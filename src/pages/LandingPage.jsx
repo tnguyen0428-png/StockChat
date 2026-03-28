@@ -4,9 +4,11 @@
 // ============================================
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 export default function LandingPage() {
+  const navigate = useNavigate();
   const [name, setName]         = useState('');
   const [email, setEmail]       = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -98,7 +100,17 @@ export default function LandingPage() {
             <span style={styles.logoGreen}>UpTik</span>
             <span style={styles.logoDark}>Alerts</span>
           </div>
-          <div style={styles.comingSoonPill}>Coming Soon</div>
+          <div style={styles.navRight}>
+            <div style={styles.comingSoonPill}>Coming Soon</div>
+            <button
+              style={styles.betaLoginBtn}
+              onClick={() => navigate('/login')}
+              onMouseEnter={e => e.currentTarget.style.color = '#1AAD5E'}
+              onMouseLeave={e => e.currentTarget.style.color = '#64748b'}
+            >
+              Beta Login
+            </button>
+          </div>
         </nav>
 
         {/* ── Hero ── */}
@@ -235,6 +247,22 @@ const styles = {
   },
   logoGreen: { color: '#1AAD5E' },
   logoDark:  { color: '#0f172a' },
+  navRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 14,
+  },
+  betaLoginBtn: {
+    background: 'none',
+    border: 'none',
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#64748b',
+    cursor: 'pointer',
+    padding: 0,
+    fontFamily: "'DM Sans', sans-serif",
+    transition: 'color 0.15s',
+  },
   comingSoonPill: {
     fontSize: 11,
     fontWeight: 600,
