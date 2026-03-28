@@ -180,16 +180,16 @@ const styles = {
     padding: '0 14px',
   },
   symbol: {
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: 700,
     color: 'var(--text1)',
   },
   price: {
-    fontSize: 12,
+    fontSize: 15,
     color: 'var(--text2)',
   },
   change: {
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: 600,
   },
   divider: {

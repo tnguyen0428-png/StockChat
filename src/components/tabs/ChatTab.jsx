@@ -464,11 +464,11 @@ const styles = {
     flexWrap: 'wrap',
   },
   msgName: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: 600,
   },
   msgTime: {
-    fontSize: 11,
+    fontSize: 12,
     color: 'var(--text3)',
   },
   adminBadge: {
@@ -494,7 +494,7 @@ const styles = {
     border: '1px solid rgba(139,92,246,0.2)',
   },
   msgText: {
-    fontSize: 14,
+    fontSize: 16,
     color: 'var(--text1)',
     lineHeight: 1.6,
     wordBreak: 'break-word',
