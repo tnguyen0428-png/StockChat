@@ -349,6 +349,9 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
           onChange={e => setInputText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Message #general... $TICKER or @AI"
+          enterKeyHint="send"
+          autoComplete="off"
+          autoCorrect="off"
         />
         <button
           style={{
