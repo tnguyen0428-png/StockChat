@@ -1,0 +1,100 @@
+/* ============================================
+   UPTIKALERTS — THEME
+   Change colors here, updates everywhere
+   ============================================ */
+
+:root {
+  /* Backgrounds */
+  --bg:         #F2F3F5;
+  --card:       #FFFFFF;
+  --card2:      #F7F8FA;
+  --border:     #E8EAED;
+
+  /* Text */
+  --text1:      #1A1A2E;
+  --text2:      #6B7280;
+  --text3:      #B0B7C3;
+
+  /* Brand */
+  --green:      #1AAD5E;
+  --green-bg:   #F0FBF5;
+  --green-border: rgba(26,173,94,0.2);
+
+  /* Signals */
+  --red:        #E05252;
+  --red-bg:     #FEF2F2;
+  --yellow:     #D4A017;
+  --yellow-bg:  #FFFBEB;
+  --blue:       #4A90D9;
+  --blue-bg:    #EFF6FF;
+
+  /* Layout */
+  --nav-h:      58px;
+  --header-h:   52px;
+  --ticker-h:   34px;
+  --radius:     10px;
+  --radius-sm:  6px;
+  --radius-lg:  20px;
+
+  /* Shadows */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.04);
+  --shadow-md:  0 2px 8px rgba(0,0,0,0.06);
+
+  /* Font */
+  --font:       'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ── GLOBAL ── */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  font-family: var(--font);
+  color: var(--text1);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 4px; background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── INPUTS ── */
+input, textarea {
+  font-family: var(--font);
+  font-size: 14px;
+  outline: none;
+  border: none;
+}
+input::placeholder, textarea::placeholder { color: var(--text3); }
+
+/* ── BUTTONS ── */
+button { cursor: pointer; font-family: var(--font); border: none; }
+button:disabled { opacity: 0.5; cursor: default; }
+
+/* ── ANIMATIONS ── */
+@keyframes pulse     { 0%,100%{opacity:1} 50%{opacity:0.3} }
+@keyframes fadeIn    { from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:translateY(0)} }
+@keyframes slideUp   { from{opacity:0; transform:translateY(20px)} to{opacity:1; transform:translateY(0)} }
+@keyframes tickerScroll { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+@keyframes spin      { to{transform:rotate(360deg)} }
+
+/* ── UTILITY ── */
+.fade-in  { animation: fadeIn 0.25s ease; }
+.slide-up { animation: slideUp 0.3s ease; }
+
+/* ── LOADING SPINNER ── */
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
