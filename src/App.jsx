@@ -11,6 +11,7 @@ import { supabase } from './lib/supabase';
 import LoginPage    from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import LandingPage   from './pages/LandingPage';
+import { GroupProvider } from './context/GroupContext';
 
 // Loading screen
 function LoadingScreen() {
@@ -91,7 +92,9 @@ export default function App() {
         path="/app"
         element={
           <ProtectedRoute session={session}>
-            <DashboardPage session={session} />
+            <GroupProvider session={session}>
+              <DashboardPage session={session} />
+            </GroupProvider>
           </ProtectedRoute>
         }
       />

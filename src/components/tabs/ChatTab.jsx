@@ -146,6 +146,14 @@ function ListsView({ group, isAdmin, isModerator }) {
       {lists.map(list => (
         <div key={list.id} style={{ marginBottom: 20 }}>
           <div style={styles.secLabel}>{list.name} · {list.curated_stocks?.length || 0} stocks</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+            {['Earnings 30%','Fundamentals 25%','Sales Growth 20%','Valuation 10%','Price Trend 10%','Market Cap 5%'].map(item => (
+              <span key={item} style={{ fontSize: 10, color: 'var(--text3)' }}>
+                <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', marginRight: 3, verticalAlign: 'middle' }} />
+                {item}
+              </span>
+            ))}
+          </div>
           {isMod && (
             <div style={styles.addRow}>
               <input
@@ -165,7 +173,11 @@ function ListsView({ group, isAdmin, isModerator }) {
               <div key={stock.id} style={{ borderBottom: '1px solid var(--border)' }}>
                 <div style={{ ...styles.listItem, cursor: 'pointer' }} onClick={() => handleExpand(stock)}>
                   <div style={{ flex: 1 }}>
-                    <span style={styles.listTicker}>{stock.ticker}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text1)', minWidth: 24 }}>#{stock.ranking}</span>
+                      <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text1)' }}>{stock.ticker}</span>
+                      <span style={{ fontSize: 10, fontWeight: 500, background: 'var(--green-bg)', color: 'var(--green)', padding: '2px 7px', borderRadius: 10, border: '1px solid rgba(26,173,94,0.2)' }}>{stock.score}</span>
+                    </div>
                     <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 6 }}>{isExpanded ? '▲' : '▼'}</span>
                   </div>
                   {isMod && (

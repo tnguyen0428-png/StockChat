@@ -1,6 +1,6 @@
 // ============================================
 // UPTIKALERTS — BottomNav.jsx
-// Bottom navigation — 4 tabs, SVG icons
+// 3 tabs: Home, Alerts, Profile
 // ============================================
 
 const HomeIcon = ({ active }) => (
@@ -17,13 +17,6 @@ const AlertsIcon = ({ active }) => (
   </svg>
 );
 
-const ChatIcon = ({ active }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2ZM20 16H6L4 18V4H20V16Z"
-      fill={active ? 'var(--green)' : 'var(--text3)'} />
-  </svg>
-);
-
 const ProfileIcon = ({ active }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z"
@@ -34,22 +27,17 @@ const ProfileIcon = ({ active }) => (
 const TABS = [
   { id: 'home',    label: 'Home',    Icon: HomeIcon    },
   { id: 'alerts',  label: 'Alerts',  Icon: AlertsIcon  },
-  { id: 'chat',    label: 'Chat',    Icon: ChatIcon    },
   { id: 'profile', label: 'Profile', Icon: ProfileIcon },
 ];
 
-export default function BottomNav({ activeTab, onTabChange, unreadAlerts, unreadChat }) {
+export default function BottomNav({ activeTab, onTabChange, unreadAlerts }) {
   return (
     <div style={styles.nav}>
       {TABS.map(({ id, label, Icon }) => {
         const isActive = activeTab === id;
-        const hasBadge = (id === 'alerts' && unreadAlerts) || (id === 'chat' && unreadChat);
+        const hasBadge = id === 'alerts' && unreadAlerts;
         return (
-          <div
-            key={id}
-            style={styles.item}
-            onClick={() => onTabChange(id)}
-          >
+          <div key={id} style={styles.item} onClick={() => onTabChange(id)}>
             <div style={styles.iconWrap}>
               <Icon active={isActive} />
               {hasBadge && <div style={styles.badge} />}
@@ -66,39 +54,23 @@ export default function BottomNav({ activeTab, onTabChange, unreadAlerts, unread
 
 const styles = {
   nav: {
-    height: 58,
-    background: 'var(--card)',
+    height: 58, background: 'var(--card)',
     borderTop: '1px solid var(--border)',
-    display: 'flex',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingBottom: 4,
-    flexShrink: 0,
-    boxShadow: '0 -1px 6px rgba(0,0,0,0.04)',
+    display: 'flex', justifyContent: 'space-around',
+    alignItems: 'center', paddingBottom: 4,
+    flexShrink: 0, boxShadow: '0 -1px 6px rgba(0,0,0,0.04)',
   },
   item: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 3,
-    cursor: 'pointer',
-    padding: '4px 14px',
-    borderRadius: 8,
+    display: 'flex', flexDirection: 'column',
+    alignItems: 'center', gap: 3, cursor: 'pointer',
+    padding: '4px 20px', borderRadius: 8,
     WebkitTapHighlightColor: 'transparent',
   },
-  iconWrap: {
-    position: 'relative',
-  },
+  iconWrap: { position: 'relative' },
   badge: {
-    position: 'absolute',
-    top: -2, right: -4,
-    width: 7, height: 7,
-    background: 'var(--red)',
-    borderRadius: '50%',
-    border: '1.5px solid var(--card)',
+    position: 'absolute', top: -2, right: -4,
+    width: 7, height: 7, background: 'var(--red)',
+    borderRadius: '50%', border: '1.5px solid var(--card)',
   },
-  label: {
-    fontSize: 10,
-    fontWeight: 500,
-  },
+  label: { fontSize: 10, fontWeight: 500 },
 };

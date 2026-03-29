@@ -54,8 +54,11 @@ const TickerBanner = memo(({ groupId }) => {
         if (!mounted) return;
 
         if (data.tickers && data.tickers.length > 0) {
+          const rankMap = {};
+          stocks.forEach(s => { rankMap[s.ticker] = s.ranking; });
           const quoteData = data.tickers.map(t => ({
             symbol: t.ticker,
+            ranking: rankMap[t.ticker] || null,
             price: t.day?.c || t.prevDay?.c || 0,
             change: t.todaysChange || 0,
             changePercent: t.todaysChangePerc || 0,
@@ -109,6 +112,7 @@ const TickerBanner = memo(({ groupId }) => {
           const isUp = q.change >= 0;
           return (
             <div key={`${q.symbol}-${i}`} style={styles.quoteItem}>
+              {q.ranking && <span style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, marginRight: 2 }}>#{q.ranking}</span>}
               <span style={styles.symbol}>{q.symbol}</span>
               <span style={styles.price}>${q.price.toFixed(2)}</span>
               <span style={{ ...styles.change, color: isUp ? 'var(--green)' : '#EF4444' }}>
