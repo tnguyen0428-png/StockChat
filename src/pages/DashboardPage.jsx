@@ -11,18 +11,21 @@ import { supabase } from '../lib/supabase';
 import HomeTab    from '../components/tabs/HomeTab';
 import AlertsTab  from '../components/tabs/AlertsTab';
 import ChatTab    from '../components/tabs/ChatTab';
-import ListsTab   from '../components/tabs/ListsTab';
+
 import ProfileTab from '../components/tabs/ProfileTab';
 
 // Shared components
 import Header     from '../components/shared/Header';
 import BottomNav  from '../components/shared/BottomNav';
 
+const LS_KEY = 'uptik_selected_group';
+
 export default function DashboardPage({ session }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('home');
   const [profile, setProfile] = useState(null);
   const [group, setGroup] = useState(null);
+  const [allGroups, setAllGroups] = useState([]);
   const [activeBroadcast, setActiveBroadcast] = useState(null);
   const [unreadAlerts, setUnreadAlerts] = useState(false);
   const [unreadChat, setUnreadChat] = useState(false);
@@ -43,14 +46,31 @@ export default function DashboardPage({ session }) {
 
       if (data) {
         setProfile(data);
-        if (data.group_members?.[0]?.groups) {
-          setGroup(data.group_members[0].groups);
+
+        const groups = (data.group_members || [])
+          .map(gm => gm.groups)
+          .filter(Boolean);
+        setAllGroups(groups);
+
+        if (groups.length) {
+          const savedId = localStorage.getItem(LS_KEY);
+          const saved   = savedId ? groups.find(g => g.id === savedId) : null;
+          const active  = saved || groups[0];
+          setGroup(active);
+          localStorage.setItem(LS_KEY, active.id);
         }
       }
     };
 
     loadProfile();
   }, [session]);
+
+  // Switch active group (called from Header group switcher)
+  const switchGroup = (g) => {
+    setGroup(g);
+    setActiveBroadcast(null);
+    localStorage.setItem(LS_KEY, g.id);
+  };
 
   // Listen for broadcasts + fetch recent one on load
   useEffect(() => {
@@ -114,8 +134,9 @@ export default function DashboardPage({ session }) {
     navigate('/login');
   };
 
-  const isAdmin    = profile?.is_admin || false;
-  const isModerator = profile?.group_members?.[0]?.role === 'moderator';
+  const isAdmin     = profile?.is_admin || false;
+  // Check moderator role against the active group specifically
+  const isModerator = profile?.group_members?.find(gm => gm.group_id === group?.id)?.role === 'moderator';
 
   return (
     <div style={styles.page}>
@@ -125,6 +146,11 @@ export default function DashboardPage({ session }) {
         group={group}
         profile={profile}
         isAdmin={isAdmin}
+        isModerator={isModerator}
+        activeTab={activeTab}
+        allGroups={allGroups}
+        onGroupSwitch={switchGroup}
+        onGroupNameUpdate={(newName) => setGroup(prev => ({ ...prev, name: newName }))}
         onSignOut={handleSignOut}
       />
 
@@ -182,10 +208,29 @@ export default function DashboardPage({ session }) {
 
       {/* Tab Content */}
       <div style={styles.content}>
-        {activeTab === 'home'    && <HomeTab session={session} profile={profile} group={group} isAdmin={isAdmin} />}
+        {activeTab === 'home' && (
+  <HomeTab
+    session={session}
+    profile={profile}
+    allGroups={allGroups}
+    isAdmin={isAdmin}
+    onGroupSelect={(g, tab) => { switchGroup(g); setActiveTab(tab); }}
+    onGroupsRefresh={async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*, group_members(*, groups(*))')
+        .eq('id', session.user.id)
+        .maybeSingle();
+      if (data) {
+        const groups = (data.group_members || []).map(gm => gm.groups).filter(Boolean);
+        setAllGroups(groups);
+      }
+    }}
+  />
+)}
         {activeTab === 'alerts'  && <AlertsTab session={session} group={group} />}
         {activeTab === 'chat'    && <ChatTab session={session} profile={profile} group={group} isAdmin={isAdmin} isModerator={isModerator} setUnreadChat={setUnreadChat} />}
-        {activeTab === 'lists'   && <ListsTab session={session} profile={profile} group={group} isAdmin={isAdmin} />}
+        
         {activeTab === 'profile' && <ProfileTab session={session} profile={profile} group={group} isAdmin={isAdmin} onSignOut={handleSignOut} />}
       </div>
 

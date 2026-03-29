@@ -39,13 +39,6 @@ const MessageItem = memo(({ msg, currentUserId }) => {
 
   return (
     <div style={styles.msg}>
-      <div style={{
-        ...styles.avatar,
-        color: msg.user_color || '#1AAD5E',
-        borderColor: (msg.user_color || '#1AAD5E') + '40',
-      }}>
-        {isAI ? 'AI' : (msg.username?.[0] || '?').toUpperCase()}
-      </div>
       <div style={bodyStyle}>
         <div style={styles.msgTop}>
           <span style={{ ...styles.msgName, color: isAI ? '#8B5CF6' : (msg.user_color || '#1AAD5E') }}>
@@ -424,22 +417,7 @@ const styles = {
     WebkitOverflowScrolling: 'touch',
   },
   msg: {
-    display: 'flex',
-    gap: 9,
     padding: '5px 0',
-  },
-  avatar: {
-    width: 36, height: 36,
-    borderRadius: '50%',
-    background: 'var(--card2)',
-    border: '1px solid',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 13,
-    fontWeight: 600,
-    flexShrink: 0,
-    marginTop: 2,
   },
   msgBody: {
     flex: 1,
