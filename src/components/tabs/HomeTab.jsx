@@ -13,14 +13,15 @@ const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
 export default function HomeTab({ session, onGroupSelect }) {
   const { publicGroups, privateGroup, activeGroup } = useGroup();
 
-  const [briefing, setBriefing]     = useState(null);
-  const [marketPulse, setMarketPulse] = useState({});
-  const [movers, setMovers]         = useState({ gainers: [], losers: [] });
-  const [moversTab, setMoversTab]   = useState('gainers');
+  const [briefing, setBriefing]           = useState(null);
+  const [marketPulse, setMarketPulse]     = useState({});
+  const [marketIndicators, setMarketIndicators] = useState([]);
+  const [movers, setMovers]               = useState({ gainers: [], losers: [] });
+  const [moversTab, setMoversTab]         = useState('gainers');
 
   useEffect(() => {
     loadBriefing();
-    loadMarketPulse();
+    loadMarketIndicators();
     loadMovers();
   }, []);
 
@@ -34,20 +35,39 @@ export default function HomeTab({ session, onGroupSelect }) {
     if (data) setBriefing(data);
   };
 
-  const loadMarketPulse = async () => {
+  const loadMarketIndicators = async () => {
+    const { data } = await supabase
+      .from('market_indicators')
+      .select('*')
+      .order('position', { ascending: true });
+    if (data) {
+      setMarketIndicators(data);
+      await loadMarketPulse(data);
+    }
+  };
+
+  const loadMarketPulse = async (indicators = marketIndicators) => {
     try {
-      const tickers = ['SPY', 'QQQ', 'DIA', 'VIXY'];
+      const tickers = indicators.map(m => m.ticker);
+      if (tickers.length === 0) return;
       const res = await fetch(
         `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickers.join(',')}&apiKey=${POLYGON_KEY}`
       );
       const data = await res.json();
-      if (data.tickers) {
-        const pulse = {};
-        data.tickers.forEach(t => {
-          pulse[t.ticker] = { price: t.day?.c || t.prevDay?.c, change: t.todaysChangePerc };
-        });
-        setMarketPulse(pulse);
-      }
+      const pulse = {};
+      (data.tickers || []).forEach(t => {
+        pulse[t.ticker] = { price: t.day?.c || t.prevDay?.c, change: t.todaysChangePerc };
+      });
+      const missing = tickers.filter(t => !pulse[t]);
+      await Promise.all(missing.map(async (ticker) => {
+        try {
+          const r = await fetch(`https://api.polygon.io/v2/aggs/ticker/${ticker}/prev?adjusted=true&apiKey=${POLYGON_KEY}`);
+          const d = await r.json();
+          const result = d.results?.[0];
+          if (result) pulse[ticker] = { price: result.c, change: ((result.c - result.o) / result.o) * 100 };
+        } catch {}
+      }));
+      setMarketPulse(pulse);
     } catch {}
   };
 
@@ -59,46 +79,90 @@ export default function HomeTab({ session, onGroupSelect }) {
       ]);
       const gainData = await gainRes.json();
       const loseData = await loseRes.json();
-      setMovers({
-        gainers: (gainData.tickers || []).slice(0, 5),
-        losers:  (loseData.tickers  || []).slice(0, 5),
-      });
+
+      const gainers = (gainData.tickers || []).slice(0, 5);
+      const losers  = (loseData.tickers  || []).slice(0, 5);
+
+      // If market is closed, fall back to previous day data
+      if (gainers.length === 0) {
+        const getLastTradingDay = () => {
+          const d = new Date();
+          d.setHours(0, 0, 0, 0);
+          if (d.getDay() === 0) d.setDate(d.getDate() - 2); // Sunday
+          if (d.getDay() === 6) d.setDate(d.getDate() - 1); // Saturday
+          const now = new Date();
+          const estHour = now.getUTCHours() - 5;
+          if (estHour < 9 || (estHour === 9 && now.getUTCMinutes() < 30)) {
+            d.setDate(d.getDate() - 1);
+            if (d.getDay() === 0) d.setDate(d.getDate() - 2);
+            if (d.getDay() === 6) d.setDate(d.getDate() - 1);
+          }
+          return d.toISOString().split('T')[0];
+        };
+        const prevRes = await fetch(
+          `https://api.polygon.io/v2/aggs/grouped/locale/us/market/stocks/${getLastTradingDay()}?adjusted=true&apiKey=${POLYGON_KEY}`
+        );
+        const prevData = await prevRes.json();
+        const results = (prevData.results || [])
+          .filter(r => r.v > 1000000)
+          .map(r => ({
+            ticker: r.T,
+            day: { c: r.c },
+            todaysChangePerc: ((r.c - r.o) / r.o) * 100,
+          }))
+          .sort((a, b) => b.todaysChangePerc - a.todaysChangePerc);
+
+        setMovers({
+          gainers: results.slice(0, 5),
+          losers:  results.slice(-5).reverse(),
+        });
+        return;
+      }
+
+      setMovers({ gainers, losers });
     } catch {}
   };
 
   const fmt = (p) => p != null ? `$${Number(p).toFixed(2)}` : '--';
   const fmtPct = (p) => p != null ? `${p > 0 ? '+' : ''}${Number(p).toFixed(1)}%` : '--';
 
-  const pulseItems = [
-    { label: 'S&P 500', key: 'SPY'  },
-    { label: 'Nasdaq',  key: 'QQQ'  },
-    { label: 'Dow',     key: 'DIA'  },
-    { label: 'VIX',     key: 'VIXY' },
-  ];
+  const pulseItems = marketIndicators.length > 0
+    ? marketIndicators.map(m => ({ label: m.label, key: m.ticker }))
+    : [{ label: 'S&P 500', key: 'SPY' }, { label: 'Nasdaq', key: 'QQQ' }, { label: 'Dow', key: 'DIA' }, { label: 'VIX', key: 'VIXY' }];
 
   const moversData = movers[moversTab] || [];
 
   return (
     <div style={styles.scroll}>
 
-      {/* DAILY BRIEFING */}
-      <div style={styles.secLabel}>Daily Briefing</div>
-      {briefing ? (
-        <div style={styles.briefingCard}>
-          <div style={styles.briefingTag}>Pre-market</div>
-          <div style={styles.briefingText}>{briefing.content}</div>
-          <div style={styles.briefingMeta}>
-            Updated {new Date(briefing.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} EST
-          </div>
+      {/* MARKET PULSE */}
+      <div style={styles.secLabel}>Market Pulse</div>
+      <div style={{ overflow: 'hidden', background: 'var(--card)', borderBottom: '1px solid var(--border)', height: 36, display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+        <style>{`@keyframes pulseScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }`}</style>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap',
+          animation: `pulseScroll ${pulseItems.length * 5}s linear infinite`,
+        }}>
+          {[...pulseItems, ...pulseItems].map((item, i) => {
+            const d = marketPulse[item.key];
+            const chg = d?.change;
+            const up = chg > 0;
+            return (
+              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 18px' }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)' }}>{item.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text1)' }}>{d ? `$${Number(d.price).toFixed(2)}` : '--'}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: chg == null ? 'var(--text3)' : up ? 'var(--green)' : 'var(--red)' }}>
+                  {d ? `${up ? '▲' : '▼'} ${Math.abs(chg).toFixed(2)}%` : '--'}
+                </span>
+                <span style={{ color: 'var(--border)', fontSize: 12 }}>│</span>
+              </span>
+            );
+          })}
         </div>
-      ) : (
-        <div style={styles.emptyCard}>
-          <span style={styles.emptyText}>No briefing posted yet today</span>
-        </div>
-      )}
+      </div>
 
-      {/* SECTORS */}
-      <div style={styles.secLabel}>Sectors</div>
+      {/* SECTOR GROUP CHAT */}
+      <div style={styles.secLabel}>Sector Group Chat</div>
       <div style={styles.pillRow}>
         {publicGroups.map(group => {
           const isActive = activeGroup?.id === group.id;
@@ -114,8 +178,8 @@ export default function HomeTab({ session, onGroupSelect }) {
         })}
       </div>
 
-      {/* PRIVATE GROUP */}
-      <div style={styles.secLabel}>Private Group</div>
+      {/* PRIVATE GROUP CHAT */}
+      <div style={styles.secLabel}>Private Group Chat</div>
       {privateGroup ? (
         <div
           style={{ ...styles.privateBtn, ...(activeGroup?.id === privateGroup.id ? styles.privateBtnActive : {}) }}
@@ -132,56 +196,47 @@ export default function HomeTab({ session, onGroupSelect }) {
         </div>
       )}
 
-      {/* MARKET PULSE */}
-      <div style={styles.secLabel}>Market Pulse</div>
-      <div style={styles.pulseGrid}>
-        {pulseItems.map(item => {
-          const d = marketPulse[item.key];
-          const chg = d?.change;
-          const up = chg > 0;
-          return (
-            <div key={item.key} style={styles.pulseCard}>
-              <div style={styles.pulseLabel}>{item.label}</div>
-              <div style={styles.pulseVal}>{d ? fmt(d.price) : '--'}</div>
-              <div style={{ ...styles.pulseChg, color: chg == null ? 'var(--text3)' : up ? 'var(--green)' : 'var(--red)' }}>
-                {d ? fmtPct(chg) : '--'}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {/* DAILY BRIEFING */}
+      <div style={styles.secLabel}>Daily Briefing</div>
+      {briefing ? (
+        <div style={styles.briefingCard}>
+<div style={styles.briefingText}>
+            {briefing.content.split('\n').map((line, i) => (
+              <div key={i} style={{ marginBottom: line ? 6 : 0 }}>{line}</div>
+            ))}
+          </div>
+          <div style={styles.briefingMeta}>
+            Updated {new Date(briefing.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} EST
+          </div>
+        </div>
+      ) : (
+        <div style={styles.emptyCard}>
+          <span style={styles.emptyText}>No briefing posted yet today</span>
+        </div>
+      )}
 
       {/* TOP MOVERS */}
       <div style={styles.secLabel}>Top Movers</div>
-      <div style={styles.moversCard}>
-        <div style={styles.tabRow}>
-          {[{ id: 'gainers', label: 'Gainers' }, { id: 'losers', label: 'Losers' }].map(t => (
-            <div
-              key={t.id}
-              style={{ ...styles.tab, ...(moversTab === t.id ? styles.tabActive : {}) }}
-              onClick={() => setMoversTab(t.id)}
-            >
-              {t.label}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {movers.gainers.slice(0, 3).map((m, i) => {
+          const chg = m.todaysChangePerc;
+          return (
+            <div key={`g${i}`} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: 'var(--card2)', border: '1px solid var(--border)' }}>
+              <span style={{ fontWeight: 600, color: 'var(--text1)' }}>{m.ticker}</span>
+              {' '}<span style={{ color: 'var(--green)' }}>+{chg?.toFixed(1)}%</span>
             </div>
-          ))}
-        </div>
-        {moversData.length === 0 ? (
-          <div style={styles.emptyText}>Loading...</div>
-        ) : (
-          moversData.map((m, i) => {
-            const chg = m.todaysChangePerc;
-            const up = chg >= 0;
-            return (
-              <div key={i} style={{ ...styles.moverRow, borderBottom: i < moversData.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                <div style={styles.moverTicker}>{m.ticker}</div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={styles.moverPrice}>{fmt(m.day?.c)}</div>
-                  <div style={{ ...styles.moverPct, color: up ? 'var(--green)' : 'var(--red)' }}>{fmtPct(chg)}</div>
-                </div>
-              </div>
-            );
-          })
-        )}
+          );
+        })}
+        <span style={{ color: 'var(--border)', fontSize: 12, alignSelf: 'center' }}>│</span>
+        {movers.losers.slice(0, 2).map((m, i) => {
+          const chg = m.todaysChangePerc;
+          return (
+            <div key={`l${i}`} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: 'var(--card2)', border: '1px solid var(--border)' }}>
+              <span style={{ fontWeight: 600, color: 'var(--text1)' }}>{m.ticker}</span>
+              {' '}<span style={{ color: 'var(--red)' }}>{chg?.toFixed(1)}%</span>
+            </div>
+          );
+        })}
       </div>
 
       <div style={{ height: 24 }} />
@@ -201,11 +256,6 @@ const styles = {
   pillActive: { background: 'var(--card2)', color: 'var(--text1)', borderColor: 'var(--text3)' },
   privateBtn: { width: '100%', background: '#EAF3DE', color: '#27500A', border: '0.5px solid #97C459', borderRadius: 10, padding: '11px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 },
   privateBtnActive: { background: '#C0DD97', borderColor: '#3B6D11' },
-  pulseGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 4 },
-  pulseCard: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 6px' },
-  pulseLabel: { fontSize: 9, color: 'var(--text3)', marginBottom: 2 },
-  pulseVal: { fontSize: 12, fontWeight: 600, color: 'var(--text1)' },
-  pulseChg: { fontSize: 10 },
   moversCard: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '0 14px 14px', marginBottom: 8 },
   tabRow: { display: 'flex', gap: 14, borderBottom: '1px solid var(--border)', marginBottom: 10, marginLeft: -14, marginRight: -14, paddingLeft: 14 },
   tab: { fontSize: 11, padding: '9px 0', color: 'var(--text3)', borderBottom: '2px solid transparent', cursor: 'pointer' },
