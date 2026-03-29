@@ -37,12 +37,19 @@ function AdminPanel({ session, profile }) {
   const [screenerResults, setScreenerResults]   = useState([]);
   const [screenerSaved, setScreenerSaved]       = useState(false);
 
+  // News Scanner state
+  const [newsItems, setNewsItems]       = useState([]);
+  const [newsLoading, setNewsLoading]   = useState(false);
+  const [selectedNews, setSelectedNews] = useState([]);
+  const [postingNews, setPostingNews]   = useState(false);
+
   useEffect(() => {
     if (activeSection === 'groups')   loadGroups();
     if (activeSection === 'users')    loadUsers();
     if (activeSection === 'briefing') loadGroups();
     if (activeSection === 'lists')    loadGroups();
     if (activeSection === 'screener') loadGroups();
+    if (activeSection === 'news')     fetchNews();
   }, [activeSection]);
 
   const loadGroups = async () => {
@@ -139,7 +146,35 @@ function AdminPanel({ session, profile }) {
     alert(`Saved top 15 ${screenerSector} stocks!`);
   };
 
+  const fetchNews = async () => {
+    setNewsLoading(true);
+    setSelectedNews([]);
+    try {
+      const res = await fetch(`https://api.polygon.io/v2/reference/news?limit=20&apiKey=${import.meta.env.VITE_POLYGON_API_KEY}`);
+      const data = await res.json();
+      setNewsItems(data.results || []);
+    } catch {}
+    setNewsLoading(false);
+  };
+
+  const postNewsBriefing = async () => {
+    if (!selectedNews.length || postingNews) return;
+    setPostingNews(true);
+    const content = selectedNews
+      .map(id => {
+        const item = newsItems.find(n => n.id === id);
+        return item ? `• ${item.title} (${item.tickers?.slice(0,3).join(', ')})` : '';
+      })
+      .filter(Boolean)
+      .join('\n');
+    await supabase.from('daily_briefings').insert({ content, mood: 'neutral', tags: [] });
+    setSelectedNews([]);
+    setPostingNews(false);
+    alert('Briefing posted!');
+  };
+
   const sections = [
+    { id: 'news',     label: 'News Scanner'  },
     { id: 'screener', label: 'Run Screener'  },
     { id: 'briefing', label: 'Post Briefing' },
     { id: 'lists',    label: 'Curated Lists' },
@@ -251,6 +286,35 @@ function AdminPanel({ session, profile }) {
                     <button style={adminStyles.removeBtn} onClick={() => deleteGroup(g.id)}>Delete</button>
                   </div>
                 ))}
+              </div>
+            ) : s.id === 'news' ? (
+              <div style={adminStyles.body}>
+                <button style={{ ...adminStyles.btn, width: '100%', marginTop: 10, opacity: newsLoading ? 0.6 : 1 }} onClick={fetchNews} disabled={newsLoading}>
+                  {newsLoading ? 'Loading...' : 'Refresh News'}
+                </button>
+                <div style={{ maxHeight: 400, overflowY: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 8 }}>
+                  {newsItems.map(item => (
+                    <div key={item.id}
+                      style={{ ...adminStyles.listRow, background: selectedNews.includes(item.id) ? 'var(--green-bg)' : 'transparent', borderRadius: 8, padding: '10px 8px', cursor: 'pointer' }}
+                      onClick={() => setSelectedNews(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text1)', lineHeight: 1.4 }}>{item.title}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3 }}>
+                          {item.tickers?.slice(0,5).join(', ')} · {new Date(item.published_utc).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                        </div>
+                      </div>
+                      <div style={{ width: 18, height: 18, borderRadius: 4, flexShrink: 0, background: selectedNews.includes(item.id) ? 'var(--green)' : 'var(--card2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {selectedNews.includes(item.id) && <span style={{ color: '#fff', fontSize: 12 }}>✓</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {selectedNews.length > 0 && (
+                  <button style={{ ...adminStyles.btn, width: '100%', marginTop: 10, opacity: postingNews ? 0.6 : 1 }} onClick={postNewsBriefing} disabled={postingNews}>
+                    {postingNews ? 'Posting...' : `Post ${selectedNews.length} article${selectedNews.length > 1 ? 's' : ''} as briefing`}
+                  </button>
+                )}
               </div>
             ) : s.id === 'users' ? (
               <div style={adminStyles.body}>
