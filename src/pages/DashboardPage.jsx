@@ -93,8 +93,8 @@ export default function DashboardPage({ session }) {
     const handleChatTab = async () => {
       if (activeTab === 'chat') {
         if (!activeGroup) {
-          const uptikChat = publicGroups.find(g => g.name === 'UpTik Chat');
-          if (uptikChat) enterGroup(uptikChat);
+          const uptikPublic = publicGroups.find(g => g.name === 'UpTik Public');
+          if (uptikPublic) enterGroup(uptikPublic);
         }
       }
     };
