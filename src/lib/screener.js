@@ -4,8 +4,6 @@
 // Scores S&P 500 + Nasdaq 100 by 6 parameters
 // ============================================
 
-import { supabase } from './supabase';
-
 const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 const BASE    = 'https://financialmodelingprep.com/stable';
 
@@ -189,16 +187,18 @@ function generateThesis(symbol, profile, ratios, beatRate, epsGrowth, salesGrowt
 
 // ── Run full screener for a sector ──
 export async function runScreener(sector, onProgress) {
-  const { data: tickerRows } = await supabase
-    .from('sector_tickers')
-    .select('ticker')
-    .eq('sector_name', sector);
+  const tickers = SECTOR_MAP[sector] || [];
 
-  const tickers = tickerRows?.map(r => r.ticker) || SECTOR_MAP[sector] || [];
+  if (tickers.length === 0) {
+    console.log('No tickers found for sector:', sector);
+    return [];
+  }
+
+  console.log('Running screener for', sector, 'with', tickers.length, 'tickers');
+
   const results = [];
   let processed = 0;
 
-  // Process in batches of 5 to avoid rate limits
   const batchSize = 5;
   for (let i = 0; i < tickers.length; i += batchSize) {
     const batch = tickers.slice(i, i + batchSize);
@@ -206,13 +206,13 @@ export async function runScreener(sector, onProgress) {
     scores.forEach(s => { if (s) results.push(s); });
     processed += batch.length;
     onProgress?.(Math.round((processed / tickers.length) * 100));
-    // Small delay between batches
     if (i + batchSize < tickers.length) {
       await new Promise(r => setTimeout(r, 300));
     }
   }
 
-  // Sort by score descending, return top 15
+  console.log('Screener complete:', results.length, 'results');
+
   return results
     .sort((a, b) => b.score - a.score)
     .slice(0, 15);
