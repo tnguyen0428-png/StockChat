@@ -3,7 +3,7 @@
 // User profile, settings, and admin panel
 // ============================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { runScreener, SECTOR_MAP } from '../../lib/screener';
 
@@ -30,6 +30,7 @@ function AdminPanel({ session, profile }) {
   const [listName, setListName]           = useState('');
 
   // Screener state
+  const screenerGroupRef = useRef(null);
   const [screenerSector, setScreenerSector]     = useState('Tech');
   const [screenerGroup, setScreenerGroup]       = useState('');
   const [screenerRunning, setScreenerRunning]   = useState(false);
@@ -110,12 +111,15 @@ function AdminPanel({ session, profile }) {
   const handleRunScreener = async () => {
     const matchingGroup = groups.find(g => g.name === screenerSector);
     if (!matchingGroup) { alert(`No group found for ${screenerSector}. Please create it first.`); return; }
-    setScreenerGroup(matchingGroup.id);
+    const groupId = matchingGroup.id;
+    screenerGroupRef.current = groupId;
+    setScreenerGroup(groupId);
     setScreenerRunning(true); setScreenerProgress(0);
     setScreenerResults([]); setScreenerSaved(false);
     try {
       const results = await runScreener(screenerSector, (pct) => setScreenerProgress(pct));
       setScreenerResults(results);
+      console.log('Screener results:', results.length, 'Group ID:', groupId);
     } catch (e) {
       alert('Screener error: ' + e.message);
     } finally {
@@ -123,9 +127,10 @@ function AdminPanel({ session, profile }) {
     }
   };
 
-  const handleSaveResults = async (groupId = screenerGroup) => {
+  const handleSaveResults = async () => {
+    const groupId = screenerGroupRef.current || screenerGroup;
     console.log('Saving to group:', groupId, 'sector:', screenerSector, 'results:', screenerResults.length);
-    if (!screenerResults.length || !groupId) return;
+    if (!screenerResults.length || !groupId) { alert('No group selected.'); return; }
     let { data: list } = await supabase
       .from('curated_lists').select('*')
       .eq('group_id', groupId).eq('name', `Top 15 ${screenerSector}`).maybeSingle();
