@@ -301,6 +301,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const [inputText, setInputText]   = useState('');
   const [showEmoji, setShowEmoji]   = useState(false);
   const [aiLoading, setAiLoading]   = useState(false);
+  const [aiMode, setAiMode]         = useState(false);
   const [loading, setLoading]       = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef       = useRef(null);
@@ -360,7 +361,30 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 1000,
-          system: 'You are a helpful stock trading assistant for UpTikAlerts. Help users with stock analysis, trading strategies, market questions, and how to use the app. Be concise and clear.',
+          system: `You are UpTik AI for UpTikAlerts — a stock research assistant focused purely on fundamentals and long-term business quality.
+
+RESPONSE LENGTH — CRITICAL:
+Default: 2-3 sentences maximum. Only expand if user says "more", "explain", "details", "why", or "break it down". Never volunteer extra information unprompted.
+
+TONE:
+Write like a Bloomberg terminal alert — short, punchy, data first. One key insight per response. End with a question to keep the conversation going.
+
+CONTENT:
+Only discuss: earnings growth, revenue trends, gross margins, P/E ratio, debt levels, competitive moat, business quality. Never discuss short-term price movement, momentum, hype, or speculation. Never say buy or sell — say "worth researching" or "warrants caution". If someone mentions losing money, briefly acknowledge before redirecting to fundamentals.
+
+FORMAT:
+Plain conversational sentences only. No lists, no headers, no bold, no bullet points, no markdown of any kind. Short paragraphs only.
+
+APP KNOWLEDGE:
+UpTikAlerts has: sector group chats (Tech, Healthcare, Finance, Energy, Industrial, Consumer, Communication, Biotech), Daily Briefing, Curated Stock Lists scored by Earnings 30% / Fundamentals 25% / Sales Growth 20% / Valuation 10% / Price Trend 10% / Market Cap 5%, Breakout Alerts, Watchlist, Private Group Chat, and UpTik AI (that is you). For real-time prices point users to the Market Pulse strip on the Home screen.
+
+EXAMPLE PERFECT RESPONSE:
+User: "Tell me about NVDA"
+You: "NVDA's earnings grew 265% last year driven by AI chip demand with gross margins at 74% — exceptional for hardware. The valuation is premium at 35x forward earnings but pricing power justifies it. Want the full breakdown?"
+
+EXAMPLE DETAIL RESPONSE:
+User: "Yes tell me more"
+You: "Supply constraints are keeping margins elevated through at least 2026 based on customer agreements. The main risk is if AI infrastructure spending slows — watch hyperscaler capex guidance each quarter."`,
           messages: [{ role: 'user', content: query }],
         }),
       });
@@ -368,13 +392,13 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
       const text = data.content?.[0]?.text || 'Unable to analyze right now.';
       await supabase.from('chat_messages').insert({
         group_id: group.id, user_id: 'user_ai',
-        username: 'AI Assistant', user_color: '#8B5CF6',
+        username: 'UpTik AI', user_color: '#8B5CF6',
         text, type: 'ai', is_admin: false,
       });
     } catch {
       await supabase.from('chat_messages').insert({
         group_id: group.id, user_id: 'user_ai',
-        username: 'AI Assistant', user_color: '#8B5CF6',
+        username: 'UpTik AI', user_color: '#8B5CF6',
         text: 'AI unavailable right now. Try again shortly.',
         type: 'ai', is_admin: false,
       });
@@ -384,10 +408,11 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   }, [group?.id]);
 
   const handleSend = useCallback(async () => {
-    const text = inputText.trim();
-    if (!text || !profile || !group) return;
+    const text = aiMode ? `@AI ${inputText.trim()}` : inputText.trim();
+    if (!inputText.trim() || !profile || !group) return;
     setInputText('');
     setShowEmoji(false);
+    setAiMode(false);
     inputRef.current?.blur();
     const { data, error } = await supabase.from('chat_messages').insert({
       group_id: group.id, user_id: session.user.id,
@@ -399,7 +424,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
       const query = text.replace(/@AI\b/gi, '').trim() || text;
       await callAI(query);
     }
-  }, [inputText, profile, group, isAdmin, callAI, session]);
+  }, [inputText, aiMode, profile, group, isAdmin, callAI, session]);
 
   const sendBroadcast = async () => {
     if (!broadcastText.trim() || sendingBroadcast) return;
@@ -510,18 +535,31 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
             {(isAdmin || isModerator) && (
               <button style={styles.broadcastBtn} onClick={() => setShowBroadcastModal(true)}>BC</button>
             )}
-            <button style={styles.emojiToggle} onClick={() => setShowEmoji(prev => !prev)}>😊</button>
             <input
               ref={inputRef}
-              style={styles.input}
+              style={{ ...styles.input, borderColor: aiMode ? '#8B5CF6' : 'var(--border)' }}
               value={inputText}
               onChange={e => setInputText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Message... $TICKER or @AI"
+              placeholder={aiMode ? 'Ask UpTik AI...' : 'Message... $TICKER or @AI'}
               enterKeyHint="send"
               autoComplete="off"
               autoCorrect="off"
             />
+            <button
+              style={{
+                background: aiMode ? 'linear-gradient(135deg, #8B5CF6, #6D28D9)' : 'var(--card2)',
+                border: aiMode ? 'none' : '1px solid var(--border)',
+                borderRadius: 8, padding: '5px 9px',
+                fontSize: 11, fontWeight: 700,
+                color: aiMode ? '#fff' : 'var(--text3)',
+                cursor: 'pointer', flexShrink: 0, lineHeight: 1,
+                transition: 'all 0.15s',
+              }}
+              onClick={() => { setAiMode(prev => !prev); inputRef.current?.focus(); }}
+            >
+              AI
+            </button>
             <button
               style={{ ...styles.sendBtn, opacity: inputText.trim() ? 1 : 0.4 }}
               onClick={handleSend}
