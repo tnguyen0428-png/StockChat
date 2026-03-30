@@ -10,7 +10,7 @@ import { useGroup } from '../../context/GroupContext';
 
 const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
 
-export default function HomeTab({ session, onGroupSelect }) {
+export default function HomeTab({ session, onGroupSelect, onAIPress }) {
   const { publicGroups, privateGroup, activeGroup } = useGroup();
 
   const [briefing, setBriefing]                 = useState(null);
@@ -278,6 +278,18 @@ export default function HomeTab({ session, onGroupSelect }) {
           <span style={styles.emptyText}>No briefing posted yet today</span>
         </div>
       )}
+
+      {/* UPTIK AI BUTTON */}
+      <div
+        onClick={() => onAIPress?.()}
+        style={{ background: '#F5F3FF', border: '1.5px solid rgba(139,92,246,0.35)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginTop: 14, marginBottom: 4, marginLeft: 12, marginRight: 12 }}
+      >
+        <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0 }}>AI</div>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#6D28D9' }}>Ask UpTik AI</div>
+          <div style={{ fontSize: 11, color: 'rgba(109,40,217,0.6)', marginTop: 2 }}>Fundamentals · Long-term · No hype</div>
+        </div>
+      </div>
 
       <div style={{ height: 24 }} />
     </div>

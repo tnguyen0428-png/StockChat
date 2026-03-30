@@ -14,6 +14,7 @@ import AlertsTab  from '../components/tabs/AlertsTab';
 import ChatTab    from '../components/tabs/ChatTab';
 import ProfileTab from '../components/tabs/ProfileTab';
 import HelpTab    from '../components/tabs/HelpTab';
+import AITab      from '../components/tabs/AITab';
 
 // Shared components
 import Header     from '../components/shared/Header';
@@ -174,8 +175,10 @@ export default function DashboardPage({ session }) {
           <HomeTab
             session={session}
             onGroupSelect={handleGroupSelect}
+            onAIPress={() => setActiveTab('ai')}
           />
         )}
+        {activeTab === 'ai' && <AITab session={session} />}
         {activeTab === 'alerts' && (
           <AlertsTab session={session} group={activeGroup} />
         )}
