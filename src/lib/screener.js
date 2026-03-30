@@ -4,6 +4,8 @@
 // Scores S&P 500 + Nasdaq 100 by 6 parameters
 // ============================================
 
+import { supabase } from './supabase';
+
 const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 const BASE    = 'https://financialmodelingprep.com/stable';
 
@@ -187,7 +189,12 @@ function generateThesis(symbol, profile, ratios, beatRate, epsGrowth, salesGrowt
 
 // ── Run full screener for a sector ──
 export async function runScreener(sector, onProgress) {
-  const tickers = SECTOR_MAP[sector] || [];
+  const { data: tickerRows } = await supabase
+    .from('sector_tickers')
+    .select('ticker')
+    .eq('sector_name', sector);
+
+  const tickers = tickerRows?.map(r => r.ticker) || SECTOR_MAP[sector] || [];
   const results = [];
   let processed = 0;
 

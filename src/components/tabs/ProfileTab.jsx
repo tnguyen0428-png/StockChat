@@ -123,14 +123,15 @@ function AdminPanel({ session, profile }) {
     }
   };
 
-  const handleSaveResults = async () => {
-    if (!screenerResults.length || !screenerGroup) return;
+  const handleSaveResults = async (groupId = screenerGroup) => {
+    console.log('Saving to group:', groupId, 'sector:', screenerSector, 'results:', screenerResults.length);
+    if (!screenerResults.length || !groupId) return;
     let { data: list } = await supabase
       .from('curated_lists').select('*')
-      .eq('group_id', screenerGroup).eq('name', `Top 15 ${screenerSector}`).maybeSingle();
+      .eq('group_id', groupId).eq('name', `Top 15 ${screenerSector}`).maybeSingle();
     if (!list) {
       const { data: newList } = await supabase
-        .from('curated_lists').insert({ group_id: screenerGroup, name: `Top 15 ${screenerSector}`, sector: screenerSector })
+        .from('curated_lists').insert({ group_id: groupId, name: `Top 15 ${screenerSector}`, sector: screenerSector })
         .select().single();
       list = newList;
     }
