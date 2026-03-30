@@ -151,14 +151,17 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
     <div style={styles.header}>
       <div style={{ cursor: 'pointer' }} onClick={() => onHomePress?.()}>
         <div style={styles.logoRow}>
-          <span style={styles.logoUp}>UpTik</span>
+          <span style={styles.logoUp}>Up</span>
+          <span style={styles.logoTik}>Tik</span>
           <span style={styles.logoAlerts}>Alerts</span>
         </div>
         <div style={styles.slogan}>Trade smarter, together</div>
       </div>
       <div ref={avatarRef} style={{ position: 'relative' }}>
         <div style={styles.avatar} onClick={() => setShowAvatarMenu(prev => !prev)}>
-          {profile?.username?.[0]?.toUpperCase() || 'U'}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="rgba(255,255,255,0.85)">
+            <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z"/>
+          </svg>
         </div>
         {showAvatarMenu && (
           <div style={styles.avatarMenu}>
@@ -282,9 +285,10 @@ const styles = {
   },
   // ── Default header ──
   logoRow:    { display: 'flex', alignItems: 'center' },
-  logoUp:     { fontSize: 18, fontWeight: 700, color: '#a0e070' },
-  logoAlerts: { fontSize: 18, fontWeight: 700, color: '#f0f0f0' },
-  slogan:     { fontSize: 12, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+  logoUp:     { fontSize: 20, fontWeight: 700, color: '#f0f0f0' },
+  logoTik:    { fontSize: 20, fontWeight: 700, color: '#a0e070' },
+  logoAlerts: { fontSize: 20, fontWeight: 700, color: '#f0f0f0' },
+  slogan:     { fontSize: 13, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
   avatar: {
     width: 30, height: 30, borderRadius: '50%',
     background: 'rgba(255,255,255,0.15)',
