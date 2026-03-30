@@ -73,8 +73,8 @@ function broadcastColor(type) {
 }
 
 // ── Lists sub-view ──
-function ListsView({ group, isAdmin, isModerator }) {
-  const isMod = isAdmin || isModerator;
+function ListsView({ group, isAdmin, isModerator, isOpenList }) {
+  const isMod = isAdmin || isModerator || isOpenList;
   const [lists, setLists]       = useState([]);
   const [expanded, setExpanded] = useState(null);
   const [notesDraft, setNotesDraft] = useState('');
@@ -486,7 +486,7 @@ You: "Supply constraints are keeping margins elevated through at least 2026 base
 
       {/* Lists view */}
       {subTab === 'lists' && (
-        <ListsView group={group} isAdmin={isAdmin} isModerator={isModerator} />
+        <ListsView group={group} isAdmin={isAdmin} isModerator={isModerator} isOpenList={group?.name === 'UpTik Chat'} />
       )}
 
       {/* Watchlist view */}

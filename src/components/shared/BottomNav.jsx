@@ -28,8 +28,16 @@ const HelpIcon = ({ active }) => (
   <div style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${active ? 'var(--green)' : 'var(--text3)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: active ? 'var(--green)' : 'var(--text3)', lineHeight: 1 }}>?</div>
 );
 
+const ChatIcon = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"
+      fill={active ? 'var(--green)' : 'var(--text3)'} />
+  </svg>
+);
+
 const TABS = [
   { id: 'home',    label: 'Home',    Icon: HomeIcon    },
+  { id: 'chat',    label: 'Chat',    Icon: ChatIcon    },
   { id: 'alerts',  label: 'Alerts',  Icon: AlertsIcon  },
   { id: 'help',    label: 'Help',    Icon: HelpIcon    },
   { id: 'profile', label: 'Profile', Icon: ProfileIcon },

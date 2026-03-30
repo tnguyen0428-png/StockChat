@@ -89,6 +89,18 @@ export default function DashboardPage({ session }) {
     if (activeTab === 'chat')   setUnreadChat(false);
   }, [activeTab]);
 
+  useEffect(() => {
+    const handleChatTab = async () => {
+      if (activeTab === 'chat') {
+        if (!activeGroup) {
+          const uptikChat = publicGroups.find(g => g.name === 'UpTik Chat');
+          if (uptikChat) enterGroup(uptikChat);
+        }
+      }
+    };
+    handleChatTab();
+  }, [activeTab]);
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     navigate('/login');
