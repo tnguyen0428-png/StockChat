@@ -160,14 +160,24 @@ function AdminPanel({ session, profile }) {
   const postNewsBriefing = async () => {
     if (!selectedNews.length || postingNews) return;
     setPostingNews(true);
-    const content = selectedNews
-      .map(id => {
-        const item = newsItems.find(n => n.id === id);
-        return item ? `• ${item.title} (${item.tickers?.slice(0,3).join(', ')})` : '';
-      })
-      .filter(Boolean)
-      .join('\n');
-    await supabase.from('daily_briefings').insert({ content, mood: 'neutral', tags: [] });
+    const articles = selectedNews.map(id => {
+      const item = newsItems.find(n => n.id === id);
+      return item ? {
+        title: item.title,
+        tickers: item.tickers?.slice(0,3) || [],
+        url: item.article_url,
+        publisher: item.publisher?.name || '',
+        time: item.published_utc,
+      } : null;
+    }).filter(Boolean);
+
+    const content = articles.map(a => `• ${a.title} (${a.tickers.join(', ')})`).join('\n');
+
+    await supabase.from('daily_briefings').insert({
+      content,
+      mood: 'neutral',
+      tags: articles.map(a => ({ title: a.title, url: a.url, tickers: a.tickers, publisher: a.publisher, time: a.time })),
+    });
     setSelectedNews([]);
     setPostingNews(false);
     alert('Briefing posted!');

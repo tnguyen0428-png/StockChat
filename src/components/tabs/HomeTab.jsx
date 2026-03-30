@@ -232,18 +232,40 @@ export default function HomeTab({ session, onGroupSelect }) {
       <div style={styles.secLabel}>Daily Briefing</div>
       {briefing ? (
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
-          {briefing.content.split('\n').filter(Boolean).map((line, i, arr) => {
-            const clean = line.replace(/^•\s*/, '');
-            const tickerMatch = clean.match(/\(([^)]+)\)$/);
-            const tickers = tickerMatch ? tickerMatch[1] : null;
-            const title = tickerMatch ? clean.replace(/\s*\([^)]+\)$/, '') : clean;
-            return (
+          {briefing.tags?.length > 0 ? (
+            briefing.tags.map((article, i, arr) => (
               <div key={i} style={{ padding: '11px 14px', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                {tickers && <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--green)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{tickers}</div>}
-                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text1)', lineHeight: 1.5 }}>{title}</div>
+                {article.tickers?.length > 0 && (
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--green)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {article.tickers.join(' · ')}
+                  </div>
+                )}
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text1)', lineHeight: 1.5, marginBottom: 5 }}>{article.title}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 10, color: 'var(--text3)' }}>{article.publisher}</span>
+                  {article.url && (
+                    <a href={article.url} target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: 11, color: 'var(--green)', fontWeight: 500, textDecoration: 'none' }}>
+                      Read →
+                    </a>
+                  )}
+                </div>
               </div>
-            );
-          })}
+            ))
+          ) : (
+            briefing.content.split('\n').filter(Boolean).map((line, i, arr) => {
+              const clean = line.replace(/^•\s*/, '');
+              const tickerMatch = clean.match(/\(([^)]+)\)$/);
+              const tickers = tickerMatch ? tickerMatch[1] : null;
+              const title = tickerMatch ? clean.replace(/\s*\([^)]+\)$/, '') : clean;
+              return (
+                <div key={i} style={{ padding: '11px 14px', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                  {tickers && <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--green)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{tickers}</div>}
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text1)', lineHeight: 1.5 }}>{title}</div>
+                </div>
+              );
+            })
+          )}
           <div style={{ padding: '8px 14px', fontSize: 11, color: 'var(--text3)', borderTop: '1px solid var(--border)' }}>
             Updated {new Date(briefing.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} EST · selected by Admin
           </div>
