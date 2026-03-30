@@ -13,17 +13,21 @@ const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
 export default function HomeTab({ session, onGroupSelect }) {
   const { publicGroups, privateGroup, activeGroup } = useGroup();
 
-  const [briefing, setBriefing]           = useState(null);
-  const [marketPulse, setMarketPulse]     = useState({});
+  const [briefing, setBriefing]                 = useState(null);
+  const [marketPulse, setMarketPulse]           = useState({});
   const [marketIndicators, setMarketIndicators] = useState([]);
-  const [movers, setMovers]               = useState({ gainers: [], losers: [] });
-  const [moversTab, setMoversTab]         = useState('gainers');
+  const [movers, setMovers]                     = useState({ gainers: [], losers: [] });
+  const [groupsWithCounts, setGroupsWithCounts] = useState([]);
 
   useEffect(() => {
     loadBriefing();
     loadMarketIndicators();
     loadMovers();
   }, []);
+
+  useEffect(() => {
+    if (publicGroups.length > 0) loadGroupCounts();
+  }, [publicGroups]);
 
   const loadBriefing = async () => {
     const { data } = await supabase
@@ -33,6 +37,17 @@ export default function HomeTab({ session, onGroupSelect }) {
       .limit(1)
       .maybeSingle();
     if (data) setBriefing(data);
+  };
+
+  const loadGroupCounts = async () => {
+    const { data: counts } = await supabase.from('group_members').select('group_id, id');
+    if (counts) {
+      const countMap = {};
+      counts.forEach(c => { countMap[c.group_id] = (countMap[c.group_id] || 0) + 1; });
+      setGroupsWithCounts(publicGroups.map(g => ({ ...g, member_count: countMap[g.id] || 0 })));
+    } else {
+      setGroupsWithCounts(publicGroups);
+    }
   };
 
   const loadMarketIndicators = async () => {
@@ -83,13 +98,12 @@ export default function HomeTab({ session, onGroupSelect }) {
       const gainers = (gainData.tickers || []).slice(0, 5);
       const losers  = (loseData.tickers  || []).slice(0, 5);
 
-      // If market is closed, fall back to previous day data
       if (gainers.length === 0) {
         const getLastTradingDay = () => {
           const d = new Date();
           d.setHours(0, 0, 0, 0);
-          if (d.getDay() === 0) d.setDate(d.getDate() - 2); // Sunday
-          if (d.getDay() === 6) d.setDate(d.getDate() - 1); // Saturday
+          if (d.getDay() === 0) d.setDate(d.getDate() - 2);
+          if (d.getDay() === 6) d.setDate(d.getDate() - 1);
           const now = new Date();
           const estHour = now.getUTCHours() - 5;
           if (estHour < 9 || (estHour === 9 && now.getUTCMinutes() < 30)) {
@@ -123,22 +137,21 @@ export default function HomeTab({ session, onGroupSelect }) {
     } catch {}
   };
 
-  const fmt = (p) => p != null ? `$${Number(p).toFixed(2)}` : '--';
-  const fmtPct = (p) => p != null ? `${p > 0 ? '+' : ''}${Number(p).toFixed(1)}%` : '--';
-
   const pulseItems = marketIndicators.length > 0
     ? marketIndicators.map(m => ({ label: m.label, key: m.ticker }))
     : [{ label: 'S&P 500', key: 'SPY' }, { label: 'Nasdaq', key: 'QQQ' }, { label: 'Dow', key: 'DIA' }, { label: 'VIX', key: 'VIXY' }];
 
-  const moversData = movers[moversTab] || [];
+  const displayGroups = groupsWithCounts.length > 0 ? groupsWithCounts : publicGroups;
 
   return (
     <div style={styles.scroll}>
 
-      {/* MARKET PULSE */}
-      <div style={styles.secLabel}>Market Pulse</div>
-      <div style={{ overflow: 'hidden', background: 'var(--card)', borderBottom: '1px solid var(--border)', height: 36, display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-        <style>{`@keyframes pulseScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }`}</style>
+      {/* MARKET PULSE STRIP */}
+      <div style={{ overflow: 'hidden', background: 'var(--card)', borderBottom: '1px solid var(--border)', height: 36, display: 'flex', alignItems: 'center' }}>
+        <style>{`
+          @keyframes pulseScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+          @keyframes moversScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        `}</style>
         <div style={{
           display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap',
           animation: `pulseScroll ${pulseItems.length * 5}s linear infinite`,
@@ -146,15 +159,33 @@ export default function HomeTab({ session, onGroupSelect }) {
           {[...pulseItems, ...pulseItems].map((item, i) => {
             const d = marketPulse[item.key];
             const chg = d?.change;
-            const up = chg > 0;
             return (
-              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 18px' }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)' }}>{item.label}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text1)' }}>{d ? `$${Number(d.price).toFixed(2)}` : '--'}</span>
-                <span style={{ fontSize: 11, fontWeight: 600, color: chg == null ? 'var(--text3)' : up ? 'var(--green)' : 'var(--red)' }}>
-                  {d ? `${up ? '▲' : '▼'} ${Math.abs(chg).toFixed(2)}%` : '--'}
+              <span key={i} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '3px 12px', margin: '0 2px', borderRadius: 6,
+                background: chg > 0 ? 'rgba(59,109,17,0.12)' : chg < 0 ? 'rgba(162,45,45,0.1)' : 'transparent',
+              }}>
+                <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text2)' }}>{item.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>{d ? `$${Number(d.price).toFixed(2)}` : '--'}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: chg > 0 ? 'var(--green)' : chg < 0 ? 'var(--red)' : 'var(--text3)' }}>
+                  {d ? `${chg > 0 ? '▲' : '▼'}${Math.abs(chg).toFixed(2)}%` : '--'}
                 </span>
-                <span style={{ color: 'var(--border)', fontSize: 12 }}>│</span>
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* TOP MOVERS STRIP */}
+      <div style={{ overflow: 'hidden', height: 36, display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', background: 'var(--card)' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', animation: `moversScroll ${(movers.gainers.length + movers.losers.length) * 3}s linear infinite` }}>
+          {[...movers.gainers.slice(0,5), ...movers.losers.slice(0,5), ...movers.gainers.slice(0,5), ...movers.losers.slice(0,5)].map((m, i) => {
+            const chg = m.todaysChangePerc;
+            const up = chg >= 0;
+            return (
+              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 12px', margin: '0 2px', borderRadius: 6, background: up ? 'rgba(59,109,17,0.12)' : 'rgba(162,45,45,0.1)' }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text1)' }}>{m.ticker}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: up ? 'var(--green)' : 'var(--red)' }}>{up ? '▲' : '▼'}{Math.abs(chg).toFixed(1)}%</span>
               </span>
             );
           })}
@@ -163,16 +194,19 @@ export default function HomeTab({ session, onGroupSelect }) {
 
       {/* SECTOR GROUP CHAT */}
       <div style={styles.secLabel}>Sector Group Chat</div>
-      <div style={styles.pillRow}>
-        {publicGroups.map(group => {
-          const isActive = activeGroup?.id === group.id;
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
+        {displayGroups.map(group => {
+          const memberCount = group.member_count || 0;
           return (
-            <div
-              key={group.id}
-              style={{ ...styles.pill, ...(isActive ? styles.pillActive : {}) }}
+            <div key={group.id}
+              style={{ flexShrink: 0, background: '#EAF3DE', border: '1.5px solid #3B6D11', borderRadius: 10, padding: '10px 16px', textAlign: 'center', cursor: 'pointer', minWidth: 82 }}
               onClick={() => onGroupSelect(group)}
             >
-              {group.sector || group.name}
+              <div style={{ fontSize: 14, fontWeight: 500, color: '#1a4d0a' }}>{group.sector || group.name}</div>
+              <div style={{ fontSize: 12, color: '#3B6D11', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontWeight: 500 }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B6D11', animation: 'pulse 1.5s ease-in-out infinite', flexShrink: 0 }} />
+                {memberCount}
+              </div>
             </div>
           );
         })}
@@ -180,33 +214,38 @@ export default function HomeTab({ session, onGroupSelect }) {
 
       {/* PRIVATE GROUP CHAT */}
       <div style={styles.secLabel}>Private Group Chat</div>
-      {privateGroup ? (
+      <div style={{ display: 'flex', gap: 8, paddingLeft: 12, paddingRight: 12 }}>
         <div
-          style={{ ...styles.privateBtn, ...(activeGroup?.id === privateGroup.id ? styles.privateBtnActive : {}) }}
-          onClick={() => onGroupSelect(privateGroup)}
+          style={{ flex: 1, background: '#EAF3DE', border: '1.5px solid #3B6D11', borderRadius: 10, padding: '12px 14px', cursor: 'pointer' }}
+          onClick={() => privateGroup && onGroupSelect(privateGroup)}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="#3B6D11">
-            <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2ZM20 16H6L4 18V4H20V16Z"/>
-          </svg>
-          {privateGroup.name}
+          <div style={{ fontSize: 10, fontWeight: 500, color: '#3B6D11', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Private</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#1a4d0a' }}>{privateGroup?.name || 'None yet'}</div>
         </div>
-      ) : (
-        <div style={styles.emptyCard}>
-          <span style={styles.emptyText}>No private group — ask for an invite link</span>
+        <div style={{ flex: 1, background: '#EAF3DE', border: '1.5px solid #3B6D11', borderRadius: 10, padding: '12px 14px', opacity: 0.6 }}>
+          <div style={{ fontSize: 10, fontWeight: 500, color: '#3B6D11', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Custom</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#1a4d0a' }}>Coming soon</div>
         </div>
-      )}
+      </div>
 
       {/* DAILY BRIEFING */}
       <div style={styles.secLabel}>Daily Briefing</div>
       {briefing ? (
-        <div style={styles.briefingCard}>
-<div style={styles.briefingText}>
-            {briefing.content.split('\n').map((line, i) => (
-              <div key={i} style={{ marginBottom: line ? 6 : 0 }}>{line}</div>
-            ))}
-          </div>
-          <div style={styles.briefingMeta}>
-            Updated {new Date(briefing.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} EST
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
+          {briefing.content.split('\n').filter(Boolean).map((line, i, arr) => {
+            const clean = line.replace(/^•\s*/, '');
+            const tickerMatch = clean.match(/\(([^)]+)\)$/);
+            const tickers = tickerMatch ? tickerMatch[1] : null;
+            const title = tickerMatch ? clean.replace(/\s*\([^)]+\)$/, '') : clean;
+            return (
+              <div key={i} style={{ padding: '11px 14px', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                {tickers && <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--green)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{tickers}</div>}
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text1)', lineHeight: 1.5 }}>{title}</div>
+              </div>
+            );
+          })}
+          <div style={{ padding: '8px 14px', fontSize: 11, color: 'var(--text3)', borderTop: '1px solid var(--border)' }}>
+            Updated {new Date(briefing.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} EST · selected by Admin
           </div>
         </div>
       ) : (
@@ -215,55 +254,14 @@ export default function HomeTab({ session, onGroupSelect }) {
         </div>
       )}
 
-      {/* TOP MOVERS */}
-      <div style={styles.secLabel}>Top Movers</div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {movers.gainers.slice(0, 3).map((m, i) => {
-          const chg = m.todaysChangePerc;
-          return (
-            <div key={`g${i}`} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, background: 'var(--card2)', border: '1px solid var(--border)' }}>
-              <span style={{ fontWeight: 600, color: 'var(--text1)' }}>{m.ticker}</span>
-              {' '}<span style={{ color: 'var(--green)' }}>+{chg?.toFixed(1)}%</span>
-            </div>
-          );
-        })}
-        <span style={{ color: 'var(--border)', fontSize: 12, alignSelf: 'center' }}>│</span>
-        {movers.losers.slice(0, 2).map((m, i) => {
-          const chg = m.todaysChangePerc;
-          return (
-            <div key={`l${i}`} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, background: 'var(--card2)', border: '1px solid var(--border)' }}>
-              <span style={{ fontWeight: 600, color: 'var(--text1)' }}>{m.ticker}</span>
-              {' '}<span style={{ color: 'var(--red)' }}>{chg?.toFixed(1)}%</span>
-            </div>
-          );
-        })}
-      </div>
-
       <div style={{ height: 24 }} />
     </div>
   );
 }
 
 const styles = {
-  scroll: { flex: 1, overflowY: 'auto', padding: '4px 12px 12px', WebkitOverflowScrolling: 'touch' },
-  secLabel: { fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text2)', padding: '0 4px', margin: '14px 0 8px' },
-  briefingCard: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, marginBottom: 8 },
-  briefingTag: { display: 'inline-block', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'var(--blue-bg)', color: 'var(--blue)', marginBottom: 6 },
-  briefingText: { fontSize: 13, color: 'var(--text1)', lineHeight: 1.7 },
-  briefingMeta: { fontSize: 11, color: 'var(--text3)', marginTop: 6 },
-  pillRow: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 },
-  pill: { fontSize: 14, padding: '7px 16px', borderRadius: 20, border: '1.5px solid var(--border)', color: 'var(--text1)', background: 'var(--card)', cursor: 'pointer', fontWeight: 500 },
-  pillActive: { background: 'var(--card2)', color: 'var(--text1)', borderColor: '#3B6D11', borderWidth: '1.5px' },
-  privateBtn: { width: '100%', background: '#EAF3DE', color: '#1a4d0a', border: '1.5px solid #3B6D11', borderRadius: 10, padding: '12px 16px', fontSize: 14, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 },
-  privateBtnActive: { background: '#C0DD97', borderColor: '#3B6D11' },
-  moversCard: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '0 14px 14px', marginBottom: 8 },
-  tabRow: { display: 'flex', gap: 14, borderBottom: '1px solid var(--border)', marginBottom: 10, marginLeft: -14, marginRight: -14, paddingLeft: 14 },
-  tab: { fontSize: 11, padding: '9px 0', color: 'var(--text3)', borderBottom: '2px solid transparent', cursor: 'pointer' },
-  tabActive: { color: 'var(--text1)', fontWeight: 600, borderBottomColor: 'var(--green)' },
-  moverRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' },
-  moverTicker: { fontSize: 14, fontWeight: 600, color: 'var(--text1)' },
-  moverPrice: { fontSize: 13, fontWeight: 500, color: 'var(--text1)' },
-  moverPct: { fontSize: 11 },
-  emptyCard: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 20, textAlign: 'center', marginBottom: 8 },
+  scroll:    { flex: 1, overflowY: 'auto', padding: '0 0 12px', WebkitOverflowScrolling: 'touch' },
+  secLabel:  { fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text2)', padding: '0 12px', margin: '14px 0 8px' },
+  emptyCard: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 20, textAlign: 'center', marginBottom: 8, marginLeft: 12, marginRight: 12 },
   emptyText: { fontSize: 13, color: 'var(--text3)' },
 };
