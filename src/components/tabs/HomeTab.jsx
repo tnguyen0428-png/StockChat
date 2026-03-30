@@ -185,7 +185,7 @@ export default function HomeTab({ session, onGroupSelect }) {
           style={{ ...styles.privateBtn, ...(activeGroup?.id === privateGroup.id ? styles.privateBtnActive : {}) }}
           onClick={() => onGroupSelect(privateGroup)}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="#3B6D11">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="#3B6D11">
             <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2ZM20 16H6L4 18V4H20V16Z"/>
           </svg>
           {privateGroup.name}
@@ -221,7 +221,7 @@ export default function HomeTab({ session, onGroupSelect }) {
         {movers.gainers.slice(0, 3).map((m, i) => {
           const chg = m.todaysChangePerc;
           return (
-            <div key={`g${i}`} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: 'var(--card2)', border: '1px solid var(--border)' }}>
+            <div key={`g${i}`} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, background: 'var(--card2)', border: '1px solid var(--border)' }}>
               <span style={{ fontWeight: 600, color: 'var(--text1)' }}>{m.ticker}</span>
               {' '}<span style={{ color: 'var(--green)' }}>+{chg?.toFixed(1)}%</span>
             </div>
@@ -231,7 +231,7 @@ export default function HomeTab({ session, onGroupSelect }) {
         {movers.losers.slice(0, 2).map((m, i) => {
           const chg = m.todaysChangePerc;
           return (
-            <div key={`l${i}`} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: 'var(--card2)', border: '1px solid var(--border)' }}>
+            <div key={`l${i}`} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, background: 'var(--card2)', border: '1px solid var(--border)' }}>
               <span style={{ fontWeight: 600, color: 'var(--text1)' }}>{m.ticker}</span>
               {' '}<span style={{ color: 'var(--red)' }}>{chg?.toFixed(1)}%</span>
             </div>
@@ -246,15 +246,15 @@ export default function HomeTab({ session, onGroupSelect }) {
 
 const styles = {
   scroll: { flex: 1, overflowY: 'auto', padding: '4px 12px 12px', WebkitOverflowScrolling: 'touch' },
-  secLabel: { fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text3)', padding: '0 4px', margin: '14px 0 8px' },
+  secLabel: { fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text2)', padding: '0 4px', margin: '14px 0 8px' },
   briefingCard: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, marginBottom: 8 },
   briefingTag: { display: 'inline-block', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'var(--blue-bg)', color: 'var(--blue)', marginBottom: 6 },
   briefingText: { fontSize: 13, color: 'var(--text1)', lineHeight: 1.7 },
-  briefingMeta: { fontSize: 10, color: 'var(--text3)', marginTop: 6 },
+  briefingMeta: { fontSize: 11, color: 'var(--text3)', marginTop: 6 },
   pillRow: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 },
-  pill: { fontSize: 13, padding: '6px 14px', borderRadius: 20, border: '1px solid var(--border)', color: 'var(--text2)', background: 'var(--card)', cursor: 'pointer', fontWeight: 500 },
-  pillActive: { background: 'var(--card2)', color: 'var(--text1)', borderColor: 'var(--text3)' },
-  privateBtn: { width: '100%', background: '#EAF3DE', color: '#27500A', border: '0.5px solid #97C459', borderRadius: 10, padding: '11px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 },
+  pill: { fontSize: 14, padding: '7px 16px', borderRadius: 20, border: '1.5px solid var(--border)', color: 'var(--text1)', background: 'var(--card)', cursor: 'pointer', fontWeight: 500 },
+  pillActive: { background: 'var(--card2)', color: 'var(--text1)', borderColor: '#3B6D11', borderWidth: '1.5px' },
+  privateBtn: { width: '100%', background: '#EAF3DE', color: '#1a4d0a', border: '1.5px solid #3B6D11', borderRadius: 10, padding: '12px 16px', fontSize: 14, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 },
   privateBtnActive: { background: '#C0DD97', borderColor: '#3B6D11' },
   moversCard: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '0 14px 14px', marginBottom: 8 },
   tabRow: { display: 'flex', gap: 14, borderBottom: '1px solid var(--border)', marginBottom: 10, marginLeft: -14, marginRight: -14, paddingLeft: 14 },

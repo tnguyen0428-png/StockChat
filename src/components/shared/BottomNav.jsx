@@ -72,5 +72,5 @@ const styles = {
     width: 7, height: 7, background: 'var(--red)',
     borderRadius: '50%', border: '1.5px solid var(--card)',
   },
-  label: { fontSize: 10, fontWeight: 500 },
+  label: { fontSize: 11, fontWeight: 500 },
 };
