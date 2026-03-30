@@ -6,18 +6,20 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 
-export default function Header({ group, profile, isAdmin, isModerator, activeTab, allGroups, onGroupSwitch, onGroupNameUpdate, onSignOut }) {
-  const [editing, setEditing]         = useState(false);
-  const [editName, setEditName]       = useState('');
-  const [saving, setSaving]           = useState(false);
-  const [saveError, setSaveError]     = useState(false);
+export default function Header({ group, profile, isAdmin, isModerator, activeTab, allGroups, onGroupSwitch, onGroupNameUpdate, onSignOut, onHomePress, onProfilePress }) {
+  const [editing, setEditing]           = useState(false);
+  const [editName, setEditName]         = useState('');
+  const [saving, setSaving]             = useState(false);
+  const [saveError, setSaveError]       = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
-  const dropdownRef = useRef(null);
+  const [showAvatarMenu, setShowAvatarMenu] = useState(false);
+  const dropdownRef  = useRef(null);
+  const avatarRef    = useRef(null);
 
   const canEdit        = isAdmin || isModerator;
   const hasMultiGroup  = (allGroups || []).length > 1;
 
-  // Close dropdown on outside click
+  // Close group dropdown on outside click
   useEffect(() => {
     if (!showDropdown) return;
     const handler = (e) => {
@@ -32,6 +34,22 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
       document.removeEventListener('touchstart', handler);
     };
   }, [showDropdown]);
+
+  // Close avatar menu on outside click
+  useEffect(() => {
+    if (!showAvatarMenu) return;
+    const handler = (e) => {
+      if (avatarRef.current && !avatarRef.current.contains(e.target)) {
+        setShowAvatarMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [showAvatarMenu]);
 
   const handleSave = async () => {
     const name = editName.trim();
@@ -131,15 +149,30 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
 
   return (
     <div style={styles.header}>
-      <div>
+      <div style={{ cursor: 'pointer' }} onClick={() => onHomePress?.()}>
         <div style={styles.logoRow}>
           <span style={styles.logoUp}>UpTik</span>
           <span style={styles.logoAlerts}>Alerts</span>
         </div>
         <div style={styles.slogan}>Trade smarter, together</div>
       </div>
-      <div style={styles.avatar}>
-        {profile?.username?.[0]?.toUpperCase() || 'U'}
+      <div ref={avatarRef} style={{ position: 'relative' }}>
+        <div style={styles.avatar} onClick={() => setShowAvatarMenu(prev => !prev)}>
+          {profile?.username?.[0]?.toUpperCase() || 'U'}
+        </div>
+        {showAvatarMenu && (
+          <div style={styles.avatarMenu}>
+            <div style={styles.avatarMenuName}>{profile?.username || 'User'}</div>
+            {profile?.email && <div style={styles.avatarMenuEmail}>{profile.email}</div>}
+            <div style={styles.avatarMenuDivider} />
+            <button style={styles.avatarMenuItem} onClick={() => { setShowAvatarMenu(false); onProfilePress?.(); }}>
+              Profile Settings
+            </button>
+            <button style={{ ...styles.avatarMenuItem, color: '#EF4444' }} onClick={() => { setShowAvatarMenu(false); onSignOut?.(); }}>
+              Sign Out
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -251,11 +284,34 @@ const styles = {
   logoRow:    { display: 'flex', alignItems: 'center' },
   logoUp:     { fontSize: 18, fontWeight: 700, color: '#a0e070' },
   logoAlerts: { fontSize: 18, fontWeight: 700, color: '#f0f0f0' },
-  slogan:     { fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
+  slogan:     { fontSize: 12, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
   avatar: {
     width: 30, height: 30, borderRadius: '50%',
     background: 'rgba(255,255,255,0.15)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 13, fontWeight: 500, color: '#fff',
+    fontSize: 13, fontWeight: 500, color: '#fff', cursor: 'pointer',
+  },
+  avatarMenu: {
+    position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+    background: 'var(--card)', border: '1px solid var(--border)',
+    borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.22)',
+    zIndex: 200, minWidth: 180, overflow: 'hidden',
+  },
+  avatarMenuName: {
+    fontSize: 13, fontWeight: 600, color: 'var(--text1)',
+    padding: '12px 14px 2px',
+  },
+  avatarMenuEmail: {
+    fontSize: 11, color: 'var(--text3)',
+    padding: '0 14px 10px',
+  },
+  avatarMenuDivider: {
+    height: 1, background: 'var(--border)', margin: '0',
+  },
+  avatarMenuItem: {
+    display: 'block', width: '100%', padding: '11px 14px',
+    border: 'none', background: 'transparent', cursor: 'pointer',
+    fontSize: 13, fontWeight: 500, color: 'var(--text1)',
+    textAlign: 'left', fontFamily: 'var(--font)',
   },
 };

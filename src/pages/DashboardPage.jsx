@@ -13,6 +13,7 @@ import HomeTab    from '../components/tabs/HomeTab';
 import AlertsTab  from '../components/tabs/AlertsTab';
 import ChatTab    from '../components/tabs/ChatTab';
 import ProfileTab from '../components/tabs/ProfileTab';
+import HelpTab    from '../components/tabs/HelpTab';
 
 // Shared components
 import Header     from '../components/shared/Header';
@@ -137,6 +138,8 @@ export default function DashboardPage({ session }) {
         onGroupSwitch={enterGroup}
         onGroupNameUpdate={(newName) => {}}
         onSignOut={handleSignOut}
+        onHomePress={() => setActiveTab('home')}
+        onProfilePress={() => setActiveTab('profile')}
       />
 
       {/* Broadcast Banner */}
@@ -186,6 +189,7 @@ export default function DashboardPage({ session }) {
             setUnreadChat={setUnreadChat}
           />
         )}
+        {activeTab === 'help' && <HelpTab />}
         {activeTab === 'profile' && (
           <ProfileTab
             session={session}

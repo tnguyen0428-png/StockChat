@@ -24,9 +24,14 @@ const ProfileIcon = ({ active }) => (
   </svg>
 );
 
+const HelpIcon = ({ active }) => (
+  <div style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${active ? 'var(--green)' : 'var(--text3)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: active ? 'var(--green)' : 'var(--text3)', lineHeight: 1 }}>?</div>
+);
+
 const TABS = [
   { id: 'home',    label: 'Home',    Icon: HomeIcon    },
   { id: 'alerts',  label: 'Alerts',  Icon: AlertsIcon  },
+  { id: 'help',    label: 'Help',    Icon: HelpIcon    },
   { id: 'profile', label: 'Profile', Icon: ProfileIcon },
 ];
 

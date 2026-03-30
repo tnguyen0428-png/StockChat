@@ -204,6 +204,7 @@ export default function HomeTab({ session, onGroupSelect }) {
             >
               <div style={{ fontSize: 14, fontWeight: 500, color: '#1a4d0a' }}>{group.sector || group.name}</div>
               <div style={{ fontSize: 12, color: '#3B6D11', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontWeight: 500 }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="#3B6D11"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"/></svg>
                 <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B6D11', animation: 'pulse 1.5s ease-in-out infinite', flexShrink: 0 }} />
                 {memberCount}
               </div>
@@ -213,17 +214,19 @@ export default function HomeTab({ session, onGroupSelect }) {
       </div>
 
       {/* PRIVATE GROUP CHAT */}
-      <div style={styles.secLabel}>Private Group Chat</div>
       <div style={{ display: 'flex', gap: 8, paddingLeft: 12, paddingRight: 12 }}>
-        <div
-          style={{ flex: 1, background: '#EAF3DE', border: '1.5px solid #3B6D11', borderRadius: 10, padding: '12px 14px', cursor: 'pointer' }}
-          onClick={() => privateGroup && onGroupSelect(privateGroup)}
-        >
-          <div style={{ fontSize: 10, fontWeight: 500, color: '#3B6D11', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Private</div>
+        <div style={{ flex: 1, background: '#EAF3DE', border: '1.5px solid #3B6D11', borderRadius: 10, padding: '11px 13px', cursor: 'pointer' }} onClick={() => privateGroup && onGroupSelect(privateGroup)}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="#3B6D11"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"/></svg>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#3B6D11' }}>Private Chat</span>
+          </div>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#1a4d0a' }}>{privateGroup?.name || 'None yet'}</div>
         </div>
-        <div style={{ flex: 1, background: '#EAF3DE', border: '1.5px solid #3B6D11', borderRadius: 10, padding: '12px 14px', opacity: 0.6 }}>
-          <div style={{ fontSize: 10, fontWeight: 500, color: '#3B6D11', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Custom</div>
+        <div style={{ flex: 1, background: '#EAF3DE', border: '1.5px solid #3B6D11', borderRadius: 10, padding: '11px 13px', opacity: 0.6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="#3B6D11"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"/></svg>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#3B6D11' }}>Custom Chat</span>
+          </div>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#1a4d0a' }}>Coming soon</div>
         </div>
       </div>
