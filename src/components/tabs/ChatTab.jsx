@@ -349,12 +349,22 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const callAI = useCallback(async (query) => {
     setAiLoading(true);
     try {
-      const res = await fetch('/api/chat', {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1000,
+          system: 'You are a helpful stock trading assistant for UpTikAlerts. Help users with stock analysis, trading strategies, market questions, and how to use the app. Be concise and clear.',
+          messages: [{ role: 'user', content: query }],
+        }),
       });
-      const data = await res.json();
+      const data = await response.json();
       const text = data.content?.[0]?.text || 'Unable to analyze right now.';
       await supabase.from('chat_messages').insert({
         group_id: group.id, user_id: 'user_ai',
