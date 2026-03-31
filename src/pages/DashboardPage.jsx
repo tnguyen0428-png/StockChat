@@ -189,7 +189,7 @@ export default function DashboardPage({ session }) {
         {activeTab === 'alerts' && (
           <AlertsTab session={session} group={activeGroup} />
         )}
-        {activeTab === 'chat' && (
+        {activeTab === 'chat' && activeGroup && (
           <ChatTab
             session={session}
             profile={profile}
@@ -198,6 +198,11 @@ export default function DashboardPage({ session }) {
             isModerator={isModerator}
             setUnreadChat={setUnreadChat}
           />
+        )}
+        {activeTab === 'chat' && !activeGroup && (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ fontSize: 14, color: 'var(--text3)' }}>Loading chat...</div>
+          </div>
         )}
         {activeTab === 'help' && <HelpTab />}
         {activeTab === 'profile' && (

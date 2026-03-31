@@ -6,9 +6,21 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { scoreTicker } from '../../lib/screener';
+import { useGroup } from '../../context/GroupContext';
 import TickerBanner from './TickerBanner';
 
 const EMOJIS = ['🔥','📈','📉','🚀','💪','🎯','👀','💰','⚠️','✅','❌','😎','🤔','👋','🙌','😂','💎','🐂','🐻','⏰'];
+
+const stripMarkdown = (text) => {
+  return text
+    .replace(/#{1,6}\s+/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`(.*?)`/g, '$1')
+    .replace(/^\s*[-•]\s+/gm, '• ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
 
 // ── Message Item ──
 const MessageItem = memo(({ msg, currentUserId }) => {
@@ -326,6 +338,8 @@ function WatchlistView({ session }) {
 
 // ── Main ChatTab ──
 export default function ChatTab({ session, profile, group, isAdmin, isModerator, setUnreadChat }) {
+  const { activeGroup } = useGroup();
+  const [watchlist, setWatchlist] = useState([]);
   const [subTab, setSubTab]         = useState('chat');
   const [messages, setMessages]     = useState([]);
   const [inputText, setInputText]   = useState('');
@@ -335,6 +349,12 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const [loading, setLoading]       = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef       = useRef(null);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    supabase.from('user_watchlist').select('symbol').eq('user_id', session.user.id)
+      .then(({ data }) => { if (data) setWatchlist(data.map(w => w.symbol)); });
+  }, [session?.user?.id]);
 
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [broadcastText, setBroadcastText]           = useState('');
@@ -380,29 +400,34 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const callAI = useCallback(async (query) => {
     setAiLoading(true);
     try {
-      // Detect ticker symbols in the query
-      const tickerMatches = query.match(/\b[A-Z]{1,5}\b|\$[A-Z]{1,5}/g) || [];
-      const tickers = [...new Set(tickerMatches.map(t => t.replace('$', '')))].slice(0, 3);
+      // Smarter ticker detection
+      const commonWords = new Set(['AI', 'IS', 'THE', 'AND', 'FOR', 'ARE', 'BUT', 'NOT', 'YOU', 'ALL', 'CAN', 'HER', 'WAS', 'ONE', 'OUR', 'OUT', 'HAD', 'HAS', 'HIM', 'HIS', 'HOW', 'ITS', 'NOW', 'OLD', 'SEE', 'TWO', 'WHO', 'DID', 'GET', 'MAY', 'NEW', 'OFF', 'USE', 'WAY', 'SAY', 'SHE', 'TOO', 'ANY', 'DAY', 'WHEN', 'WHAT', 'WITH', 'FROM', 'THEY', 'BEEN', 'HAVE', 'THIS', 'WILL', 'YOUR', 'THAT', 'NEXT', 'TELL', 'SHOW', 'GIVE', 'KNOW', 'DOES', 'JUST', 'LIKE', 'MAKE', 'MUCH', 'SOME', 'TIME', 'VERY', 'WELL', 'ALSO', 'BACK', 'EVEN', 'GOOD', 'HERE', 'HIGH', 'INTO', 'LOOK', 'MORE', 'MOST', 'MOVE', 'NEED', 'ONLY', 'OVER', 'SAME', 'SUCH', 'TAKE', 'THAN', 'THEM', 'THEN', 'THERE', 'THESE', 'THINK', 'THOSE', 'THROUGH', 'UNDER', 'WHICH', 'WHILE', 'ABOUT', 'AFTER', 'AGAIN', 'BELOW', 'COULD', 'EVERY', 'FIRST', 'FOUND', 'GREAT', 'GROUP', 'LARGE', 'LATER', 'NEVER', 'OFTEN', 'OTHER', 'PLACE', 'POINT', 'RIGHT', 'SMALL', 'SOUND', 'STILL', 'STUDY', 'THEIR', 'THERE', 'THESE', 'THING', 'THINK', 'THREE', 'WATER', 'WHERE', 'WORLD', 'WOULD', 'WRITE', 'YEARS', 'STOCK', 'TRADE', 'PRICE', 'SHARE', 'CHART', 'TREND', 'BULL', 'BEAR', 'LONG', 'SHORT', 'CALL', 'PUTS', 'HOLD', 'SELL', 'LIST', 'CHAT', 'HELP', 'INFO', 'DATA', 'LATE', 'LAST', 'EARN', 'TECH', 'SECT', 'MARK', 'OPEN', 'PEAK']);
+      const dollarTickers = (query.match(/\$([A-Z]{1,5})/g) || []).map(t => t.replace('$', ''));
+      const upperWords = (query.match(/\b[A-Z]{2,5}\b/g) || []).filter(w => !commonWords.has(w));
+      const tickers = [...new Set([...dollarTickers, ...upperWords])].slice(0, 3);
 
       // Fetch FMP data for detected tickers
       let stockContext = '';
       if (tickers.length > 0) {
-        const stockData = await Promise.all(tickers.map(async (ticker) => {
+        const stockData = await Promise.allSettled(tickers.map(async (ticker) => {
           try {
             const [profileRes, earningsRes] = await Promise.all([
               fetch(`https://financialmodelingprep.com/stable/profile?symbol=${ticker}&apiKey=${import.meta.env.VITE_FMP_API_KEY}`),
               fetch(`https://financialmodelingprep.com/stable/earnings?symbol=${ticker}&apiKey=${import.meta.env.VITE_FMP_API_KEY}`),
             ]);
-            const profile = await profileRes.json();
-            const earnings = await earningsRes.json();
-            const p = profile?.[0];
-            const nextEarnings = earnings?.find(e => e.epsActual === null);
-            const lastEarnings = earnings?.find(e => e.epsActual !== null);
+            const profileData = await profileRes.json();
+            const earningsData = await earningsRes.json();
+            const p = Array.isArray(profileData) ? profileData[0] : null;
+            const earnings = Array.isArray(earningsData) ? earningsData : [];
+            const nextEarnings = earnings.find(e => e.epsActual === null);
+            const lastEarnings = earnings.find(e => e.epsActual !== null);
             if (!p) return null;
             return `${ticker}: price $${p.price}, sector ${p.sector}, mktcap $${(p.marketCap/1e9).toFixed(1)}B, next earnings ${nextEarnings?.date || 'unknown'}, last EPS actual ${lastEarnings?.epsActual} vs est ${lastEarnings?.epsEstimated}`;
           } catch { return null; }
         }));
-        const validData = stockData.filter(Boolean);
+        const validData = stockData
+          .filter(r => r.status === 'fulfilled' && r.value !== null)
+          .map(r => r.value);
         if (validData.length > 0) {
           stockContext = `\n\nREAL-TIME STOCK DATA:\n${validData.join('\n')}`;
         }
@@ -443,7 +468,7 @@ CONTENT:
 
 USER CONTEXT:
 - User's name: ${profile?.username || 'Trader'}
-- Active group: ${activeGroup?.name || 'None'}
+- Active group: ${group?.name || 'None'}
 - Watchlist: ${watchlist.length > 0 ? watchlist.join(', ') : 'empty'}${stockContext}
 
 APP KNOWLEDGE:
@@ -464,17 +489,18 @@ User: "Market feels scary" → "Totally normal feeling. As Buffett says — be f
         username: 'UpTik AI', user_color: '#8B5CF6',
         text, type: 'ai', is_admin: false,
       });
-    } catch {
+    } catch(err) {
+      console.error('UpTik AI error:', err.message, err);
       await supabase.from('chat_messages').insert({
         group_id: group.id, user_id: 'user_ai',
         username: 'UpTik AI', user_color: '#8B5CF6',
-        text: 'Unable to respond right now. Try again shortly.',
+        text: `Error: ${err.message}`,
         type: 'ai', is_admin: false,
       });
     } finally {
       setAiLoading(false);
     }
-  }, [group?.id, profile, activeGroup, watchlist]);
+  }, [group?.id, group?.name, profile?.username, watchlist]);
 
   const handleSend = useCallback(async () => {
     const text = aiMode ? `@AI ${inputText.trim()}` : inputText.trim();
@@ -555,7 +581,7 @@ User: "Market feels scary" → "Totally normal feeling. As Buffett says — be f
 
       {/* Lists view */}
       {subTab === 'lists' && (
-        <ListsView group={group} isAdmin={isAdmin} isModerator={isModerator} isOpenList={group?.name === 'UpTik Chat'} />
+        <ListsView group={group} isAdmin={isAdmin} isModerator={isModerator} isOpenList={group?.name === 'UpTik Public'} />
       )}
 
       {/* Watchlist view */}

@@ -16,8 +16,22 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
   const [briefing, setBriefing]                 = useState(null);
   const [marketPulse, setMarketPulse]           = useState({});
   const [marketIndicators, setMarketIndicators] = useState([]);
+  const [futuresIndicators, setFuturesIndicators] = useState([]);
+  const [futuresData, setFuturesData]           = useState({});
+  const [futuresLabels, setFuturesLabels]       = useState([]);
   const [movers, setMovers]                     = useState({ gainers: [], losers: [] });
   const [groupsWithCounts, setGroupsWithCounts] = useState([]);
+
+  const getMarketStatus = () => {
+    const now = new Date();
+    const est = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const day = est.getDay();
+    const timeInMinutes = est.getHours() * 60 + est.getMinutes();
+    if (day === 0 || day === 6) return 'closed';
+    if (timeInMinutes < 570) return 'premarket';
+    if (timeInMinutes >= 570 && timeInMinutes < 960) return 'open';
+    return 'afterhours';
+  };
 
   useEffect(() => {
     loadBriefing();
@@ -50,10 +64,17 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
     }
   };
 
-  const loadFutures = async (indicators) => {
+  const loadFutures = async () => {
     try {
       const futureSymbols = ['ES=F', 'NQ=F', 'YM=F', 'GC=F', 'CL=F'];
-      const futuresResults = await Promise.all(futureSymbols.map(async (symbol) => {
+      const futuresMap = {
+        'ES=F': 'S&P Futures',
+        'NQ=F': 'Nas Futures',
+        'YM=F': 'Dow Futures',
+        'GC=F': 'Gold',
+        'CL=F': 'Oil',
+      };
+      const results = await Promise.all(futureSymbols.map(async (symbol) => {
         try {
           const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`)}`);
           const data = await res.json();
@@ -62,31 +83,14 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
           const price = meta.regularMarketPrice;
           const prev = meta.previousClose;
           const change = ((price - prev) / prev) * 100;
-          return { symbol, price, change };
+          return { symbol, price, change, label: futuresMap[symbol] };
         } catch { return null; }
       }));
-
-      const futuresMap = {
-        'ES=F': 'S&P Futures',
-        'NQ=F': 'Nas Futures',
-        'YM=F': 'Dow Futures',
-        'GC=F': 'Gold',
-        'CL=F': 'Oil',
-      };
-
+      const valid = results.filter(Boolean);
       const pulse = {};
-
-      // Add futures data
-      futuresResults.filter(Boolean).forEach(r => {
-        pulse[r.symbol] = { price: r.price, change: r.change, label: 'FUT' };
-      });
-
-      setMarketPulse(pulse);
-      setMarketIndicators(futuresResults.filter(Boolean).map((r, i) => ({
-        ticker: r.symbol,
-        label: futuresMap[r.symbol],
-        position: i + 1,
-      })));
+      valid.forEach(r => { pulse[r.symbol] = { price: r.price, change: r.change, label: 'FUT' }; });
+      setFuturesData(pulse);
+      setFuturesLabels(valid.map(r => ({ key: r.symbol, label: r.label })));
     } catch {}
   };
 
@@ -97,10 +101,9 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
       .order('position', { ascending: true });
     if (data) {
       setMarketIndicators(data);
+      await loadMarketPulse(data);
       const status = getMarketStatus();
-      if (status === 'open') {
-        await loadMarketPulse(data);
-      } else {
+      if (status !== 'open') {
         await loadFutures();
       }
     }
@@ -206,17 +209,6 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
     } catch {}
   };
 
-  const getMarketStatus = () => {
-    const now = new Date();
-    const est = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-    const day = est.getDay();
-    const timeInMinutes = est.getHours() * 60 + est.getMinutes();
-    if (day === 0 || day === 6) return 'closed';
-    if (timeInMinutes < 570) return 'premarket';
-    if (timeInMinutes >= 570 && timeInMinutes < 960) return 'open';
-    return 'afterhours';
-  };
-
   const marketStatus = getMarketStatus();
   const statusLabel =
     marketStatus === 'open' ? 'MARKET PULSE' :
@@ -225,9 +217,11 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
     'MARKET CLOSED';
   const statusColor = marketStatus === 'open' ? '#3B6D11' : '#A32D2D';
 
-  const pulseItems = marketIndicators.length > 0
-    ? marketIndicators.map(m => ({ label: m.label, key: m.ticker }))
-    : [{ label: 'S&P 500', key: 'SPY' }, { label: 'Nasdaq', key: 'QQQ' }, { label: 'Dow', key: 'DIA' }, { label: 'VIX', key: 'VIXY' }];
+  const pulseItems = marketStatus === 'open'
+    ? (marketIndicators.length > 0 ? marketIndicators.map(m => ({ label: m.label, key: m.ticker })) : [{ label: 'S&P 500', key: 'SPY' }, { label: 'Nasdaq', key: 'QQQ' }, { label: 'Dow', key: 'DIA' }, { label: 'VIX', key: 'VIXY' }])
+    : futuresLabels.length > 0 ? futuresLabels : marketIndicators.map(m => ({ label: m.label, key: m.ticker }));
+
+  const activePulse = marketStatus === 'open' ? marketPulse : { ...marketPulse, ...futuresData };
 
   const displayGroups = groupsWithCounts.length > 0 ? groupsWithCounts : publicGroups;
 
@@ -251,7 +245,7 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
           animation: `pulseScroll ${pulseItems.length * 5}s linear infinite`,
         }}>
           {[...pulseItems, ...pulseItems].map((item, i) => {
-            const d = marketPulse[item.key];
+            const d = activePulse[item.key];
             const chg = d?.change;
             return (
               <span key={i} style={{
