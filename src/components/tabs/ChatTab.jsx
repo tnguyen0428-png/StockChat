@@ -173,7 +173,7 @@ function ListsView({ group, isAdmin, isModerator, isOpenList }) {
           <div style={styles.secLabel}>{list.name} · {list.curated_stocks?.length || 0} stocks</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
             {['Earnings 30%','Fundamentals 25%','Sales Growth 20%','Valuation 10%','Price Trend 10%','Market Cap 5%'].map(item => (
-              <span key={item} style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500 }}>
+              <span key={item} style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 500 }}>
                 <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', marginRight: 3, verticalAlign: 'middle' }} />
                 {item}
               </span>
@@ -197,13 +197,18 @@ function ListsView({ group, isAdmin, isModerator, isOpenList }) {
             return (
               <div key={stock.id} style={{ borderBottom: '1px solid var(--border)' }}>
                 <div style={{ ...styles.listItem, cursor: 'pointer' }} onClick={() => handleExpand(stock)}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text1)', minWidth: 24 }}>#{stock.ranking}</span>
-                      <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text1)' }}>{stock.ticker}</span>
-                      <span style={{ fontSize: 10, fontWeight: 500, background: 'var(--green-bg)', color: 'var(--green)', padding: '2px 7px', borderRadius: 10, border: '1px solid rgba(26,173,94,0.2)' }}>{stock.score}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', minWidth: 20 }}>#{stock.ranking}</span>
+                    <img
+                      src={`https://images.financialmodelingprep.com/symbol/${stock.ticker}.png`}
+                      alt={stock.ticker}
+                      style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'contain', background: 'var(--card2)', border: '0.5px solid var(--border)', flexShrink: 0 }}
+                      onError={e => { e.target.style.display = 'none'; }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text1)' }}>{stock.ticker}</div>
                     </div>
-                    <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 6 }}>{isExpanded ? '▲' : '▼'}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', background: 'var(--card2)', padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)', flexShrink: 0, marginRight: 8 }}>{stock.score}</span>
                   </div>
                   {isMod && (
                     <button style={styles.removeBtn} onClick={e => { e.stopPropagation(); handleDeleteStock(stock); }}>

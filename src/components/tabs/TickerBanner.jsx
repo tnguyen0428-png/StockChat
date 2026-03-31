@@ -112,8 +112,13 @@ const TickerBanner = memo(({ groupId }) => {
           const isUp = q.change >= 0;
           return (
             <div key={`${q.symbol}-${i}`} style={styles.quoteItem}>
-              {q.ranking && <span style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, marginRight: 2 }}>#{q.ranking}</span>}
-              <span style={styles.symbol}>{q.symbol}</span>
+              <img
+                src={`https://images.financialmodelingprep.com/symbol/${q.symbol}.png`}
+                alt={q.symbol}
+                style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'contain', background: 'var(--card)', border: '0.5px solid var(--border)', flexShrink: 0 }}
+                onError={e => { e.target.style.display = 'none'; }}
+              />
+              <span style={styles.symbol}>{q.ranking ? `#${q.ranking} ` : ''}{q.symbol}</span>
               <span style={styles.price}>${q.price.toFixed(2)}</span>
               <span style={{ ...styles.change, color: isUp ? 'var(--green)' : '#EF4444' }}>
                 {isUp ? '▲' : '▼'} {Math.abs(q.changePercent).toFixed(2)}%
