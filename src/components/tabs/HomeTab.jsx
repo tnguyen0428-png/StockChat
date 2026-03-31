@@ -65,23 +65,47 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
     try {
       const tickers = indicators.map(m => m.ticker);
       if (tickers.length === 0) return;
+
+      // Use v3 snapshot for extended hours support
       const res = await fetch(
-        `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickers.join(',')}&apiKey=${POLYGON_KEY}`
+        `https://api.polygon.io/v3/snapshot?ticker.any_of=${tickers.join(',')}&apiKey=${POLYGON_KEY}`
       );
       const data = await res.json();
       const pulse = {};
-      (data.tickers || []).forEach(t => {
-        pulse[t.ticker] = { price: t.day?.c || t.prevDay?.c, change: t.todaysChangePerc };
+
+      (data.results || []).forEach(t => {
+        const session = t.session;
+        const marketStatus = t.market_status;
+
+        let change = session.regular_trading_change_percent;
+        let price = session.close || session.price;
+        let label = '';
+
+        if (marketStatus !== 'open') {
+          if (session.late_trading_change_percent) {
+            change = session.late_trading_change_percent;
+            price = session.close + (session.late_trading_change || 0);
+            label = 'AH';
+          } else if (session.early_trading_change_percent) {
+            change = session.early_trading_change_percent;
+            label = 'PM';
+          }
+        }
+
+        pulse[t.ticker] = { price, change, label };
       });
+
+      // Fallback for missing tickers (GLD, SLV etc)
       const missing = tickers.filter(t => !pulse[t]);
       await Promise.all(missing.map(async (ticker) => {
         try {
           const r = await fetch(`https://api.polygon.io/v2/aggs/ticker/${ticker}/prev?adjusted=true&apiKey=${POLYGON_KEY}`);
           const d = await r.json();
           const result = d.results?.[0];
-          if (result) pulse[ticker] = { price: result.c, change: ((result.c - result.o) / result.o) * 100 };
+          if (result) pulse[ticker] = { price: result.c, change: ((result.c - result.o) / result.o) * 100, label: '' };
         } catch {}
       }));
+
       setMarketPulse(pulse);
     } catch {}
   };
@@ -137,6 +161,17 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
     } catch {}
   };
 
+  const isMarketOpen = () => {
+    const now = new Date();
+    const est = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const day = est.getDay();
+    const hours = est.getHours();
+    const minutes = est.getMinutes();
+    const timeInMinutes = hours * 60 + minutes;
+    if (day === 0 || day === 6) return false;
+    return timeInMinutes >= 570 && timeInMinutes < 960;
+  };
+
   const pulseItems = marketIndicators.length > 0
     ? marketIndicators.map(m => ({ label: m.label, key: m.ticker }))
     : [{ label: 'S&P 500', key: 'SPY' }, { label: 'Nasdaq', key: 'QQQ' }, { label: 'Dow', key: 'DIA' }, { label: 'VIX', key: 'VIXY' }];
@@ -147,7 +182,12 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
     <div style={styles.scroll}>
 
       {/* MARKET PULSE STRIP */}
-      <div style={{ overflow: 'hidden', background: 'var(--card)', borderBottom: '1px solid var(--border)', height: 36, display: 'flex', alignItems: 'center' }}>
+      <div style={{ overflow: 'hidden', background: 'var(--card)', borderBottom: '1px solid var(--border)', height: 40, display: 'flex', alignItems: 'center' }}>
+        {!isMarketOpen() && (
+          <div style={{ flexShrink: 0, background: 'rgba(162,45,45,0.15)', padding: '2px 8px', marginLeft: 8, borderRadius: 4, fontSize: 10, fontWeight: 600, color: '#A32D2D', whiteSpace: 'nowrap' }}>
+            After Hours
+          </div>
+        )}
         <style>{`
           @keyframes pulseScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
           @keyframes moversScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
@@ -170,6 +210,11 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
                 <span style={{ fontSize: 12, fontWeight: 600, color: chg > 0 ? 'var(--green)' : chg < 0 ? 'var(--red)' : 'var(--text3)' }}>
                   {d ? `${chg > 0 ? '▲' : '▼'}${Math.abs(chg).toFixed(2)}%` : '--'}
                 </span>
+                {d?.label && (
+                  <span style={{ fontSize: 9, fontWeight: 600, color: chg > 0 ? 'var(--green)' : 'var(--red)', opacity: 0.8 }}>
+                    {d.label}
+                  </span>
+                )}
               </span>
             );
           })}

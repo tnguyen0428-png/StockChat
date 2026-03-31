@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { scoreTicker } from '../../lib/screener';
 import TickerBanner from './TickerBanner';
 
 const EMOJIS = ['🔥','📈','📉','🚀','💪','🎯','👀','💰','⚠️','✅','❌','😎','🤔','👋','🙌','😂','💎','🐂','🐻','⏰'];
@@ -115,8 +116,32 @@ function ListsView({ group, isAdmin, isModerator, isOpenList }) {
     const list = lists.find(l => l.id === listId);
     const nextRank = list?.curated_stocks?.length
       ? Math.max(...list.curated_stocks.map(s => s.ranking)) + 1 : 1;
-    const { error } = await supabase.from('curated_stocks').insert({ list_id: listId, ticker, ranking: nextRank });
-    if (!error) { setAddTickers(prev => ({ ...prev, [listId]: '' })); await loadLists(); }
+
+    // Score the ticker automatically
+    let score = 0;
+    let notes = null;
+    let thesis = null;
+    try {
+      const result = await scoreTicker(ticker);
+      if (result) {
+        score = result.score;
+        thesis = result.thesis;
+        notes = `P/E: ${result.pe?.toFixed(1) || 'N/A'} · PEG: ${result.peg?.toFixed(2) || 'N/A'} · Net Margin: ${result.netMargin ? (result.netMargin * 100).toFixed(1) + '%' : 'N/A'} · Sales Growth: ${result.salesGrowth != null ? result.salesGrowth + '%' : 'N/A'} · EPS Growth: ${result.epsGrowth != null ? result.epsGrowth + '%' : 'N/A'} · Beat Rate: ${result.beatRate != null ? result.beatRate + '%' : 'N/A'}`;
+      }
+    } catch {}
+
+    const { error } = await supabase.from('curated_stocks').insert({
+      list_id: listId,
+      ticker,
+      ranking: nextRank,
+      score,
+      notes,
+      thesis,
+    });
+    if (!error) {
+      setAddTickers(prev => ({ ...prev, [listId]: '' }));
+      await loadLists();
+    }
   };
 
   const handleDeleteStock = async (stock) => {
@@ -148,7 +173,7 @@ function ListsView({ group, isAdmin, isModerator, isOpenList }) {
           <div style={styles.secLabel}>{list.name} · {list.curated_stocks?.length || 0} stocks</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
             {['Earnings 30%','Fundamentals 25%','Sales Growth 20%','Valuation 10%','Price Trend 10%','Market Cap 5%'].map(item => (
-              <span key={item} style={{ fontSize: 10, color: 'var(--text3)' }}>
+              <span key={item} style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500 }}>
                 <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', marginRight: 3, verticalAlign: 'middle' }} />
                 {item}
               </span>
