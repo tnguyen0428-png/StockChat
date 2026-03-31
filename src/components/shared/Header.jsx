@@ -201,11 +201,11 @@ const styles = {
   chatLabel: {
     fontSize: 16,
     fontWeight: 700,
-    color: 'var(--text1)',
+    color: '#f0f0f0',
   },
   chatSep: {
     fontSize: 16,
-    color: 'var(--text3)',
+    color: 'rgba(255,255,255,0.4)',
     fontWeight: 400,
   },
   groupNameWrap: {
@@ -217,12 +217,12 @@ const styles = {
   chatGroupName: {
     fontSize: 15,
     fontWeight: 600,
-    color: 'var(--green)',
+    color: '#a0e070',
   },
   dropdownToggle: {
     background: 'none',
     border: 'none',
-    color: 'var(--text3)',
+    color: 'rgba(255,255,255,0.6)',
     fontSize: 9,
     cursor: 'pointer',
     padding: '2px 4px',
