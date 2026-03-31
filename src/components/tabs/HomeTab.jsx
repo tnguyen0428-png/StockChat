@@ -181,13 +181,14 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
   return (
     <div style={styles.scroll}>
 
+      {/* MARKET PULSE LABEL */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 12px', background: 'var(--card)', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B6D11' }} />
+        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text2)', letterSpacing: '0.04em' }}>MARKET PULSE</span>
+      </div>
+
       {/* MARKET PULSE STRIP */}
       <div style={{ overflow: 'hidden', background: 'var(--card)', borderBottom: '1px solid var(--border)', height: 40, display: 'flex', alignItems: 'center' }}>
-        {!isMarketOpen() && (
-          <div style={{ flexShrink: 0, background: 'rgba(162,45,45,0.15)', padding: '2px 8px', marginLeft: 8, borderRadius: 4, fontSize: 10, fontWeight: 600, color: '#A32D2D', whiteSpace: 'nowrap' }}>
-            After Hours
-          </div>
-        )}
         <style>{`
           @keyframes pulseScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
           @keyframes moversScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
@@ -221,6 +222,12 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
         </div>
       </div>
 
+      {/* TOP MOVERS LABEL */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 12px', background: 'var(--card)', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B6D11' }} />
+        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text2)', letterSpacing: '0.04em' }}>TODAY'S TOP MOVERS</span>
+      </div>
+
       {/* TOP MOVERS STRIP */}
       <div style={{ overflow: 'hidden', height: 36, display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', background: 'var(--card)' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', animation: `moversScroll ${(movers.gainers.length + movers.losers.length) * 3}s linear infinite` }}>
@@ -240,7 +247,7 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
       {/* SECTOR GROUP CHAT */}
       <div style={styles.secLabel}>Sector Group Chat</div>
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
-        {displayGroups.map(group => {
+        {displayGroups.filter(g => g.name !== 'UpTik Public').map(group => {
           const memberCount = group.member_count || 0;
           return (
             <div key={group.id}
