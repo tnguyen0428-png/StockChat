@@ -380,6 +380,34 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const callAI = useCallback(async (query) => {
     setAiLoading(true);
     try {
+      // Detect ticker symbols in the query
+      const tickerMatches = query.match(/\b[A-Z]{1,5}\b|\$[A-Z]{1,5}/g) || [];
+      const tickers = [...new Set(tickerMatches.map(t => t.replace('$', '')))].slice(0, 3);
+
+      // Fetch FMP data for detected tickers
+      let stockContext = '';
+      if (tickers.length > 0) {
+        const stockData = await Promise.all(tickers.map(async (ticker) => {
+          try {
+            const [profileRes, earningsRes] = await Promise.all([
+              fetch(`https://financialmodelingprep.com/stable/profile?symbol=${ticker}&apiKey=${import.meta.env.VITE_FMP_API_KEY}`),
+              fetch(`https://financialmodelingprep.com/stable/earnings?symbol=${ticker}&apiKey=${import.meta.env.VITE_FMP_API_KEY}`),
+            ]);
+            const profile = await profileRes.json();
+            const earnings = await earningsRes.json();
+            const p = profile?.[0];
+            const nextEarnings = earnings?.find(e => e.epsActual === null);
+            const lastEarnings = earnings?.find(e => e.epsActual !== null);
+            if (!p) return null;
+            return `${ticker}: price $${p.price}, sector ${p.sector}, mktcap $${(p.marketCap/1e9).toFixed(1)}B, next earnings ${nextEarnings?.date || 'unknown'}, last EPS actual ${lastEarnings?.epsActual} vs est ${lastEarnings?.epsEstimated}`;
+          } catch { return null; }
+        }));
+        const validData = stockData.filter(Boolean);
+        if (validData.length > 0) {
+          stockContext = `\n\nREAL-TIME STOCK DATA:\n${validData.join('\n')}`;
+        }
+      }
+
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -401,7 +429,7 @@ PERSONALITY:
 
 RESPONSE RULES:
 - Answer the question first, disclaimers last and keep them very short
-- If you don't have real-time data, say so in ONE phrase then pivot to what you DO know
+- If you have real-time data in context, USE IT — answer directly and specifically
 - Only ask a clarifying question if you genuinely don't understand what they're asking
 - Never give a wall of text — if it needs more than 3 sentences, wait for the user to ask
 - Write like a text from a smart friend, not a compliance document
@@ -416,20 +444,21 @@ CONTENT:
 USER CONTEXT:
 - User's name: ${profile?.username || 'Trader'}
 - Active group: ${activeGroup?.name || 'None'}
-- Watchlist: ${watchlist.length > 0 ? watchlist.join(', ') : 'empty'}
+- Watchlist: ${watchlist.length > 0 ? watchlist.join(', ') : 'empty'}${stockContext}
 
 APP KNOWLEDGE:
 UpTikAlerts scoring: Earnings 30% / Fundamentals 25% / Sales Growth 20% / Valuation 10% / Price Trend 10% / Market Cap 5%. Sectors: Tech, Healthcare, Finance, Energy, Industrial, Consumer, Communication. Features: Daily Briefing, Curated Lists, Alerts, Watchlist, Private Chat.
 
 GOOD RESPONSE EXAMPLES:
 User: "What stocks are trending up?" → "Tech is leading right now — NVDA and META have strong momentum this week. Want me to break down the fundamentals on either?"
-User: "What's SPY at?" → "No live prices on my end — check the Market Pulse strip on your home screen. Last close was around 634. Want a read on where the market is fundamentally?"
+User: "When is COHR earnings?" → "COHR reports next on [date from real-time data]. Last quarter they [beat/missed] by $X. Want me to walk through what to watch?"
 User: "Market feels scary" → "Totally normal feeling. As Buffett says — be fearful when others are greedy, be greedy when others are fearful. What are you watching?"`,
           messages: [{ role: 'user', content: query }],
         }),
       });
       const data = await response.json();
-      const text = data.content?.[0]?.text || 'Unable to analyze right now.';
+      const rawText = data.content?.[0]?.text || 'Unable to respond right now.';
+      const text = stripMarkdown(rawText);
       await supabase.from('chat_messages').insert({
         group_id: group.id, user_id: 'user_ai',
         username: 'UpTik AI', user_color: '#8B5CF6',
@@ -439,13 +468,13 @@ User: "Market feels scary" → "Totally normal feeling. As Buffett says — be f
       await supabase.from('chat_messages').insert({
         group_id: group.id, user_id: 'user_ai',
         username: 'UpTik AI', user_color: '#8B5CF6',
-        text: 'AI unavailable right now. Try again shortly.',
+        text: 'Unable to respond right now. Try again shortly.',
         type: 'ai', is_admin: false,
       });
     } finally {
       setAiLoading(false);
     }
-  }, [group?.id]);
+  }, [group?.id, profile, activeGroup, watchlist]);
 
   const handleSend = useCallback(async () => {
     const text = aiMode ? `@AI ${inputText.trim()}` : inputText.trim();

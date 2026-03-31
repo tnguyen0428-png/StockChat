@@ -56,7 +56,7 @@ export default function AITab({ session }) {
     if (data) setWatchlist(data.map(w => w.symbol));
   };
 
-  const buildSystemPrompt = () => `You are UpTik AI, the trading assistant for UpTikAlerts. You are sharp, direct, and human — like a knowledgeable friend who trades stocks.
+  const buildSystemPrompt = (stockContext = '') => `You are UpTik AI, the trading assistant for UpTikAlerts. You are sharp, direct, and human — like a knowledgeable friend who trades stocks.
 
 PERSONALITY:
 - Conversational and natural, never robotic
@@ -66,7 +66,7 @@ PERSONALITY:
 
 RESPONSE RULES:
 - Answer the question first, disclaimers last and keep them very short
-- If you don't have real-time data, say so in ONE phrase then pivot to what you DO know
+- If you have real-time data in context, USE IT — answer directly and specifically
 - Only ask a clarifying question if you genuinely don't understand what they're asking
 - Never give a wall of text — if it needs more than 3 sentences, wait for the user to ask
 - Write like a text from a smart friend, not a compliance document
@@ -81,7 +81,7 @@ CONTENT:
 USER CONTEXT:
 - User's name: ${profile?.username || 'Trader'}
 - Active group: ${activeGroup?.name || 'None'}
-- Watchlist: ${watchlist.length > 0 ? watchlist.join(', ') : 'empty'}
+- Watchlist: ${watchlist.length > 0 ? watchlist.join(', ') : 'empty'}${stockContext}
 
 APP KNOWLEDGE:
 UpTikAlerts scoring: Earnings 30% / Fundamentals 25% / Sales Growth 20% / Valuation 10% / Price Trend 10% / Market Cap 5%. Sectors: Tech, Healthcare, Finance, Energy, Industrial, Consumer, Communication. Features: Daily Briefing, Curated Lists, Alerts, Watchlist, Private Chat.
@@ -99,6 +99,34 @@ User: "Market feels scary" → "Totally normal feeling. As Buffett says — be f
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
     try {
+      // Detect ticker symbols in the query
+      const tickerMatches = userText.match(/\b[A-Z]{1,5}\b|\$[A-Z]{1,5}/g) || [];
+      const tickers = [...new Set(tickerMatches.map(t => t.replace('$', '')))].slice(0, 3);
+
+      // Fetch FMP data for detected tickers
+      let stockContext = '';
+      if (tickers.length > 0) {
+        const stockData = await Promise.all(tickers.map(async (ticker) => {
+          try {
+            const [profileRes, earningsRes] = await Promise.all([
+              fetch(`https://financialmodelingprep.com/stable/profile?symbol=${ticker}&apiKey=${import.meta.env.VITE_FMP_API_KEY}`),
+              fetch(`https://financialmodelingprep.com/stable/earnings?symbol=${ticker}&apiKey=${import.meta.env.VITE_FMP_API_KEY}`),
+            ]);
+            const profile = await profileRes.json();
+            const earnings = await earningsRes.json();
+            const p = profile?.[0];
+            const nextEarnings = earnings?.find(e => e.epsActual === null);
+            const lastEarnings = earnings?.find(e => e.epsActual !== null);
+            if (!p) return null;
+            return `${ticker}: price $${p.price}, sector ${p.sector}, mktcap $${(p.marketCap/1e9).toFixed(1)}B, next earnings ${nextEarnings?.date || 'unknown'}, last EPS actual ${lastEarnings?.epsActual} vs est ${lastEarnings?.epsEstimated}`;
+          } catch { return null; }
+        }));
+        const validData = stockData.filter(Boolean);
+        if (validData.length > 0) {
+          stockContext = `\n\nREAL-TIME STOCK DATA:\n${validData.join('\n')}`;
+        }
+      }
+
       const history = [...messages, userMsg]
         .filter(m => m.role === 'user' || m.role === 'assistant')
         .map(m => ({ role: m.role, content: m.text }));
@@ -113,7 +141,7 @@ User: "Market feels scary" → "Totally normal feeling. As Buffett says — be f
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 1000,
-          system: buildSystemPrompt(),
+          system: buildSystemPrompt(stockContext),
           messages: history,
         }),
       });
