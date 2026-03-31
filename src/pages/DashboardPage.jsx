@@ -90,16 +90,11 @@ export default function DashboardPage({ session }) {
   }, [activeTab]);
 
   useEffect(() => {
-    const handleChatTab = async () => {
-      if (activeTab === 'chat') {
-        if (!activeGroup) {
-          const uptikPublic = publicGroups.find(g => g.name === 'UpTik Public');
-          if (uptikPublic) enterGroup(uptikPublic);
-        }
-      }
-    };
-    handleChatTab();
-  }, [activeTab]);
+    if (activeTab === 'chat' && publicGroups.length > 0 && !activeGroup) {
+      const uptikPublic = publicGroups.find(g => g.name === 'UpTik Public');
+      if (uptikPublic) enterGroup(uptikPublic);
+    }
+  }, [activeTab, publicGroups]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
