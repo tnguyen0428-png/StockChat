@@ -279,7 +279,15 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="#3B6D11"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"/></svg>
             <span style={{ fontSize: 11, fontWeight: 600, color: '#3B6D11' }}>Public Group Chat</span>
           </div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#1a4d0a' }}>UpTik Public</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontSize: 14, fontWeight: 500, color: '#1a4d0a' }}>UpTik Public</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B6D11', animation: 'pulse 1.5s ease-in-out infinite', flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: '#3B6D11', fontWeight: 500 }}>
+                {groupsWithCounts.find(g => g.name === 'UpTik Public')?.member_count || publicGroups.find(g => g.name === 'UpTik Public')?.member_count || 0}
+              </span>
+            </div>
+          </div>
         </div>
         {/* Private Chat */}
         <div
