@@ -50,6 +50,46 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
     }
   };
 
+  const loadFutures = async (indicators) => {
+    try {
+      const futureSymbols = ['ES=F', 'NQ=F', 'YM=F', 'GC=F', 'CL=F'];
+      const futuresResults = await Promise.all(futureSymbols.map(async (symbol) => {
+        try {
+          const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`)}`);
+          const data = await res.json();
+          const meta = data.chart?.result?.[0]?.meta;
+          if (!meta) return null;
+          const price = meta.regularMarketPrice;
+          const prev = meta.previousClose;
+          const change = ((price - prev) / prev) * 100;
+          return { symbol, price, change };
+        } catch { return null; }
+      }));
+
+      const futuresMap = {
+        'ES=F': 'S&P Futures',
+        'NQ=F': 'Nas Futures',
+        'YM=F': 'Dow Futures',
+        'GC=F': 'Gold',
+        'CL=F': 'Oil',
+      };
+
+      const pulse = {};
+
+      // Add futures data
+      futuresResults.filter(Boolean).forEach(r => {
+        pulse[r.symbol] = { price: r.price, change: r.change, label: 'FUT' };
+      });
+
+      setMarketPulse(pulse);
+      setMarketIndicators(futuresResults.filter(Boolean).map((r, i) => ({
+        ticker: r.symbol,
+        label: futuresMap[r.symbol],
+        position: i + 1,
+      })));
+    } catch {}
+  };
+
   const loadMarketIndicators = async () => {
     const { data } = await supabase
       .from('market_indicators')
@@ -57,7 +97,12 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
       .order('position', { ascending: true });
     if (data) {
       setMarketIndicators(data);
-      await loadMarketPulse(data);
+      const status = getMarketStatus();
+      if (status === 'open') {
+        await loadMarketPulse(data);
+      } else {
+        await loadFutures();
+      }
     }
   };
 
@@ -161,16 +206,24 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
     } catch {}
   };
 
-  const isMarketOpen = () => {
+  const getMarketStatus = () => {
     const now = new Date();
     const est = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
     const day = est.getDay();
-    const hours = est.getHours();
-    const minutes = est.getMinutes();
-    const timeInMinutes = hours * 60 + minutes;
-    if (day === 0 || day === 6) return false;
-    return timeInMinutes >= 570 && timeInMinutes < 960;
+    const timeInMinutes = est.getHours() * 60 + est.getMinutes();
+    if (day === 0 || day === 6) return 'closed';
+    if (timeInMinutes < 570) return 'premarket';
+    if (timeInMinutes >= 570 && timeInMinutes < 960) return 'open';
+    return 'afterhours';
   };
+
+  const marketStatus = getMarketStatus();
+  const statusLabel =
+    marketStatus === 'open' ? 'MARKET PULSE' :
+    marketStatus === 'premarket' ? 'PRE-MARKET' :
+    marketStatus === 'afterhours' ? 'AFTER HOURS' :
+    'MARKET CLOSED';
+  const statusColor = marketStatus === 'open' ? '#3B6D11' : '#A32D2D';
 
   const pulseItems = marketIndicators.length > 0
     ? marketIndicators.map(m => ({ label: m.label, key: m.ticker }))
@@ -183,8 +236,8 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
 
       {/* MARKET PULSE LABEL */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 12px', background: 'var(--card)', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B6D11' }} />
-        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text2)', letterSpacing: '0.04em' }}>MARKET PULSE</span>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor }} />
+        <span style={{ fontSize: 10, fontWeight: 600, color: statusColor, letterSpacing: '0.04em' }}>{statusLabel}</span>
       </div>
 
       {/* MARKET PULSE STRIP */}
@@ -207,14 +260,17 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
                 background: chg > 0 ? 'rgba(59,109,17,0.12)' : chg < 0 ? 'rgba(162,45,45,0.1)' : 'transparent',
               }}>
                 <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text2)' }}>{item.label}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>{d ? `$${Number(d.price).toFixed(2)}` : '--'}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: chg > 0 ? 'var(--green)' : chg < 0 ? 'var(--red)' : 'var(--text3)' }}>
-                  {d ? `${chg > 0 ? '▲' : '▼'}${Math.abs(chg).toFixed(2)}%` : '--'}
-                </span>
-                {d?.label && (
-                  <span style={{ fontSize: 9, fontWeight: 600, color: chg > 0 ? 'var(--green)' : 'var(--red)', opacity: 0.8 }}>
-                    {d.label}
+                {d?.label === 'FUT' ? (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: chg > 0 ? 'var(--green)' : chg < 0 ? 'var(--red)' : 'var(--text3)' }}>
+                    {chg > 0 ? '▲' : '▼'}{Math.abs((chg / 100) * Number(d.price)).toFixed(2)}
                   </span>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>{d ? `$${Number(d.price).toFixed(2)}` : '--'}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: chg > 0 ? 'var(--green)' : chg < 0 ? 'var(--red)' : 'var(--text3)' }}>
+                      {d ? `${chg > 0 ? '▲' : '▼'}${Math.abs(chg).toFixed(2)}%` : '--'}
+                    </span>
+                  </>
                 )}
               </span>
             );
