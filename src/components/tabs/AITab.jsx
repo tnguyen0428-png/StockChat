@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useGroup } from '../../context/GroupContext';
 import { supabase } from '../../lib/supabase';
 import { askUpTikAI, stripMarkdown } from '../../lib/aiAgent';
+import FadingMessage from '../shared/FadingMessage';
 
 const QUICK_CHIPS = [
   'How do I join a group?',
@@ -90,22 +91,32 @@ export default function AITab({ session }) {
 
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10, WebkitOverflowScrolling: 'touch' }}>
-        {messages.map((msg, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', gap: 8, alignItems: 'flex-start' }}>
-            {msg.role === 'assistant' && (
-              <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0, marginTop: 2 }}>AI</div>
-            )}
-            <div style={{
-              maxWidth: '80%', padding: '10px 13px', borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '2px 12px 12px 12px',
-              background: msg.role === 'user' ? '#7C3AED' : 'var(--card)',
-              border: msg.role === 'assistant' ? '1px solid var(--border)' : 'none',
-              color: msg.role === 'user' ? '#fff' : 'var(--text1)',
-              fontSize: 14, lineHeight: 1.6,
-            }}>
-              {msg.text}
+        {messages.map((msg, i) => {
+          const bubble = (
+            <div style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', gap: 8, alignItems: 'flex-start' }}>
+              {msg.role === 'assistant' && (
+                <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0, marginTop: 2 }}>AI</div>
+              )}
+              <div style={{
+                maxWidth: '80%', padding: '10px 13px', borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '2px 12px 12px 12px',
+                background: msg.role === 'user' ? '#7C3AED' : 'var(--card)',
+                border: msg.role === 'assistant' ? '1px solid var(--border)' : 'none',
+                color: msg.role === 'user' ? '#fff' : 'var(--text1)',
+                fontSize: 14, lineHeight: 1.6,
+              }}>
+                {msg.text}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+          if (msg.role === 'assistant' && i > 0) {
+            return (
+              <FadingMessage key={i} onRemove={() => setMessages(prev => prev.filter((_, idx) => idx !== i))}>
+                {bubble}
+              </FadingMessage>
+            );
+          }
+          return <div key={i}>{bubble}</div>;
+        })}
         {loading && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
             <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>AI</div>

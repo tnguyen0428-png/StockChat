@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { scoreTicker } from '../../lib/screener';
 import { useGroup } from '../../context/GroupContext';
 import { askUpTikAI } from '../../lib/aiAgent';
+import FadingMessage from '../shared/FadingMessage';
 import TickerBanner from './TickerBanner';
 
 const EMOJIS = ['🔥','📈','📉','🚀','💪','🎯','👀','💰','⚠️','✅','❌','😎','🤔','👋','🙌','😂','💎','🐂','🐻','⏰'];
@@ -361,7 +362,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
         .eq('group_id', group.id)
         .order('created_at', { ascending: true })
         .limit(100);
-      if (data) setMessages(data);
+      if (data) setMessages(data.filter(m => m.type !== 'ai'));
       setLoading(false);
     };
     loadMessages();
@@ -527,9 +528,17 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
                   <div style={styles.emptyText}>No messages yet — say hello!</div>
                 </div>
               )}
-              {messages.map(msg => (
-                <MessageItem key={msg.id} msg={msg} currentUserId={session?.user?.id} />
-              ))}
+              {messages.map(msg => {
+                const isAI = msg.user_id === 'user_ai' || msg.type === 'ai';
+                if (isAI) {
+                  return (
+                    <FadingMessage key={msg.id} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
+                      <MessageItem msg={msg} currentUserId={session?.user?.id} />
+                    </FadingMessage>
+                  );
+                }
+                return <MessageItem key={msg.id} msg={msg} currentUserId={session?.user?.id} />;
+              })}
               {aiLoading && (
                 <div style={styles.aiLoading}>
                   <span style={{ color: '#8B5CF6', fontSize: 14 }}>AI is analyzing</span>
