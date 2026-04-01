@@ -561,9 +561,20 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
           )}
 
           <div style={styles.inputBar}>
-            {(isAdmin || isModerator) && (
-              <button style={styles.broadcastBtn} onClick={() => setShowBroadcastModal(true)}>BC</button>
-            )}
+            <div
+              style={{
+                borderRadius: 20,
+                background: aiMode ? 'linear-gradient(135deg, #8B5CF6, #6D28D9)' : '#1a1a2e',
+                border: aiMode ? 'none' : '1.5px solid rgba(139,92,246,0.3)',
+                padding: '7px 12px',
+                display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+              onClick={() => { setAiMode(prev => !prev); inputRef.current?.focus(); }}
+            >
+              <div style={{ width: 18, height: 18, borderRadius: '50%', background: aiMode ? 'rgba(255,255,255,0.2)' : 'linear-gradient(135deg, #8B5CF6, #6D28D9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: '#fff' }}>AI</div>
+              <span style={{ fontSize: 11, fontWeight: 600, color: aiMode ? '#fff' : '#8B5CF6' }}>Ask</span>
+            </div>
             <input
               ref={inputRef}
               style={{ ...styles.input, borderColor: aiMode ? '#8B5CF6' : 'var(--border)' }}
@@ -575,22 +586,15 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
               autoComplete="off"
               autoCorrect="off"
             />
+            {(isAdmin || isModerator) && (
+              <div style={{ flexShrink: 0, cursor: 'pointer', opacity: 0.5 }} onClick={() => setShowBroadcastModal(true)}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" fill="#888"/>
+                </svg>
+              </div>
+            )}
             <button
-              style={{
-                background: aiMode ? 'linear-gradient(135deg, #8B5CF6, #6D28D9)' : 'var(--card2)',
-                border: aiMode ? 'none' : '1px solid var(--border)',
-                borderRadius: 8, padding: '5px 9px',
-                fontSize: 11, fontWeight: 700,
-                color: aiMode ? '#fff' : 'var(--text3)',
-                cursor: 'pointer', flexShrink: 0, lineHeight: 1,
-                transition: 'all 0.15s',
-              }}
-              onClick={() => { setAiMode(prev => !prev); inputRef.current?.focus(); }}
-            >
-              AI
-            </button>
-            <button
-              style={{ ...styles.sendBtn, opacity: inputText.trim() ? 1 : 0.4 }}
+              style={{ ...styles.sendBtn, background: aiMode ? '#8B5CF6' : 'var(--green)', opacity: inputText.trim() ? 1 : 0.4 }}
               onClick={handleSend}
               disabled={!inputText.trim()}
             >
@@ -772,12 +776,7 @@ const styles = {
   inputBar: {
     background: 'var(--card)', borderTop: '1px solid var(--border)',
     padding: '8px 12px', display: 'flex',
-    gap: 8, alignItems: 'center', flexShrink: 0,
-  },
-  broadcastBtn: {
-    background: 'none', border: '1px solid var(--border)',
-    borderRadius: 8, padding: '5px 8px',
-    fontSize: 16, cursor: 'pointer', flexShrink: 0, lineHeight: 1,
+    gap: 6, alignItems: 'center', flexShrink: 0,
   },
   emojiToggle: {
     background: 'none', border: 'none',
@@ -787,14 +786,14 @@ const styles = {
     flex: 1, background: 'var(--card2)',
     border: '1.5px solid var(--border)',
     color: 'var(--text1)', padding: '10px 14px',
-    borderRadius: 22, fontFamily: 'var(--font)',
-    fontSize: 16, outline: 'none',
+    borderRadius: 20, fontFamily: 'var(--font)',
+    fontSize: 15, outline: 'none',
   },
   sendBtn: {
     background: 'var(--green)', border: 'none', color: '#fff',
-    width: 40, height: 40, borderRadius: '50%',
+    width: 36, height: 36, borderRadius: '50%',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 16, flexShrink: 0, cursor: 'pointer',
+    fontSize: 14, flexShrink: 0, cursor: 'pointer',
     transition: 'opacity 0.15s',
   },
   loadingWrap: {
