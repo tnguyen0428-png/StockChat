@@ -16,10 +16,8 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
   const [briefing, setBriefing]                 = useState(null);
   const [marketPulse, setMarketPulse]           = useState({});
   const [marketIndicators, setMarketIndicators] = useState([]);
-  const [futuresIndicators, setFuturesIndicators] = useState([]);
   const [futuresData, setFuturesData]           = useState({});
   const [futuresLabels, setFuturesLabels]       = useState([]);
-  const [movers, setMovers]                     = useState({ gainers: [], losers: [] });
   const [groupsWithCounts, setGroupsWithCounts] = useState([]);
 
   const getMarketStatus = () => {
@@ -36,7 +34,6 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
   useEffect(() => {
     loadBriefing();
     loadMarketIndicators();
-    loadMovers();
   }, []);
 
   useEffect(() => {
@@ -158,64 +155,7 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
     } catch {}
   };
 
-  const loadMovers = async () => {
-    try {
-      const [gainRes, loseRes] = await Promise.all([
-        fetch(`https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers?apiKey=${POLYGON_KEY}`),
-        fetch(`https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/losers?apiKey=${POLYGON_KEY}`),
-      ]);
-      const gainData = await gainRes.json();
-      const loseData = await loseRes.json();
-
-      const gainers = (gainData.tickers || []).slice(0, 5);
-      const losers  = (loseData.tickers  || []).slice(0, 5);
-
-      if (gainers.length === 0) {
-        const getLastTradingDay = () => {
-          const d = new Date();
-          d.setHours(0, 0, 0, 0);
-          if (d.getDay() === 0) d.setDate(d.getDate() - 2);
-          if (d.getDay() === 6) d.setDate(d.getDate() - 1);
-          const now = new Date();
-          const estHour = now.getUTCHours() - 5;
-          if (estHour < 9 || (estHour === 9 && now.getUTCMinutes() < 30)) {
-            d.setDate(d.getDate() - 1);
-            if (d.getDay() === 0) d.setDate(d.getDate() - 2);
-            if (d.getDay() === 6) d.setDate(d.getDate() - 1);
-          }
-          return d.toISOString().split('T')[0];
-        };
-        const prevRes = await fetch(
-          `https://api.polygon.io/v2/aggs/grouped/locale/us/market/stocks/${getLastTradingDay()}?adjusted=true&apiKey=${POLYGON_KEY}`
-        );
-        const prevData = await prevRes.json();
-        const results = (prevData.results || [])
-          .filter(r => r.v > 1000000)
-          .map(r => ({
-            ticker: r.T,
-            day: { c: r.c },
-            todaysChangePerc: ((r.c - r.o) / r.o) * 100,
-          }))
-          .sort((a, b) => b.todaysChangePerc - a.todaysChangePerc);
-
-        setMovers({
-          gainers: results.slice(0, 5),
-          losers:  results.slice(-5).reverse(),
-        });
-        return;
-      }
-
-      setMovers({ gainers, losers });
-    } catch {}
-  };
-
   const marketStatus = getMarketStatus();
-  const statusLabel =
-    marketStatus === 'open' ? 'MARKET PULSE' :
-    marketStatus === 'premarket' ? 'PRE-MARKET' :
-    marketStatus === 'afterhours' ? 'AFTER HOURS' :
-    'MARKET CLOSED';
-  const statusColor = marketStatus === 'open' ? '#3B6D11' : '#A32D2D';
 
   const pulseItems = marketStatus === 'open'
     ? (marketIndicators.length > 0 ? marketIndicators.map(m => ({ label: m.label, key: m.ticker })) : [{ label: 'S&P 500', key: 'SPY' }, { label: 'Nasdaq', key: 'QQQ' }, { label: 'Dow', key: 'DIA' }, { label: 'VIX', key: 'VIXY' }])
@@ -292,7 +232,7 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
                 <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#8bc34a', animation: 'pulse 1.5s ease-in-out infinite' }} />
                 <span style={{ fontSize: 14, color: '#ccc', fontWeight: 500 }}>{group.sector || group.name}</span>
               </div>
-              <span style={{ fontSize: 11, color: '#555' }}>{memberCount}</span>
+              <span style={{ fontSize: 11, color: '#8bc34a' }}>{memberCount}</span>
             </div>
           );
         })}
