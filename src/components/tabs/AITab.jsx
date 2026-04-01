@@ -108,14 +108,14 @@ export default function AITab({ session }) {
               </div>
             </div>
           );
-          if (msg.role === 'assistant' && i > 0) {
-            return (
-              <FadingMessage key={i} onRemove={() => setMessages(prev => prev.filter((_, idx) => idx !== i))}>
-                {bubble}
-              </FadingMessage>
-            );
+          if (i === 0 && msg.role === 'assistant') {
+            return <div key={i}>{bubble}</div>;
           }
-          return <div key={i}>{bubble}</div>;
+          return (
+            <FadingMessage key={i} onRemove={() => setMessages(prev => prev.filter((_, idx) => idx !== i))}>
+              {bubble}
+            </FadingMessage>
+          );
         })}
         {loading && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>

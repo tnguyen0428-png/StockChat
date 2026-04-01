@@ -362,7 +362,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
         .eq('group_id', group.id)
         .order('created_at', { ascending: true })
         .limit(100);
-      if (data) setMessages(data.filter(m => m.type !== 'ai'));
+      if (data) setMessages(data.filter(m => m.type !== 'ai' && !/@AI\b/i.test(m.text)));
       setLoading(false);
     };
     loadMessages();
@@ -530,7 +530,8 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
               )}
               {messages.map(msg => {
                 const isAI = msg.user_id === 'user_ai' || msg.type === 'ai';
-                if (isAI) {
+                const isAIQuestion = msg.type === 'user' && /@AI\b/i.test(msg.text);
+                if (isAI || isAIQuestion) {
                   return (
                     <FadingMessage key={msg.id} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
                       <MessageItem msg={msg} currentUserId={session?.user?.id} />
