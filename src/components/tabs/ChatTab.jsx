@@ -391,9 +391,17 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const callAI = useCallback(async (query) => {
     setAiLoading(true);
     try {
+      const recentHistory = messages
+        .filter(m => m.type === 'user' || m.type === 'ai')
+        .slice(-10)
+        .map(m => ({
+          role: m.user_id === 'user_ai' ? 'assistant' : 'user',
+          content: m.text,
+        }));
+
       const { text, newLastTicker } = await askUpTikAI({
         userText: query,
-        history: [],
+        history: recentHistory,
         lastTicker: aiLastTicker,
         username: profile?.username,
         groupName: activeGroup?.name,
@@ -416,7 +424,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     } finally {
       setAiLoading(false);
     }
-  }, [group?.id, activeGroup?.name, profile?.username, watchlist]);
+  }, [group?.id, activeGroup?.name, profile?.username, watchlist, messages, aiLastTicker]);
 
   const handleSend = useCallback(async () => {
     const text = aiMode ? `@AI ${inputText.trim()}` : inputText.trim();

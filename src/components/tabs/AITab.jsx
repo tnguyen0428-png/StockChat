@@ -28,7 +28,7 @@ export default function AITab({ session }) {
     loadWatchlist();
     setMessages([{
       role: 'assistant',
-      text: `Hi ${profile?.username || 'there'}! I'm UpTik AI — your fundamental analysis assistant. I focus on earnings, revenue growth, valuations and long-term business quality. What would you like to research today?`
+      text: `Hey ${profile?.username || 'there'} — what are we researching today?`
     }]);
   }, [profile?.username]);
 
