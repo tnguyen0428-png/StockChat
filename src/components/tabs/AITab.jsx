@@ -83,7 +83,7 @@ export default function AITab({ session }) {
           <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 }}>AI</div>
           <div>
             <div style={{ fontSize: 16, fontWeight: 600, color: '#fff' }}>UpTik AI</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>Fundamentals · Long-term · No hype</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>Filter out the noise.</div>
           </div>
         </div>
       </div>
