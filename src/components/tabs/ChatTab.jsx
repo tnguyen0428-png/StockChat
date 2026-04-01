@@ -433,7 +433,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     setInputText('');
     setShowEmoji(false);
     setAiMode(false);
-    inputRef.current?.blur();
+    inputRef.current?.focus();
     const { data, error } = await supabase.from('chat_messages').insert({
       group_id: group.id, user_id: session.user.id,
       username: profile.username, user_color: profile.color,

@@ -24,6 +24,7 @@ export default function AITab({ session }) {
   const [watchlist, setWatchlist] = useState([]);
   const [lastTicker, setLastTicker] = useState(null);
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     loadWatchlist();
@@ -50,6 +51,7 @@ export default function AITab({ session }) {
     const userText = text || input.trim();
     if (!userText || loading) return;
     setInput('');
+    inputRef.current?.focus();
     const userMsg = { role: 'user', text: userText };
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
@@ -142,6 +144,7 @@ export default function AITab({ session }) {
       {/* Input bar */}
       <div style={{ padding: '8px 16px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, background: 'var(--card)' }}>
         <input
+          ref={inputRef}
           style={{ flex: 1, background: 'var(--card2)', border: '1.5px solid var(--border)', borderRadius: 22, padding: '10px 14px', fontSize: 14, color: 'var(--text1)', outline: 'none', fontFamily: 'var(--font)' }}
           value={input}
           onChange={e => setInput(e.target.value)}
