@@ -1,6 +1,6 @@
 // ============================================
 // UPTIKALERTS — BottomNav.jsx
-// 3 tabs: Home, Alerts, Profile
+// 5 tabs: Home, Alerts, Chat (center), Help, Profile
 // ============================================
 
 const HomeIcon = ({ active }) => (
@@ -28,17 +28,17 @@ const HelpIcon = ({ active }) => (
   <div style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${active ? 'var(--green)' : 'var(--text3)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: active ? 'var(--green)' : 'var(--text3)', lineHeight: 1 }}>?</div>
 );
 
-const ChatIcon = ({ active }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+const ChatIcon = ({ active, highlighted }) => (
+  <svg width={highlighted ? 24 : 22} height={highlighted ? 24 : 22} viewBox="0 0 24 24" fill="none">
     <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"
-      fill={active ? 'var(--green)' : 'var(--text3)'} />
+      fill={highlighted ? '#fff' : (active ? 'var(--green)' : 'var(--text3)')} />
   </svg>
 );
 
 const TABS = [
   { id: 'home',    label: 'Home',    Icon: HomeIcon    },
-  { id: 'chat',    label: 'Chat',    Icon: ChatIcon    },
   { id: 'alerts',  label: 'Alerts',  Icon: AlertsIcon  },
+  { id: 'chat',    label: 'Chat',    Icon: ChatIcon    },
   { id: 'help',    label: 'Help',    Icon: HelpIcon    },
   { id: 'profile', label: 'Profile', Icon: ProfileIcon },
 ];
@@ -49,13 +49,24 @@ export default function BottomNav({ activeTab, onTabChange, unreadAlerts }) {
       {TABS.map(({ id, label, Icon }) => {
         const isActive = activeTab === id;
         const hasBadge = id === 'alerts' && unreadAlerts;
+        const isChat = id === 'chat';
         return (
-          <div key={id} style={styles.item} onClick={() => onTabChange(id)}>
+          <div key={id} style={{ ...styles.item, ...(isChat ? { marginTop: -22 } : {}) }} onClick={() => onTabChange(id)}>
             <div style={styles.iconWrap}>
-              <Icon active={isActive} />
+              {isChat ? (
+                <div style={styles.chatCircle}>
+                  <Icon active={isActive} highlighted />
+                </div>
+              ) : (
+                <Icon active={isActive} />
+              )}
               {hasBadge && <div style={styles.badge} />}
             </div>
-            <span style={{ ...styles.label, color: isActive ? 'var(--green)' : 'var(--text3)' }}>
+            <span style={{
+              ...styles.label,
+              color: isChat ? 'var(--green)' : (isActive ? 'var(--green)' : 'var(--text3)'),
+              fontWeight: isChat ? 600 : 500,
+            }}>
               {label}
             </span>
           </div>
@@ -80,6 +91,13 @@ const styles = {
     WebkitTapHighlightColor: 'transparent',
   },
   iconWrap: { position: 'relative' },
+  chatCircle: {
+    width: 52, height: 52, borderRadius: '50%',
+    background: 'linear-gradient(135deg, #8bc34a, #5a9a35)',
+    border: '3px solid var(--card)',
+    boxShadow: '0 4px 14px rgba(139,195,74,0.4)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
   badge: {
     position: 'absolute', top: -2, right: -4,
     width: 7, height: 7, background: 'var(--red)',

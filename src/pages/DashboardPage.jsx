@@ -183,6 +183,8 @@ export default function DashboardPage({ session }) {
             session={session}
             onGroupSelect={handleGroupSelect}
             onAIPress={() => setActiveTab('ai')}
+            onSignOut={handleSignOut}
+            onProfilePress={() => setActiveTab('profile')}
           />
         )}
         {activeTab === 'ai' && <AITab session={session} />}
