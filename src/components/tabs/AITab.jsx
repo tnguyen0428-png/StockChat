@@ -5,19 +5,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useGroup } from '../../context/GroupContext';
 import { supabase } from '../../lib/supabase';
-
-const ANTHROPIC_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
-
-const stripMarkdown = (text) => {
-  return text
-    .replace(/#{1,6}\s+/g, '')        // remove headers
-    .replace(/\*\*(.*?)\*\*/g, '$1')  // remove bold
-    .replace(/\*(.*?)\*/g, '$1')      // remove italic
-    .replace(/`(.*?)`/g, '$1')        // remove code
-    .replace(/^\s*[-•]\s+/gm, '• ')  // normalize bullets
-    .replace(/\n{3,}/g, '\n\n')       // max double newlines
-    .trim();
-};
+import { askUpTikAI, stripMarkdown } from '../../lib/aiAgent';
 
 const QUICK_CHIPS = [
   'How do I join a group?',
@@ -33,6 +21,7 @@ export default function AITab({ session }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [watchlist, setWatchlist] = useState([]);
+  const [lastTicker, setLastTicker] = useState(null);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -56,41 +45,6 @@ export default function AITab({ session }) {
     if (data) setWatchlist(data.map(w => w.symbol));
   };
 
-  const buildSystemPrompt = (stockContext = '') => `You are UpTik AI, the trading assistant for UpTikAlerts. You are sharp, direct, and human — like a knowledgeable friend who trades stocks.
-
-PERSONALITY:
-- Conversational and natural, never robotic
-- Brief by default — 2-3 sentences max unless asked for more
-- Confident but not arrogant
-- Occasionally drop a famous investor quote naturally (Buffett, Munger, Lynch, Marks, Druckenmiller)
-
-RESPONSE RULES:
-- Answer the question first, disclaimers last and keep them very short
-- If you have real-time data in context, USE IT — answer directly and specifically
-- Only ask a clarifying question if you genuinely don't understand what they're asking
-- Never give a wall of text — if it needs more than 3 sentences, wait for the user to ask
-- Write like a text from a smart friend, not a compliance document
-- Plain text only, no markdown, no bullet points, no headers
-
-CONTENT:
-- Talk freely about trending stocks, price momentum, what's hot and what's not
-- Focus on fundamentals when relevant but don't ignore momentum and market sentiment
-- Frame opinions as analysis not advice — say "looks strong" not "you should buy"
-- Use UpTikAlerts features naturally — mention curated lists, sector groups, daily briefing
-
-USER CONTEXT:
-- User's name: ${profile?.username || 'Trader'}
-- Active group: ${activeGroup?.name || 'None'}
-- Watchlist: ${watchlist.length > 0 ? watchlist.join(', ') : 'empty'}${stockContext}
-
-APP KNOWLEDGE:
-UpTikAlerts scoring: Earnings 30% / Fundamentals 25% / Sales Growth 20% / Valuation 10% / Price Trend 10% / Market Cap 5%. Sectors: Tech, Healthcare, Finance, Energy, Industrial, Consumer, Communication. Features: Daily Briefing, Curated Lists, Alerts, Watchlist, Private Chat.
-
-GOOD RESPONSE EXAMPLES:
-User: "What stocks are trending up?" → "Tech is leading right now — NVDA and META have strong momentum this week. Want me to break down the fundamentals on either?"
-User: "What's SPY at?" → "No live prices on my end — check the Market Pulse strip on your home screen. Last close was around 634. Want a read on where the market is fundamentally?"
-User: "Market feels scary" → "Totally normal feeling. As Buffett says — be fearful when others are greedy, be greedy when others are fearful. What are you watching?"`
-
   const sendMessage = async (text) => {
     const userText = text || input.trim();
     if (!userText || loading) return;
@@ -99,54 +53,20 @@ User: "Market feels scary" → "Totally normal feeling. As Buffett says — be f
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
     try {
-      // Detect ticker symbols in the query
-      const tickerMatches = userText.match(/\b[A-Z]{1,5}\b|\$[A-Z]{1,5}/g) || [];
-      const tickers = [...new Set(tickerMatches.map(t => t.replace('$', '')))].slice(0, 3);
-
-      // Fetch FMP data for detected tickers
-      let stockContext = '';
-      if (tickers.length > 0) {
-        const stockData = await Promise.all(tickers.map(async (ticker) => {
-          try {
-            const [profileRes, earningsRes] = await Promise.all([
-              fetch(`https://financialmodelingprep.com/stable/profile?symbol=${ticker}&apiKey=${import.meta.env.VITE_FMP_API_KEY}`),
-              fetch(`https://financialmodelingprep.com/stable/earnings?symbol=${ticker}&apiKey=${import.meta.env.VITE_FMP_API_KEY}`),
-            ]);
-            const profile = await profileRes.json();
-            const earnings = await earningsRes.json();
-            const p = profile?.[0];
-            const nextEarnings = earnings?.find(e => e.epsActual === null);
-            const lastEarnings = earnings?.find(e => e.epsActual !== null);
-            if (!p) return null;
-            return `${ticker}: price $${p.price}, sector ${p.sector}, mktcap $${(p.marketCap/1e9).toFixed(1)}B, next earnings ${nextEarnings?.date || 'unknown'}, last EPS actual ${lastEarnings?.epsActual} vs est ${lastEarnings?.epsEstimated}`;
-          } catch { return null; }
-        }));
-        const validData = stockData.filter(Boolean);
-        if (validData.length > 0) {
-          stockContext = `\n\nREAL-TIME STOCK DATA:\n${validData.join('\n')}`;
-        }
-      }
-
       const history = [...messages, userMsg]
         .filter(m => m.role === 'user' || m.role === 'assistant')
         .map(m => ({ role: m.role, content: m.text }));
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1000,
-          system: buildSystemPrompt(stockContext),
-          messages: history,
-        }),
+
+      const { text: aiText, newLastTicker } = await askUpTikAI({
+        userText,
+        history,
+        lastTicker,
+        username: profile?.username,
+        groupName: activeGroup?.name,
+        watchlist,
       });
-      const data = await res.json();
-      const aiText = stripMarkdown(data.content?.[0]?.text || 'Unable to respond right now. Try again shortly.');
+
+      setLastTicker(newLastTicker);
       setMessages(prev => [...prev, { role: 'assistant', text: aiText }]);
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', text: 'Unable to respond right now. Try again shortly.' }]);

@@ -7,20 +7,10 @@ import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { scoreTicker } from '../../lib/screener';
 import { useGroup } from '../../context/GroupContext';
+import { askUpTikAI } from '../../lib/aiAgent';
 import TickerBanner from './TickerBanner';
 
 const EMOJIS = ['🔥','📈','📉','🚀','💪','🎯','👀','💰','⚠️','✅','❌','😎','🤔','👋','🙌','😂','💎','🐂','🐻','⏰'];
-
-const stripMarkdown = (text) => {
-  return text
-    .replace(/#{1,6}\s+/g, '')
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
-    .replace(/`(.*?)`/g, '$1')
-    .replace(/^\s*[-•]\s+/gm, '• ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-};
 
 // ── Message Item ──
 const MessageItem = memo(({ msg, currentUserId }) => {
@@ -345,6 +335,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const [inputText, setInputText]   = useState('');
   const [showEmoji, setShowEmoji]   = useState(false);
   const [aiLoading, setAiLoading]   = useState(false);
+  const [aiLastTicker, setAiLastTicker] = useState(null);
   const [aiMode, setAiMode]         = useState(false);
   const [loading, setLoading]       = useState(false);
   const messagesEndRef = useRef(null);
@@ -400,90 +391,15 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const callAI = useCallback(async (query) => {
     setAiLoading(true);
     try {
-      // Smarter ticker detection
-      const commonWords = new Set(['AI', 'IS', 'THE', 'AND', 'FOR', 'ARE', 'BUT', 'NOT', 'YOU', 'ALL', 'CAN', 'HER', 'WAS', 'ONE', 'OUR', 'OUT', 'HAD', 'HAS', 'HIM', 'HIS', 'HOW', 'ITS', 'NOW', 'OLD', 'SEE', 'TWO', 'WHO', 'DID', 'GET', 'MAY', 'NEW', 'OFF', 'USE', 'WAY', 'SAY', 'SHE', 'TOO', 'ANY', 'DAY', 'WHEN', 'WHAT', 'WITH', 'FROM', 'THEY', 'BEEN', 'HAVE', 'THIS', 'WILL', 'YOUR', 'THAT', 'NEXT', 'TELL', 'SHOW', 'GIVE', 'KNOW', 'DOES', 'JUST', 'LIKE', 'MAKE', 'MUCH', 'SOME', 'TIME', 'VERY', 'WELL', 'ALSO', 'BACK', 'EVEN', 'GOOD', 'HERE', 'HIGH', 'INTO', 'LOOK', 'MORE', 'MOST', 'MOVE', 'NEED', 'ONLY', 'OVER', 'SAME', 'SUCH', 'TAKE', 'THAN', 'THEM', 'THEN', 'THERE', 'THESE', 'THINK', 'THOSE', 'THROUGH', 'UNDER', 'WHICH', 'WHILE', 'ABOUT', 'AFTER', 'AGAIN', 'BELOW', 'COULD', 'EVERY', 'FIRST', 'FOUND', 'GREAT', 'GROUP', 'LARGE', 'LATER', 'NEVER', 'OFTEN', 'OTHER', 'PLACE', 'POINT', 'RIGHT', 'SMALL', 'SOUND', 'STILL', 'STUDY', 'THEIR', 'THERE', 'THESE', 'THING', 'THINK', 'THREE', 'WATER', 'WHERE', 'WORLD', 'WOULD', 'WRITE', 'YEARS', 'STOCK', 'TRADE', 'PRICE', 'SHARE', 'CHART', 'TREND', 'BULL', 'BEAR', 'LONG', 'SHORT', 'CALL', 'PUTS', 'HOLD', 'SELL', 'LIST', 'CHAT', 'HELP', 'INFO', 'DATA', 'LATE', 'LAST', 'EARN', 'TECH', 'SECT', 'MARK', 'OPEN', 'PEAK']);
-      const dollarTickers = (query.match(/\$([A-Z]{1,5})/g) || []).map(t => t.replace('$', ''));
-      const upperWords = (query.match(/\b[A-Z]{2,5}\b/g) || []).filter(w => !commonWords.has(w));
-      const tickers = [...new Set([...dollarTickers, ...upperWords])].slice(0, 3);
-
-      // Fetch FMP data for detected tickers
-      let stockContext = '';
-      if (tickers.length > 0) {
-        const stockData = await Promise.allSettled(tickers.map(async (ticker) => {
-          try {
-            const [profileRes, earningsRes] = await Promise.all([
-              fetch(`https://financialmodelingprep.com/stable/profile?symbol=${ticker}&apiKey=${import.meta.env.VITE_FMP_API_KEY}`),
-              fetch(`https://financialmodelingprep.com/stable/earnings?symbol=${ticker}&apiKey=${import.meta.env.VITE_FMP_API_KEY}`),
-            ]);
-            const profileData = await profileRes.json();
-            const earningsData = await earningsRes.json();
-            const p = Array.isArray(profileData) ? profileData[0] : null;
-            const earnings = Array.isArray(earningsData) ? earningsData : [];
-            const nextEarnings = earnings.find(e => e.epsActual === null);
-            const lastEarnings = earnings.find(e => e.epsActual !== null);
-            if (!p) return null;
-            return `${ticker}: price $${p.price}, sector ${p.sector}, mktcap $${(p.marketCap/1e9).toFixed(1)}B, next earnings ${nextEarnings?.date || 'unknown'}, last EPS actual ${lastEarnings?.epsActual} vs est ${lastEarnings?.epsEstimated}`;
-          } catch { return null; }
-        }));
-        const validData = stockData
-          .filter(r => r.status === 'fulfilled' && r.value !== null)
-          .map(r => r.value);
-        if (validData.length > 0) {
-          stockContext = `\n\nREAL-TIME STOCK DATA:\n${validData.join('\n')}`;
-        }
-      }
-
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1000,
-          system: `You are UpTik AI, the trading assistant for UpTikAlerts. You are sharp, direct, and human — like a knowledgeable friend who trades stocks.
-
-PERSONALITY:
-- Conversational and natural, never robotic
-- Brief by default — 2-3 sentences max unless asked for more
-- Confident but not arrogant
-- Occasionally drop a famous investor quote naturally (Buffett, Munger, Lynch, Marks, Druckenmiller)
-
-RESPONSE RULES:
-- Answer the question first, disclaimers last and keep them very short
-- If you have real-time data in context, USE IT — answer directly and specifically
-- Only ask a clarifying question if you genuinely don't understand what they're asking
-- Never give a wall of text — if it needs more than 3 sentences, wait for the user to ask
-- Write like a text from a smart friend, not a compliance document
-- Plain text only, no markdown, no bullet points, no headers
-
-CONTENT:
-- Talk freely about trending stocks, price momentum, what's hot and what's not
-- Focus on fundamentals when relevant but don't ignore momentum and market sentiment
-- Frame opinions as analysis not advice — say "looks strong" not "you should buy"
-- Use UpTikAlerts features naturally — mention curated lists, sector groups, daily briefing
-
-USER CONTEXT:
-- User's name: ${profile?.username || 'Trader'}
-- Active group: ${group?.name || 'None'}
-- Watchlist: ${watchlist.length > 0 ? watchlist.join(', ') : 'empty'}${stockContext}
-
-APP KNOWLEDGE:
-UpTikAlerts scoring: Earnings 30% / Fundamentals 25% / Sales Growth 20% / Valuation 10% / Price Trend 10% / Market Cap 5%. Sectors: Tech, Healthcare, Finance, Energy, Industrial, Consumer, Communication. Features: Daily Briefing, Curated Lists, Alerts, Watchlist, Private Chat.
-
-GOOD RESPONSE EXAMPLES:
-User: "What stocks are trending up?" → "Tech is leading right now — NVDA and META have strong momentum this week. Want me to break down the fundamentals on either?"
-User: "When is COHR earnings?" → "COHR reports next on [date from real-time data]. Last quarter they [beat/missed] by $X. Want me to walk through what to watch?"
-User: "Market feels scary" → "Totally normal feeling. As Buffett says — be fearful when others are greedy, be greedy when others are fearful. What are you watching?"`,
-          messages: [{ role: 'user', content: query }],
-        }),
+      const { text, newLastTicker } = await askUpTikAI({
+        userText: query,
+        history: [],
+        lastTicker: aiLastTicker,
+        username: profile?.username,
+        groupName: activeGroup?.name,
+        watchlist,
       });
-      const data = await response.json();
-      const rawText = data.content?.[0]?.text || 'Unable to respond right now.';
-      const text = stripMarkdown(rawText);
+      setAiLastTicker(newLastTicker);
       await supabase.from('chat_messages').insert({
         group_id: group.id, user_id: 'user_ai',
         username: 'UpTik AI', user_color: '#8B5CF6',
@@ -500,7 +416,7 @@ User: "Market feels scary" → "Totally normal feeling. As Buffett says — be f
     } finally {
       setAiLoading(false);
     }
-  }, [group?.id, group?.name, profile?.username, watchlist]);
+  }, [group?.id, activeGroup?.name, profile?.username, watchlist]);
 
   const handleSend = useCallback(async () => {
     const text = aiMode ? `@AI ${inputText.trim()}` : inputText.trim();
