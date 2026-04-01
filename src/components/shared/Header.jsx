@@ -156,6 +156,7 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
           <span style={styles.logoAlerts}>Alerts</span>
         </div>
         <div style={styles.slogan}>Trade smarter, together</div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Trade smarter as a group.</div>
       </div>
       <div ref={avatarRef} style={{ position: 'relative' }}>
         <div style={styles.avatar} onClick={() => setShowAvatarMenu(prev => !prev)}>

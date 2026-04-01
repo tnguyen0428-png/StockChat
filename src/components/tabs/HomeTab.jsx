@@ -231,7 +231,7 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
       {/* MARKET PULSE LABEL */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 12px', background: 'var(--card)', borderBottom: '1px solid var(--border)' }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor }} />
-        <span style={{ fontSize: 10, fontWeight: 600, color: statusColor, letterSpacing: '0.04em' }}>{statusLabel}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: statusColor, letterSpacing: '0.04em' }}>{statusLabel}</span>
       </div>
 
       {/* MARKET PULSE STRIP */}
@@ -253,41 +253,19 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
                 padding: '3px 12px', margin: '0 2px', borderRadius: 6,
                 background: chg > 0 ? 'rgba(59,109,17,0.12)' : chg < 0 ? 'rgba(162,45,45,0.1)' : 'transparent',
               }}>
-                <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text2)' }}>{item.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text2)' }}>{item.label}</span>
                 {d?.label === 'FUT' ? (
-                  <span style={{ fontSize: 12, fontWeight: 600, color: chg > 0 ? 'var(--green)' : chg < 0 ? 'var(--red)' : 'var(--text3)' }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: chg > 0 ? 'var(--green)' : chg < 0 ? 'var(--red)' : 'var(--text3)' }}>
                     {chg > 0 ? '▲' : '▼'}{Math.abs((chg / 100) * Number(d.price)).toFixed(2)}
                   </span>
                 ) : (
                   <>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>{d ? `$${Number(d.price).toFixed(2)}` : '--'}</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: chg > 0 ? 'var(--green)' : chg < 0 ? 'var(--red)' : 'var(--text3)' }}>
+                    <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text1)' }}>{d ? `$${Number(d.price).toFixed(2)}` : '--'}</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: chg > 0 ? 'var(--green)' : chg < 0 ? 'var(--red)' : 'var(--text3)' }}>
                       {d ? `${chg > 0 ? '▲' : '▼'}${Math.abs(chg).toFixed(2)}%` : '--'}
                     </span>
                   </>
                 )}
-              </span>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* TOP MOVERS LABEL */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 12px', background: 'var(--card)', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B6D11' }} />
-        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text2)', letterSpacing: '0.04em' }}>TODAY'S TOP MOVERS</span>
-      </div>
-
-      {/* TOP MOVERS STRIP */}
-      <div style={{ overflow: 'hidden', height: 36, display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', background: 'var(--card)' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', animation: `moversScroll ${(movers.gainers.length + movers.losers.length) * 3}s linear infinite` }}>
-          {[...movers.gainers.slice(0,5), ...movers.losers.slice(0,5), ...movers.gainers.slice(0,5), ...movers.losers.slice(0,5)].map((m, i) => {
-            const chg = m.todaysChangePerc;
-            const up = chg >= 0;
-            return (
-              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 12px', margin: '0 2px', borderRadius: 6, background: up ? 'rgba(59,109,17,0.12)' : 'rgba(162,45,45,0.1)' }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text1)' }}>{m.ticker}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: up ? 'var(--green)' : 'var(--red)' }}>{up ? '▲' : '▼'}{Math.abs(chg).toFixed(1)}%</span>
               </span>
             );
           })}
@@ -304,8 +282,8 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
               style={{ flexShrink: 0, background: '#EAF3DE', border: '1.5px solid #3B6D11', borderRadius: 10, padding: '10px 16px', textAlign: 'center', cursor: 'pointer', minWidth: 82 }}
               onClick={() => onGroupSelect(group)}
             >
-              <div style={{ fontSize: 14, fontWeight: 500, color: '#1a4d0a' }}>{group.sector || group.name}</div>
-              <div style={{ fontSize: 12, color: '#3B6D11', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontWeight: 500 }}>
+              <div style={{ fontSize: 16, fontWeight: 500, color: '#1a4d0a' }}>{group.sector || group.name}</div>
+              <div style={{ fontSize: 14, color: '#3B6D11', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontWeight: 500 }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="#3B6D11"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"/></svg>
                 <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B6D11', animation: 'pulse 1.5s ease-in-out infinite', flexShrink: 0 }} />
                 {memberCount}
@@ -327,13 +305,13 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="#3B6D11"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"/></svg>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#3B6D11' }}>Public Group Chat</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#3B6D11' }}>Public Group Chat</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: '#1a4d0a' }}>UpTik Public</div>
+            <div style={{ fontSize: 16, fontWeight: 500, color: '#1a4d0a' }}>UpTik Public</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B6D11', animation: 'pulse 1.5s ease-in-out infinite', flexShrink: 0 }} />
-              <span style={{ fontSize: 12, color: '#3B6D11', fontWeight: 500 }}>
+              <span style={{ fontSize: 14, color: '#3B6D11', fontWeight: 500 }}>
                 {groupsWithCounts.find(g => g.name === 'UpTik Public')?.member_count || publicGroups.find(g => g.name === 'UpTik Public')?.member_count || 0}
               </span>
             </div>
@@ -346,9 +324,9 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="#3B6D11"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"/></svg>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#3B6D11' }}>Private Chat</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#3B6D11' }}>Private Chat</span>
           </div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#1a4d0a' }}>{privateGroup?.name || 'No private group'}</div>
+          <div style={{ fontSize: 16, fontWeight: 500, color: '#1a4d0a' }}>{privateGroup?.name || 'No private group'}</div>
         </div>
       </div>
 
@@ -360,16 +338,16 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
             briefing.tags.map((article, i, arr) => (
               <div key={i} style={{ padding: '11px 14px', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
                 {article.tickers?.length > 0 && (
-                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--green)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--green)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     {article.tickers.join(' · ')}
                   </div>
                 )}
-                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text1)', lineHeight: 1.5, marginBottom: 5 }}>{article.title}</div>
+                <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--text1)', lineHeight: 1.5, marginBottom: 5 }}>{article.title}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 10, color: 'var(--text3)' }}>{article.publisher}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text3)' }}>{article.publisher}</span>
                   {article.url && (
                     <a href={article.url} target="_blank" rel="noopener noreferrer"
-                      style={{ fontSize: 11, color: 'var(--green)', fontWeight: 500, textDecoration: 'none' }}>
+                      style={{ fontSize: 13, color: 'var(--green)', fontWeight: 500, textDecoration: 'none' }}>
                       Read →
                     </a>
                   )}
@@ -384,13 +362,13 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
               const title = tickerMatch ? clean.replace(/\s*\([^)]+\)$/, '') : clean;
               return (
                 <div key={i} style={{ padding: '11px 14px', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                  {tickers && <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--green)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{tickers}</div>}
-                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text1)', lineHeight: 1.5 }}>{title}</div>
+                  {tickers && <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--green)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{tickers}</div>}
+                  <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--text1)', lineHeight: 1.5 }}>{title}</div>
                 </div>
               );
             })
           )}
-          <div style={{ padding: '8px 14px', fontSize: 11, color: 'var(--text3)', borderTop: '1px solid var(--border)' }}>
+          <div style={{ padding: '8px 14px', fontSize: 13, color: 'var(--text3)', borderTop: '1px solid var(--border)' }}>
             Updated {new Date(briefing.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} EST · selected by Admin
           </div>
         </div>
@@ -407,8 +385,8 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
       >
         <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0 }}>AI</div>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#6D28D9' }}>Ask UpTik AI</div>
-          <div style={{ fontSize: 11, color: 'rgba(109,40,217,0.6)', marginTop: 2 }}>Fundamentals · Long-term · No hype</div>
+          <div style={{ fontSize: 16, fontWeight: 500, color: '#6D28D9' }}>Ask UpTik AI</div>
+          <div style={{ fontSize: 13, color: 'rgba(109,40,217,0.6)', marginTop: 2 }}>Fundamentals · Long-term · No hype</div>
         </div>
       </div>
 
@@ -419,7 +397,7 @@ export default function HomeTab({ session, onGroupSelect, onAIPress }) {
 
 const styles = {
   scroll:    { flex: 1, overflowY: 'auto', padding: '0 0 12px', WebkitOverflowScrolling: 'touch' },
-  secLabel:  { fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text2)', padding: '0 12px', margin: '14px 0 8px' },
+  secLabel:  { fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text2)', padding: '0 12px', margin: '14px 0 8px' },
   emptyCard: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 20, textAlign: 'center', marginBottom: 8, marginLeft: 12, marginRight: 12 },
-  emptyText: { fontSize: 13, color: 'var(--text3)' },
+  emptyText: { fontSize: 15, color: 'var(--text3)' },
 };
