@@ -29,7 +29,14 @@ export default function DashboardPage({ session }) {
     enterGroup, refreshGroups,
   } = useGroup();
 
-  const [activeTab, setActiveTab]         = useState('home');
+  const [activeTab, setActiveTab]         = useState(() => {
+    const redirect = localStorage.getItem('uptik_join_redirect');
+    if (redirect) {
+      localStorage.removeItem('uptik_join_redirect');
+      return redirect;
+    }
+    return 'home';
+  });
   const [activeBroadcast, setActiveBroadcast] = useState(null);
   const [unreadAlerts, setUnreadAlerts]   = useState(false);
   const [unreadChat, setUnreadChat]       = useState(false);

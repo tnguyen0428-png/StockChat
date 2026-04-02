@@ -60,6 +60,7 @@ export default function JoinGroupPage({ session }) {
 
     // Set as active group and navigate after a short delay
     localStorage.setItem('uptik_active_group', data.group_id);
+    localStorage.setItem('uptik_join_redirect', 'chat');
     setTimeout(() => navigate('/app'), 1800);
   };
 
