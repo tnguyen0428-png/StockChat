@@ -8,9 +8,10 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 
 // Pages
-import LoginPage    from './pages/LoginPage';
+import LoginPage     from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import LandingPage   from './pages/LandingPage';
+import JoinGroupPage from './pages/JoinGroupPage';
 import { GroupProvider } from './context/GroupContext';
 
 // Loading screen
@@ -66,6 +67,21 @@ export default function App() {
           setRecoveryMode(false);
         }
         setSession(session);
+
+        // Handle pending invite after sign-in
+        if (event === 'SIGNED_IN' && session) {
+          const pendingCode = localStorage.getItem('uptik_pending_invite');
+          if (pendingCode) {
+            localStorage.removeItem('uptik_pending_invite');
+            // Join the group in the background
+            supabase.rpc('join_custom_group', { p_invite_code: pendingCode })
+              .then(({ data }) => {
+                if (data?.success && data.group_id) {
+                  localStorage.setItem('uptik_active_group', data.group_id);
+                }
+              });
+          }
+        }
       }
     );
 
@@ -87,6 +103,10 @@ export default function App() {
               ? <Navigate to="/app" replace />
               : <LoginPage />
         }
+      />
+      <Route
+        path="/join/:code"
+        element={<JoinGroupPage session={session} />}
       />
       <Route
         path="/app"
