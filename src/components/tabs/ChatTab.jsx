@@ -450,17 +450,13 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     if (!broadcastText.trim() || sendingBroadcast) return;
     setSendingBroadcast(true);
     if (isAdmin) {
-      const { data: allGroups } = await supabase.from('groups').select('id');
-      if (allGroups?.length) {
-        await supabase.from('broadcasts').insert(
-          allGroups.map(g => ({ group_id: g.id, title: broadcastText.trim(), type: 'INFO', sent_by: profile.username, is_mod_alert: false }))
-        );
-      }
+      await supabase.from('breakout_alerts').insert({
+        alert_type: 'INFO', title: broadcastText.trim(), sent_by: profile.username,
+      });
     } else {
       const type = detectBroadcastType(broadcastText);
-      await supabase.from('broadcasts').insert({
-        group_id: group.id, title: broadcastText.trim(),
-        type, sent_by: profile.username, is_mod_alert: true,
+      await supabase.from('breakout_alerts').insert({
+        alert_type: type, title: broadcastText.trim(), sent_by: profile.username,
       });
     }
     setBroadcastText('');
