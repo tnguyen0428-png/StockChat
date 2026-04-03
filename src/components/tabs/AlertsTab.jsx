@@ -12,7 +12,7 @@ import { useGroup } from '../../context/GroupContext';
 
 const SWIPE_THRESHOLD = 80;
 
-function SwipeableCard({ children, alertId }) {
+function SwipeableCard({ children, alertId, onWatchlist }) {
   const touchRef = useRef({ startX: 0, startY: 0, swiping: false });
   const [offsetX, setOffsetX] = useState(0);
   const [confirmed, setConfirmed] = useState(null);
@@ -43,6 +43,7 @@ function SwipeableCard({ children, alertId }) {
     if (!touchRef.current.swiping) { setOffsetX(0); return; }
     if (offsetX >= SWIPE_THRESHOLD) {
       // TODO: Wire to user_watchlist table
+      if (onWatchlist) onWatchlist();
       setConfirmed('watchlist');
       setOffsetX(0);
       setTimeout(() => setConfirmed(null), 900);
@@ -255,6 +256,20 @@ const MOCK_ALERTS = [
   { id: 'mock-8', ticker: 'META', name: 'Meta Platforms',           alert_type: 'ma_cross',  price: 527.40, change: 1.22, volume: '12.1M',  time: '1:42 PM',   timeGroup: 'afternoon',  signal: '20MA $512.88 crossed above 50MA $498.33',     confidence: 68, support: 498.00, resistance: 545.00, sector: 'Social Media',        recentPrices: [538,534,530,526,522,519,516,514,517,520,522,525,527],              context: 'Operates Facebook, Instagram, and WhatsApp while investing heavily in AI and the metaverse.',                 confidenceReason: 'Moderate confidence: MA cross is valid but price has been pulling back from highs — needs volume to confirm.',              rsVsSpy: -0.50 },
 ];
 
+// TODO: Replace with Supabase aotd_history table
+const MOCK_AOTD_HISTORY = [
+  { date: 'Apr 2',  ticker: 'TSLA', name: 'Tesla Inc',              type: 'gap_up',    alertPrice: 189.30, alertChange: 5.20, confidence: 95, signal: 'Pre-market gap on 6x volume',    nextDayClose: 195.36, outcome: 3.20 },
+  { date: 'Apr 1',  ticker: 'NVDA', name: 'Nvidia Corp',            type: '52w_high',  alertPrice: 875.40, alertChange: 2.14, confidence: 91, signal: 'Within 1.8% of 52W high',        nextDayClose: 891.15, outcome: 1.80 },
+  { date: 'Mar 31', ticker: 'PLTR', name: 'Palantir Technologies',  type: 'gap_up',    alertPrice: 24.88,  alertChange: 4.63, confidence: 85, signal: 'Gap above consolidation zone',    nextDayClose: 24.78,  outcome: -0.40 },
+  { date: 'Mar 28', ticker: 'SMCI', name: 'Super Micro Computer',   type: 'vol_surge', alertPrice: 92.17,  alertChange: 5.31, confidence: 78, signal: 'Volume 4.2x average',             nextDayClose: 94.66,  outcome: 2.70 },
+  { date: 'Mar 27', ticker: 'AAPL', name: 'Apple Inc',              type: '52w_high',  alertPrice: 196.45, alertChange: 0.93, confidence: 88, signal: 'Approaching 52W high on low vol', nextDayClose: 197.63, outcome: 0.60 },
+  { date: 'Mar 26', ticker: 'AMD',  name: 'Advanced Micro Devices', type: 'vol_surge', alertPrice: 178.92, alertChange: 3.44, confidence: 63, signal: 'Volume spike near key support',   nextDayClose: 176.95, outcome: -1.10 },
+  { date: 'Mar 25', ticker: 'META', name: 'Meta Platforms',         type: 'ma_cross',  alertPrice: 527.40, alertChange: 1.22, confidence: 68, signal: '20MA crossed above 50MA',         nextDayClose: 533.87, outcome: 1.23 },
+  { date: 'Mar 24', ticker: 'CRWD', name: 'CrowdStrike Holdings',   type: 'ma_cross',  alertPrice: 334.50, alertChange: 1.87, confidence: 72, signal: 'Bullish MA cross on avg volume',  nextDayClose: 340.18, outcome: 1.70 },
+  { date: 'Mar 21', ticker: 'NVDA', name: 'Nvidia Corp',            type: 'vol_surge', alertPrice: 862.10, alertChange: 3.88, confidence: 82, signal: 'Volume 3.8x with new catalyst',   nextDayClose: 858.22, outcome: -0.45 },
+  { date: 'Mar 20', ticker: 'TSLA', name: 'Tesla Inc',              type: '52w_high',  alertPrice: 181.50, alertChange: 2.75, confidence: 79, signal: 'Testing 52W high on earnings',     nextDayClose: null,   outcome: null },
+];
+
 const BADGE_CONFIG = {
   '52w_high':  { color: '#D97706', bg: '#FFFBEB', border: 'rgba(217,119,6,0.25)',   label: '52W High'  },
   'vol_surge': { color: '#7C3AED', bg: '#F5F3FF', border: 'rgba(124,58,237,0.25)',  label: 'Vol Surge' },
@@ -394,6 +409,26 @@ function AlertCard({ alert, badge, isExpanded, onToggle, forceExpanded, darkMode
               <Sparkline prices={alert.recentPrices} fullWidth />
             </div>
           )}
+          {/* Past performance from history */}
+          {showExp && (() => {
+            const similar = MOCK_AOTD_HISTORY
+              .filter(h => h.outcome != null && (h.ticker === (alert.ticker ?? '') || h.type === alert.alert_type))
+              .slice(0, 3);
+            if (similar.length === 0) return null;
+            return (
+              <div style={styles.pastPerf}>
+                <span style={styles.pastPerfLabel}>Past performance: </span>
+                {similar.map((h, i) => (
+                  <span key={i}>
+                    {i > 0 && ', '}
+                    <span style={{ fontWeight: 700, color: h.outcome >= 0 ? '#16A34A' : '#DC2626' }}>
+                      {h.outcome >= 0 ? '+' : ''}{h.outcome.toFixed(1)}%
+                    </span>
+                  </span>
+                ))}
+              </div>
+            );
+          })()}
           <button style={styles.viewChartBtn} onClick={e => e.stopPropagation()}>View Chart</button>
         </div>
       </div>
@@ -476,7 +511,14 @@ export default function AlertsTab({ session }) {
   const [filter, setFilter]          = useState('all');
   const [sort, setSort]              = useState('newest');
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [subTab, setSubTab] = useState('live');
   const [refreshKey, setRefreshKey]  = useState(0);
+  // TODO: Persist watchlist from user_watchlist table
+  const [watchlist, setWatchlist] = useState([]);
+  const [historyFilter, setHistoryFilter] = useState('all');
+  const addToWatchlist = useCallback((ticker) => {
+    setWatchlist(prev => prev.includes(ticker) ? prev : [...prev, ticker]);
+  }, []);
 
   // Live market data from Supabase market_data table
   const [fearScore, setFearScore]           = useState(null);
@@ -754,6 +796,26 @@ export default function AlertsTab({ session }) {
         </div>
       )}
 
+      {/* Sub-tab toggle: Live / Watchlist / History */}
+      <div style={styles.subTabBar}>
+        {['live', 'watchlist', 'history'].map(t => (
+          <button
+            key={t}
+            style={{
+              ...styles.subTabBtn,
+              background: subTab === t ? '#1a3c2a' : 'var(--card)',
+              color: subTab === t ? '#ffffff' : 'var(--text2)',
+              borderColor: subTab === t ? '#1a3c2a' : 'var(--border)',
+            }}
+            onClick={() => setSubTab(t)}
+          >
+            {t === 'live' ? 'Live' : t === 'watchlist' ? `Watchlist${watchlist.length ? ` (${watchlist.length})` : ''}` : 'History'}
+          </button>
+        ))}
+      </div>
+
+      {subTab === 'live' && (<>
+
       {/* Filter pills */}
       <div style={styles.filterBar}>
         {['all', '52w_high', 'vol_surge', 'gap_up', 'ma_cross'].map(f => (
@@ -798,7 +860,7 @@ export default function AlertsTab({ session }) {
       {alertOfTheDay && aotdBadge && (
         <div>
           <div style={styles.aotdLabel}>⭐ Alert of the Day</div>
-          <SwipeableCard alertId={alertOfTheDay.id}>
+          <SwipeableCard alertId={alertOfTheDay.id} onWatchlist={() => addToWatchlist(alertOfTheDay.ticker ?? alertOfTheDay.tickers?.[0])}>
             <AlertCard
               alert={alertOfTheDay}
               badge={aotdBadge}
@@ -829,7 +891,7 @@ export default function AlertsTab({ session }) {
         const { alert } = row;
         const badge = BADGE_CONFIG[alert.alert_type] || BADGE_CONFIG['vol_surge'];
         return (
-          <SwipeableCard key={alert.id} alertId={alert.id}>
+          <SwipeableCard key={alert.id} alertId={alert.id} onWatchlist={() => addToWatchlist(alert.ticker ?? alert.tickers?.[0])}>
             <AlertCard
               alert={alert}
               badge={badge}
@@ -840,6 +902,163 @@ export default function AlertsTab({ session }) {
           </SwipeableCard>
         );
       })}
+
+      </>)}
+
+      {/* Watchlist sub-tab */}
+      {subTab === 'watchlist' && (() => {
+        const watchlistAlerts = displayAlerts.filter(a => watchlist.includes(a.ticker ?? a.tickers?.[0]));
+        if (watchlistAlerts.length === 0) {
+          return (
+            <div style={styles.emptyWrap}>
+              <div style={styles.emptyIcon}>⭐</div>
+              <div style={styles.emptyTitle}>No watchlist alerts</div>
+              <div style={styles.emptyText}>Swipe right on any alert to add it here.</div>
+            </div>
+          );
+        }
+        return watchlistAlerts.map(alert => {
+          const badge = BADGE_CONFIG[alert.alert_type] || BADGE_CONFIG['vol_surge'];
+          return (
+            <SwipeableCard key={alert.id} alertId={alert.id} onWatchlist={() => addToWatchlist(alert.ticker ?? alert.tickers?.[0])}>
+              <AlertCard
+                alert={alert}
+                badge={badge}
+                isExpanded={expandedId === alert.id}
+                onToggle={() => setExpandedId(expandedId === alert.id ? null : alert.id)}
+                darkMode={darkMode}
+              />
+            </SwipeableCard>
+          );
+        });
+      })()}
+
+      {/* History sub-tab */}
+      {subTab === 'history' && (() => {
+        const filteredHistory = historyFilter === 'all'
+          ? MOCK_AOTD_HISTORY
+          : MOCK_AOTD_HISTORY.filter(h => h.type === historyFilter);
+        const resolved = filteredHistory.filter(h => h.outcome != null);
+        const hits = resolved.filter(h => h.outcome > 0).length;
+        const hitRate = resolved.length > 0 ? Math.round((hits / resolved.length) * 100) : 0;
+        const avgReturn = resolved.length > 0 ? resolved.reduce((s, h) => s + h.outcome, 0) / resolved.length : 0;
+        let streak = '';
+        for (let i = 0; i < filteredHistory.length; i++) {
+          const o = filteredHistory[i].outcome;
+          if (o == null) continue;
+          if (!streak) { streak = o > 0 ? '1W' : '1L'; continue; }
+          const dir = streak.endsWith('W') ? 1 : -1;
+          if ((o > 0 && dir > 0) || (o < 0 && dir < 0)) {
+            streak = (parseInt(streak) + 1) + streak.slice(-1);
+          } else break;
+        }
+        const ordered = [...filteredHistory].reverse();
+        const cumPts = [0];
+        ordered.forEach(h => cumPts.push(cumPts[cumPts.length - 1] + (h.outcome ?? 0)));
+        const best = resolved.length > 0 ? resolved.reduce((b, h) => h.outcome > b.outcome ? h : b) : null;
+        const worst = resolved.length > 0 ? resolved.reduce((w, h) => h.outcome < w.outcome ? h : w) : null;
+
+        return (
+          <div>
+            <div style={styles.secLabel}>Alert of the Day — Track Record</div>
+
+            {/* Summary stat boxes */}
+            <div style={styles.statRow}>
+              <div style={styles.statBox}>
+                <span style={styles.statBoxLabel}>Hit Rate</span>
+                <span style={{ ...styles.statBoxValue, color: hitRate >= 50 ? '#16A34A' : '#DC2626' }}>{hitRate}%</span>
+              </div>
+              <div style={styles.statBox}>
+                <span style={styles.statBoxLabel}>Avg Return</span>
+                <span style={{ ...styles.statBoxValue, color: avgReturn >= 0 ? '#16A34A' : '#DC2626' }}>
+                  {avgReturn >= 0 ? '+' : ''}{avgReturn.toFixed(1)}%
+                </span>
+              </div>
+              <div style={styles.statBox}>
+                <span style={styles.statBoxLabel}>Streak</span>
+                <span style={{ ...styles.statBoxValue, color: streak.endsWith('W') ? '#16A34A' : '#DC2626' }}>{streak || '—'}</span>
+              </div>
+            </div>
+
+            {/* History type filter */}
+            <div style={styles.filterBar}>
+              {['all', '52w_high', 'vol_surge', 'gap_up', 'ma_cross'].map(f => (
+                <button
+                  key={f}
+                  style={{
+                    ...styles.filterBtn,
+                    background:  historyFilter === f ? '#1a3c2a' : 'var(--card)',
+                    color:       historyFilter === f ? '#ffffff'  : 'var(--text2)',
+                    borderColor: historyFilter === f ? '#1a3c2a'  : 'var(--border)',
+                    fontWeight:  historyFilter === f ? 600 : 400,
+                  }}
+                  onClick={() => setHistoryFilter(f)}
+                >
+                  {f === 'all' ? 'All' : BADGE_CONFIG[f]?.label || f}
+                </button>
+              ))}
+            </div>
+
+            {/* Win streak dots */}
+            <div style={styles.historyDots}>
+              {ordered.map((h, i) => (
+                <div key={i} style={{
+                  ...styles.dot,
+                  background: h.outcome == null ? 'var(--text3)' : h.outcome > 0 ? '#16A34A' : '#DC2626',
+                }} />
+              ))}
+            </div>
+
+            {/* Cumulative return sparkline */}
+            <div style={{ margin: '0 0 14px' }}>
+              <Sparkline prices={cumPts} fullWidth />
+            </div>
+
+            {/* Best / Worst highlight */}
+            {(best || worst) && (
+              <div style={styles.bestWorstRow}>
+                {best && (
+                  <div style={{ ...styles.bestWorstCard, borderLeftColor: '#16A34A' }}>
+                    <span style={styles.bestWorstLabel}>Best Alert</span>
+                    <span style={styles.bestWorstText}>{best.ticker} · {best.date} · <strong style={{ color: '#16A34A' }}>+{best.outcome.toFixed(1)}%</strong></span>
+                  </div>
+                )}
+                {worst && (
+                  <div style={{ ...styles.bestWorstCard, borderLeftColor: '#DC2626' }}>
+                    <span style={styles.bestWorstLabel}>Worst Alert</span>
+                    <span style={styles.bestWorstText}>{worst.ticker} · {worst.date} · <strong style={{ color: '#DC2626' }}>{worst.outcome.toFixed(1)}%</strong></span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* History cards */}
+            {filteredHistory.map((h, i) => {
+              const isPending = h.outcome == null;
+              const isHit = !isPending && h.outcome > 0;
+              return (
+                <div key={i} style={styles.historyRow}>
+                  <span style={styles.historyDatePill}>{h.date}</span>
+                  <span style={styles.historyMiddle}>
+                    <span style={styles.historyTicker}>{h.ticker}</span>
+                    <span style={styles.historySignal}>{h.signal}</span>
+                    <span style={styles.historyPriceJourney}>
+                      ${h.alertPrice.toFixed(2)}{h.nextDayClose != null ? ` → $${h.nextDayClose.toFixed(2)} next day` : ''}
+                    </span>
+                  </span>
+                  <span style={{
+                    ...styles.historyBadge,
+                    background: isPending ? 'var(--border)' : isHit ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.12)',
+                    color: isPending ? 'var(--text3)' : isHit ? '#16A34A' : '#DC2626',
+                  }}>
+                    {isPending ? 'Pending' : isHit ? `Hit +${h.outcome.toFixed(1)}%` : `Miss ${h.outcome.toFixed(1)}%`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       <div style={{ height: 20 }} />
     </PullToRefresh>
@@ -1018,6 +1237,108 @@ const styles = {
     fontSize: 10, fontWeight: 700,
     textTransform: 'uppercase', letterSpacing: 1,
     color: '#D97706', padding: '0 4px 5px',
+  },
+
+  // Sub-tab toggle
+  subTabBar: {
+    display: 'flex', gap: 8, padding: '0 0 10px',
+  },
+  subTabBtn: {
+    flex: 1, padding: '10px 0', minHeight: 44,
+    borderRadius: 24, fontSize: 13, fontWeight: 600,
+    border: '1px solid', cursor: 'pointer',
+    textAlign: 'center', transition: 'all .15s',
+  },
+
+  // Track Record stats
+  statRow: {
+    display: 'flex', gap: 8, marginBottom: 12,
+  },
+  statBox: {
+    flex: 1, display: 'flex', flexDirection: 'column',
+    alignItems: 'center', gap: 4,
+    background: 'var(--card)', border: '1px solid var(--border)',
+    borderRadius: 12, padding: '12px 8px',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+  },
+  statBoxLabel: {
+    fontSize: 9, fontWeight: 600, textTransform: 'uppercase',
+    letterSpacing: '0.5px', color: 'var(--text3)',
+  },
+  statBoxValue: {
+    fontSize: 20, fontWeight: 700,
+  },
+
+  // AOTD Track Record
+  historyDots: {
+    display: 'flex', gap: 6, padding: '4px 4px 8px',
+    justifyContent: 'flex-start', alignItems: 'center',
+  },
+  dot: { width: 10, height: 10, borderRadius: '50%', flexShrink: 0 },
+  historyStatLine: {
+    fontSize: 11, color: 'var(--text2)',
+    padding: '0 4px 8px',
+  },
+  historyRow: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '10px 12px', minHeight: 44,
+    background: 'var(--card)',
+    border: '1px solid var(--border)',
+    borderRadius: 12, marginBottom: 6,
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+  },
+  historyDatePill: {
+    fontSize: 10, fontWeight: 600, color: 'var(--text3)',
+    background: 'var(--border)', borderRadius: 6,
+    padding: '3px 7px', flexShrink: 0, whiteSpace: 'nowrap',
+  },
+  historyMiddle: {
+    flex: 1, display: 'flex', flexDirection: 'column',
+    gap: 2, minWidth: 0,
+  },
+  historyTicker: {
+    fontSize: 13, fontWeight: 700, color: 'var(--text1)',
+  },
+  historySignal: {
+    fontSize: 11, color: 'var(--text2)',
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  },
+  historyPriceJourney: {
+    fontSize: 10, color: 'var(--text3)',
+  },
+  historyBadge: {
+    fontSize: 11, fontWeight: 700, flexShrink: 0,
+    padding: '4px 10px', borderRadius: 20, whiteSpace: 'nowrap',
+  },
+
+  // Best / Worst highlight
+  bestWorstRow: {
+    display: 'flex', gap: 8, marginBottom: 12,
+  },
+  bestWorstCard: {
+    flex: 1, borderLeft: '4px solid',
+    background: 'var(--card)', border: '1px solid var(--border)',
+    borderRadius: 10, padding: '8px 10px',
+    display: 'flex', flexDirection: 'column', gap: 2,
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+  },
+  bestWorstLabel: {
+    fontSize: 9, fontWeight: 600, textTransform: 'uppercase',
+    letterSpacing: '0.5px', color: 'var(--text3)',
+  },
+  bestWorstText: {
+    fontSize: 11, color: 'var(--text1)',
+  },
+
+  // Past performance in expanded card
+  pastPerf: {
+    fontSize: 11, color: 'var(--text2)',
+    padding: '8px 0', marginBottom: 4,
+    borderTop: '1px solid var(--border)',
+  },
+  pastPerfLabel: {
+    color: 'var(--text3)', fontSize: 10, fontWeight: 600,
+    textTransform: 'uppercase', letterSpacing: '0.5px',
   },
 
   // Dark mode toggle
