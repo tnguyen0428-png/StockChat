@@ -271,5 +271,5 @@ const styles = {
     borderRadius: '50%', display: 'flex',
     alignItems: 'center', justifyContent: 'center', lineHeight: 1,
   },
-  content: { flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+  content: { flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: 90 },
 };
