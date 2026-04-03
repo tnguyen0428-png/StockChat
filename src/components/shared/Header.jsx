@@ -715,13 +715,13 @@ const styles = {
   logoUp:     { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
   logoTik:    { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
   logoAlerts: {
-    fontSize: 14, fontWeight: 300, color: '#b0c4d8', letterSpacing: 2,
+    fontSize: 14, fontWeight: 300, color: '#d4e4f2', letterSpacing: 2,
     fontFamily: "'Avenir Next', 'Avenir', 'Nunito Sans', sans-serif",
     marginTop: -4, paddingLeft: 18,
   },
   slogan: {
     fontSize: 10, fontWeight: 300, fontStyle: 'italic',
-    color: '#b0c4d8', letterSpacing: 1,
+    color: '#d4e4f2', letterSpacing: 1,
     fontFamily: "'Avenir Next', 'Avenir', 'Nunito Sans', sans-serif",
   },
   avatar: {

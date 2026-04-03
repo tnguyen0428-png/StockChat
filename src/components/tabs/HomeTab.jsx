@@ -201,7 +201,7 @@ export default function HomeTab({ session, onGroupSelect, onAIPress, onSignOut, 
               <span style={{ fontSize: 20, fontWeight: 500, color: '#f0ede8' }}>Up</span>
               <span style={{ fontSize: 20, fontWeight: 500, color: '#8cd9a0' }}>tik</span>
             </div>
-            <div style={{ fontFamily: "'Avenir Next','Avenir','Nunito Sans',sans-serif", fontSize: 14, fontWeight: 300, color: '#b0c4d8', letterSpacing: 2, marginTop: -4, paddingLeft: 18 }}>alerts</div>
+            <div style={{ fontFamily: "'Avenir Next','Avenir','Nunito Sans',sans-serif", fontSize: 14, fontWeight: 300, color: '#d4e4f2', letterSpacing: 2, marginTop: -4, paddingLeft: 18 }}>alerts</div>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
@@ -244,7 +244,7 @@ export default function HomeTab({ session, onGroupSelect, onAIPress, onSignOut, 
               )}
             </div>
           </div>
-          <span style={{ fontFamily: "'Avenir Next','Avenir','Nunito Sans',sans-serif", fontSize: 10, fontWeight: 300, fontStyle: 'italic', color: '#b0c4d8', letterSpacing: 1 }}>"ONE TEAM, ONE TRADE"</span>
+          <span style={{ fontFamily: "'Avenir Next','Avenir','Nunito Sans',sans-serif", fontSize: 10, fontWeight: 300, fontStyle: 'italic', color: '#d4e4f2', letterSpacing: 1 }}>"ONE TEAM, ONE TRADE"</span>
         </div>
       </div>
 
@@ -339,10 +339,10 @@ export default function HomeTab({ session, onGroupSelect, onAIPress, onSignOut, 
         {/* DAILY BRIEFING */}
         <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: '#7a8ea3', padding: '8px 12px 4px' }}>Daily Briefing</div>
         {briefing ? (
-          <div style={{ background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 10, overflow: 'hidden', marginBottom: 8, marginLeft: 12, marginRight: 12 }}>
+          <>
             {briefing.tags?.length > 0 ? (
-              briefing.tags.map((article, i, arr) => (
-                <div key={i} style={{ padding: '9px 12px', borderBottom: i < arr.length - 1 ? '1px solid #d8e2ed' : 'none', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              briefing.tags.map((article, i) => (
+                <div key={i} style={{ background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 10, padding: '9px 12px', marginBottom: 6, marginLeft: 12, marginRight: 12, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {article.tickers?.length > 0 && (
                       <div style={{ fontSize: 12, fontWeight: 700, color: '#2a7d4b', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -360,23 +360,23 @@ export default function HomeTab({ session, onGroupSelect, onAIPress, onSignOut, 
                 </div>
               ))
             ) : (
-              briefing.content.split('\n').filter(Boolean).map((line, i, arr) => {
+              briefing.content.split('\n').filter(Boolean).map((line, i) => {
                 const clean = line.replace(/^•\s*/, '');
                 const tickerMatch = clean.match(/\(([^)]+)\)$/);
                 const tickers = tickerMatch ? tickerMatch[1] : null;
                 const title = tickerMatch ? clean.replace(/\s*\([^)]+\)$/, '') : clean;
                 return (
-                  <div key={i} style={{ padding: '9px 12px', borderBottom: i < arr.length - 1 ? '1px solid #d8e2ed' : 'none' }}>
+                  <div key={i} style={{ background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 10, padding: '9px 12px', marginBottom: 6, marginLeft: 12, marginRight: 12 }}>
                     {tickers && <div style={{ fontSize: 12, fontWeight: 700, color: '#2a7d4b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{tickers}</div>}
                     <div style={{ fontSize: 15, fontWeight: 600, color: '#1a2d4a', lineHeight: 1.35 }}>{title}</div>
                   </div>
                 );
               })
             )}
-            <div style={{ padding: '8px 14px', fontSize: 12, color: '#7a8ea3', borderTop: '1px solid #d8e2ed' }}>
+            <div style={{ padding: '4px 14px 8px', fontSize: 12, color: '#7a8ea3', marginLeft: 12 }}>
               Updated {new Date(briefing.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} EST · selected by Admin
             </div>
-          </div>
+          </>
         ) : (
           <div style={{ background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 10, padding: 20, textAlign: 'center', marginBottom: 8, marginLeft: 12, marginRight: 12 }}>
             <span style={{ fontSize: 15, color: '#7a8ea3' }}>No briefing posted yet today</span>
