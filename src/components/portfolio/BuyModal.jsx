@@ -31,11 +31,15 @@ export default function BuyModal({ session, cashBalance, onClose, onComplete }) 
       setSearching(true);
       try {
         const res = await fetch(
-          `https://financialmodelingprep.com/api/v3/search?query=${encodeURIComponent(query)}&limit=5&apikey=${FMP_KEY}`
+          `https://financialmodelingprep.com/stable/search-symbol?query=${encodeURIComponent(query)}&limit=5&apikey=${FMP_KEY}`
         );
         const data = await res.json();
+        console.log('FMP search:', data);
         if (Array.isArray(data)) {
-          setResults(data.filter(d => d.exchangeShortName === 'NYSE' || d.exchangeShortName === 'NASDAQ'));
+          setResults(data.filter(d => {
+            const ex = (d.exchangeShortName || d.exchange || '').toUpperCase();
+            return ex.includes('NYSE') || ex.includes('NASDAQ');
+          }));
         }
       } catch { /* silent */ }
       setSearching(false);
@@ -47,7 +51,7 @@ export default function BuyModal({ session, cashBalance, onClose, onComplete }) 
     setError('');
     try {
       const res = await fetch(
-        `https://financialmodelingprep.com/api/v3/quote-short/${item.symbol}?apikey=${FMP_KEY}`
+        `https://financialmodelingprep.com/stable/quote-short/${item.symbol}?apikey=${FMP_KEY}`
       );
       const data = await res.json();
       const price = Array.isArray(data) && data[0] ? data[0].price : null;
