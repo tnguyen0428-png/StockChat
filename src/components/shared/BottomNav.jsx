@@ -86,6 +86,7 @@ const styles = {
     display: 'flex', justifyContent: 'space-around',
     alignItems: 'center', paddingBottom: 4,
     flexShrink: 0, boxShadow: '0 -1px 4px rgba(19,45,82,0.04)',
+    position: 'relative', zIndex: 999,
   },
   item: {
     display: 'flex', flexDirection: 'column',
@@ -100,6 +101,7 @@ const styles = {
     border: '3px solid #f8fafc',
     boxShadow: '0 4px 14px rgba(42,125,75,0.3)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
+    position: 'relative', zIndex: 1000,
   },
   badge: {
     position: 'absolute', top: -2, right: -4,

@@ -114,26 +114,139 @@ const swipeStyles = {
 
 // ── Sparkline ───────────────────────────────────────────────────────
 
-function Sparkline({ prices, fullWidth }) {
+function Sparkline({ prices, fullWidth, enhanced, support, resistance, alertPrice }) {
   if (!prices || prices.length < 2) return null;
-  const W = fullWidth ? 400 : 120;
-  const H = fullWidth ? 36 : 32;
+
+  // Simple mode (history cumulative sparkline, etc.)
+  if (!enhanced) {
+    const W = fullWidth ? 400 : 120;
+    const H = fullWidth ? 36 : 32;
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const range = max - min || 1;
+    const pts = prices.map((p, i) =>
+      `${(i / (prices.length - 1)) * W},${H - ((p - min) / range) * (H - 2) - 1}`
+    ).join(' ');
+    const color = prices[prices.length - 1] >= prices[0] ? '#16A34A' : '#DC2626';
+    return (
+      <svg viewBox={`0 0 ${W} ${H}`}
+        style={{ display: 'block', flexShrink: 0, width: fullWidth ? '100%' : W, height: fullWidth ? 36 : H }}
+        preserveAspectRatio="none">
+        <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5"
+          strokeLinejoin="round" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  // Enhanced mode — full chart with gradient fill, S/R lines, alert dot, tap tooltip
+  const W = 400, H = 64, PAD = 1;
   const min = Math.min(...prices);
   const max = Math.max(...prices);
   const range = max - min || 1;
-  const pts = prices.map((p, i) =>
-    `${(i / (prices.length - 1)) * W},${H - ((p - min) / range) * (H - 2) - 1}`
-  ).join(' ');
-  const color = prices[prices.length - 1] >= prices[0] ? '#16A34A' : '#DC2626';
+  const trendUp = prices[prices.length - 1] >= prices[0];
+  const color = trendUp ? '#16A34A' : '#DC2626';
+  const gradId = trendUp ? 'sparkFillUp' : 'sparkFillDown';
+
+  const coords = prices.map((p, i) => ({
+    x: (i / (prices.length - 1)) * W,
+    y: H - ((p - min) / range) * (H - PAD * 2) - PAD,
+    price: p,
+  }));
+  const linePts = coords.map(c => `${c.x},${c.y}`).join(' ');
+  const fillPts = `0,${H} ${linePts} ${W},${H}`;
+
+  // Support / resistance Y positions
+  const srLines = [];
+  if (support != null && support >= min && support <= max) {
+    srLines.push({ y: H - ((support - min) / range) * (H - PAD * 2) - PAD, label: 'S', color: '#16A34A', price: support });
+  }
+  if (resistance != null && resistance >= min && resistance <= max) {
+    srLines.push({ y: H - ((resistance - min) / range) * (H - PAD * 2) - PAD, label: 'R', color: '#DC2626', price: resistance });
+  }
+
+  // Alert trigger dot — closest data point to alertPrice
+  let alertDot = null;
+  if (alertPrice != null) {
+    let closest = 0;
+    let closestDist = Infinity;
+    coords.forEach((c, i) => {
+      const d = Math.abs(c.price - alertPrice);
+      if (d < closestDist) { closestDist = d; closest = i; }
+    });
+    alertDot = coords[closest];
+  }
+
+  // Tap tooltip state via ref
+  const [tapInfo, setTapInfo] = useState(null);
+  const svgRef = useRef(null);
+
+  const handleTouch = useCallback((e) => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const clientX = e.touches[0].clientX;
+    const pct = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
+    const idx = Math.round(pct * (prices.length - 1));
+    const c = coords[idx];
+    if (c) setTapInfo({ x: c.x, y: c.y, price: c.price });
+  }, [coords, prices.length]);
+
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      style={{ display: 'block', flexShrink: 0, width: fullWidth ? '100%' : W, height: fullWidth ? 36 : H }}
-      preserveAspectRatio="none"
-    >
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5"
-        strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
+    <div>
+      {/* Price labels above chart */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 2px 4px', fontSize: 11 }}>
+        <span style={{ color: 'var(--text3)' }}>${prices[0].toFixed(2)}</span>
+        <span style={{ color: 'var(--text1)', fontWeight: 700 }}>${prices[prices.length - 1].toFixed(2)}</span>
+      </div>
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${H}`}
+        style={{ display: 'block', width: '100%', height: 64, padding: '8px 0' }}
+        preserveAspectRatio="none"
+        onTouchStart={handleTouch}
+        onTouchMove={handleTouch}
+        onTouchEnd={() => setTapInfo(null)}
+      >
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.20" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Fill gradient */}
+        <polygon points={fillPts} fill={`url(#${gradId})`} />
+        {/* Support / resistance dashed lines */}
+        {srLines.map(sr => (
+          <g key={sr.label}>
+            <line x1={0} y1={sr.y} x2={W} y2={sr.y}
+              stroke={sr.color} strokeWidth="0.8" strokeDasharray="4 3" opacity="0.5" />
+            <text x={W - 2} y={sr.y - 2} textAnchor="end"
+              fontSize="7" fontWeight="700" fill={sr.color} opacity="0.7">
+              {sr.label}
+            </text>
+          </g>
+        ))}
+        {/* Main line */}
+        <polyline points={linePts} fill="none" stroke={color} strokeWidth="1.5"
+          strokeLinejoin="round" strokeLinecap="round" />
+        {/* Alert trigger dot */}
+        {alertDot && (
+          <circle cx={alertDot.x} cy={alertDot.y} r="3" fill={color} stroke="#fff" strokeWidth="1" />
+        )}
+        {/* Tap crosshair + tooltip */}
+        {tapInfo && (
+          <g>
+            <line x1={tapInfo.x} y1={0} x2={tapInfo.x} y2={H}
+              stroke="var(--text3)" strokeWidth="0.7" strokeDasharray="2 2" />
+            <rect x={tapInfo.x - 22} y={Math.max(tapInfo.y - 14, 0)}
+              width="44" height="12" rx="3" fill="var(--text1)" opacity="0.85" />
+            <text x={tapInfo.x} y={Math.max(tapInfo.y - 5, 9)}
+              textAnchor="middle" fontSize="7" fontWeight="700" fill="#fff">
+              ${tapInfo.price.toFixed(2)}
+            </text>
+          </g>
+        )}
+      </svg>
+    </div>
   );
 }
 
@@ -312,9 +425,19 @@ function AlertCard({ alert, badge, isExpanded, onToggle, forceExpanded, darkMode
   const signal  = alert.signal ?? alert.title ?? '';
   const showExp = forceExpanded || isExpanded;
   const rs      = alert.rsVsSpy;
+  const cardRef = useRef(null);
+
+  useEffect(() => {
+    if (isExpanded && cardRef.current) {
+      setTimeout(() => {
+        cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 250);
+    }
+  }, [isExpanded]);
 
   return (
     <div
+      ref={cardRef}
       style={{
         ...styles.alertCard,
         borderLeftColor: badge.color,
@@ -405,7 +528,13 @@ function AlertCard({ alert, badge, isExpanded, onToggle, forceExpanded, darkMode
           </div>
           {alert.recentPrices && (
             <div style={{ marginBottom: 12 }}>
-              <Sparkline prices={alert.recentPrices} fullWidth />
+              <Sparkline
+                prices={alert.recentPrices}
+                enhanced
+                support={alert.support}
+                resistance={alert.resistance}
+                alertPrice={alert.price != null ? Number(alert.price) : undefined}
+              />
             </div>
           )}
           {/* Past performance from history */}
@@ -1026,7 +1155,7 @@ export default function AlertsTab({ session }) {
         );
       })()}
 
-      <div style={{ height: 20 }} />
+      <div style={{ height: 100 }} />
     </PullToRefresh>
   );
 }
@@ -1036,7 +1165,7 @@ export default function AlertsTab({ session }) {
 const styles = {
   scroll: {
     flex: 1, overflowY: 'auto',
-    padding: '4px 12px 12px',
+    padding: '4px 12px 100px',
     WebkitOverflowScrolling: 'touch',
     background: 'var(--bg)',
   },
