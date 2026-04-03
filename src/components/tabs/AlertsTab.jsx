@@ -431,7 +431,7 @@ function AlertCard({ alert, badge, isExpanded, onToggle, forceExpanded, darkMode
     if (isExpanded && cardRef.current) {
       setTimeout(() => {
         cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 250);
+      }, 300);
     }
   }, [isExpanded]);
 
@@ -1155,7 +1155,7 @@ export default function AlertsTab({ session }) {
         );
       })()}
 
-      <div style={{ height: 100 }} />
+      <div style={{ height: 300 }} />
     </PullToRefresh>
   );
 }
