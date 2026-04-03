@@ -88,7 +88,7 @@ function SwipeableCard({ children, alertId }) {
 }
 
 const swipeStyles = {
-  wrapper: { position: 'relative', overflow: 'hidden', borderRadius: 12, marginBottom: 10 },
+  wrapper: { position: 'relative', overflowX: 'hidden', overflowY: 'visible', borderRadius: 12, marginBottom: 10 },
   actionLayer: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
