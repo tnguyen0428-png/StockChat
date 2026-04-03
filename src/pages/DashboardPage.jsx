@@ -41,10 +41,8 @@ export default function DashboardPage({ session }) {
 
     const cutoff = new Date(Date.now() - 40000).toISOString();
     supabase
-      .from('broadcasts')
+      .from('breakout_alerts')
       .select('*')
-      .eq('group_id', activeGroup.id)
-      .eq('is_mod_alert', false)
       .gt('created_at', cutoff)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -62,18 +60,15 @@ export default function DashboardPage({ session }) {
       });
 
     const channel = supabase
-      .channel(`broadcasts_${activeGroup.id}`)
+      .channel('breakout_alerts_broadcast')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'broadcasts',
-        filter: `group_id=eq.${activeGroup.id}`,
+        table: 'breakout_alerts',
       }, (payload) => {
         if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
         setActiveBroadcast(payload.new);
-        if (!payload.new.is_mod_alert) {
-          dismissTimerRef.current = setTimeout(() => setActiveBroadcast(null), 40000);
-        }
+        dismissTimerRef.current = setTimeout(() => setActiveBroadcast(null), 40000);
       })
       .subscribe();
 
