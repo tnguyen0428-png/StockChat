@@ -1,6 +1,7 @@
 // ============================================
 // UPTIKALERTS — PortfolioTab.jsx
-// Paper trading challenge — inline design
+// Portfolio Challenge: A+C combo design
+// Rank + chart + catch-the-leader + inline buy + activity feed
 // ============================================
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -21,40 +22,41 @@ export default function PortfolioTab({ session }) {
   const [loadingData, setLoadingData] = useState(true);
   const [sellTrade, setSellTrade] = useState(null);
 
-  // Leaderboard
+  // Inline buy state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [selectedTicker, setSelectedTicker] = useState(null); // { symbol, name, price }
+  const [showPresets, setShowPresets] = useState(false);
+  const [customAmount, setCustomAmount] = useState('');
+  const [showCustom, setShowCustom] = useState(false);
+  const [buyError, setBuyError] = useState('');
+  const [buying, setBuying] = useState(false);
+  const searchTimer = useRef(null);
+
+  // Leaderboard + rank
   const [leaderboard, setLeaderboard] = useState([]);
   const [expandedUser, setExpandedUser] = useState(null);
   const [lbLoading, setLbLoading] = useState(false);
+  const [myRank, setMyRank] = useState(null);
+  const [aheadUser, setAheadUser] = useState(null); // { username, pctReturn, gap }
 
-  // Inline buy flow
-  const [tickerQuery, setTickerQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [selectedTicker, setSelectedTicker] = useState(null);
-  const [buyAmount, setBuyAmount] = useState('');
-  const [buying, setBuying] = useState(false);
-  const [buyError, setBuyError] = useState('');
+  // Activity feed
+  const [activity, setActivity] = useState([]);
 
   const refreshRef = useRef(null);
-  const searchTimer = useRef(null);
-  const inputRef = useRef(null);
-  const amountRef = useRef(null);
 
-  // ── Data loading ──
-
+  // ── Load portfolio ──
   const loadPortfolio = useCallback(async () => {
     if (!session?.user?.id) return;
     await supabase.rpc('ensure_paper_portfolio');
-
     const [{ data: pf }, { data: openTrades }] = await Promise.all([
       supabase.from('paper_portfolios').select('*').eq('user_id', session.user.id).single(),
       supabase.from('paper_trades').select('*').eq('user_id', session.user.id).eq('status', 'open'),
     ]);
-
     setPortfolio(pf);
     setTrades(openTrades || []);
     setLoadingData(false);
-
     if (openTrades?.length > 0) {
       const tickers = [...new Set(openTrades.map(t => t.ticker))].join(',');
       await fetchPrices(tickers);
@@ -75,13 +77,25 @@ export default function PortfolioTab({ session }) {
     } catch { /* silent */ }
   };
 
+  useEffect(() => { loadPortfolio(); }, [loadPortfolio]);
+
+  // Refresh prices every 30s
+  useEffect(() => {
+    if (trades.length === 0) return;
+    refreshRef.current = setInterval(() => {
+      const tickers = [...new Set(trades.map(t => t.ticker))].join(',');
+      fetchPrices(tickers);
+    }, 30000);
+    return () => clearInterval(refreshRef.current);
+  }, [trades]);
+
+  // ── Leaderboard (loads on mount for rank) ──
   const loadLeaderboard = useCallback(async () => {
     setLbLoading(true);
     const [{ data: allPortfolios }, { data: allTrades }] = await Promise.all([
       supabase.from('paper_portfolios').select('*, profiles(username)'),
       supabase.from('paper_trades').select('*').eq('status', 'open'),
     ]);
-
     if (!allPortfolios) { setLbLoading(false); return; }
 
     const allTickers = [...new Set((allTrades || []).map(t => t.ticker))];
@@ -105,7 +119,6 @@ export default function PortfolioTab({ session }) {
       }, 0);
       const totalValue = Number(pf.cash_balance) + positionsValue;
       const pctReturn = ((totalValue - STARTING_CASH) / STARTING_CASH) * 100;
-
       return {
         userId: pf.user_id,
         username: pf.profiles?.username || 'Unknown',
@@ -123,35 +136,70 @@ export default function PortfolioTab({ session }) {
 
     entries.sort((a, b) => b.pctReturn - a.pctReturn);
     setLeaderboard(entries);
+
+    // Find my rank + person ahead
+    const myIdx = entries.findIndex(e => e.userId === session?.user?.id);
+    if (myIdx >= 0) {
+      setMyRank(myIdx + 1);
+      if (myIdx > 0) {
+        const ahead = entries[myIdx - 1];
+        setAheadUser({
+          username: ahead.username,
+          rank: myIdx, // their rank is myIdx (0-indexed + 1 = myIdx)
+          gap: (ahead.pctReturn - entries[myIdx].pctReturn).toFixed(2),
+          progress: ahead.pctReturn !== 0
+            ? Math.min(100, Math.max(0, (entries[myIdx].pctReturn / ahead.pctReturn) * 100))
+            : 0,
+        });
+      } else {
+        setAheadUser(null); // user is #1
+      }
+    }
     setLbLoading(false);
-  }, [prices]);
+  }, [session?.user?.id]);
 
-  useEffect(() => { loadPortfolio(); }, [loadPortfolio]);
-
-  // Load leaderboard on mount (need rank for portfolio view) and on tab switch
+  // Load leaderboard on mount (need rank for portfolio view)
   useEffect(() => { loadLeaderboard(); }, []);
-  useEffect(() => { if (view === 'leaderboard') loadLeaderboard(); }, [view]);
 
-  // Refresh prices every 30s
+  // ── Activity feed ──
+  const loadActivity = useCallback(async () => {
+    const { data } = await supabase
+      .from('paper_trades')
+      .select('*, profiles(username)')
+      .order('bought_at', { ascending: false })
+      .limit(5);
+    if (data) setActivity(data);
+  }, []);
+
+  useEffect(() => { loadActivity(); }, [loadActivity]);
+
+  // Realtime activity subscription
   useEffect(() => {
-    if (view !== 'portfolio' || trades.length === 0) return;
-    refreshRef.current = setInterval(() => {
-      const tickers = [...new Set(trades.map(t => t.ticker))].join(',');
-      fetchPrices(tickers);
-    }, 30000);
-    return () => clearInterval(refreshRef.current);
-  }, [view, trades]);
+    const channel = supabase
+      .channel('portfolio_activity')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'paper_trades',
+      }, () => {
+        loadActivity();
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [loadActivity]);
 
-  // ── Inline search ──
-
+  // ── Search (debounced) ──
   useEffect(() => {
-    if (!tickerQuery.trim()) { setSearchResults([]); return; }
+    if (!searchQuery.trim() || searchQuery.length < 1) {
+      setSearchResults([]);
+      return;
+    }
     clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(async () => {
       setSearching(true);
       try {
         const res = await fetch(
-          `https://financialmodelingprep.com/stable/search-symbol?query=${encodeURIComponent(tickerQuery)}&limit=5&apikey=${FMP_KEY}`
+          `https://financialmodelingprep.com/stable/search-symbol?query=${encodeURIComponent(searchQuery)}&limit=5&apikey=${FMP_KEY}`
         );
         const data = await res.json();
         if (Array.isArray(data)) {
@@ -164,40 +212,42 @@ export default function PortfolioTab({ session }) {
       setSearching(false);
     }, 300);
     return () => clearTimeout(searchTimer.current);
-  }, [tickerQuery]);
+  }, [searchQuery]);
 
+  // ── Select ticker from search ──
   const handleSelectTicker = async (item) => {
     setBuyError('');
     setSearchResults([]);
-    setTickerQuery('');
+    setSearchQuery('');
     try {
       const res = await fetch(
         `https://financialmodelingprep.com/stable/quote-short?symbol=${item.symbol}&apikey=${FMP_KEY}`
       );
       const data = await res.json();
       const price = Array.isArray(data) && data[0] ? data[0].price : null;
-      if (!price) { setBuyError("Couldn't fetch price. Try again."); return; }
+      if (!price) {
+        setBuyError("Couldn't fetch price. Try again.");
+        return;
+      }
       setSelectedTicker({ symbol: item.symbol, name: item.name, price });
-      setTimeout(() => amountRef.current?.focus(), 100);
+      setShowPresets(true);
+      setShowCustom(false);
+      setCustomAmount('');
     } catch {
       setBuyError("Couldn't fetch price. Try again.");
     }
   };
 
-  const cancelBuy = () => {
-    setSelectedTicker(null);
-    setBuyAmount('');
-    setBuyError('');
-  };
-
-  const dollarAmount = parseFloat(buyAmount) || 0;
-  const shares = selectedTicker?.price ? dollarAmount / selectedTicker.price : 0;
-
-  const handleBuy = async () => {
-    if (!selectedTicker || dollarAmount <= 0 || dollarAmount > cashBalance || buying) return;
+  // ── Buy with preset or custom amount ──
+  const executeBuy = async (dollarAmount) => {
+    if (!selectedTicker?.price || dollarAmount <= 0 || buying) return;
+    if (dollarAmount > cashBalance) {
+      setBuyError(`Exceeds cash ($${cashBalance.toLocaleString()})`);
+      return;
+    }
     setBuying(true);
     setBuyError('');
-
+    const shares = dollarAmount / selectedTicker.price;
     try {
       const { error: insertErr } = await supabase.from('paper_trades').insert({
         user_id: session.user.id,
@@ -209,30 +259,35 @@ export default function PortfolioTab({ session }) {
         bought_at: new Date().toISOString(),
       });
       if (insertErr) throw insertErr;
-
       const { error: updateErr } = await supabase
         .from('paper_portfolios')
         .update({ cash_balance: cashBalance - dollarAmount })
         .eq('user_id', session.user.id);
       if (updateErr) throw updateErr;
-
-      cancelBuy();
-      loadPortfolio();
-      loadLeaderboard();
+      // Reset and reload
+      setSelectedTicker(null);
+      setShowPresets(false);
+      setShowCustom(false);
+      setCustomAmount('');
+      await loadPortfolio();
+      await loadLeaderboard();
+      await loadActivity();
     } catch (err) {
-      setBuyError(err.message || 'Failed to buy. Try again.');
+      setBuyError(err.message || 'Failed to buy.');
+    } finally {
       setBuying(false);
     }
   };
 
-  const onSellComplete = () => {
-    setSellTrade(null);
-    loadPortfolio();
-    loadLeaderboard();
+  const clearSelection = () => {
+    setSelectedTicker(null);
+    setShowPresets(false);
+    setShowCustom(false);
+    setCustomAmount('');
+    setBuyError('');
   };
 
   // ── Calculations ──
-
   const totalPositionsValue = trades.reduce((sum, t) => {
     const curPrice = prices[t.ticker] || Number(t.entry_price);
     return sum + (Number(t.shares) * curPrice);
@@ -242,47 +297,48 @@ export default function PortfolioTab({ session }) {
   const totalReturn = ((totalValue - STARTING_CASH) / STARTING_CASH) * 100;
   const isPositive = totalReturn >= 0;
 
-  // Rank from leaderboard
-  const myRankIdx = leaderboard.findIndex(e => e.userId === session?.user?.id);
-  const myRank = myRankIdx >= 0 ? myRankIdx + 1 : null;
+  const onSellComplete = () => {
+    setSellTrade(null);
+    loadPortfolio();
+    loadLeaderboard();
+    loadActivity();
+  };
 
-  // Catch-the-leader
-  const leaderAbove = myRankIdx > 0 ? leaderboard[myRankIdx - 1] : null;
-  const gapPct = leaderAbove ? leaderAbove.pctReturn - totalReturn : 0;
-  const isLeader = myRank === 1;
-
-  // Progress bar: how close to person above (capped 0-100)
-  let progressPct = 0;
-  if (leaderAbove && leaderAbove.pctReturn !== 0) {
-    progressPct = Math.max(0, Math.min(100, (totalReturn / leaderAbove.pctReturn) * 100));
-  }
-  if (isLeader) progressPct = 100;
-
-  const canBuy = selectedTicker && dollarAmount > 0 && dollarAmount <= cashBalance && !buying;
+  const timeAgo = (ts) => {
+    if (!ts) return '';
+    const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  };
 
   // ── Loading ──
-
   if (loadingData) {
     return (
-      <div style={S.scroll}>
+      <div style={s.scroll}>
         <div style={{ padding: 20 }}>
-          {[1, 2, 3].map(i => <div key={i} style={S.skeleton} />)}
+          {[1, 2, 3].map(i => <div key={i} style={s.skeleton} />)}
         </div>
       </div>
     );
   }
 
+  // ═══════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════
   return (
-    <div style={S.scroll}>
-      {/* 1. Segmented control */}
-      <div style={S.segWrap}>
-        <div style={S.segBar}>
+    <div style={s.scroll}>
+
+      {/* ── 1. Segmented control ── */}
+      <div style={s.segWrap}>
+        <div style={s.segBar}>
           <button
-            style={{ ...S.segBtn, ...(view === 'portfolio' ? S.segActive : {}) }}
+            style={{ ...s.segBtn, ...(view === 'portfolio' ? s.segActive : {}) }}
             onClick={() => setView('portfolio')}
           >My Portfolio</button>
           <button
-            style={{ ...S.segBtn, ...(view === 'leaderboard' ? S.segActive : {}) }}
+            style={{ ...s.segBtn, ...(view === 'leaderboard' ? s.segActive : {}) }}
             onClick={() => setView('leaderboard')}
           >Leaderboard</button>
         </div>
@@ -290,177 +346,228 @@ export default function PortfolioTab({ session }) {
 
       {view === 'portfolio' ? (
         <>
-          {/* 2. Rank circle + Value hero */}
-          <div style={S.hero}>
-            <div style={S.rankCircle}>
-              <span style={S.rankText}>{myRank ? `#${myRank}` : '--'}</span>
+          {/* ── 2. Rank circle + Value hero ── */}
+          <div style={s.heroRow}>
+            <div style={s.rankCircle}>
+              <div style={s.rankNum}>#{myRank || '-'}</div>
             </div>
-            <div style={S.heroRight}>
-              <div style={{ ...S.heroValue, color: isPositive ? '#27500A' : '#ef5350' }}>
-                ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <div style={s.heroInfo}>
+              <div style={s.heroValueRow}>
+                <span style={{ ...s.heroValue, color: isPositive ? '#3B6D11' : '#E24B4A' }}>
+                  ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                <span style={{ ...s.heroPct, color: isPositive ? '#3B6D11' : '#E24B4A' }}>
+                  {isPositive ? '+' : ''}{totalReturn.toFixed(2)}%
+                </span>
               </div>
-              <div style={{ ...S.heroPct, color: isPositive ? '#3B6D11' : '#ef5350' }}>
-                {isPositive ? '+' : ''}{totalReturn.toFixed(2)}% all time
-              </div>
-              <div style={S.heroCash}>
-                Cash: ${cashBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <div style={s.heroMeta}>
+                {myRank && <span style={{ color: '#3B6D11' }}>Rank #{myRank}</span>}
+                <span style={{ color: 'var(--text3)' }}>·</span>
+                <span style={{ color: 'var(--text3)' }}>
+                  Cash: ${cashBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </span>
               </div>
               {lastUpdated && (
-                <div style={S.heroTime}>
+                <div style={s.heroTimestamp}>
                   Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                 </div>
               )}
             </div>
           </div>
 
-          {/* 3. Sparkline placeholder */}
-          <div style={S.chartPlaceholder}>
-            <span style={S.chartText}>Portfolio chart coming soon</span>
+          {/* ── 3. Sparkline chart placeholder ── */}
+          <div style={s.chartPlaceholder}>
+            <svg width="100%" height="40" viewBox="0 0 300 40" preserveAspectRatio="none" style={{ opacity: 0.15 }}>
+              <polyline points="0,35 20,32 40,28 60,30 80,22 100,25 120,18 140,20 160,14 180,16 200,10 220,12 240,8 260,10 280,6 300,4"
+                fill="none" stroke="var(--text3)" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <div style={s.chartLabel}>Portfolio chart coming soon</div>
           </div>
 
-          {/* 4. Catch-the-leader bar */}
-          {myRank !== null && leaderboard.length > 1 && (
-            <div style={S.leaderBar}>
-              {isLeader ? (
-                <div style={S.leaderWin}>You're in the lead!</div>
-              ) : (
+          {/* ── 4. Catch-the-leader bar ── */}
+          {myRank !== null && (
+            <div style={s.leaderBar}>
+              {aheadUser ? (
                 <>
-                  <div style={S.leaderLabel}>
-                    {gapPct.toFixed(2)}% behind {leaderAbove?.username} (#{myRank - 1})
+                  <div style={s.leaderText}>
+                    <span style={{ fontWeight: 600 }}>{aheadUser.gap}%</span> behind{' '}
+                    <span style={{ fontWeight: 600 }}>{aheadUser.username} (#{aheadUser.rank})</span>
                   </div>
-                  <div style={S.progressTrack}>
-                    <div style={{ ...S.progressFill, width: `${progressPct}%` }} />
+                  <div style={s.leaderTrack}>
+                    <div style={{ ...s.leaderFill, width: `${Math.max(5, aheadUser.progress)}%` }} />
                   </div>
                 </>
+              ) : (
+                <div style={{ ...s.leaderText, color: '#3B6D11' }}>
+                  You're in the lead!
+                </div>
               )}
             </div>
           )}
 
-          {/* 5. Add ticker input */}
-          <div style={S.addSection}>
-            <div style={S.addRow}>
-              <div style={S.addInputWrap}>
-                <input
-                  ref={inputRef}
-                  style={S.addInput}
-                  value={tickerQuery}
-                  onChange={e => {
-                    const v = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
-                    setTickerQuery(v);
-                    if (selectedTicker) cancelBuy();
-                  }}
-                  placeholder="ADD TICKER"
-                />
-                {searching && <span style={S.addSpinner}>...</span>}
-              </div>
-              {!selectedTicker && (
-                <button style={{ ...S.addBtn, opacity: 0.4 }} disabled>Add</button>
-              )}
+          {/* ── 5. Add ticker input ── */}
+          <div style={s.addSection}>
+            <div style={s.addRow}>
+              <input
+                style={s.addInput}
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
+                placeholder="ADD TICKER"
+                maxLength={5}
+              />
+              <button
+                style={s.addBtn}
+                onClick={() => {
+                  if (searchResults.length > 0) {
+                    handleSelectTicker(searchResults[0]);
+                  }
+                }}
+              >Add</button>
             </div>
 
             {/* Search dropdown */}
-            {searchResults.length > 0 && !selectedTicker && (
-              <div style={S.dropdown}>
+            {searchResults.length > 0 && (
+              <div style={s.dropdown}>
                 {searchResults.map(r => (
-                  <div key={r.symbol} style={S.dropItem} onClick={() => handleSelectTicker(r)}>
-                    <span style={S.dropTicker}>{r.symbol}</span>
-                    <span style={S.dropName}>{r.name}</span>
+                  <div key={r.symbol} style={s.dropdownRow} onClick={() => handleSelectTicker(r)}>
+                    <span style={s.dropdownTicker}>{r.symbol}</span>
+                    <span style={s.dropdownName}>{r.name}</span>
+                    <span style={s.dropdownExchange}>{r.exchange}</span>
                   </div>
                 ))}
               </div>
             )}
+            {searching && <div style={s.searchHint}>Searching...</div>}
 
-            {/* Inline buy card */}
-            {selectedTicker && (
-              <div style={S.buyCard}>
-                <div style={S.buyCardHeader}>
+            {/* ── 6. Quick invest presets ── */}
+            {showPresets && selectedTicker && (
+              <div style={s.presetCard}>
+                <div style={s.presetHeader}>
                   <div>
-                    <span style={S.buyCardTicker}>{selectedTicker.symbol}</span>
-                    <span style={S.buyCardName}>{selectedTicker.name}</span>
+                    <span style={s.presetTicker}>{selectedTicker.symbol}</span>
+                    <span style={s.presetPrice}>${selectedTicker.price.toFixed(2)}</span>
                   </div>
-                  <button style={S.buyCardClose} onClick={cancelBuy}>X</button>
+                  <button style={s.presetClose} onClick={clearSelection}>×</button>
                 </div>
-                <div style={S.buyCardPrice}>
-                  ${selectedTicker.price.toFixed(2)} <span style={S.buyCardPriceLabel}>current</span>
-                </div>
-                <div style={S.amountRow}>
-                  <span style={S.dollarSign}>$</span>
-                  <input
-                    ref={amountRef}
-                    style={S.amountInput}
-                    type="number"
-                    inputMode="decimal"
-                    value={buyAmount}
-                    onChange={e => setBuyAmount(e.target.value)}
-                    placeholder="0.00"
-                  />
-                  <button
-                    style={{ ...S.buyBtn, opacity: canBuy ? 1 : 0.4 }}
-                    onClick={handleBuy}
-                    disabled={!canBuy}
-                  >
-                    {buying ? '...' : 'Buy'}
-                  </button>
-                </div>
-                {dollarAmount > 0 && selectedTicker.price > 0 && (
-                  <div style={S.buyHint}>
-                    {shares.toFixed(4)} shares at ${selectedTicker.price.toFixed(2)}
+                {!showCustom ? (
+                  <div style={s.presetBtns}>
+                    <button style={s.presetBtn} onClick={() => executeBuy(1000)}>
+                      {buying ? '...' : '$1K'}
+                    </button>
+                    <button style={s.presetBtn} onClick={() => executeBuy(5000)}>
+                      {buying ? '...' : '$5K'}
+                    </button>
+                    <button style={s.presetBtn} onClick={() => executeBuy(10000)}>
+                      {buying ? '...' : '$10K'}
+                    </button>
+                    <button style={s.presetBtnOther} onClick={() => setShowCustom(true)}>
+                      Other
+                    </button>
+                  </div>
+                ) : (
+                  <div style={s.customRow}>
+                    <div style={s.customInputWrap}>
+                      <span style={s.customDollar}>$</span>
+                      <input
+                        style={s.customInput}
+                        type="number"
+                        inputMode="decimal"
+                        value={customAmount}
+                        onChange={e => setCustomAmount(e.target.value)}
+                        placeholder="Amount"
+                        autoFocus
+                      />
+                    </div>
+                    <button
+                      style={{
+                        ...s.customBuyBtn,
+                        opacity: (parseFloat(customAmount) > 0 && !buying) ? 1 : 0.4,
+                      }}
+                      onClick={() => executeBuy(parseFloat(customAmount) || 0)}
+                      disabled={!(parseFloat(customAmount) > 0) || buying}
+                    >
+                      {buying ? '...' : 'Buy'}
+                    </button>
                   </div>
                 )}
-                {dollarAmount > cashBalance && (
-                  <div style={S.buyErr}>Exceeds cash (${cashBalance.toFixed(2)})</div>
-                )}
-                {buyError && <div style={S.buyErr}>{buyError}</div>}
+                {buyError && <div style={s.buyError}>{buyError}</div>}
               </div>
             )}
+            {buyError && !showPresets && <div style={s.buyError}>{buyError}</div>}
           </div>
 
-          {/* 6. Open positions */}
-          {trades.length > 0 && (
-            <div style={S.section}>
-              <div style={S.sectionTitle}>Open Positions</div>
-              {trades.map(trade => {
+          {/* ── 7. Open positions ── */}
+          <div style={s.section}>
+            <div style={s.secLabel}>Positions · {trades.length}</div>
+            {trades.length === 0 ? (
+              <div style={s.emptyText}>No positions yet — add a ticker above</div>
+            ) : (
+              trades.map(trade => {
                 const curPrice = prices[trade.ticker] || Number(trade.entry_price);
                 const entryPrice = Number(trade.entry_price);
                 const pctGain = ((curPrice - entryPrice) / entryPrice) * 100;
                 const isUp = pctGain >= 0;
+                const currentValue = Number(trade.shares) * curPrice;
                 return (
                   <div
                     key={trade.id}
-                    style={S.posRow}
+                    style={s.posRow}
                     onClick={() => setSellTrade({ ...trade, currentPrice: curPrice })}
                   >
                     <div>
-                      <div style={S.posTicker}>{trade.ticker}</div>
-                      <div style={S.posDetail}>
-                        {Number(trade.shares).toFixed(2)} shares @ ${entryPrice.toFixed(2)}
+                      <div style={s.posTicker}>{trade.ticker}</div>
+                      <div style={s.posDetail}>
+                        ${Number(trade.dollar_amount).toLocaleString()} · {Number(trade.shares).toFixed(2)} shares
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ ...S.posPrice, color: isUp ? '#3B6D11' : '#ef5350' }}>
-                        ${curPrice.toFixed(2)}
-                      </div>
-                      <div style={{ ...S.posPct, color: isUp ? '#3B6D11' : '#ef5350' }}>
+                      <div style={{ ...s.posPct, color: isUp ? '#3B6D11' : '#E24B4A' }}>
                         {isUp ? '+' : ''}{pctGain.toFixed(2)}%
                       </div>
+                      <div style={s.posVal}>
+                        ${currentValue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </div>
                     </div>
+                  </div>
+                );
+              })
+            )}
+            {trades.length > 0 && (
+              <div style={s.sellHint}>Tap a position to sell</div>
+            )}
+          </div>
+
+          {/* ── 8. Live activity feed ── */}
+          {activity.length > 0 && (
+            <div style={s.section}>
+              <div style={s.secLabel}>Live activity</div>
+              {activity.map((a, i) => {
+                const isSell = a.status === 'closed';
+                const username = a.profiles?.username || 'Unknown';
+                const ts = isSell ? a.sold_at : a.bought_at;
+                return (
+                  <div key={a.id || i} style={s.actRow}>
+                    <span style={s.actUser}>{username}</span>
+                    <span style={{ color: 'var(--text2)' }}>
+                      {' '}{isSell ? 'sold' : 'bought'} {a.ticker}
+                    </span>
+                    <span style={s.actTime}> · {timeAgo(ts)}</span>
                   </div>
                 );
               })}
             </div>
           )}
 
-          {trades.length === 0 && (
-            <div style={S.emptyHint}>Search a ticker above to make your first trade.</div>
-          )}
+          <div style={{ height: 20 }} />
         </>
       ) : (
-        /* Leaderboard view */
-        <div style={S.section}>
+
+        /* ── LEADERBOARD VIEW ── */
+        <div style={s.section}>
           {lbLoading ? (
-            [1, 2, 3].map(i => <div key={i} style={S.skeleton} />)
+            [1, 2, 3].map(i => <div key={i} style={s.skeleton} />)
           ) : leaderboard.length === 0 ? (
-            <div style={S.emptyHint}>No participants yet.</div>
+            <div style={s.emptyText}>No participants yet.</div>
           ) : (
             leaderboard.map((entry, idx) => {
               const isMe = entry.userId === session?.user?.id;
@@ -469,25 +576,28 @@ export default function PortfolioTab({ session }) {
               return (
                 <div key={entry.userId}>
                   <div
-                    style={{ ...S.lbRow, background: isMe ? 'rgba(59,109,17,0.08)' : 'transparent' }}
+                    style={{
+                      ...s.lbRow,
+                      background: isMe ? 'rgba(59,109,17,0.08)' : 'transparent',
+                    }}
                     onClick={() => setExpandedUser(isExpanded ? null : entry.userId)}
                   >
-                    <div style={S.lbRank}>#{idx + 1}</div>
-                    <div style={S.lbName}>
+                    <div style={s.lbRank}>#{idx + 1}</div>
+                    <div style={s.lbName}>
                       {entry.username}
-                      {isMe && <span style={S.lbYou}> (you)</span>}
+                      {isMe && <span style={s.lbYou}> (you)</span>}
                     </div>
-                    <div style={{ ...S.lbReturn, color: isUp ? '#3B6D11' : '#ef5350' }}>
+                    <div style={{ ...s.lbReturn, color: isUp ? '#3B6D11' : '#E24B4A' }}>
                       {isUp ? '+' : ''}{entry.pctReturn.toFixed(2)}%
                     </div>
-                    <div style={S.lbCount}>{entry.openCount} pos</div>
+                    <div style={s.lbCount}>{entry.openCount} pos</div>
                   </div>
                   {isExpanded && entry.positions.length > 0 && (
-                    <div style={S.lbExpanded}>
+                    <div style={s.lbExpanded}>
                       {entry.positions.map((p, i) => (
-                        <div key={i} style={S.lbTicker}>
-                          <span style={S.lbTickerName}>{p.ticker}</span>
-                          <span style={{ color: p.pctGain >= 0 ? '#3B6D11' : '#ef5350', fontSize: 12 }}>
+                        <div key={i} style={s.lbTicker}>
+                          <span style={s.lbTickerName}>{p.ticker}</span>
+                          <span style={{ color: p.pctGain >= 0 ? '#3B6D11' : '#E24B4A', fontSize: 12 }}>
                             {p.pctGain >= 0 ? '+' : ''}{p.pctGain.toFixed(2)}%
                           </span>
                         </div>
@@ -501,7 +611,7 @@ export default function PortfolioTab({ session }) {
         </div>
       )}
 
-      {/* Sell modal */}
+      {/* ── SellModal ── */}
       {sellTrade && (
         <SellModal
           session={session}
@@ -514,9 +624,10 @@ export default function PortfolioTab({ session }) {
   );
 }
 
-// ── Styles ──
-
-const S = {
+// ═══════════════════════════════════════════
+// STYLES
+// ═══════════════════════════════════════════
+const s = {
   scroll: { flex: 1, overflowY: 'auto', background: 'var(--bg)' },
 
   // Segmented control
@@ -528,144 +639,154 @@ const S = {
     background: 'transparent', color: 'var(--text3)',
     fontFamily: 'var(--font)', transition: 'all 0.15s',
   },
-  segActive: { background: 'var(--card)', color: 'var(--text1)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
+  segActive: {
+    background: 'var(--card)', color: 'var(--text1)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+  },
 
   // Hero
-  hero: {
-    display: 'flex', alignItems: 'center', gap: 16,
-    margin: '14px 16px 0', padding: '16px 16px',
-    background: 'var(--card)', borderRadius: 14,
-    border: '1px solid var(--border)',
+  heroRow: {
+    padding: '16px 16px 0', display: 'flex', alignItems: 'center', gap: 14,
   },
   rankCircle: {
     width: 52, height: 52, borderRadius: '50%', background: '#EAF3DE',
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  rankText: { fontSize: 18, fontWeight: 800, color: '#27500A' },
-  heroRight: { flex: 1 },
-  heroValue: { fontSize: 24, fontWeight: 700, lineHeight: 1.2 },
-  heroPct: { fontSize: 13, fontWeight: 600, marginTop: 2 },
-  heroCash: { fontSize: 12, color: 'var(--text3)', marginTop: 4 },
-  heroTime: { fontSize: 11, color: 'var(--text3)', marginTop: 2 },
+  rankNum: { fontSize: 22, fontWeight: 700, color: '#27500A' },
+  heroInfo: { flex: 1 },
+  heroValueRow: { display: 'flex', alignItems: 'baseline', gap: 8 },
+  heroValue: { fontSize: 24, fontWeight: 700 },
+  heroPct: { fontSize: 14, fontWeight: 600 },
+  heroMeta: { display: 'flex', gap: 6, fontSize: 12, marginTop: 3 },
+  heroTimestamp: { fontSize: 11, color: 'var(--text3)', marginTop: 2 },
 
   // Chart placeholder
   chartPlaceholder: {
-    margin: '10px 16px 0', height: 60, borderRadius: 10,
-    background: 'var(--card2)', border: '1px dashed var(--border)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    margin: '12px 16px 0', padding: '10px 14px',
+    background: 'var(--card)', borderRadius: 10, border: '1px dashed var(--border)',
+    position: 'relative', overflow: 'hidden',
   },
-  chartText: { fontSize: 12, color: 'var(--text3)' },
+  chartLabel: {
+    fontSize: 12, color: 'var(--text3)', textAlign: 'center', marginTop: 4,
+  },
 
   // Catch-the-leader
   leaderBar: {
-    margin: '10px 16px 0', padding: '10px 14px',
-    background: '#FAEEDA', borderRadius: 10,
+    margin: '12px 16px 0', padding: '10px 12px',
+    background: '#FAEEDA', borderRadius: 8,
   },
-  leaderLabel: { fontSize: 13, fontWeight: 600, color: '#8B6914', marginBottom: 6 },
-  progressTrack: {
-    height: 5, borderRadius: 3, background: 'rgba(139,105,20,0.15)',
+  leaderText: { fontSize: 13, color: '#633806' },
+  leaderTrack: {
+    height: 4, background: '#EDD9A3', borderRadius: 2, marginTop: 8,
   },
-  progressFill: {
-    height: 5, borderRadius: 3, background: '#C8960C',
-    transition: 'width 0.3s ease',
+  leaderFill: {
+    height: 4, background: '#BA7517', borderRadius: 2, transition: 'width 0.3s',
   },
-  leaderWin: { fontSize: 13, fontWeight: 700, color: '#3B6D11' },
 
   // Add ticker
-  addSection: { margin: '12px 16px 0', position: 'relative' },
+  addSection: { padding: '12px 16px 0', position: 'relative' },
   addRow: { display: 'flex', gap: 8 },
-  addInputWrap: {
-    flex: 1, display: 'flex', alignItems: 'center',
-    background: 'var(--card)', border: '1.5px solid var(--border)',
-    borderRadius: 10, padding: '0 12px',
-  },
   addInput: {
-    flex: 1, background: 'transparent', border: 'none',
-    padding: '11px 0', fontSize: 14, fontWeight: 600,
-    color: 'var(--text1)', fontFamily: 'var(--font)',
-    outline: 'none', letterSpacing: 0.5,
+    flex: 1, background: 'var(--card2)', border: '1.5px solid var(--border)',
+    borderRadius: 8, padding: '11px 12px', fontSize: 14, fontWeight: 600,
+    color: 'var(--text1)', fontFamily: 'var(--font)', outline: 'none',
+    letterSpacing: 0.5,
   },
-  addSpinner: { fontSize: 12, color: 'var(--text3)' },
   addBtn: {
-    background: '#3B6D11', color: '#fff', border: 'none',
-    borderRadius: 10, padding: '11px 20px',
-    fontSize: 14, fontWeight: 600, cursor: 'pointer',
-    fontFamily: 'var(--font)', flexShrink: 0,
-  },
-
-  // Dropdown
-  dropdown: {
-    position: 'absolute', top: 46, left: 0, right: 0, zIndex: 50,
-    background: 'var(--card)', border: '1px solid var(--border)',
-    borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-    overflow: 'hidden',
-  },
-  dropItem: {
-    display: 'flex', alignItems: 'center', gap: 10,
-    padding: '11px 14px', cursor: 'pointer',
-    borderBottom: '1px solid var(--border)',
-  },
-  dropTicker: { fontSize: 14, fontWeight: 700, color: 'var(--text1)', minWidth: 56 },
-  dropName: { fontSize: 13, color: 'var(--text3)', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' },
-
-  // Inline buy card
-  buyCard: {
-    marginTop: 8, padding: '14px 14px',
-    background: 'var(--card)', border: '1.5px solid #3B6D11',
-    borderRadius: 12,
-  },
-  buyCardHeader: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-    marginBottom: 6,
-  },
-  buyCardTicker: { fontSize: 16, fontWeight: 700, color: 'var(--text1)', marginRight: 8 },
-  buyCardName: { fontSize: 12, color: 'var(--text3)' },
-  buyCardClose: {
-    background: 'none', border: 'none', fontSize: 14, fontWeight: 700,
-    color: 'var(--text3)', cursor: 'pointer', padding: '0 4px',
+    background: '#3B6D11', color: '#fff', border: 'none', borderRadius: 8,
+    padding: '11px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
     fontFamily: 'var(--font)',
   },
-  buyCardPrice: { fontSize: 14, fontWeight: 600, color: 'var(--text1)', marginBottom: 10 },
-  buyCardPriceLabel: { fontSize: 11, fontWeight: 400, color: 'var(--text3)' },
-  amountRow: {
-    display: 'flex', alignItems: 'center', gap: 6,
-    background: 'var(--card2)', border: '1px solid var(--border)',
-    borderRadius: 8, padding: '0 8px 0 12px',
+
+  // Search dropdown
+  dropdown: {
+    position: 'absolute', left: 16, right: 16, top: 56,
+    background: 'var(--card)', border: '1px solid var(--border)',
+    borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+    zIndex: 50, overflow: 'hidden',
   },
-  dollarSign: { fontSize: 16, fontWeight: 600, color: 'var(--text3)' },
-  amountInput: {
-    flex: 1, background: 'transparent', border: 'none',
-    padding: '10px 0', fontSize: 18, fontWeight: 600,
-    color: 'var(--text1)', fontFamily: 'var(--font)', outline: 'none',
+  dropdownRow: {
+    padding: '12px 14px', borderBottom: '1px solid var(--border)',
+    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
   },
-  buyBtn: {
-    background: '#3B6D11', color: '#fff', border: 'none',
-    borderRadius: 8, padding: '10px 18px',
-    fontSize: 14, fontWeight: 700, cursor: 'pointer',
-    fontFamily: 'var(--font)', flexShrink: 0,
-    transition: 'opacity 0.15s',
+  dropdownTicker: { fontSize: 14, fontWeight: 700, color: 'var(--text1)', minWidth: 55 },
+  dropdownName: {
+    fontSize: 13, color: 'var(--text3)', flex: 1,
+    overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
   },
-  buyHint: { fontSize: 12, color: 'var(--text3)', marginTop: 6 },
-  buyErr: { fontSize: 12, color: '#ef5350', marginTop: 4 },
+  dropdownExchange: { fontSize: 11, color: 'var(--text3)', flexShrink: 0 },
+  searchHint: { fontSize: 12, color: 'var(--text3)', marginTop: 4 },
+
+  // Preset card
+  presetCard: {
+    marginTop: 8, padding: '12px 14px', background: '#EAF3DE',
+    borderRadius: 10, border: '1px solid rgba(59,109,17,0.2)',
+  },
+  presetHeader: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10,
+  },
+  presetTicker: { fontSize: 15, fontWeight: 700, color: '#1a4d0a' },
+  presetPrice: { fontSize: 13, color: '#3B6D11', marginLeft: 8 },
+  presetClose: {
+    background: 'none', border: 'none', fontSize: 20, color: '#3B6D11',
+    cursor: 'pointer', padding: '0 4px', lineHeight: 1,
+  },
+  presetBtns: { display: 'flex', gap: 6 },
+  presetBtn: {
+    flex: 1, padding: '10px 0', borderRadius: 8,
+    border: '1.5px solid #3B6D11', background: 'transparent',
+    fontSize: 14, fontWeight: 600, color: '#3B6D11',
+    cursor: 'pointer', fontFamily: 'var(--font)',
+  },
+  presetBtnOther: {
+    flex: 1, padding: '10px 0', borderRadius: 8,
+    border: '1px solid var(--border)', background: 'transparent',
+    fontSize: 14, fontWeight: 600, color: 'var(--text2)',
+    cursor: 'pointer', fontFamily: 'var(--font)',
+  },
+  customRow: { display: 'flex', gap: 8 },
+  customInputWrap: {
+    flex: 1, display: 'flex', alignItems: 'center',
+    background: '#fff', border: '1.5px solid #3B6D11', borderRadius: 8,
+    padding: '0 10px',
+  },
+  customDollar: { fontSize: 16, fontWeight: 600, color: '#3B6D11', marginRight: 4 },
+  customInput: {
+    flex: 1, border: 'none', background: 'transparent', padding: '10px 0',
+    fontSize: 16, fontWeight: 600, color: '#1a4d0a', outline: 'none',
+    fontFamily: 'var(--font)',
+  },
+  customBuyBtn: {
+    background: '#3B6D11', color: '#fff', border: 'none', borderRadius: 8,
+    padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+    fontFamily: 'var(--font)', transition: 'opacity 0.15s',
+  },
+  buyError: { fontSize: 12, color: '#E24B4A', marginTop: 6 },
 
   // Positions
-  section: { padding: '0 16px 16px' },
-  sectionTitle: {
+  section: { padding: '0 16px 8px' },
+  secLabel: {
     fontSize: 11, fontWeight: 600, color: 'var(--text3)',
-    textTransform: 'uppercase', letterSpacing: 0.5,
-    padding: '14px 0 8px',
+    textTransform: 'uppercase', letterSpacing: 0.5, padding: '14px 0 8px',
   },
+  emptyText: { fontSize: 14, color: 'var(--text3)', padding: '16px 0', textAlign: 'center' },
   posRow: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '13px 14px', background: 'var(--card)',
-    borderRadius: 12, marginBottom: 6, cursor: 'pointer',
-    border: '1px solid var(--border)',
+    padding: '12px 14px', background: 'var(--card)', borderRadius: 10,
+    border: '1px solid var(--border)', marginBottom: 6, cursor: 'pointer',
   },
-  posTicker: { fontSize: 15, fontWeight: 700, color: 'var(--text1)' },
+  posTicker: { fontSize: 14, fontWeight: 700, color: 'var(--text1)' },
   posDetail: { fontSize: 12, color: 'var(--text3)', marginTop: 2 },
-  posPrice: { fontSize: 14, fontWeight: 600 },
-  posPct: { fontSize: 12, fontWeight: 600, marginTop: 2 },
-  emptyHint: { fontSize: 13, color: 'var(--text3)', textAlign: 'center', padding: '28px 16px' },
+  posPct: { fontSize: 14, fontWeight: 600 },
+  posVal: { fontSize: 12, color: 'var(--text3)', marginTop: 2 },
+  sellHint: {
+    fontSize: 11, color: 'var(--text3)', textAlign: 'center', padding: '6px 0',
+  },
+
+  // Activity feed
+  actRow: { fontSize: 13, padding: '5px 0', color: 'var(--text2)' },
+  actUser: { fontWeight: 600, color: 'var(--text1)' },
+  actTime: { fontSize: 12, color: 'var(--text3)' },
 
   // Leaderboard
   lbRow: {
@@ -677,7 +798,9 @@ const S = {
   lbYou: { fontSize: 12, fontWeight: 400, color: 'var(--text3)' },
   lbReturn: { fontSize: 14, fontWeight: 700, width: 70, textAlign: 'right' },
   lbCount: { fontSize: 11, color: 'var(--text3)', width: 40, textAlign: 'right' },
-  lbExpanded: { padding: '4px 14px 12px 44px', display: 'flex', flexWrap: 'wrap', gap: 8 },
+  lbExpanded: {
+    padding: '4px 14px 12px 44px', display: 'flex', flexWrap: 'wrap', gap: 8,
+  },
   lbTicker: {
     display: 'flex', gap: 6, alignItems: 'center',
     background: 'var(--card)', border: '1px solid var(--border)',
@@ -686,5 +809,8 @@ const S = {
   lbTickerName: { fontSize: 12, fontWeight: 700, color: 'var(--text1)' },
 
   // Loading
-  skeleton: { height: 52, borderRadius: 12, marginBottom: 10, background: 'var(--card2)', animation: 'pulse 1.5s ease-in-out infinite' },
+  skeleton: {
+    height: 52, borderRadius: 12, marginBottom: 10,
+    background: 'var(--card2)', animation: 'pulse 1.5s ease-in-out infinite',
+  },
 };
