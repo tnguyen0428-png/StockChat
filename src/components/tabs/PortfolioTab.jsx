@@ -57,7 +57,7 @@ export default function PortfolioTab({ session }) {
   const fetchPrices = async (tickers) => {
     if (!tickers) return;
     try {
-      const res = await fetch(`https://financialmodelingprep.com/stable/quote-short/${tickers}?apikey=${FMP_KEY}`);
+      const res = await fetch(`https://financialmodelingprep.com/stable/quote-short?symbol=${tickers}&apikey=${FMP_KEY}`);
       const data = await res.json();
       if (Array.isArray(data)) {
         const map = {};
@@ -97,7 +97,7 @@ export default function PortfolioTab({ session }) {
     let priceMap = { ...prices };
     if (allTickers.length > 0) {
       try {
-        const res = await fetch(`https://financialmodelingprep.com/stable/quote-short/${allTickers.join(',')}?apikey=${FMP_KEY}`);
+        const res = await fetch(`https://financialmodelingprep.com/stable/quote-short?symbol=${allTickers.join(',')}&apikey=${FMP_KEY}`);
         const data = await res.json();
         if (Array.isArray(data)) {
           data.forEach(q => { priceMap[q.symbol] = q.price; });

@@ -51,7 +51,7 @@ export default function BuyModal({ session, cashBalance, onClose, onComplete }) 
     setError('');
     try {
       const res = await fetch(
-        `https://financialmodelingprep.com/stable/quote-short/${item.symbol}?apikey=${FMP_KEY}`
+        `https://financialmodelingprep.com/stable/quote-short?symbol=${item.symbol}&apikey=${FMP_KEY}`
       );
       const data = await res.json();
       const price = Array.isArray(data) && data[0] ? data[0].price : null;
