@@ -155,12 +155,13 @@ function Sparkline({ prices, fullWidth, enhanced, support, resistance, alertPric
   const linePts = coords.map(c => `${c.x},${c.y}`).join(' ');
   const fillPts = `0,${H} ${linePts} ${W},${H}`;
 
-  // Support / resistance Y positions
+  // Support / resistance Y positions — skip if outside price range or too far away
   const srLines = [];
-  if (support != null && support >= min && support <= max) {
+  const maxDist = range * 2;
+  if (support != null && support >= min && support <= max && Math.abs(support - min) <= maxDist) {
     srLines.push({ y: H - ((support - min) / range) * (H - PAD * 2) - PAD, label: 'S', color: '#16A34A', price: support });
   }
-  if (resistance != null && resistance >= min && resistance <= max) {
+  if (resistance != null && resistance >= min && resistance <= max && Math.abs(resistance - max) <= maxDist) {
     srLines.push({ y: H - ((resistance - min) / range) * (H - PAD * 2) - PAD, label: 'R', color: '#DC2626', price: resistance });
   }
 
@@ -200,6 +201,7 @@ function Sparkline({ prices, fullWidth, enhanced, support, resistance, alertPric
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
+        overflow="hidden"
         style={{ display: 'block', width: '100%', height: 64, padding: '8px 0' }}
         preserveAspectRatio="none"
         onTouchStart={handleTouch}
@@ -211,7 +213,11 @@ function Sparkline({ prices, fullWidth, enhanced, support, resistance, alertPric
             <stop offset="0%" stopColor={color} stopOpacity="0.20" />
             <stop offset="100%" stopColor={color} stopOpacity="0" />
           </linearGradient>
+          <clipPath id="sparkClip">
+            <rect x="0" y="0" width={W} height={H} />
+          </clipPath>
         </defs>
+        <g clipPath="url(#sparkClip)">
         {/* Fill gradient */}
         <polygon points={fillPts} fill={`url(#${gradId})`} />
         {/* Support / resistance dashed lines */}
@@ -245,6 +251,7 @@ function Sparkline({ prices, fullWidth, enhanced, support, resistance, alertPric
             </text>
           </g>
         )}
+        </g>
       </svg>
     </div>
   );
