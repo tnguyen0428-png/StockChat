@@ -114,9 +114,10 @@ const swipeStyles = {
 
 // ── Sparkline ───────────────────────────────────────────────────────
 
-function Sparkline({ prices }) {
+function Sparkline({ prices, fullWidth }) {
   if (!prices || prices.length < 2) return null;
-  const W = 120, H = 32;
+  const W = fullWidth ? 400 : 120;
+  const H = fullWidth ? 36 : 32;
   const min = Math.min(...prices);
   const max = Math.max(...prices);
   const range = max - min || 1;
@@ -125,7 +126,11 @@ function Sparkline({ prices }) {
   ).join(' ');
   const color = prices[prices.length - 1] >= prices[0] ? '#16A34A' : '#DC2626';
   return (
-    <svg width={W} height={H} style={{ display: 'block', flexShrink: 0 }}>
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      style={{ display: 'block', flexShrink: 0, width: fullWidth ? '100%' : W, height: fullWidth ? 36 : H }}
+      preserveAspectRatio="none"
+    >
       <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5"
         strokeLinejoin="round" strokeLinecap="round" />
     </svg>
@@ -224,7 +229,7 @@ function SectorHeatMap({ sectors = MOCK_SECTORS }) {
 const heatStyles = {
   grid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 },
   tile: {
-    borderRadius: 8, padding: '10px 8px',
+    borderRadius: 8, padding: '14px 10px', minHeight: 56,
     display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center', gap: 2,
   },
@@ -328,18 +333,27 @@ function AlertCard({ alert, badge, isExpanded, onToggle, forceExpanded, darkMode
       {/* Signal */}
       {signal && <div style={styles.signalText}>{signal}</div>}
 
-      {/* Footer: vol (left) | vs SPY (center) | confidence (right) — bold numbers only */}
+      {/* Footer: vol (left) | vs SPY (center) | confidence (right) */}
       <div style={styles.cardFooter}>
-        <span style={styles.metricValue}>{volume ?? '—'}</span>
+        <span style={styles.footerCell}>
+          <span style={styles.footerLabel}>Vol</span>
+          <span style={styles.metricValue}>{volume ?? '—'}</span>
+        </span>
         {rs != null && (
-          <span style={{ fontWeight: 700, fontSize: 12, color: rs >= 0 ? '#16A34A' : '#DC2626' }}>
-            {rs >= 0 ? '+' : ''}{rs.toFixed(2)}%
+          <span style={styles.footerCell}>
+            <span style={styles.footerLabel}>vs SPY</span>
+            <span style={{ fontWeight: 700, fontSize: 12, color: rs >= 0 ? '#16A34A' : '#DC2626' }}>
+              {rs >= 0 ? '+' : ''}{rs.toFixed(2)}%
+            </span>
           </span>
         )}
         <span style={styles.footerRight}>
           {alert.confidence != null && (
-            <span style={{ fontWeight: 700, fontSize: 12, color: confColor(alert.confidence) }}>
-              {alert.confidence}%
+            <span style={styles.footerCell}>
+              <span style={styles.footerLabel}>Confidence</span>
+              <span style={{ fontWeight: 700, fontSize: 12, color: confColor(alert.confidence) }}>
+                {alert.confidence}%
+              </span>
             </span>
           )}
           {!forceExpanded && (
@@ -356,30 +370,30 @@ function AlertCard({ alert, badge, isExpanded, onToggle, forceExpanded, darkMode
             <div style={styles.confRationale}>💡 {alert.confidenceReason}</div>
           )}
           <div style={styles.expandGrid}>
-            <div style={styles.expandDataCols}>
-              <div style={styles.expandItem}>
-                <span style={styles.expandLabel}>Support</span>
-                <span style={styles.expandValue}>${alert.support?.toFixed(2) ?? '—'}</span>
-              </div>
-              <div style={styles.expandItem}>
-                <span style={styles.expandLabel}>Resistance</span>
-                <span style={styles.expandValue}>${alert.resistance?.toFixed(2) ?? '—'}</span>
-              </div>
-              <div style={styles.expandItem}>
-                <span style={styles.expandLabel}>Sector</span>
-                <span style={styles.expandValue}>{alert.sector ?? '—'}</span>
-              </div>
-              {rs != null && (
-                <div style={styles.expandItem}>
-                  <span style={styles.expandLabel}>vs SPY</span>
-                  <span style={{ ...styles.expandValue, color: rs >= 0 ? '#16A34A' : '#DC2626' }}>
-                    {rs >= 0 ? '+' : ''}{rs.toFixed(2)}%
-                  </span>
-                </div>
-              )}
+            <div style={styles.expandItem}>
+              <span style={styles.expandLabel}>Support</span>
+              <span style={styles.expandValue}>${alert.support?.toFixed(2) ?? '—'}</span>
             </div>
-            {alert.recentPrices && <Sparkline prices={alert.recentPrices} />}
+            <div style={styles.expandItem}>
+              <span style={styles.expandLabel}>Resistance</span>
+              <span style={styles.expandValue}>${alert.resistance?.toFixed(2) ?? '—'}</span>
+            </div>
+            <div style={styles.expandItem}>
+              <span style={styles.expandLabel}>Sector</span>
+              <span style={styles.expandValue}>{alert.sector ?? '—'}</span>
+            </div>
+            <div style={styles.expandItem}>
+              <span style={styles.expandLabel}>vs SPY</span>
+              <span style={{ ...styles.expandValue, color: rs != null ? (rs >= 0 ? '#16A34A' : '#DC2626') : 'var(--text1)' }}>
+                {rs != null ? `${rs >= 0 ? '+' : ''}${rs.toFixed(2)}%` : '—'}
+              </span>
+            </div>
           </div>
+          {alert.recentPrices && (
+            <div style={{ marginBottom: 12 }}>
+              <Sparkline prices={alert.recentPrices} fullWidth />
+            </div>
+          )}
           <button style={styles.viewChartBtn} onClick={e => e.stopPropagation()}>View Chart</button>
         </div>
       </div>
@@ -465,18 +479,24 @@ export default function AlertsTab({ session }) {
   const [refreshKey, setRefreshKey]  = useState(0);
 
   // Live market data from Supabase market_data table
-  const [fearScore, setFearScore] = useState(null);
-  const [sectors, setSectors]     = useState(null);
-  const [spyData, setSpyData]     = useState(null);
+  const [fearScore, setFearScore]           = useState(null);
+  const [sectors, setSectors]               = useState(null);
+  const [spyData, setSpyData]               = useState(null);
+  const [marketUpdatedAt, setMarketUpdatedAt] = useState(null);
 
   useEffect(() => {
     supabase.from('market_data').select('*').then(({ data }) => {
       if (!data) return;
+      let latestUpdated = null;
       data.forEach(row => {
         if (row.key === 'vix_score')            setFearScore(row.value?.score ?? null);
         if (row.key === 'sector_performance')   setSectors(row.value);
         if (row.key === 'spy_price')            setSpyData(row.value);
+        if (row.updated_at && (!latestUpdated || row.updated_at > latestUpdated)) {
+          latestUpdated = row.updated_at;
+        }
       });
+      if (latestUpdated) setMarketUpdatedAt(latestUpdated);
     });
   }, []);
 
@@ -625,7 +645,13 @@ export default function AlertsTab({ session }) {
 
   // ── Derived data ──────────────────────────────────────────────────
 
-  const displayAlerts = breakout_alerts.length > 0 ? breakout_alerts : MOCK_ALERTS;
+  // For live alerts, compute rsVsSpy from SPY change; mock alerts already have it
+  const displayAlerts = breakout_alerts.length > 0
+    ? breakout_alerts.map(a => {
+        if (a.rsVsSpy != null || a.change == null || !spyData?.change) return a;
+        return { ...a, rsVsSpy: Number(a.change) - Number(spyData.change) };
+      })
+    : MOCK_ALERTS;
 
   const alertOfTheDay = displayAlerts.length > 0
     ? displayAlerts.reduce((best, a) => (a.confidence ?? 0) > (best.confidence ?? 0) ? a : best)
@@ -759,6 +785,11 @@ export default function AlertsTab({ session }) {
 
       {/* Fear Index — live VIX from market_data, falls back to mock */}
       <FearIndex score={fearScore ?? MOCK_FEAR_SCORE} />
+      {marketUpdatedAt && (
+        <div style={{ fontSize: 10, color: 'var(--text3)', textAlign: 'center', marginTop: -6, marginBottom: 8 }}>
+          Last updated {new Date(marketUpdatedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+        </div>
+      )}
 
       {/* Sector Heat Map — live from market_data, falls back to mock */}
       <SectorHeatMap sectors={sectors ?? MOCK_SECTORS} />
@@ -906,12 +937,19 @@ const styles = {
     lineHeight: 1.55, marginBottom: 16,
   },
   cardFooter: {
-    display: 'flex', alignItems: 'center',
+    display: 'flex', alignItems: 'flex-start',
     justifyContent: 'space-between',
     borderTop: '1px solid var(--border)',
     padding: '7px 0', fontSize: 12,
   },
-  footerRight: { display: 'flex', alignItems: 'center', gap: 8 },
+  footerCell: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+  },
+  footerLabel: {
+    fontSize: 9, fontWeight: 600, color: 'var(--text3)',
+    textTransform: 'uppercase', letterSpacing: '0.5px',
+  },
+  footerRight: { display: 'flex', alignItems: 'flex-start', gap: 8 },
   chevron: {
     fontSize: 14, color: 'var(--text3)',
     display: 'inline-block', transition: 'transform 0.2s ease',
@@ -932,17 +970,15 @@ const styles = {
   },
   confRationale: {
     fontSize: 11, color: 'var(--text2)',
-    lineHeight: 1.5,
+    lineHeight: 1.7,
     background: 'color-mix(in srgb, var(--card) 92%, var(--green) 8%)',
     borderRadius: 8, padding: '8px 12px', marginBottom: 10,
   },
   expandGrid: {
-    display: 'flex', alignItems: 'center',
-    justifyContent: 'space-between', gap: 8,
-    marginBottom: 12,
+    display: 'grid', gridTemplateColumns: '1fr 1fr',
+    gap: 10, marginBottom: 12,
   },
-  expandDataCols: { display: 'flex', flex: 1, gap: 0 },
-  expandItem: { flex: 1, display: 'flex', flexDirection: 'column', gap: 3 },
+  expandItem: { display: 'flex', flexDirection: 'column', gap: 3 },
   expandLabel: {
     fontSize: 10, color: 'var(--text3)',
     textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600,
@@ -950,6 +986,7 @@ const styles = {
   expandValue: { fontSize: 13, fontWeight: 600, color: 'var(--text1)' },
   viewChartBtn: {
     width: '100%', padding: '8px 0',
+    minHeight: 44,
     fontSize: 12, fontWeight: 600,
     color: 'var(--green)', background: 'var(--green-bg)',
     border: '1px solid rgba(26,173,94,0.3)',
