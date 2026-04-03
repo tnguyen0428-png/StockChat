@@ -53,6 +53,24 @@ export default function App() {
   const [recoveryMode, setRecoveryMode] = useState(false);
 
   useEffect(() => {
+    // ── Handle email confirmation (PKCE flow) ──
+    const params = new URLSearchParams(window.location.search);
+    const tokenHash = params.get('token_hash');
+    const type = params.get('type');
+
+    if (tokenHash && type) {
+      supabase.auth.verifyOtp({ token_hash: tokenHash, type })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Email verification failed:', error.message);
+          } else {
+            console.log('Email verified successfully');
+          }
+          // Clean the URL
+          window.history.replaceState({}, '', window.location.pathname);
+        });
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
