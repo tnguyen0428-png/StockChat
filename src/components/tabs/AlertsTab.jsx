@@ -421,6 +421,288 @@ function confColor(c) {
   return '#DC2626';
 }
 
+// ── Mock key stats for detail overlay ────────────────────────────────
+
+// TODO: Replace with FMP key stats endpoint
+const MOCK_KEY_STATS = {
+  NVDA: { dayLow: 868.20, dayHigh: 879.44, wk52Low: 473.20, wk52High: 891.46, marketCap: '2.16T', marketCapDesc: 'One of the world\'s most valuable companies', avgVolume: '35.8M' },
+  SMCI: { dayLow: 88.10, dayHigh: 93.85, wk52Low: 40.10, wk52High: 122.90, marketCap: '54.2B', marketCapDesc: 'Large-cap tech company', avgVolume: '28.4M' },
+  PLTR: { dayLow: 23.90, dayHigh: 25.12, wk52Low: 13.68, wk52High: 27.50, marketCap: '54.8B', marketCapDesc: 'Large-cap software company', avgVolume: '42.1M' },
+  CRWD: { dayLow: 328.40, dayHigh: 336.80, wk52Low: 200.81, wk52High: 398.33, marketCap: '81.4B', marketCapDesc: 'Major cybersecurity leader', avgVolume: '5.2M' },
+  AAPL: { dayLow: 194.80, dayHigh: 197.10, wk52Low: 164.08, wk52High: 198.23, marketCap: '3.01T', marketCapDesc: 'The world\'s most valuable public company', avgVolume: '54.2M' },
+  AMD:  { dayLow: 174.30, dayHigh: 180.15, wk52Low: 93.12, wk52High: 227.30, marketCap: '289B', marketCapDesc: 'Major semiconductor company', avgVolume: '44.7M' },
+  TSLA: { dayLow: 183.20, dayHigh: 191.80, wk52Low: 138.80, wk52High: 278.98, marketCap: '604B', marketCapDesc: 'Leading electric vehicle maker', avgVolume: '98.3M' },
+  META: { dayLow: 522.10, dayHigh: 530.80, wk52Low: 279.40, wk52High: 542.81, marketCap: '1.35T', marketCapDesc: 'Social media and AI giant', avgVolume: '16.8M' },
+};
+
+// ── Stock Detail Overlay ────────────────────────────────────────────
+
+function StockDetailOverlay({ alert, darkMode, onClose }) {
+  const ticker = alert.ticker ?? alert.tickers?.[0] ?? '—';
+  const priceNum = alert.price != null ? Number(alert.price) : 0;
+  const changeNum = alert.change != null ? Number(alert.change) : 0;
+  const changeAmt = priceNum * changeNum / 100;
+  const isUp = changeNum >= 0;
+  const vol = alert.volume ?? (alert.current_volume ? (Number(alert.current_volume) / 1e6).toFixed(1) + 'M' : '—');
+  const stats = MOCK_KEY_STATS[ticker] || {};
+  const [chartRange, setChartRange] = useState('1M');
+  const [toast, setToast] = useState(null);
+
+  // TODO: Replace with live FMP quote data
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 1500);
+  };
+
+  const volNum = parseFloat(vol);
+  const avgVolNum = parseFloat(stats.avgVolume);
+  const volAboveAvg = volNum && avgVolNum ? volNum > avgVolNum : null;
+
+  // Range bar helper
+  const RangeBar = ({ low, high, current, label }) => {
+    const pct = high > low ? Math.min(Math.max(((current - low) / (high - low)) * 100, 0), 100) : 50;
+    return (
+      <div>
+        <div style={ovStyles.statLabel}>{label}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+          <span style={{ color: 'var(--text3)' }}>${low.toFixed(2)}</span>
+          <div style={ovStyles.rangeTrack}>
+            <div style={{ ...ovStyles.rangeDot, left: `${pct}%` }} />
+          </div>
+          <span style={{ color: 'var(--text3)' }}>${high.toFixed(2)}</span>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={ovStyles.overlay}>
+      {/* Header */}
+      <div style={ovStyles.header}>
+        <div>
+          <div style={ovStyles.headerTicker}>{ticker}</div>
+          <div style={ovStyles.headerName}>{alert.name ?? ''}</div>
+        </div>
+        <button style={ovStyles.closeBtn} onClick={onClose}>✕</button>
+      </div>
+
+      <div style={ovStyles.scrollBody}>
+        {/* Price */}
+        <div style={ovStyles.priceSection}>
+          <div style={ovStyles.priceRow}>
+            <span style={ovStyles.priceBig}>${priceNum.toFixed(2)}</span>
+            <span style={{ ...ovStyles.priceChange, color: isUp ? '#16A34A' : '#DC2626' }}>
+              {isUp ? '▲' : '▼'} ${Math.abs(changeAmt).toFixed(2)} ({isUp ? '+' : ''}{changeNum.toFixed(2)}%)
+            </span>
+          </div>
+          <div style={ovStyles.realtime}>Real-Time</div>
+        </div>
+
+        {/* Chart */}
+        <div style={{ marginBottom: 16 }}>
+          {chartRange === '1M' && alert.recentPrices ? (
+            <Sparkline prices={alert.recentPrices} enhanced
+              support={alert.support} resistance={alert.resistance}
+              alertPrice={priceNum} />
+          ) : (
+            <div style={ovStyles.chartPlaceholder}>Chart data coming soon</div>
+          )}
+          {/* TODO: Fetch historical prices from FMP for each range */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            {['1D', '1W', '1M', '3M', '1Y'].map(r => (
+              <button key={r} style={{
+                ...ovStyles.rangePill,
+                background: chartRange === r ? '#1a3c2a' : 'var(--card)',
+                color: chartRange === r ? '#fff' : 'var(--text2)',
+                borderColor: chartRange === r ? '#1a3c2a' : 'var(--border)',
+              }} onClick={() => {
+                if (r === '1M') { setChartRange(r); }
+                else { setChartRange(r); showToast('Coming soon'); }
+              }}>
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Key Stats */}
+        <div style={ovStyles.sectionLabel}>Key Stats</div>
+        <div style={ovStyles.statsGrid}>
+          {stats.dayLow != null && (
+            <div style={ovStyles.statCell}>
+              <RangeBar low={stats.dayLow} high={stats.dayHigh} current={priceNum} label="Today's Range" />
+              <div style={ovStyles.statExplain}>How the price moved today between its low and high</div>
+            </div>
+          )}
+          {stats.wk52Low != null && (
+            <div style={ovStyles.statCell}>
+              <RangeBar low={stats.wk52Low} high={stats.wk52High} current={priceNum} label="52-Week Range" />
+              <div style={ovStyles.statExplain}>Where the price sits compared to its yearly low and high</div>
+            </div>
+          )}
+          {stats.marketCap && (
+            <div style={ovStyles.statCell}>
+              <div style={ovStyles.statLabel}>Market Cap</div>
+              <div style={ovStyles.statValue}>${stats.marketCap}</div>
+              <div style={ovStyles.statExplain}>{stats.marketCapDesc}</div>
+            </div>
+          )}
+          <div style={ovStyles.statCell}>
+            <div style={ovStyles.statLabel}>Volume</div>
+            <div style={ovStyles.statValue}>{vol} shares traded today</div>
+            {volAboveAvg != null && (
+              <div style={{ ...ovStyles.statExplain, color: volAboveAvg ? '#16A34A' : '#DC2626', fontWeight: 600 }}>
+                {volAboveAvg ? 'Above average' : 'Below average'} — typical is {stats.avgVolume}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Why it's alerting */}
+        <div style={ovStyles.sectionLabel}>Why It's Alerting</div>
+        <div style={ovStyles.whyCard}>
+          {alert.signal && <div style={ovStyles.whySignal}>{alert.signal}</div>}
+          {alert.confidenceReason && <div style={ovStyles.whyRationale}>💡 {alert.confidenceReason}</div>}
+          <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+            {alert.confidence != null && (
+              <span style={{ fontSize: 12 }}>
+                <span style={{ color: 'var(--text3)' }}>Confidence </span>
+                <strong style={{ color: confColor(alert.confidence) }}>{alert.confidence}%</strong>
+              </span>
+            )}
+            {alert.support != null && (
+              <span style={{ fontSize: 12 }}>
+                <span style={{ color: 'var(--text3)' }}>Support </span>
+                <strong style={{ color: 'var(--text1)' }}>${alert.support.toFixed(2)}</strong>
+              </span>
+            )}
+            {alert.resistance != null && (
+              <span style={{ fontSize: 12 }}>
+                <span style={{ color: 'var(--text3)' }}>Resistance </span>
+                <strong style={{ color: 'var(--text1)' }}>${alert.resistance.toFixed(2)}</strong>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div style={ovStyles.actionRow}>
+          {/* TODO: Wire to user_watchlist table */}
+          <button style={ovStyles.actionBtnOutline} onClick={() => showToast('Added to Watchlist')}>
+            Add to Watchlist
+          </button>
+          {/* TODO: Navigate to chat tab and prefill ticker */}
+          <button style={ovStyles.actionBtnSolid} onClick={() => showToast('Opening chat...')}>
+            Discuss in Chat
+          </button>
+        </div>
+      </div>
+
+      {/* Toast */}
+      {toast && <div style={ovStyles.toast}>{toast}</div>}
+    </div>
+  );
+}
+
+const ovStyles = {
+  overlay: {
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    background: 'var(--bg)', zIndex: 10001,
+    display: 'flex', flexDirection: 'column',
+    maxWidth: 480, margin: '0 auto',
+  },
+  header: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '16px 16px 12px', flexShrink: 0,
+    borderBottom: '1px solid var(--border)',
+  },
+  headerTicker: { fontSize: 22, fontWeight: 800, color: 'var(--text1)' },
+  headerName: { fontSize: 13, color: 'var(--text3)', marginTop: 2 },
+  closeBtn: {
+    width: 36, height: 36, borderRadius: '50%',
+    background: 'var(--card)', border: '1px solid var(--border)',
+    fontSize: 16, cursor: 'pointer', display: 'flex',
+    alignItems: 'center', justifyContent: 'center',
+    color: 'var(--text2)',
+  },
+  scrollBody: {
+    flex: 1, overflowY: 'auto', padding: '16px 16px 120px',
+    WebkitOverflowScrolling: 'touch',
+  },
+  priceSection: { marginBottom: 20 },
+  priceRow: { display: 'flex', alignItems: 'baseline', gap: 12 },
+  priceBig: { fontSize: 32, fontWeight: 800, color: 'var(--text1)' },
+  priceChange: { fontSize: 14, fontWeight: 700 },
+  realtime: { fontSize: 10, color: 'var(--text3)', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
+  chartPlaceholder: {
+    height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: 'var(--text3)', fontSize: 13, background: 'var(--card)',
+    borderRadius: 8, border: '1px solid var(--border)',
+  },
+  rangePill: {
+    flex: 1, padding: '6px 0', minHeight: 32,
+    fontSize: 11, fontWeight: 600, borderRadius: 16,
+    border: '1px solid', cursor: 'pointer', textAlign: 'center',
+  },
+  sectionLabel: {
+    fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+    letterSpacing: 1, color: 'var(--text3)', marginBottom: 10,
+  },
+  statsGrid: {
+    display: 'grid', gridTemplateColumns: '1fr',
+    gap: 12, marginBottom: 20,
+  },
+  statCell: {
+    background: 'var(--card)', border: '1px solid var(--border)',
+    borderRadius: 10, padding: '12px 14px',
+  },
+  statLabel: {
+    fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+    letterSpacing: '0.5px', color: 'var(--text3)', marginBottom: 6,
+  },
+  statValue: { fontSize: 14, fontWeight: 700, color: 'var(--text1)', marginBottom: 2 },
+  statExplain: { fontSize: 11, color: 'var(--text3)', lineHeight: 1.5, marginTop: 4 },
+  rangeTrack: {
+    flex: 1, height: 4, background: 'var(--border)',
+    borderRadius: 2, position: 'relative',
+  },
+  rangeDot: {
+    position: 'absolute', top: -4, width: 12, height: 12,
+    borderRadius: '50%', background: 'var(--green)',
+    border: '2px solid var(--card)', transform: 'translateX(-50%)',
+  },
+  whyCard: {
+    background: 'var(--card)', border: '1px solid var(--border)',
+    borderRadius: 10, padding: '14px', marginBottom: 20,
+  },
+  whySignal: { fontSize: 13, fontWeight: 600, color: 'var(--text1)', marginBottom: 6 },
+  whyRationale: { fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 },
+  actionRow: {
+    display: 'flex', gap: 10, marginBottom: 20,
+  },
+  actionBtnOutline: {
+    flex: 1, padding: '12px 0', minHeight: 48,
+    fontSize: 13, fontWeight: 700, borderRadius: 10,
+    background: 'transparent', color: 'var(--green)',
+    border: '2px solid var(--green)', cursor: 'pointer',
+  },
+  actionBtnSolid: {
+    flex: 1, padding: '12px 0', minHeight: 48,
+    fontSize: 13, fontWeight: 700, borderRadius: 10,
+    background: 'var(--green)', color: '#fff',
+    border: 'none', cursor: 'pointer',
+  },
+  toast: {
+    position: 'absolute', bottom: 100, left: '50%',
+    transform: 'translateX(-50%)',
+    background: 'var(--text1)', color: 'var(--bg)',
+    fontSize: 13, fontWeight: 600,
+    padding: '8px 20px', borderRadius: 20,
+    zIndex: 10002,
+  },
+};
+
 // ── Helper: render a single alert card ──────────────────────────────
 
 function AlertCard({ alert, badge, isExpanded, onToggle, forceExpanded, darkMode }) {
@@ -433,6 +715,7 @@ function AlertCard({ alert, badge, isExpanded, onToggle, forceExpanded, darkMode
   const showExp = forceExpanded || isExpanded;
   const rs      = alert.rsVsSpy;
   const cardRef = useRef(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   useEffect(() => {
     if (isExpanded && cardRef.current) {
@@ -507,7 +790,7 @@ function AlertCard({ alert, badge, isExpanded, onToggle, forceExpanded, darkMode
       </div>
 
       {/* Expanded detail panel */}
-      <div style={{ ...styles.expandPanel, maxHeight: showExp ? 400 : 0 }}>
+      <div style={{ ...styles.expandPanel, maxHeight: showExp ? 800 : 0 }}>
         <div style={styles.expandPanelInner}>
           {alert.context && <p style={styles.expandContext}>{alert.context}</p>}
           {alert.confidenceReason && (
@@ -564,7 +847,12 @@ function AlertCard({ alert, badge, isExpanded, onToggle, forceExpanded, darkMode
               </div>
             );
           })()}
-          <button style={styles.viewChartBtn} onClick={e => e.stopPropagation()}>View Chart</button>
+          <button style={styles.viewChartBtn} onClick={e => { e.stopPropagation(); setDetailOpen(true); }}>
+            View Details
+          </button>
+          {detailOpen && (
+            <StockDetailOverlay alert={alert} darkMode={darkMode} onClose={() => setDetailOpen(false)} />
+          )}
         </div>
       </div>
     </div>
@@ -1313,7 +1601,6 @@ const styles = {
     border: '1px solid rgba(26,173,94,0.3)',
     borderRadius: 8, cursor: 'pointer',
   },
-
   // Scanner UI
   scanToggleBtn: {
     fontSize: 11, fontWeight: 600,
