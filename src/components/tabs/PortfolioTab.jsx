@@ -22,6 +22,7 @@ export default function PortfolioTab({ session }) {
   const [loadingData, setLoadingData] = useState(true);
   const [showBuy, setShowBuy] = useState(false);
   const [sellTrade, setSellTrade] = useState(null);
+  const [showPortfolio, setShowPortfolio] = useState(false);
 
   // Leaderboard
   const [leaderboard, setLeaderboard] = useState([]);
@@ -148,6 +149,7 @@ export default function PortfolioTab({ session }) {
   const totalValue = cashBalance + totalPositionsValue;
   const totalReturn = ((totalValue - STARTING_CASH) / STARTING_CASH) * 100;
   const isPositive = totalReturn >= 0;
+  const hasStarted = trades.length > 0 || cashBalance < STARTING_CASH;
 
   const onBuyComplete = () => {
     setShowBuy(false);
@@ -194,75 +196,120 @@ export default function PortfolioTab({ session }) {
 
       {view === 'portfolio' ? (
         <>
-          {/* Header card */}
-          <div style={styles.headerCard}>
-            <div style={styles.headerLabel}>Total Portfolio Value</div>
-            <div style={{ ...styles.headerValue, color: isPositive ? '#3B6D11' : '#ef5350' }}>
-              ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div style={{ ...styles.headerReturn, color: isPositive ? '#3B6D11' : '#ef5350' }}>
-              {isPositive ? '+' : ''}{totalReturn.toFixed(2)}% from $50,000
-            </div>
-            <div style={styles.headerCash}>
-              Cash: ${cashBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            {lastUpdated && (
-              <div style={styles.timestamp}>
-                Last updated: {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+          {!hasStarted && !showPortfolio ? (
+            /* Welcome / onboarding screen */
+            <div style={styles.welcome}>
+              <div style={styles.welcomeIcon}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3B6D11" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                  <polyline points="16 7 22 7 22 13" />
+                </svg>
               </div>
-            )}
-          </div>
+              <div style={styles.welcomeTitle}>Portfolio challenge</div>
+              <div style={styles.welcomeSubtitle}>
+                Compete with the group — build the best portfolio using virtual cash and real market prices.
+              </div>
 
-          {/* Open positions */}
-          {trades.length > 0 ? (
-            <div style={styles.section}>
-              <div style={styles.sectionTitle}>Open Positions</div>
-              {trades.map(trade => {
-                const curPrice = prices[trade.ticker] || Number(trade.entry_price);
-                const entryPrice = Number(trade.entry_price);
-                const pctGain = ((curPrice - entryPrice) / entryPrice) * 100;
-                const isUp = pctGain >= 0;
-                return (
-                  <div
-                    key={trade.id}
-                    style={styles.posRow}
-                    onClick={() => setSellTrade({ ...trade, currentPrice: curPrice })}
-                  >
-                    <div style={styles.posLeft}>
-                      <div style={styles.posTicker}>{trade.ticker}</div>
-                      <div style={styles.posDetail}>
-                        {Number(trade.shares).toFixed(2)} shares @ ${entryPrice.toFixed(2)}
-                      </div>
-                    </div>
-                    <div style={styles.posRight}>
-                      <div style={{ ...styles.posPrice, color: isUp ? '#3B6D11' : '#ef5350' }}>
-                        ${curPrice.toFixed(2)}
-                      </div>
-                      <div style={{ ...styles.posPct, color: isUp ? '#3B6D11' : '#ef5350' }}>
-                        {isUp ? '+' : ''}{pctGain.toFixed(2)}%
-                      </div>
+              <div style={styles.statGrid}>
+                <div style={styles.statCard}>
+                  <div style={styles.statLabel}>STARTING CASH</div>
+                  <div style={{ ...styles.statValue, color: '#3B6D11' }}>$50,000</div>
+                </div>
+                <div style={styles.statCard}>
+                  <div style={styles.statLabel}>MARKET PRICES</div>
+                  <div style={styles.statValue}>Real-time</div>
+                </div>
+              </div>
+
+              <div style={styles.steps}>
+                {[
+                  { title: 'Buy stocks with virtual cash', sub: 'Search any ticker, invest any amount' },
+                  { title: 'Track your portfolio performance', sub: 'Prices update every 30 seconds' },
+                  { title: 'Climb the leaderboard', sub: 'Ranked by % return — best investor wins' },
+                ].map((step, i) => (
+                  <div key={i} style={styles.stepRow}>
+                    <div style={styles.stepNum}>{i + 1}</div>
+                    <div>
+                      <div style={styles.stepTitle}>{step.title}</div>
+                      <div style={styles.stepSub}>{step.sub}</div>
                     </div>
                   </div>
-                );
-              })}
+                ))}
+              </div>
+
+              <button style={styles.startBtn} onClick={() => setShowPortfolio(true)}>
+                Start challenge
+              </button>
+              <div style={styles.disclaimer}>No real money involved — it's all virtual</div>
             </div>
           ) : (
-            <div style={styles.emptyState}>
-              <div style={styles.emptyTitle}>Start your challenge!</div>
-              <div style={styles.emptyText}>You have $50,000 to invest.</div>
-              <button style={styles.emptyBtn} onClick={() => setShowBuy(true)}>
-                + Buy Your First Stock
-              </button>
-            </div>
-          )}
+            <>
+              {/* Header card */}
+              <div style={styles.headerCard}>
+                <div style={styles.headerLabel}>Total Portfolio Value</div>
+                <div style={{ ...styles.headerValue, color: isPositive ? '#3B6D11' : '#ef5350' }}>
+                  ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div style={{ ...styles.headerReturn, color: isPositive ? '#3B6D11' : '#ef5350' }}>
+                  {isPositive ? '+' : ''}{totalReturn.toFixed(2)}% from $50,000
+                </div>
+                <div style={styles.headerCash}>
+                  Cash: ${cashBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                {lastUpdated && (
+                  <div style={styles.timestamp}>
+                    Last updated: {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  </div>
+                )}
+              </div>
 
-          {/* Buy button (only when positions exist) */}
-          {trades.length > 0 && (
-            <div style={styles.buyWrap}>
-              <button style={styles.buyBtn} onClick={() => setShowBuy(true)}>
-                + Buy Stock
-              </button>
-            </div>
+              {/* Open positions */}
+              {trades.length > 0 ? (
+                <div style={styles.section}>
+                  <div style={styles.sectionTitle}>Open Positions</div>
+                  {trades.map(trade => {
+                    const curPrice = prices[trade.ticker] || Number(trade.entry_price);
+                    const entryPrice = Number(trade.entry_price);
+                    const pctGain = ((curPrice - entryPrice) / entryPrice) * 100;
+                    const isUp = pctGain >= 0;
+                    return (
+                      <div
+                        key={trade.id}
+                        style={styles.posRow}
+                        onClick={() => setSellTrade({ ...trade, currentPrice: curPrice })}
+                      >
+                        <div style={styles.posLeft}>
+                          <div style={styles.posTicker}>{trade.ticker}</div>
+                          <div style={styles.posDetail}>
+                            {Number(trade.shares).toFixed(2)} shares @ ${entryPrice.toFixed(2)}
+                          </div>
+                        </div>
+                        <div style={styles.posRight}>
+                          <div style={{ ...styles.posPrice, color: isUp ? '#3B6D11' : '#ef5350' }}>
+                            ${curPrice.toFixed(2)}
+                          </div>
+                          <div style={{ ...styles.posPct, color: isUp ? '#3B6D11' : '#ef5350' }}>
+                            {isUp ? '+' : ''}{pctGain.toFixed(2)}%
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={styles.emptyState}>
+                  <div style={styles.emptyTitle}>No open positions</div>
+                  <div style={styles.emptyText}>Buy your first stock to get started.</div>
+                </div>
+              )}
+
+              {/* Buy button */}
+              <div style={styles.buyWrap}>
+                <button style={styles.buyBtn} onClick={() => setShowBuy(true)}>
+                  + Buy Stock
+                </button>
+              </div>
+            </>
           )}
         </>
       ) : (
@@ -388,18 +435,44 @@ const styles = {
   posPrice: { fontSize: 14, fontWeight: 600 },
   posPct: { fontSize: 12, fontWeight: 600, marginTop: 2 },
 
-  // Empty state
+  // Empty state (after started, no positions)
   emptyState: {
-    padding: '48px 32px', textAlign: 'center',
+    padding: '32px 32px', textAlign: 'center',
   },
-  emptyTitle: { fontSize: 18, fontWeight: 700, color: 'var(--text1)', marginBottom: 6 },
-  emptyText: { fontSize: 14, color: 'var(--text3)', marginBottom: 24 },
-  emptyBtn: {
-    background: '#3B6D11', color: '#fff', border: 'none',
-    borderRadius: 12, padding: '14px 28px',
-    fontSize: 15, fontWeight: 600, cursor: 'pointer',
-    fontFamily: 'var(--font)',
+  emptyTitle: { fontSize: 16, fontWeight: 700, color: 'var(--text1)', marginBottom: 6 },
+  emptyText: { fontSize: 14, color: 'var(--text3)' },
+
+  // Welcome / onboarding
+  welcome: {
+    padding: '28px 24px', textAlign: 'center',
   },
+  welcomeIcon: {
+    width: 56, height: 56, borderRadius: '50%', background: '#EAF3DE',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    margin: '0 auto 16px',
+  },
+  welcomeTitle: { fontSize: 20, fontWeight: 700, color: 'var(--text1)', marginBottom: 8 },
+  welcomeSubtitle: { fontSize: 14, color: 'var(--text2)', lineHeight: 1.6, marginBottom: 20 },
+  statGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 },
+  statCard: { background: 'var(--card2)', borderRadius: 10, padding: 14, textAlign: 'center' },
+  statLabel: { fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  statValue: { fontSize: 18, fontWeight: 700, color: 'var(--text1)' },
+  steps: { textAlign: 'left', marginBottom: 24 },
+  stepRow: { display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 },
+  stepNum: {
+    width: 24, height: 24, borderRadius: '50%', background: '#EAF3DE',
+    color: '#3B6D11', fontSize: 13, fontWeight: 700,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0, marginTop: 1,
+  },
+  stepTitle: { fontSize: 14, fontWeight: 600, color: 'var(--text1)', marginBottom: 2 },
+  stepSub: { fontSize: 13, color: 'var(--text3)' },
+  startBtn: {
+    width: '100%', background: '#3B6D11', color: '#fff', border: 'none',
+    borderRadius: 12, padding: '15px 0', fontSize: 16, fontWeight: 600,
+    cursor: 'pointer', fontFamily: 'var(--font)',
+  },
+  disclaimer: { fontSize: 12, color: 'var(--text3)', marginTop: 10 },
 
   // Buy button
   buyWrap: {
