@@ -3,10 +3,12 @@
 // Breakout alerts feed
 // ============================================
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { run52wHighScan, DEFAULT_THRESHOLD, runVolSurgeScan, DEFAULT_VOL_MULTIPLIER, runGapUpScan, DEFAULT_GAP_THRESHOLD, runMACrossScan, DEFAULT_SHORT_MA, DEFAULT_LONG_MA } from '../../lib/breakoutScanner';
 import { useGroup } from '../../context/GroupContext';
+import { MOCK_FEAR_SCORE, MOCK_SECTORS, MOCK_ALERTS, MOCK_AOTD_HISTORY, BADGE_CONFIG, DARK_THEME, LIGHT_THEME, MOCK_KEY_STATS } from './alertsMockData';
+import { styles, swipeStyles, heatStyles, ovStyles } from './alertsTabStyles';
 
 // ── Swipeable card wrapper ──────────────────────────────────────────
 
@@ -87,30 +89,6 @@ function SwipeableCard({ children, alertId }) {
   );
 }
 
-const swipeStyles = {
-  wrapper: { position: 'relative', overflowX: 'hidden', overflowY: 'visible', borderRadius: 12, marginBottom: 10 },
-  actionLayer: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    pointerEvents: 'none', zIndex: 0,
-  },
-  actionLeft: {
-    background: '#16A34A', color: '#fff', fontWeight: 700, fontSize: 13,
-    padding: '0 18px', height: '100%', display: 'flex', alignItems: 'center',
-    borderRadius: '12px 0 0 12px',
-  },
-  actionRight: {
-    background: '#9CA3AF', color: '#fff', fontWeight: 700, fontSize: 13,
-    padding: '0 18px', height: '100%', display: 'flex', alignItems: 'center',
-    marginLeft: 'auto', borderRadius: '0 12px 12px 0',
-  },
-  toast: {
-    position: 'absolute', top: '50%', left: '50%',
-    transform: 'translate(-50%, -50%)', color: '#fff', fontWeight: 700,
-    fontSize: 12, padding: '6px 16px', borderRadius: 20, zIndex: 10,
-    pointerEvents: 'none', animation: 'fadeInOut 0.9s ease forwards',
-  },
-};
 
 // ── Sparkline ───────────────────────────────────────────────────────
 
@@ -259,9 +237,6 @@ function Sparkline({ prices, fullWidth, enhanced, support, resistance, alertPric
 
 // ── Fear Index gauge ────────────────────────────────────────────────
 
-// TODO: Replace with live VIX API data
-const MOCK_FEAR_SCORE = 18.42;
-
 function getFearSentiment(score) {
   if (score > 30) return { label: 'Extreme Fear',  color: '#DC2626' };
   if (score > 20) return { label: 'Fear',           color: '#EA580C' };
@@ -270,7 +245,7 @@ function getFearSentiment(score) {
   return                 { label: 'Extreme Greed',  color: '#16A34A' };
 }
 
-function FearIndex({ score = MOCK_FEAR_SCORE }) {
+const FearIndex = memo(function FearIndex({ score = MOCK_FEAR_SCORE }) {
   const { label, color } = getFearSentiment(score);
   const cx = 100, cy = 90, r = 74;
   const pct  = Math.min(Math.max(score / 50, 0), 1);
@@ -308,19 +283,9 @@ function FearIndex({ score = MOCK_FEAR_SCORE }) {
       </svg>
     </div>
   );
-}
+});
 
 // ── Sector Heat Map ─────────────────────────────────────────────────
-
-// TODO: Replace with FMP sector performance API
-const MOCK_SECTORS = [
-  { name: 'Technology',  perf: 3.12 },
-  { name: 'Healthcare',  perf: -0.87 },
-  { name: 'Energy',      perf: 1.45 },
-  { name: 'Financials',  perf: 0.63 },
-  { name: 'Consumer',    perf: -1.54 },
-  { name: 'Industrials', perf: 2.08 },
-];
 
 function sectorColor(perf) {
   const t = Math.min(Math.max((perf + 2) / 6, 0), 1);
@@ -330,7 +295,7 @@ function sectorColor(perf) {
   return `rgb(${r},${g},${b})`;
 }
 
-function SectorHeatMap({ sectors = MOCK_SECTORS }) {
+const SectorHeatMap = memo(function SectorHeatMap({ sectors = MOCK_SECTORS }) {
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={styles.secLabel}>Sector Performance</div>
@@ -344,74 +309,7 @@ function SectorHeatMap({ sectors = MOCK_SECTORS }) {
       </div>
     </div>
   );
-}
-
-const heatStyles = {
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 },
-  tile: {
-    borderRadius: 8, padding: '14px 10px', minHeight: 56,
-    display: 'flex', flexDirection: 'column',
-    alignItems: 'center', justifyContent: 'center', gap: 2,
-  },
-  tileName: {
-    fontSize: 10, fontWeight: 600, color: '#fff',
-    textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.9,
-  },
-  tilePerf: { fontSize: 14, fontWeight: 700, color: '#fff' },
-};
-
-// ── Mock data ───────────────────────────────────────────────────────
-
-// TODO: Replace MOCK_ALERTS with live API data
-// TODO: Calculate rsVsSpy from live SPY data
-const MOCK_ALERTS = [
-  { id: 'mock-1', ticker: 'NVDA', name: 'Nvidia Corp',             alert_type: '52w_high',  price: 875.40, change: 2.14, volume: '41.2M',  time: '9:47 AM',   timeGroup: 'morning',    signal: 'Within 1.8% of 52-week high of $891.46',    confidence: 91, support: 848.00, resistance: 891.46, sector: 'Semiconductors',      recentPrices: [843,849,852,848,855,861,858,864,869,866,871,875],                  context: 'Designs GPUs powering AI data centers, autonomous vehicles, and PC gaming.',                             confidenceReason: 'High confidence: price within 2% of 52W high with strong institutional volume and no distribution days.',                  rsVsSpy: 1.42 },
-  { id: 'mock-2', ticker: 'SMCI', name: 'Super Micro Computer',    alert_type: 'vol_surge', price: 92.17,  change: 5.31, volume: '38.1M',  time: '10:03 AM',  timeGroup: 'morning',    signal: 'Volume surging 4.2x 30-day average',          confidence: 78, support: 84.50,  resistance: 98.00,  sector: 'Technology Hardware', recentPrices: [81,83,82,84,85,83,86,87,88,86,89,91,92],                           context: 'Builds high-performance server and storage systems optimized for AI workloads.',                             confidenceReason: 'Moderate confidence: strong volume surge but price still below key resistance at $98.',                                     rsVsSpy: 4.59 },
-  { id: 'mock-3', ticker: 'PLTR', name: 'Palantir Technologies',   alert_type: 'gap_up',    price: 24.88,  change: 4.63, volume: '29.7M',  time: '9:31 AM',   timeGroup: 'morning',    signal: 'Opened $1.10 above prior close of $23.78',    confidence: 85, support: 22.40,  resistance: 26.50,  sector: 'Software',            recentPrices: [22.8,23.1,23.0,23.4,23.2,23.7,23.6,24.0,24.2,24.5,24.7,24.88],   context: 'Provides AI-driven data analytics platforms to governments and large enterprises.',                           confidenceReason: 'High confidence: clean gap above prior consolidation zone with above-average volume confirming the move.',                  rsVsSpy: 3.91 },
-  { id: 'mock-4', ticker: 'CRWD', name: 'CrowdStrike Holdings',    alert_type: 'ma_cross',  price: 334.50, change: 1.87, volume: '8.4M',   time: '11:15 AM',  timeGroup: 'morning',    signal: '20MA $321.14 crossed above 50MA $308.77',     confidence: 72, support: 310.00, resistance: 355.00, sector: 'Cybersecurity',       recentPrices: [318,322,319,325,321,328,324,329,327,331,330,334],                  context: 'Delivers cloud-native endpoint security and threat intelligence to enterprises globally.',                   confidenceReason: 'Moderate confidence: bullish MA cross confirmed but volume is near average — watch for follow-through.',                    rsVsSpy: 1.15 },
-  { id: 'mock-5', ticker: 'AAPL', name: 'Apple Inc',               alert_type: '52w_high',  price: 196.45, change: 0.93, volume: '61.8M',  time: 'Yesterday', timeGroup: null,          signal: 'Within 0.9% of 52-week high of $198.23',      confidence: 88, support: 188.00, resistance: 198.23, sector: 'Consumer Electronics', recentPrices: [189,191,190,192,191,193,192,194,193,195,194,196,196.45],           context: 'Designs iPhones, Macs, and services including the App Store and Apple Intelligence.',                         confidenceReason: 'High confidence: steady approach to 52W high on consistent buying with low volatility and tight price action.',             rsVsSpy: 0.21 },
-  { id: 'mock-6', ticker: 'AMD',  name: 'Advanced Micro Devices',  alert_type: 'vol_surge', price: 178.92, change: 3.44, volume: '52.3M',  time: 'Yesterday', timeGroup: null,          signal: 'Volume surging 3.1x 30-day average',          confidence: 63, support: 165.00, resistance: 190.00, sector: 'Semiconductors',      recentPrices: [182,180,178,176,174,172,171,173,174,176,177,179],                  context: 'Makes CPUs and GPUs for PCs, servers, and gaming consoles competing directly with Intel and Nvidia.',        confidenceReason: 'Lower confidence: volume spike is notable but price is in a short-term downtrend approaching key support.',                 rsVsSpy: -0.88 },
-  { id: 'mock-7', ticker: 'TSLA', name: 'Tesla Inc',               alert_type: 'gap_up',    price: 189.30, change: 5.20, volume: '114.6M', time: '8:14 AM',   timeGroup: 'pre-market', signal: 'Opened $9.36 above prior close of $179.94',    confidence: 95, support: 175.00, resistance: 200.00, sector: 'Electric Vehicles',   recentPrices: [176,177,178,179,180,182,183,185,186,187,188,189,189.30],           context: 'Manufactures electric vehicles and energy storage systems, also developing full self-driving software.',      confidenceReason: 'Very high confidence: pre-market gap with 6x normal volume driven by a clear catalyst and clean technical setup.',          rsVsSpy: 4.48 },
-  { id: 'mock-8', ticker: 'META', name: 'Meta Platforms',           alert_type: 'ma_cross',  price: 527.40, change: 1.22, volume: '12.1M',  time: '1:42 PM',   timeGroup: 'afternoon',  signal: '20MA $512.88 crossed above 50MA $498.33',     confidence: 68, support: 498.00, resistance: 545.00, sector: 'Social Media',        recentPrices: [538,534,530,526,522,519,516,514,517,520,522,525,527],              context: 'Operates Facebook, Instagram, and WhatsApp while investing heavily in AI and the metaverse.',                 confidenceReason: 'Moderate confidence: MA cross is valid but price has been pulling back from highs — needs volume to confirm.',              rsVsSpy: -0.50 },
-];
-
-// TODO: Replace with Supabase aotd_history table
-const MOCK_AOTD_HISTORY = [
-  { date: 'Apr 2',  ticker: 'TSLA', name: 'Tesla Inc',              type: 'gap_up',    alertPrice: 189.30, alertChange: 5.20, confidence: 95, signal: 'Pre-market gap on 6x volume',    nextDayClose: 195.36, outcome: 3.20 },
-  { date: 'Apr 1',  ticker: 'NVDA', name: 'Nvidia Corp',            type: '52w_high',  alertPrice: 875.40, alertChange: 2.14, confidence: 91, signal: 'Within 1.8% of 52W high',        nextDayClose: 891.15, outcome: 1.80 },
-  { date: 'Mar 31', ticker: 'PLTR', name: 'Palantir Technologies',  type: 'gap_up',    alertPrice: 24.88,  alertChange: 4.63, confidence: 85, signal: 'Gap above consolidation zone',    nextDayClose: 24.78,  outcome: -0.40 },
-  { date: 'Mar 28', ticker: 'SMCI', name: 'Super Micro Computer',   type: 'vol_surge', alertPrice: 92.17,  alertChange: 5.31, confidence: 78, signal: 'Volume 4.2x average',             nextDayClose: 94.66,  outcome: 2.70 },
-  { date: 'Mar 27', ticker: 'AAPL', name: 'Apple Inc',              type: '52w_high',  alertPrice: 196.45, alertChange: 0.93, confidence: 88, signal: 'Approaching 52W high on low vol', nextDayClose: 197.63, outcome: 0.60 },
-  { date: 'Mar 26', ticker: 'AMD',  name: 'Advanced Micro Devices', type: 'vol_surge', alertPrice: 178.92, alertChange: 3.44, confidence: 63, signal: 'Volume spike near key support',   nextDayClose: 176.95, outcome: -1.10 },
-  { date: 'Mar 25', ticker: 'META', name: 'Meta Platforms',         type: 'ma_cross',  alertPrice: 527.40, alertChange: 1.22, confidence: 68, signal: '20MA crossed above 50MA',         nextDayClose: 533.87, outcome: 1.23 },
-  { date: 'Mar 24', ticker: 'CRWD', name: 'CrowdStrike Holdings',   type: 'ma_cross',  alertPrice: 334.50, alertChange: 1.87, confidence: 72, signal: 'Bullish MA cross on avg volume',  nextDayClose: 340.18, outcome: 1.70 },
-  { date: 'Mar 21', ticker: 'NVDA', name: 'Nvidia Corp',            type: 'vol_surge', alertPrice: 862.10, alertChange: 3.88, confidence: 82, signal: 'Volume 3.8x with new catalyst',   nextDayClose: 858.22, outcome: -0.45 },
-  { date: 'Mar 20', ticker: 'TSLA', name: 'Tesla Inc',              type: '52w_high',  alertPrice: 181.50, alertChange: 2.75, confidence: 79, signal: 'Testing 52W high on earnings',     nextDayClose: null,   outcome: null },
-];
-
-const BADGE_CONFIG = {
-  '52w_high':  { color: '#D97706', bg: '#FFFBEB', border: 'rgba(217,119,6,0.25)',   label: '52W High'  },
-  'vol_surge': { color: '#7C3AED', bg: '#F5F3FF', border: 'rgba(124,58,237,0.25)',  label: 'Vol Surge' },
-  'gap_up':    { color: '#16A34A', bg: '#F0FDF4', border: 'rgba(22,163,74,0.25)',   label: 'Gap Up'    },
-  'ma_cross':  { color: '#2563EB', bg: '#EFF6FF', border: 'rgba(37,99,235,0.25)',   label: 'MA Cross'  },
-};
-
-// ── Dark mode themes ────────────────────────────────────────────────
-
-const DARK_THEME = {
-  '--text1': '#F3F4F6', '--text2': '#D1D5DB', '--text3': '#9CA3AF',
-  '--card': '#1F2937', '--border': '#374151',
-  '--green': '#22C55E', '--green-bg': 'rgba(34,197,94,0.12)',
-  '--blue': '#60A5FA', '--blue-bg': 'rgba(96,165,250,0.12)',
-  '--red': '#F87171', '--bg': '#111827',
-};
-const LIGHT_THEME = {
-  '--text1': '#111827', '--text2': '#6B7280', '--text3': '#9CA3AF',
-  '--card': '#ffffff', '--border': '#E5E7EB',
-  '--green': '#16A34A', '--green-bg': 'rgba(26,173,94,0.08)',
-  '--blue': '#2563EB', '--blue-bg': 'rgba(37,99,235,0.08)',
-  '--red': '#DC2626', '--bg': '#ffffff',
-};
+});
 
 // ── Helper: confidence color ────────────────────────────────────────
 
@@ -420,20 +318,6 @@ function confColor(c) {
   if (c >= 65) return '#D97706';
   return '#DC2626';
 }
-
-// ── Mock key stats for detail overlay ────────────────────────────────
-
-// TODO: Replace with FMP key stats endpoint
-const MOCK_KEY_STATS = {
-  NVDA: { dayLow: 868.20, dayHigh: 879.44, wk52Low: 473.20, wk52High: 891.46, marketCap: '2.16T', marketCapDesc: 'One of the world\'s most valuable companies', avgVolume: '35.8M' },
-  SMCI: { dayLow: 88.10, dayHigh: 93.85, wk52Low: 40.10, wk52High: 122.90, marketCap: '54.2B', marketCapDesc: 'Large-cap tech company', avgVolume: '28.4M' },
-  PLTR: { dayLow: 23.90, dayHigh: 25.12, wk52Low: 13.68, wk52High: 27.50, marketCap: '54.8B', marketCapDesc: 'Large-cap software company', avgVolume: '42.1M' },
-  CRWD: { dayLow: 328.40, dayHigh: 336.80, wk52Low: 200.81, wk52High: 398.33, marketCap: '81.4B', marketCapDesc: 'Major cybersecurity leader', avgVolume: '5.2M' },
-  AAPL: { dayLow: 194.80, dayHigh: 197.10, wk52Low: 164.08, wk52High: 198.23, marketCap: '3.01T', marketCapDesc: 'The world\'s most valuable public company', avgVolume: '54.2M' },
-  AMD:  { dayLow: 174.30, dayHigh: 180.15, wk52Low: 93.12, wk52High: 227.30, marketCap: '289B', marketCapDesc: 'Major semiconductor company', avgVolume: '44.7M' },
-  TSLA: { dayLow: 183.20, dayHigh: 191.80, wk52Low: 138.80, wk52High: 278.98, marketCap: '604B', marketCapDesc: 'Leading electric vehicle maker', avgVolume: '98.3M' },
-  META: { dayLow: 522.10, dayHigh: 530.80, wk52Low: 279.40, wk52High: 542.81, marketCap: '1.35T', marketCapDesc: 'Social media and AI giant', avgVolume: '16.8M' },
-};
 
 // ── Stock Detail Overlay ────────────────────────────────────────────
 
@@ -605,103 +489,6 @@ function StockDetailOverlay({ alert, darkMode, onClose }) {
   );
 }
 
-const ovStyles = {
-  overlay: {
-    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-    background: 'var(--bg)', zIndex: 10001,
-    display: 'flex', flexDirection: 'column',
-    maxWidth: 480, margin: '0 auto',
-  },
-  header: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '16px 16px 12px', flexShrink: 0,
-    borderBottom: '1px solid var(--border)',
-  },
-  headerTicker: { fontSize: 22, fontWeight: 800, color: 'var(--text1)' },
-  headerName: { fontSize: 13, color: 'var(--text3)', marginTop: 2 },
-  closeBtn: {
-    width: 36, height: 36, borderRadius: '50%',
-    background: 'var(--card)', border: '1px solid var(--border)',
-    fontSize: 16, cursor: 'pointer', display: 'flex',
-    alignItems: 'center', justifyContent: 'center',
-    color: 'var(--text2)',
-  },
-  scrollBody: {
-    flex: 1, overflowY: 'auto', padding: '16px 16px 120px',
-    WebkitOverflowScrolling: 'touch',
-  },
-  priceSection: { marginBottom: 20 },
-  priceRow: { display: 'flex', alignItems: 'baseline', gap: 12 },
-  priceBig: { fontSize: 32, fontWeight: 800, color: 'var(--text1)' },
-  priceChange: { fontSize: 14, fontWeight: 700 },
-  realtime: { fontSize: 10, color: 'var(--text3)', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
-  chartPlaceholder: {
-    height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: 'var(--text3)', fontSize: 13, background: 'var(--card)',
-    borderRadius: 8, border: '1px solid var(--border)',
-  },
-  rangePill: {
-    flex: 1, padding: '6px 0', minHeight: 32,
-    fontSize: 11, fontWeight: 600, borderRadius: 16,
-    border: '1px solid', cursor: 'pointer', textAlign: 'center',
-  },
-  sectionLabel: {
-    fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-    letterSpacing: 1, color: 'var(--text3)', marginBottom: 10,
-  },
-  statsGrid: {
-    display: 'grid', gridTemplateColumns: '1fr',
-    gap: 12, marginBottom: 20,
-  },
-  statCell: {
-    background: 'var(--card)', border: '1px solid var(--border)',
-    borderRadius: 10, padding: '12px 14px',
-  },
-  statLabel: {
-    fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
-    letterSpacing: '0.5px', color: 'var(--text3)', marginBottom: 6,
-  },
-  statValue: { fontSize: 14, fontWeight: 700, color: 'var(--text1)', marginBottom: 2 },
-  statExplain: { fontSize: 11, color: 'var(--text3)', lineHeight: 1.5, marginTop: 4 },
-  rangeTrack: {
-    flex: 1, height: 4, background: 'var(--border)',
-    borderRadius: 2, position: 'relative',
-  },
-  rangeDot: {
-    position: 'absolute', top: -4, width: 12, height: 12,
-    borderRadius: '50%', background: 'var(--green)',
-    border: '2px solid var(--card)', transform: 'translateX(-50%)',
-  },
-  whyCard: {
-    background: 'var(--card)', border: '1px solid var(--border)',
-    borderRadius: 10, padding: '14px', marginBottom: 20,
-  },
-  whySignal: { fontSize: 13, fontWeight: 600, color: 'var(--text1)', marginBottom: 6 },
-  whyRationale: { fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 },
-  actionRow: {
-    display: 'flex', gap: 10, marginBottom: 20,
-  },
-  actionBtnOutline: {
-    flex: 1, padding: '12px 0', minHeight: 48,
-    fontSize: 13, fontWeight: 700, borderRadius: 10,
-    background: 'transparent', color: 'var(--green)',
-    border: '2px solid var(--green)', cursor: 'pointer',
-  },
-  actionBtnSolid: {
-    flex: 1, padding: '12px 0', minHeight: 48,
-    fontSize: 13, fontWeight: 700, borderRadius: 10,
-    background: 'var(--green)', color: '#fff',
-    border: 'none', cursor: 'pointer',
-  },
-  toast: {
-    position: 'absolute', bottom: 100, left: '50%',
-    transform: 'translateX(-50%)',
-    background: 'var(--text1)', color: 'var(--bg)',
-    fontSize: 13, fontWeight: 600,
-    padding: '8px 20px', borderRadius: 20,
-    zIndex: 10002,
-  },
-};
 
 // ── Helper: render a single alert card ──────────────────────────────
 
@@ -943,8 +730,12 @@ export default function AlertsTab({ session }) {
   const [sectors, setSectors]               = useState(null);
   const [spyData, setSpyData]               = useState(null);
   const [marketUpdatedAt, setMarketUpdatedAt] = useState(null);
+  const lastFetchedAt = useRef(0);
+  const STALE_TIME = 5 * 60 * 1000; // 5 minutes
 
-  useEffect(() => {
+  const fetchMarketData = useCallback((force = false) => {
+    if (!force && Date.now() - lastFetchedAt.current < STALE_TIME) return;
+    lastFetchedAt.current = Date.now();
     supabase.from('market_data').select('*').then(({ data }) => {
       if (!data) return;
       let latestUpdated = null;
@@ -959,6 +750,8 @@ export default function AlertsTab({ session }) {
       if (latestUpdated) setMarketUpdatedAt(latestUpdated);
     });
   }, []);
+
+  useEffect(() => { fetchMarketData(); }, [fetchMarketData]);
 
   const [darkMode, setDarkMode] = useState(() => {
     try { return localStorage.getItem('uptik_darkMode') === 'true'; } catch { return false; }
@@ -1103,44 +896,52 @@ export default function AlertsTab({ session }) {
     'afternoon':  'Afternoon',
   };
 
-  // ── Derived data ──────────────────────────────────────────────────
+  // ── Derived data (memoized) ─────────────────────────────────────────
 
-  // For live alerts, compute rsVsSpy from SPY change; mock alerts already have it
-  const displayAlerts = breakout_alerts.length > 0
-    ? breakout_alerts.map(a => {
+  const displayAlerts = useMemo(() => {
+    if (breakout_alerts.length > 0) {
+      return breakout_alerts.map(a => {
         if (a.rsVsSpy != null || a.change == null || !spyData?.change) return a;
         return { ...a, rsVsSpy: Number(a.change) - Number(spyData.change) };
-      })
-    : MOCK_ALERTS;
+      });
+    }
+    return MOCK_ALERTS;
+  }, [breakout_alerts, spyData]);
 
-  const alertOfTheDay = displayAlerts.length > 0
-    ? displayAlerts.reduce((best, a) => (a.confidence ?? 0) > (best.confidence ?? 0) ? a : best)
-    : null;
+  const alertOfTheDay = useMemo(() => {
+    if (displayAlerts.length === 0) return null;
+    return displayAlerts.reduce((best, a) => (a.confidence ?? 0) > (best.confidence ?? 0) ? a : best);
+  }, [displayAlerts]);
 
   const aotdBadge = alertOfTheDay ? (BADGE_CONFIG[alertOfTheDay.alert_type] || BADGE_CONFIG['vol_surge']) : null;
 
-  const filtered = (filter === 'all' ? displayAlerts : displayAlerts.filter(a => a.alert_type === filter))
-    .filter(a => !alertOfTheDay || a.id !== alertOfTheDay.id)
-    .slice()
-    .sort((a, b) => {
-      if (sort === 'confidence') return (b.confidence ?? 0) - (a.confidence ?? 0);
-      if (sort === 'change')     return (b.change ?? 0) - (a.change ?? 0);
-      return 0;
-    });
+  const filtered = useMemo(() => {
+    return (filter === 'all' ? displayAlerts : displayAlerts.filter(a => a.alert_type === filter))
+      .filter(a => !alertOfTheDay || a.id !== alertOfTheDay.id)
+      .slice()
+      .sort((a, b) => {
+        if (sort === 'confidence') return (b.confidence ?? 0) - (a.confidence ?? 0);
+        if (sort === 'change')     return (b.change ?? 0) - (a.change ?? 0);
+        return 0;
+      });
+  }, [displayAlerts, filter, sort, alertOfTheDay]);
 
-  const GROUP_ORDER = ['pre-market', 'morning', 'afternoon', null];
-  const groups = {};
-  filtered.forEach(a => {
-    const g = getTimeGroup(a);
-    if (!groups[g]) groups[g] = [];
-    groups[g].push(a);
-  });
-  const groupedRows = [];
-  GROUP_ORDER.forEach(g => {
-    if (!groups[g]) return;
-    if (g) groupedRows.push({ type: 'header', label: GROUP_LABELS[g], key: `header-${g}` });
-    groups[g].forEach(alert => groupedRows.push({ type: 'alert', alert }));
-  });
+  const groupedRows = useMemo(() => {
+    const GROUP_ORDER = ['pre-market', 'morning', 'afternoon', null];
+    const groups = {};
+    filtered.forEach(a => {
+      const g = getTimeGroup(a);
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(a);
+    });
+    const rows = [];
+    GROUP_ORDER.forEach(g => {
+      if (!groups[g]) return;
+      if (g) rows.push({ type: 'header', label: GROUP_LABELS[g], key: `header-${g}` });
+      groups[g].forEach(alert => rows.push({ type: 'alert', alert }));
+    });
+    return rows;
+  }, [filtered]);
 
   // ── Loading state ─────────────────────────────────────────────────
 
@@ -1155,7 +956,7 @@ export default function AlertsTab({ session }) {
   // ── Render ────────────────────────────────────────────────────────
 
   return (
-    <PullToRefresh onRefresh={() => setRefreshKey(k => k + 1)}>
+    <PullToRefresh onRefresh={() => { setRefreshKey(k => k + 1); fetchMarketData(true); }}>
 
       {/* Header: label + scanners toggle + dark mode */}
       <div style={{ margin: '14px 4px 8px' }}>
@@ -1455,9 +1256,7 @@ export default function AlertsTab({ session }) {
   );
 }
 
-// ── Styles ──────────────────────────────────────────────────────────
-
-const styles = {
+/*
   scroll: {
     flex: 1, overflowY: 'auto',
     padding: '4px 12px 100px',
@@ -1738,7 +1537,7 @@ const styles = {
     border: '1px solid var(--border)', borderRadius: '50%',
     cursor: 'pointer', padding: 0, lineHeight: 1,
   },
-};
+}; */
 
 // ── Keyframe injection ──────────────────────────────────────────────
 
