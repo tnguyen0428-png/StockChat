@@ -1,44 +1,40 @@
 // ============================================
 // UPTIKALERTS — BottomNav.jsx
-// 5 tabs: Home, Alerts, Chat (center), Help, Profile
+// 5 tabs: Home, Alerts, Chat (center), Challenge, Profile
 // ============================================
 
 const HomeIcon = ({ active }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M3 9.5L12 3L21 9.5V20C21 20.55 20.55 21 20 21H15V15H9V21H4C3.45 21 3 20.55 3 20V9.5Z"
-      fill={active ? 'var(--green)' : '#8a9299'} />
+      fill={active ? '#132d52' : '#7a8ea3'} />
   </svg>
 );
 
 const AlertsIcon = ({ active }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z"
-      fill={active ? 'var(--green)' : '#8a9299'} />
+      fill={active ? '#132d52' : '#7a8ea3'} />
   </svg>
 );
 
 const ProfileIcon = ({ active }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z"
-      fill={active ? 'var(--green)' : '#8a9299'} />
+      fill={active ? '#132d52' : '#7a8ea3'} />
   </svg>
-);
-
-const HelpIcon = ({ active }) => (
-  <div style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${active ? 'var(--green)' : '#8a9299'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: active ? 'var(--green)' : '#8a9299', lineHeight: 1 }}>?</div>
 );
 
 const ChatIcon = ({ active, highlighted }) => (
   <svg width={highlighted ? 24 : 22} height={highlighted ? 24 : 22} viewBox="0 0 24 24" fill="none">
     <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"
-      fill={highlighted ? '#fff' : (active ? 'var(--green)' : '#8a9299')} />
+      fill={highlighted ? '#fff' : (active ? '#2a7d4b' : '#7a8ea3')} />
   </svg>
 );
 
 const ChallengeIcon = ({ active }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
-      fill={active ? 'var(--green)' : '#8a9299'} />
+      fill={active ? '#132d52' : '#7a8ea3'} />
   </svg>
 );
 
@@ -71,7 +67,7 @@ export default function BottomNav({ activeTab, onTabChange, unreadAlerts }) {
             </div>
             <span style={{
               ...styles.label,
-              color: isChat ? 'var(--green)' : (isActive ? 'var(--green)' : '#8a9299'),
+              color: isChat ? '#2a7d4b' : (isActive ? '#132d52' : '#7a8ea3'),
               fontWeight: isChat ? 600 : 500,
             }}>
               {label}
@@ -85,11 +81,11 @@ export default function BottomNav({ activeTab, onTabChange, unreadAlerts }) {
 
 const styles = {
   nav: {
-    height: 58, background: 'var(--card)',
-    borderTop: '1px solid var(--border)',
+    height: 58, background: '#f8fafc',
+    borderTop: '0.5px solid #d8e2ed',
     display: 'flex', justifyContent: 'space-around',
     alignItems: 'center', paddingBottom: 4,
-    flexShrink: 0, boxShadow: '0 -1px 6px rgba(0,0,0,0.04)',
+    flexShrink: 0, boxShadow: '0 -1px 4px rgba(19,45,82,0.04)',
   },
   item: {
     display: 'flex', flexDirection: 'column',
@@ -100,15 +96,15 @@ const styles = {
   iconWrap: { position: 'relative' },
   chatCircle: {
     width: 52, height: 52, borderRadius: '50%',
-    background: 'linear-gradient(135deg, #8bc34a, #5a9a35)',
-    border: '3px solid var(--card)',
-    boxShadow: '0 4px 14px rgba(139,195,74,0.4)',
+    background: '#2a7d4b',
+    border: '3px solid #f8fafc',
+    boxShadow: '0 4px 14px rgba(42,125,75,0.3)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   badge: {
     position: 'absolute', top: -2, right: -4,
     width: 7, height: 7, background: 'var(--red)',
-    borderRadius: '50%', border: '1.5px solid var(--card)',
+    borderRadius: '50%', border: '1.5px solid #f8fafc',
   },
   label: { fontSize: 11, fontWeight: 500 },
 };

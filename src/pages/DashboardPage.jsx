@@ -123,18 +123,18 @@ export default function DashboardPage({ session }) {
   if (loading) {
     return (
       <div style={{
-        minHeight: '100vh', background: 'var(--bg)',
+        minHeight: '100vh', background: '#132d52',
         display: 'flex', alignItems: 'center',
         justifyContent: 'center', flexDirection: 'column', gap: 12,
       }}>
         <div style={{ fontSize: 28, fontWeight: 700 }}>
-          <span style={{ color: 'var(--green)' }}>UpTik</span>
-          <span style={{ color: 'var(--text1)' }}>Alerts</span>
+          <span style={{ color: '#f0ede8' }}>Up</span>
+          <span style={{ color: '#8cd9a0' }}>tik</span>
         </div>
         <div style={{
           width: 24, height: 24,
-          border: '2px solid var(--border)',
-          borderTopColor: 'var(--green)',
+          border: '2px solid rgba(255,255,255,0.15)',
+          borderTopColor: '#8cd9a0',
           borderRadius: '50%',
           animation: 'spin 0.7s linear infinite',
         }} />

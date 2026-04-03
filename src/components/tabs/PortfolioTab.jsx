@@ -58,7 +58,7 @@ export default function PortfolioTab({ session }) {
   const [userBadges, setUserBadges] = useState([]);
   const [trashTalkMsgs, setTrashTalkMsgs] = useState([]);
   const [trashTalkInput, setTrashTalkInput] = useState('');
-  const [riskLevel, setRiskLevel] = useState({ level: 'Low', bars: 2, color: '#3B6D11', note: '' });
+  const [riskLevel, setRiskLevel] = useState({ level: 'Low', bars: 2, color: '#2a7d4b', note: '' });
 
   const refreshRef = useRef(null);
   const allTradesRef = useRef([]);
@@ -363,7 +363,7 @@ export default function PortfolioTab({ session }) {
         const pct = (maxSector[1] / totalVal) * 100;
         if (pct > 60) setRiskLevel({ level: 'High', bars: 4, color: '#E24B4A', note: `${pct.toFixed(0)}% in ${maxSector[0].toLowerCase()} — diversify` });
         else if (pct > 40) setRiskLevel({ level: 'Medium', bars: 3, color: '#BA7517', note: `${pct.toFixed(0)}% in ${maxSector[0].toLowerCase()}` });
-        else setRiskLevel({ level: 'Low', bars: 2, color: '#3B6D11', note: 'Well diversified' });
+        else setRiskLevel({ level: 'Low', bars: 2, color: '#2a7d4b', note: 'Well diversified' });
       }
     } catch { /* silent */ }
   }, [trades, prices]);
@@ -535,10 +535,10 @@ export default function PortfolioTab({ session }) {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                    <span style={{ ...s.valSm, color: isPositive ? '#3B6D11' : '#E24B4A' }}>
+                    <span style={{ ...s.valSm, color: isPositive ? '#2a7d4b' : '#E24B4A' }}>
                       ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: isPositive ? '#3B6D11' : '#E24B4A' }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: isPositive ? '#2a7d4b' : '#E24B4A' }}>
                       {isPositive ? '+' : ''}{totalReturn.toFixed(2)}%
                     </span>
                   </div>
@@ -570,7 +570,7 @@ export default function PortfolioTab({ session }) {
                       </div>
                     </>
                   ) : (
-                    <div style={{ fontSize: 10, fontWeight: 600, color: '#3B6D11' }}>You're in the lead!</div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: '#2a7d4b' }}>You're in the lead!</div>
                   )}
                 </div>
               )}
@@ -603,8 +603,8 @@ export default function PortfolioTab({ session }) {
                 {showPresets && selectedTicker && (
                   <div style={s.presetSm}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <div><b style={{ fontSize: 12, color: '#1a4d0a' }}>{selectedTicker.symbol}</b> <span style={{ fontSize: 10, color: '#3B6D11' }}>${selectedTicker.price.toFixed(2)}</span></div>
-                      <button style={{ background: 'none', border: 'none', fontSize: 14, color: '#3B6D11', cursor: 'pointer', lineHeight: 1 }} onClick={clearSelection}>×</button>
+                      <div><b style={{ fontSize: 12, color: '#1a4d0a' }}>{selectedTicker.symbol}</b> <span style={{ fontSize: 10, color: '#2a7d4b' }}>${selectedTicker.price.toFixed(2)}</span></div>
+                      <button style={{ background: 'none', border: 'none', fontSize: 14, color: '#2a7d4b', cursor: 'pointer', lineHeight: 1 }} onClick={clearSelection}>×</button>
                     </div>
                     {!showCustom ? (
                       <div style={{ display: 'flex', gap: 4 }}>
@@ -618,7 +618,7 @@ export default function PortfolioTab({ session }) {
                     ) : (
                       <div style={{ display: 'flex', gap: 4 }}>
                         <div style={s.customWrapSm}>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: '#3B6D11' }}>$</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#2a7d4b' }}>$</span>
                           <input
                             style={s.customInputSm}
                             type="number"
@@ -658,7 +658,7 @@ export default function PortfolioTab({ session }) {
                     return (
                       <div key={trade.id} style={s.posRowSm} onClick={() => setSellTrade({ ...trade, currentPrice: curPrice })}>
                         <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text1)' }}>{trade.ticker}</span>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: isUp ? '#3B6D11' : '#E24B4A' }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: isUp ? '#2a7d4b' : '#E24B4A' }}>
                           {isUp ? '+' : ''}{pctGain.toFixed(1)}%
                         </span>
                       </div>
@@ -777,9 +777,9 @@ export default function PortfolioTab({ session }) {
               {/* Card 6: Season countdown */}
               <div style={s.cardGreen}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#27500A' }}>Season 1 · {daysLeft} days left</div>
-                <div style={{ fontSize: 10, color: '#3B6D11', marginTop: 2 }}>$50k cash · ranked by % return</div>
+                <div style={{ fontSize: 10, color: '#2a7d4b', marginTop: 2 }}>$50k cash · ranked by % return</div>
                 <div style={{ height: 3, background: '#C0DD97', borderRadius: 2, marginTop: 6 }}>
-                  <div style={{ height: 3, background: '#3B6D11', borderRadius: 2, width: `${seasonProgress}%`, transition: 'width 0.3s' }} />
+                  <div style={{ height: 3, background: '#2a7d4b', borderRadius: 2, width: `${seasonProgress}%`, transition: 'width 0.3s' }} />
                 </div>
               </div>
 
@@ -810,7 +810,7 @@ export default function PortfolioTab({ session }) {
                       {entry.username}
                       {isMe && <span style={s.lbYou}> (you)</span>}
                     </div>
-                    <div style={{ ...s.lbReturn, color: isUp ? '#3B6D11' : '#E24B4A' }}>
+                    <div style={{ ...s.lbReturn, color: isUp ? '#2a7d4b' : '#E24B4A' }}>
                       {isUp ? '+' : ''}{entry.pctReturn.toFixed(2)}%
                     </div>
                     <div style={s.lbCount}>{entry.openCount} pos</div>
@@ -820,7 +820,7 @@ export default function PortfolioTab({ session }) {
                       {entry.positions.map((p, i) => (
                         <div key={i} style={s.lbTicker}>
                           <span style={s.lbTickerName}>{p.ticker}</span>
-                          <span style={{ color: p.pctGain >= 0 ? '#3B6D11' : '#E24B4A', fontSize: 12 }}>
+                          <span style={{ color: p.pctGain >= 0 ? '#2a7d4b' : '#E24B4A', fontSize: 12 }}>
                             {p.pctGain >= 0 ? '+' : ''}{p.pctGain.toFixed(2)}%
                           </span>
                         </div>
@@ -866,14 +866,14 @@ const s = {
 
   // Ticker tape
   tape: {
-    background: '#1c2a1c', overflow: 'hidden', height: 22,
+    background: '#0f2440', overflow: 'hidden', height: 22,
     display: 'flex', alignItems: 'center', marginTop: 8,
   },
   tapeInner: {
     display: 'flex', whiteSpace: 'nowrap',
     animation: 'tickerScroll 30s linear infinite',
   },
-  tapeText: { fontSize: 10, color: '#8bc34a', fontFamily: 'var(--font)', paddingRight: 40 },
+  tapeText: { fontSize: 10, color: '#8cd9a0', fontFamily: 'var(--font)', paddingRight: 40 },
 
   // Split layout
   splitWrap: { display: 'flex', minHeight: 0 },
@@ -909,7 +909,7 @@ const s = {
     letterSpacing: 0.4, width: '100%', boxSizing: 'border-box',
   },
   addBtnSm: {
-    background: '#3B6D11', color: '#fff', border: 'none', borderRadius: 6,
+    background: '#2a7d4b', color: '#fff', border: 'none', borderRadius: 6,
     padding: '7px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
     fontFamily: 'var(--font)', flexShrink: 0,
   },
@@ -930,8 +930,8 @@ const s = {
   },
   presetBtnSm: {
     flex: 1, padding: '6px 0', borderRadius: 5,
-    border: '1px solid #3B6D11', background: 'transparent',
-    fontSize: 11, fontWeight: 600, color: '#3B6D11',
+    border: '1px solid #2a7d4b', background: 'transparent',
+    fontSize: 11, fontWeight: 600, color: '#2a7d4b',
     cursor: 'pointer', fontFamily: 'var(--font)',
   },
   otherBtnSm: {
@@ -942,14 +942,14 @@ const s = {
   },
   customWrapSm: {
     flex: 1, display: 'flex', alignItems: 'center',
-    background: '#fff', border: '1px solid #3B6D11', borderRadius: 5, padding: '0 6px',
+    background: '#fff', border: '1px solid #2a7d4b', borderRadius: 5, padding: '0 6px',
   },
   customInputSm: {
     flex: 1, border: 'none', background: 'transparent', padding: '6px 0',
     fontSize: 12, fontWeight: 600, color: '#1a4d0a', outline: 'none', fontFamily: 'var(--font)',
   },
   customBuySm: {
-    background: '#3B6D11', color: '#fff', border: 'none', borderRadius: 5,
+    background: '#2a7d4b', color: '#fff', border: 'none', borderRadius: 5,
     padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
   },
 

@@ -244,7 +244,7 @@ const styles = {
   spinner: {
     width: 24, height: 24,
     border: '2px solid var(--border)',
-    borderTopColor: 'var(--green)',
+    borderTopColor: 'var(--navy)',
     borderRadius: '50%',
     animation: 'spin 0.7s linear infinite',
   },

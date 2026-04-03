@@ -5,23 +5,35 @@
 
 :root {
   /* Backgrounds */
-  --bg:         #F2F3F5;
-  --card:       #FFFFFF;
-  --card2:      #F7F8FA;
-  --border:     #E8EAED;
+  --bg:         #eef2f7;
+  --card:       #f8fafc;
+  --card2:      #dfe6ef;
+  --border:     #d8e2ed;
 
   /* Text */
-  --text1:      #1A1A2E;
-  --text2:      #6B7280;
-  --text3:      #B0B7C3;
+  --text1:      #1a2d4a;
+  --text2:      #4a6078;
+  --text3:      #7a8ea3;
 
   /* Brand */
-  --green:      #1AAD5E;
-  --green-bg:   #F0FBF5;
-  --green-border: rgba(26,173,94,0.2);
+  --green:      #8cd9a0;
+  --green-bg:   #e8f5ed;
+  --green-border: rgba(140,217,160,0.3);
+
+  /* Navy */
+  --navy:       #132d52;
+  --navy-dark:  #0f2440;
+  --navy-light: #eef2f7;
+  --navy-card:  #f8fafc;
+  --navy-border:#d8e2ed;
+  --navy-text:  #1a2d4a;
+  --navy-muted: #7a8ea3;
+  --green-accent:#8cd9a0;
+  --green-button:#2a7d4b;
+  --green-btn:  #2a7d4b;
 
   /* Signals */
-  --red:        #E05252;
+  --red:        #E24B4A;
   --red-bg:     #FEF2F2;
   --yellow:     #D4A017;
   --yellow-bg:  #FFFBEB;
@@ -94,7 +106,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .spinner {
   width: 20px; height: 20px;
   border: 2px solid var(--border);
-  border-top-color: var(--green);
+  border-top-color: var(--navy);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }

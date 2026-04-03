@@ -188,55 +188,68 @@ export default function HomeTab({ session, onGroupSelect, onAIPress, onSignOut, 
     <div style={styles.scroll}>
 
       {/* HEADER */}
-      <div style={{ background: '#354030', padding: '10px 14px 9px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 500, color: '#fff' }}>
-            <span style={{ color: '#f0f0f0' }}>Up</span><span style={{ color: '#a0e070' }}>Tik</span><span style={{ color: '#f0f0f0' }}>Alerts</span>
-          </div>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>Trade smarter as a group.</div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: marketStatus === 'open' ? 'rgba(59,109,17,0.25)' : 'rgba(162,45,45,0.25)', padding: '3px 8px', borderRadius: 10 }}>
-            <div style={{ width: 5, height: 5, borderRadius: '50%', background: marketStatus === 'open' ? '#8bc34a' : '#ef5350' }} />
-            <span style={{ fontSize: 9, fontWeight: 600, color: marketStatus === 'open' ? '#8bc34a' : '#ef5350', letterSpacing: '0.04em' }}>
-              {marketStatus === 'open' ? 'LIVE' : marketStatus === 'premarket' ? 'PRE' : marketStatus === 'afterhours' ? 'AH' : 'CLOSED'}
-            </span>
-          </div>
-          <div ref={profileMenuRef} style={{ position: 'relative' }}>
-            <div
-              style={{ width: 27, height: 27, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-              onClick={() => setShowProfileMenu(prev => !prev)}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <div style={{ background: '#132d52', padding: '10px 14px 9px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <svg width="38" height="38" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3" />
+            <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.2" opacity="0.6" />
+            <path d="M25 22 L25 30 C25 34 25 34 25 30 L25 22" strokeWidth="1.5" opacity="0.35" />
+            <path d="M35 8 L29 14 M35 8 L41 14" strokeWidth="3" />
+          </svg>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 20, fontWeight: 500, color: '#f0ede8' }}>Up</span>
+              <span style={{ fontSize: 20, fontWeight: 500, color: '#8cd9a0' }}>tik</span>
             </div>
-            {showProfileMenu && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: -4, width: 140, background: '#1e1e1e', border: '1px solid #333', borderRadius: 10, boxShadow: '0 6px 24px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', top: -5, right: 11, width: 10, height: 10, background: '#1e1e1e', borderLeft: '1px solid #333', borderTop: '1px solid #333', transform: 'rotate(45deg)' }} />
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#e0e0e0', padding: '9px 12px 8px', borderBottom: '1px solid #2a2a2a' }}>
-                  {profile?.username || 'User'}
-                </div>
-                <div
-                  style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 500, color: '#ccc', padding: '8px 12px', borderBottom: '1px solid #2a2a2a', cursor: 'pointer' }}
-                  onClick={() => { setShowProfileMenu(false); onProfilePress?.(); }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                  Profile
-                </div>
-                <div
-                  style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 500, color: '#EF4444', padding: '8px 12px', cursor: 'pointer' }}
-                  onClick={() => { setShowProfileMenu(false); onSignOut?.(); }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                  Sign Out
-                </div>
-              </div>
-            )}
+            <div style={{ fontFamily: "'Avenir Next','Avenir','Nunito Sans',sans-serif", fontSize: 14, fontWeight: 300, color: '#b0c4d8', letterSpacing: 2, marginTop: -4, paddingLeft: 18 }}>alerts</div>
           </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.12)', padding: '3px 8px', borderRadius: 10 }}>
+              <div style={{ width: 5, height: 5, borderRadius: '50%', background: marketStatus === 'open' ? '#8cd9a0' : '#ef5350' }} />
+              <span style={{ fontSize: 9, fontWeight: 600, color: marketStatus === 'open' ? '#8cd9a0' : '#ef5350', letterSpacing: '0.04em' }}>
+                {marketStatus === 'open' ? 'LIVE' : marketStatus === 'premarket' ? 'PRE' : marketStatus === 'afterhours' ? 'AH' : 'CLOSED'}
+              </span>
+            </div>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <div ref={profileMenuRef} style={{ position: 'relative' }}>
+              <div
+                style={{ width: 27, height: 27, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                onClick={() => setShowProfileMenu(prev => !prev)}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </div>
+              {showProfileMenu && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: -4, width: 140, background: '#132d52', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, boxShadow: '0 6px 24px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', top: -5, right: 11, width: 10, height: 10, background: '#132d52', borderLeft: '1px solid rgba(255,255,255,0.15)', borderTop: '1px solid rgba(255,255,255,0.15)', transform: 'rotate(45deg)' }} />
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#e0e0e0', padding: '9px 12px 8px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                    {profile?.username || 'User'}
+                  </div>
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 500, color: '#ccc', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}
+                    onClick={() => { setShowProfileMenu(false); onProfilePress?.(); }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    Profile
+                  </div>
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 500, color: '#EF4444', padding: '8px 12px', cursor: 'pointer' }}
+                    onClick={() => { setShowProfileMenu(false); onSignOut?.(); }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Sign Out
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <span style={{ fontFamily: "'Avenir Next','Avenir','Nunito Sans',sans-serif", fontSize: 10, fontWeight: 300, fontStyle: 'italic', color: '#b0c4d8', letterSpacing: 1 }}>"ONE TEAM, ONE TRADE"</span>
         </div>
       </div>
 
       {/* MARKET PULSE STRIP */}
-      <div style={{ overflow: 'hidden', background: '#1c2a1c', borderBottom: '1px solid #354535', height: 52, display: 'flex', alignItems: 'center' }}>
+      <div style={{ overflow: 'hidden', background: '#0f2440', borderBottom: '1px solid #1a3a5a', height: 52, display: 'flex', alignItems: 'center' }}>
         <style>{`
           @keyframes pulseScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
         `}</style>
@@ -250,10 +263,10 @@ export default function HomeTab({ session, onGroupSelect, onAIPress, onSignOut, 
             const isFutures = d?.label === 'FUT';
             const pointChange = isFutures ? ((chg / 100) * Number(d.price)).toFixed(2) : null;
             const arrow = chg > 0 ? '▲' : '▼';
-            const changeColor = chg > 0 ? '#b5e655' : chg < 0 ? 'var(--red)' : 'var(--text3)';
+            const changeColor = chg > 0 ? '#8cd9a0' : chg < 0 ? 'var(--red)' : 'var(--text3)';
             return (
-              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', margin: '0 4px', borderRadius: 10, background: chg > 0 ? 'rgba(59,109,17,0.2)' : chg < 0 ? 'rgba(162,45,45,0.15)' : 'transparent' }}>
-                <span style={{ fontSize: 16, fontWeight: 500, color: '#8aaa7a' }}>{item.label}</span>
+              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', margin: '0 4px', borderRadius: 10, background: chg > 0 ? 'rgba(140,217,160,0.12)' : chg < 0 ? 'rgba(162,45,45,0.15)' : 'transparent' }}>
+                <span style={{ fontSize: 16, fontWeight: 500, color: '#7a8ea3' }}>{item.label}</span>
                 <span style={{ fontSize: 16, fontWeight: 700, color: changeColor }}>
                   {d ? (isFutures
                     ? `${arrow} ${chg > 0 ? '+' : ''}${pointChange} (${chg > 0 ? '+' : ''}${chg.toFixed(2)}%)`
@@ -267,53 +280,53 @@ export default function HomeTab({ session, onGroupSelect, onAIPress, onSignOut, 
       </div>
 
       {/* GROUP CHAT — MEDIUM OLIVE */}
-      <div style={{ background: '#1c2a1c', paddingBottom: 10 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: '#7a9a6a', padding: '8px 12px 4px' }}>Group Chat</div>
+      <div style={{ background: '#0f2440', paddingBottom: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: '#7a8ea3', padding: '8px 12px 4px' }}>Group Chat</div>
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', padding: '0 12px 0' }}>
           {/* Public */}
           {uptikPublic && (
             <div
-              style={{ flexShrink: 0, background: '#243424', border: '1.5px solid #4a7a2a', borderRadius: 10, padding: '8px 12px', textAlign: 'center', cursor: 'pointer', minWidth: 80 }}
+              style={{ flexShrink: 0, background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(140,217,160,0.3)', borderRadius: 10, padding: '8px 12px', textAlign: 'center', cursor: 'pointer', minWidth: 80 }}
               onClick={() => onGroupSelect(uptikPublic)}
             >
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#7aaa5a', letterSpacing: 0.5, marginBottom: 3 }}>PUBLIC</div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#8cd9a0', letterSpacing: 0.5, marginBottom: 3 }}>PUBLIC</div>
               <div style={{ fontSize: 13, color: '#ddd', fontWeight: 500, marginBottom: 3 }}>{uptikPublic.name}</div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#b5e655', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                <span style={{ fontSize: 11, color: '#b5e655' }}>{uptikPublic.member_count || 0}</span>
+                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#8cd9a0', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                <span style={{ fontSize: 11, color: '#8cd9a0' }}>{uptikPublic.member_count || 0}</span>
               </div>
             </div>
           )}
 
           {/* Private */}
           <div
-            style={{ flexShrink: 0, background: '#243424', border: '1.5px solid #4a7a2a', borderRadius: 10, padding: '8px 12px', textAlign: 'center', cursor: privateGroup ? 'pointer' : 'default', minWidth: 80, opacity: privateGroup ? 1 : 0.6 }}
+            style={{ flexShrink: 0, background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(140,217,160,0.3)', borderRadius: 10, padding: '8px 12px', textAlign: 'center', cursor: privateGroup ? 'pointer' : 'default', minWidth: 80, opacity: privateGroup ? 1 : 0.6 }}
             onClick={() => privateGroup && onGroupSelect(privateGroup)}
           >
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#7aaa5a', letterSpacing: 0.5, marginBottom: 3 }}>PRIVATE</div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#8cd9a0', letterSpacing: 0.5, marginBottom: 3 }}>PRIVATE</div>
             <div style={{ fontSize: 13, color: '#ddd', fontWeight: 500, marginBottom: 3 }}>{privateGroup?.name || 'None'}</div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-              <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#b5e655', animation: 'pulse 1.5s ease-in-out infinite' }} />
-              <span style={{ fontSize: 11, color: '#b5e655' }}>0</span>
+              <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#8cd9a0', animation: 'pulse 1.5s ease-in-out infinite' }} />
+              <span style={{ fontSize: 11, color: '#8cd9a0' }}>0</span>
             </div>
           </div>
 
           {/* Divider */}
-          <div style={{ width: 1, background: '#3a5a2a', margin: '6px 2px', flexShrink: 0 }} />
+          <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '6px 2px', flexShrink: 0 }} />
 
           {/* Sector groups */}
           {sectorGroups.map(group => {
             const memberCount = group.member_count || 0;
             return (
               <div key={group.id}
-                style={{ flexShrink: 0, background: '#2a3a2a', border: '1px solid #3a4a3a', borderRadius: 10, padding: '8px 12px', textAlign: 'center', cursor: 'pointer', minWidth: 72 }}
+                style={{ flexShrink: 0, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '8px 12px', textAlign: 'center', cursor: 'pointer', minWidth: 72 }}
                 onClick={() => onGroupSelect(group)}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, marginBottom: 2 }}>
-                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#b5e655', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#8cd9a0', animation: 'pulse 1.5s ease-in-out infinite' }} />
                   <span style={{ fontSize: 13, color: '#ccc', fontWeight: 500 }}>{group.sector || group.name}</span>
                 </div>
-                <span style={{ fontSize: 11, color: '#b5e655' }}>{memberCount}</span>
+                <span style={{ fontSize: 11, color: '#8cd9a0' }}>{memberCount}</span>
               </div>
             );
           })}
@@ -321,26 +334,26 @@ export default function HomeTab({ session, onGroupSelect, onAIPress, onSignOut, 
       </div>
 
       {/* LIGHT THEME ZONE */}
-      <div style={{ background: '#f4f7f0' }}>
+      <div style={{ background: '#eef2f7' }}>
 
         {/* DAILY BRIEFING */}
-        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: '#7a8a6a', padding: '8px 12px 4px' }}>Daily Briefing</div>
+        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: '#7a8ea3', padding: '8px 12px 4px' }}>Daily Briefing</div>
         {briefing ? (
-          <div style={{ background: '#ffffff', border: '1px solid #dde5d5', borderRadius: 10, overflow: 'hidden', marginBottom: 8, marginLeft: 12, marginRight: 12 }}>
+          <div style={{ background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 10, overflow: 'hidden', marginBottom: 8, marginLeft: 12, marginRight: 12 }}>
             {briefing.tags?.length > 0 ? (
               briefing.tags.map((article, i, arr) => (
-                <div key={i} style={{ padding: '9px 12px', borderBottom: i < arr.length - 1 ? '1px solid #e8ede2' : 'none', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <div key={i} style={{ padding: '9px 12px', borderBottom: i < arr.length - 1 ? '1px solid #d8e2ed' : 'none', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {article.tickers?.length > 0 && (
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#3B6D11', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#2a7d4b', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         {article.tickers.join(' · ')}
                       </div>
                     )}
-                    <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a1a', lineHeight: 1.35 }}>{article.title}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: '#1a2d4a', lineHeight: 1.35 }}>{article.title}</div>
                   </div>
                   {article.url && (
                     <a href={article.url} target="_blank" rel="noopener noreferrer"
-                      style={{ fontSize: 13, color: '#3B6D11', fontWeight: 600, textDecoration: 'none', flexShrink: 0, marginTop: 2 }}>
+                      style={{ fontSize: 13, color: '#2a7d4b', fontWeight: 600, textDecoration: 'none', flexShrink: 0, marginTop: 2 }}>
                       Read →
                     </a>
                   )}
@@ -353,20 +366,20 @@ export default function HomeTab({ session, onGroupSelect, onAIPress, onSignOut, 
                 const tickers = tickerMatch ? tickerMatch[1] : null;
                 const title = tickerMatch ? clean.replace(/\s*\([^)]+\)$/, '') : clean;
                 return (
-                  <div key={i} style={{ padding: '9px 12px', borderBottom: i < arr.length - 1 ? '1px solid #e8ede2' : 'none' }}>
-                    {tickers && <div style={{ fontSize: 12, fontWeight: 700, color: '#3B6D11', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{tickers}</div>}
-                    <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a1a', lineHeight: 1.35 }}>{title}</div>
+                  <div key={i} style={{ padding: '9px 12px', borderBottom: i < arr.length - 1 ? '1px solid #d8e2ed' : 'none' }}>
+                    {tickers && <div style={{ fontSize: 12, fontWeight: 700, color: '#2a7d4b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{tickers}</div>}
+                    <div style={{ fontSize: 15, fontWeight: 600, color: '#1a2d4a', lineHeight: 1.35 }}>{title}</div>
                   </div>
                 );
               })
             )}
-            <div style={{ padding: '8px 14px', fontSize: 12, color: '#8a9a7a', borderTop: '1px solid #e8ede2' }}>
+            <div style={{ padding: '8px 14px', fontSize: 12, color: '#7a8ea3', borderTop: '1px solid #d8e2ed' }}>
               Updated {new Date(briefing.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} EST · selected by Admin
             </div>
           </div>
         ) : (
-          <div style={{ background: '#ffffff', border: '1px solid #dde5d5', borderRadius: 10, padding: 20, textAlign: 'center', marginBottom: 8, marginLeft: 12, marginRight: 12 }}>
-            <span style={{ fontSize: 15, color: '#8a9a7a' }}>No briefing posted yet today</span>
+          <div style={{ background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 10, padding: 20, textAlign: 'center', marginBottom: 8, marginLeft: 12, marginRight: 12 }}>
+            <span style={{ fontSize: 15, color: '#7a8ea3' }}>No briefing posted yet today</span>
           </div>
         )}
 

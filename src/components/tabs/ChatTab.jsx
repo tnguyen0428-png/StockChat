@@ -45,7 +45,7 @@ const MessageItem = memo(({ msg, currentUserId }) => {
     <div style={styles.msg}>
       <div style={bodyStyle}>
         <div style={styles.msgTop}>
-          <span style={{ ...styles.msgName, color: isAI ? '#8B5CF6' : (msg.user_color || '#1AAD5E') }}>
+          <span style={{ ...styles.msgName, color: isAI ? '#8B5CF6' : (msg.user_color || '#2a7d4b') }}>
             {msg.username}
           </span>
           {isAdmin && <span style={styles.adminBadge}>Admin</span>}
@@ -72,8 +72,8 @@ function detectBroadcastType(text) {
 }
 
 function broadcastColor(type) {
-  const colors = { BULLISH: '#1AAD5E', BEARISH: '#E05252', WATCHLIST: '#D4A017', INFO: '#4A90D9' };
-  return colors[type] || '#1AAD5E';
+  const colors = { BULLISH: '#2a7d4b', BEARISH: '#E05252', WATCHLIST: '#D4A017', INFO: '#4A90D9' };
+  return colors[type] || '#2a7d4b';
 }
 
 // ── Lists sub-view ──

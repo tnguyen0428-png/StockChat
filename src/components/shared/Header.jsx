@@ -161,7 +161,7 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
   if (activeTab === 'chat') {
     return (
       <>
-        <div style={styles.header}>
+        <div style={{ ...styles.header, borderBottom: '2px solid #2a7d4b' }}>
           <div style={styles.chatRow}>
             <span style={styles.chatLabel}>GroupChat</span>
             <span style={styles.chatSep}> · </span>
@@ -397,20 +397,34 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
 
   return (
     <div style={styles.header}>
-      <div style={{ cursor: 'pointer' }} onClick={() => onHomePress?.()}>
-        <div style={styles.logoRow}>
-          <span style={styles.logoUp}>Up</span>
-          <span style={styles.logoTik}>Tik</span>
-          <span style={styles.logoAlerts}>Alerts</span>
+      <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }} onClick={() => onHomePress?.()}>
+        {/* U-arrow icon */}
+        <svg width="38" height="38" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3" />
+          <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.2" opacity="0.6" />
+          <path d="M25 22 L25 30 C25 34 25 34 25 30 L25 22" strokeWidth="1.5" opacity="0.35" />
+          <path d="M35 8 L29 14 M35 8 L41 14" strokeWidth="3" />
+        </svg>
+        <div>
+          <div style={styles.logoRow}>
+            <span style={styles.logoUp}>Up</span>
+            <span style={styles.logoTik}>tik</span>
+          </div>
+          <div style={styles.logoAlerts}>alerts</div>
         </div>
-        <div style={styles.slogan}>Trade smarter, together</div>
       </div>
-      <div ref={avatarRef} style={{ position: 'relative' }}>
-        <div style={styles.avatar} onClick={() => setShowAvatarMenu(prev => !prev)}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="rgba(255,255,255,0.85)">
-            <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z"/>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Bell icon */}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
           </svg>
-        </div>
+          <div ref={avatarRef} style={{ position: 'relative' }}>
+            <div style={styles.avatar} onClick={() => setShowAvatarMenu(prev => !prev)}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#f0ede8' }}>
+                {(profile?.username || 'U')[0].toUpperCase()}
+              </span>
+            </div>
         {showAvatarMenu && (
           <div style={styles.avatarMenu}>
             <div style={styles.avatarMenuName}>{profile?.username || 'User'}</div>
@@ -424,6 +438,9 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
             </button>
           </div>
         )}
+          </div>
+        </div>
+        <div style={styles.slogan}>ONE TEAM, ONE TRADE</div>
       </div>
     </div>
   );
@@ -431,12 +448,12 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
 
 const styles = {
   header: {
-    background: '#354030',
-    borderBottom: '2px solid #5a9a35',
-    padding: '13px 16px',
+    background: '#132d52',
+    borderBottom: 'none',
+    padding: '10px 16px 8px',
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexShrink: 0,
   },
   // ── Chat tab header ──
@@ -465,7 +482,7 @@ const styles = {
   chatGroupName: {
     fontSize: 15,
     fontWeight: 600,
-    color: '#a0e070',
+    color: '#8cd9a0',
   },
   inviteBtn: {
     background: 'rgba(255,255,255,0.12)',
@@ -694,16 +711,24 @@ const styles = {
     fontFamily: 'var(--font)',
   },
   // ── Default header ──
-  logoRow:    { display: 'flex', alignItems: 'center' },
-  logoUp:     { fontSize: 20, fontWeight: 700, color: '#f0f0f0' },
-  logoTik:    { fontSize: 20, fontWeight: 700, color: '#a0e070' },
-  logoAlerts: { fontSize: 20, fontWeight: 700, color: '#f0f0f0' },
-  slogan:     { fontSize: 13, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+  logoRow:    { display: 'flex', alignItems: 'baseline' },
+  logoUp:     { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
+  logoTik:    { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
+  logoAlerts: {
+    fontSize: 14, fontWeight: 300, color: '#b0c4d8', letterSpacing: 2,
+    fontFamily: "'Avenir Next', 'Avenir', 'Nunito Sans', sans-serif",
+    marginTop: -4, paddingLeft: 18,
+  },
+  slogan: {
+    fontSize: 10, fontWeight: 300, fontStyle: 'italic',
+    color: '#b0c4d8', letterSpacing: 1,
+    fontFamily: "'Avenir Next', 'Avenir', 'Nunito Sans', sans-serif",
+  },
   avatar: {
-    width: 30, height: 30, borderRadius: '50%',
-    background: 'rgba(255,255,255,0.15)',
+    width: 28, height: 28, borderRadius: '50%',
+    background: 'rgba(255,255,255,0.12)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 13, fontWeight: 500, color: '#fff', cursor: 'pointer',
+    cursor: 'pointer',
   },
   avatarMenu: {
     position: 'absolute', top: 'calc(100% + 8px)', right: 0,

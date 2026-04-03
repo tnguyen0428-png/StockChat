@@ -148,7 +148,7 @@ export default function JoinGroupPage({ session }) {
 const styles = {
   page: {
     minHeight: '100vh',
-    background: '#1c2a1c',
+    background: '#132d52',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
