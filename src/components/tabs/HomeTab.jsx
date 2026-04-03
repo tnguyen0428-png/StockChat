@@ -249,13 +249,15 @@ export default function HomeTab({ session, onGroupSelect, onAIPress, onSignOut, 
             const chg = d?.change;
             const isFutures = d?.label === 'FUT';
             const pointChange = isFutures ? ((chg / 100) * Number(d.price)).toFixed(2) : null;
+            const arrow = chg > 0 ? '▲' : '▼';
+            const changeColor = chg > 0 ? '#b5e655' : chg < 0 ? 'var(--red)' : 'var(--text3)';
             return (
               <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', margin: '0 4px', borderRadius: 10, background: chg > 0 ? 'rgba(59,109,17,0.2)' : chg < 0 ? 'rgba(162,45,45,0.15)' : 'transparent' }}>
                 <span style={{ fontSize: 16, fontWeight: 500, color: '#8aaa7a' }}>{item.label}</span>
-                <span style={{ fontSize: 16, fontWeight: 700, color: chg > 0 ? '#b5e655' : chg < 0 ? 'var(--red)' : 'var(--text3)' }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: changeColor }}>
                   {d ? (isFutures
-                    ? `${chg > 0 ? '▲' : '▼'} ${chg > 0 ? '+' : ''}${pointChange}`
-                    : `${chg > 0 ? '▲' : '▼'}${Math.abs(chg).toFixed(2)}%`
+                    ? `${arrow} ${chg > 0 ? '+' : ''}${pointChange} (${chg > 0 ? '+' : ''}${chg.toFixed(2)}%)`
+                    : `${arrow}${Math.abs(chg).toFixed(2)}%`
                   ) : '--'}
                 </span>
               </span>

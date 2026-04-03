@@ -164,7 +164,8 @@ export async function scoreTicker(symbol) {
       salesGrowth:  Math.round(salesGrowth * 100),
       thesis,
     };
-  } catch {
+  } catch (err) {
+    console.error(`scoreTicker ${symbol} failed:`, err.message);
     return null;
   }
 }

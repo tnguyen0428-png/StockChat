@@ -6,41 +6,48 @@
 const HomeIcon = ({ active }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M3 9.5L12 3L21 9.5V20C21 20.55 20.55 21 20 21H15V15H9V21H4C3.45 21 3 20.55 3 20V9.5Z"
-      fill={active ? 'var(--green)' : 'var(--text3)'} />
+      fill={active ? 'var(--green)' : '#8a9299'} />
   </svg>
 );
 
 const AlertsIcon = ({ active }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z"
-      fill={active ? 'var(--green)' : 'var(--text3)'} />
+      fill={active ? 'var(--green)' : '#8a9299'} />
   </svg>
 );
 
 const ProfileIcon = ({ active }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z"
-      fill={active ? 'var(--green)' : 'var(--text3)'} />
+      fill={active ? 'var(--green)' : '#8a9299'} />
   </svg>
 );
 
 const HelpIcon = ({ active }) => (
-  <div style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${active ? 'var(--green)' : 'var(--text3)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: active ? 'var(--green)' : 'var(--text3)', lineHeight: 1 }}>?</div>
+  <div style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${active ? 'var(--green)' : '#8a9299'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: active ? 'var(--green)' : '#8a9299', lineHeight: 1 }}>?</div>
 );
 
 const ChatIcon = ({ active, highlighted }) => (
   <svg width={highlighted ? 24 : 22} height={highlighted ? 24 : 22} viewBox="0 0 24 24" fill="none">
     <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"
-      fill={highlighted ? '#fff' : (active ? 'var(--green)' : 'var(--text3)')} />
+      fill={highlighted ? '#fff' : (active ? 'var(--green)' : '#8a9299')} />
+  </svg>
+);
+
+const ChallengeIcon = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
+      fill={active ? 'var(--green)' : '#8a9299'} />
   </svg>
 );
 
 const TABS = [
-  { id: 'home',    label: 'Home',    Icon: HomeIcon    },
-  { id: 'alerts',  label: 'Alerts',  Icon: AlertsIcon  },
-  { id: 'chat',    label: 'Chat',    Icon: ChatIcon    },
-  { id: 'help',    label: 'Help',    Icon: HelpIcon    },
-  { id: 'profile', label: 'Profile', Icon: ProfileIcon },
+  { id: 'home',      label: 'Home',      Icon: HomeIcon      },
+  { id: 'alerts',    label: 'Alerts',    Icon: AlertsIcon    },
+  { id: 'chat',      label: 'Chat',      Icon: ChatIcon      },
+  { id: 'challenge', label: 'Challenge', Icon: ChallengeIcon },
+  { id: 'profile',   label: 'Profile',   Icon: ProfileIcon   },
 ];
 
 export default function BottomNav({ activeTab, onTabChange, unreadAlerts }) {
@@ -64,7 +71,7 @@ export default function BottomNav({ activeTab, onTabChange, unreadAlerts }) {
             </div>
             <span style={{
               ...styles.label,
-              color: isChat ? 'var(--green)' : (isActive ? 'var(--green)' : 'var(--text3)'),
+              color: isChat ? 'var(--green)' : (isActive ? 'var(--green)' : '#8a9299'),
               fontWeight: isChat ? 600 : 500,
             }}>
               {label}

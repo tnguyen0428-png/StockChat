@@ -48,7 +48,17 @@ export function GroupProvider({ session, children }) {
       // Restore last active group
       const savedId = localStorage.getItem('uptik_active_group');
       const saved = savedId ? groups.find(g => g.id === savedId) : null;
-      if (saved) setActiveGroup(saved);
+      if (saved) {
+        setActiveGroup(saved);
+      } else if (savedId) {
+        // Fallback: group may not be in member list yet (just joined)
+        const { data: fallbackGroup } = await supabase
+          .from('groups')
+          .select('*')
+          .eq('id', savedId)
+          .maybeSingle();
+        if (fallbackGroup) setActiveGroup(fallbackGroup);
+      }
     }
   };
 

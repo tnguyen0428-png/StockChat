@@ -15,6 +15,7 @@ import ChatTab    from '../components/tabs/ChatTab';
 import ProfileTab from '../components/tabs/ProfileTab';
 import HelpTab    from '../components/tabs/HelpTab';
 import AITab      from '../components/tabs/AITab';
+import PortfolioTab from '../components/tabs/PortfolioTab';
 
 // Shared components
 import Header     from '../components/shared/Header';
@@ -97,11 +98,12 @@ export default function DashboardPage({ session }) {
   }, [activeTab]);
 
   useEffect(() => {
+    if (loading) return;
     if (activeTab === 'chat' && publicGroups.length > 0 && !activeGroup) {
       const uptikPublic = publicGroups.find(g => g.name === 'UpTik Public');
       if (uptikPublic) enterGroup(uptikPublic);
     }
-  }, [activeTab, publicGroups]);
+  }, [activeTab, publicGroups, loading]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -212,6 +214,9 @@ export default function DashboardPage({ session }) {
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ fontSize: 14, color: 'var(--text3)' }}>Loading chat...</div>
           </div>
+        )}
+        {activeTab === 'challenge' && (
+          <PortfolioTab session={session} />
         )}
         {activeTab === 'help' && <HelpTab />}
         {activeTab === 'profile' && (

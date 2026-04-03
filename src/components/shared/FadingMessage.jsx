@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export default function FadingMessage({ children, onRemove, delay = 20000, duration = 5000 }) {
+export default function FadingMessage({ children, onRemove, delay = 60000, duration = 5000 }) {
   const [visible, setVisible] = useState(true);
   const [fading, setFading] = useState(false);
 

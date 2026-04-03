@@ -23,8 +23,10 @@ export default function AITab({ session }) {
   const [loading, setLoading] = useState(false);
   const [watchlist, setWatchlist] = useState([]);
   const [lastTicker, setLastTicker] = useState(null);
+  const [listening, setListening] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const recognitionRef = useRef(null);
 
   useEffect(() => {
     loadWatchlist();
@@ -45,6 +47,28 @@ export default function AITab({ session }) {
       .select('symbol')
       .eq('user_id', session.user.id);
     if (data) setWatchlist(data.map(w => w.symbol));
+  };
+
+  const toggleMic = () => {
+    if (listening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setListening(false);
+      return;
+    }
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      setInput(prev => prev ? `${prev} ${transcript}` : transcript);
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
   };
 
   const sendMessage = async (text) => {
@@ -152,6 +176,15 @@ export default function AITab({ session }) {
           placeholder="Ask UpTik AI..."
           enterKeyHint="send"
         />
+        <div
+          onClick={toggleMic}
+          style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, opacity: listening ? 1 : 0.35, transition: 'opacity 0.15s' }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill={listening ? '#7C3AED' : 'var(--text1)'}>
+            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z"/>
+            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+          </svg>
+        </div>
         <button
           onClick={() => sendMessage()}
           disabled={!input.trim() || loading}
