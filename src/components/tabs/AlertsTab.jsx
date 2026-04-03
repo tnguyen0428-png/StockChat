@@ -12,7 +12,7 @@ import { useGroup } from '../../context/GroupContext';
 
 const SWIPE_THRESHOLD = 80;
 
-function SwipeableCard({ children, alertId, onWatchlist }) {
+function SwipeableCard({ children, alertId }) {
   const touchRef = useRef({ startX: 0, startY: 0, swiping: false });
   const [offsetX, setOffsetX] = useState(0);
   const [confirmed, setConfirmed] = useState(null);
@@ -43,7 +43,6 @@ function SwipeableCard({ children, alertId, onWatchlist }) {
     if (!touchRef.current.swiping) { setOffsetX(0); return; }
     if (offsetX >= SWIPE_THRESHOLD) {
       // TODO: Wire to user_watchlist table
-      if (onWatchlist) onWatchlist();
       setConfirmed('watchlist');
       setOffsetX(0);
       setTimeout(() => setConfirmed(null), 900);
@@ -513,12 +512,7 @@ export default function AlertsTab({ session }) {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [subTab, setSubTab] = useState('live');
   const [refreshKey, setRefreshKey]  = useState(0);
-  // TODO: Persist watchlist from user_watchlist table
-  const [watchlist, setWatchlist] = useState([]);
   const [historyFilter, setHistoryFilter] = useState('all');
-  const addToWatchlist = useCallback((ticker) => {
-    setWatchlist(prev => prev.includes(ticker) ? prev : [...prev, ticker]);
-  }, []);
 
   // Live market data from Supabase market_data table
   const [fearScore, setFearScore]           = useState(null);
@@ -796,9 +790,9 @@ export default function AlertsTab({ session }) {
         </div>
       )}
 
-      {/* Sub-tab toggle: Live / Watchlist / History */}
+      {/* Sub-tab toggle: Live / History */}
       <div style={styles.subTabBar}>
-        {['live', 'watchlist', 'history'].map(t => (
+        {['live', 'history'].map(t => (
           <button
             key={t}
             style={{
@@ -809,7 +803,7 @@ export default function AlertsTab({ session }) {
             }}
             onClick={() => setSubTab(t)}
           >
-            {t === 'live' ? 'Live' : t === 'watchlist' ? `Watchlist${watchlist.length ? ` (${watchlist.length})` : ''}` : 'History'}
+            {t === 'live' ? 'Live' : 'History'}
           </button>
         ))}
       </div>
@@ -860,7 +854,7 @@ export default function AlertsTab({ session }) {
       {alertOfTheDay && aotdBadge && (
         <div>
           <div style={styles.aotdLabel}>⭐ Alert of the Day</div>
-          <SwipeableCard alertId={alertOfTheDay.id} onWatchlist={() => addToWatchlist(alertOfTheDay.ticker ?? alertOfTheDay.tickers?.[0])}>
+          <SwipeableCard alertId={alertOfTheDay.id}>
             <AlertCard
               alert={alertOfTheDay}
               badge={aotdBadge}
@@ -891,7 +885,7 @@ export default function AlertsTab({ session }) {
         const { alert } = row;
         const badge = BADGE_CONFIG[alert.alert_type] || BADGE_CONFIG['vol_surge'];
         return (
-          <SwipeableCard key={alert.id} alertId={alert.id} onWatchlist={() => addToWatchlist(alert.ticker ?? alert.tickers?.[0])}>
+          <SwipeableCard key={alert.id} alertId={alert.id}>
             <AlertCard
               alert={alert}
               badge={badge}
@@ -904,34 +898,6 @@ export default function AlertsTab({ session }) {
       })}
 
       </>)}
-
-      {/* Watchlist sub-tab */}
-      {subTab === 'watchlist' && (() => {
-        const watchlistAlerts = displayAlerts.filter(a => watchlist.includes(a.ticker ?? a.tickers?.[0]));
-        if (watchlistAlerts.length === 0) {
-          return (
-            <div style={styles.emptyWrap}>
-              <div style={styles.emptyIcon}>⭐</div>
-              <div style={styles.emptyTitle}>No watchlist alerts</div>
-              <div style={styles.emptyText}>Swipe right on any alert to add it here.</div>
-            </div>
-          );
-        }
-        return watchlistAlerts.map(alert => {
-          const badge = BADGE_CONFIG[alert.alert_type] || BADGE_CONFIG['vol_surge'];
-          return (
-            <SwipeableCard key={alert.id} alertId={alert.id} onWatchlist={() => addToWatchlist(alert.ticker ?? alert.tickers?.[0])}>
-              <AlertCard
-                alert={alert}
-                badge={badge}
-                isExpanded={expandedId === alert.id}
-                onToggle={() => setExpandedId(expandedId === alert.id ? null : alert.id)}
-                darkMode={darkMode}
-              />
-            </SwipeableCard>
-          );
-        });
-      })()}
 
       {/* History sub-tab */}
       {subTab === 'history' && (() => {
