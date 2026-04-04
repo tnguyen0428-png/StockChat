@@ -356,18 +356,13 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     if (!group?.id) return;
     const loadMessages = async () => {
       setLoading(true);
-      console.log('loadMessages firing, group.id:', group.id);
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('chat_messages')
         .select('*')
         .eq('group_id', group.id)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
         .limit(100);
-      if (error) {
-        console.error('loadMessages error:', error);
-      }
-      console.log('loadMessages result:', data?.length, 'messages');
-      if (data) setMessages(data.filter(m => m.type !== 'ai' && !/@AI\b/i.test(m.text)));
+      if (data) setMessages(data.reverse().filter(m => m.type !== 'ai' && !/@AI\b/i.test(m.text)));
       setLoading(false);
     };
     loadMessages();
