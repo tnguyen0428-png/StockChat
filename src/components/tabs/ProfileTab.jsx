@@ -401,12 +401,26 @@ export default function ProfileTab({ session, profile, group, isAdmin, onSignOut
   const [newUsername, setNewUsername] = useState('');
   const [savingName, setSavingName] = useState(false);
 
+  useEffect(() => {
+    if (profile?.notification_prefs) {
+      setNotifications(prev => ({ ...prev, ...profile.notification_prefs }));
+    }
+  }, [profile?.notification_prefs]);
+
   const copyInviteLink = () => {
     navigator.clipboard?.writeText(`${window.location.origin}/join/${group?.invite_code}`).catch(() => {});
     setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
 
-  const toggleNotification = (key) => setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
+  const toggleNotification = (key) => {
+    setNotifications(prev => {
+      const updated = { ...prev, [key]: !prev[key] };
+      if (session?.user?.id) {
+        supabase.from('profiles').update({ notification_prefs: updated }).eq('id', session.user.id);
+      }
+      return updated;
+    });
+  };
 
   const saveUsername = async () => {
     if (!newUsername.trim() || !session?.user?.id || savingName) return;
