@@ -494,6 +494,7 @@ export default function PortfolioTab({ session }) {
       message: trashTalkInput.trim(),
     });
     setTrashTalkInput('');
+    document.activeElement?.blur();
   };
 
   const toggleReaction = async (msgId, reactionType) => {
