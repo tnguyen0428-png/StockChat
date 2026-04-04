@@ -310,7 +310,7 @@ function WatchlistView({ session, onAskAI }) {
     } catch (e) { console.error('Watchlist quote fetch error:', e); }
     // DCF does NOT support batch — individual calls
     const dcfPromises = symbols.map(sym =>
-      fetch(`https://financialmodelingprep.com/stable/dcf?symbol=${sym}&apikey=${FMP_KEY}`)
+      fetch(`https://financialmodelingprep.com/stable/discounted-cash-flow?symbol=${sym}&apikey=${FMP_KEY}`)
         .then(r => r.json())
         .then(json => {
           const item = Array.isArray(json) ? json[0] : json;
