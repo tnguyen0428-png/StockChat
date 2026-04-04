@@ -60,7 +60,6 @@ export default function LandingPage() {
     'Portfolio challenge',
     'Daily briefings',
     'Options flow',
-    'Voice input',
   ];
 
   const INSIDE = [
@@ -256,8 +255,11 @@ export default function LandingPage() {
 
             {/* Feature badges */}
             <div className={`land-section d5${visible ? ' visible' : ''}`} style={styles.badges}>
-              {FEATURES.map(f => (
-                <div key={f} style={styles.badge}>
+              {FEATURES.map((f, i) => (
+                <div key={f} style={{
+                  ...styles.badge,
+                  ...(i === FEATURES.length - 1 && FEATURES.length % 2 !== 0 ? { gridColumn: '1 / -1', maxWidth: 190, margin: '0 auto' } : {}),
+                }}>
                   <span style={styles.badgeCheck}>✓</span>
                   {f}
                 </div>
@@ -325,13 +327,13 @@ const styles = {
   logoUp: { fontSize: 17, fontWeight: 500, color: '#f0ede8' },
   logoTik: { fontSize: 17, fontWeight: 500, color: '#8cd9a0' },
   logoAlerts: {
-    fontSize: 12, fontWeight: 300, color: '#d4e4f2', letterSpacing: 1.8,
+    fontSize: 14, fontWeight: 300, color: '#d4e4f2', letterSpacing: 2,
     fontFamily: "'Avenir Next', 'Avenir', 'Nunito Sans', sans-serif",
-    marginTop: -1, paddingLeft: 3,
+    marginTop: -1, paddingLeft: 4,
   },
   logoSlogan: {
-    fontSize: 8, fontWeight: 300, fontStyle: 'italic',
-    color: 'rgba(212,228,242,0.65)', letterSpacing: 1,
+    fontSize: 10, fontWeight: 300, fontStyle: 'italic',
+    color: '#d4e4f2', letterSpacing: 1,
     fontFamily: "'Avenir Next', 'Avenir', 'Nunito Sans', sans-serif",
   },
   navRight: {
@@ -545,22 +547,24 @@ const styles = {
 
   // ── Feature badges ──
   badges: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 5,
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: 6,
+    maxWidth: 380,
+    margin: '0 auto',
   },
   badge: {
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
-    fontSize: 10,
+    justifyContent: 'center',
+    gap: 5,
+    fontSize: 11,
     fontWeight: 500,
     color: '#1a2d4a',
     background: '#f8fafc',
     border: '1px solid #d8e2ed',
-    borderRadius: 20,
-    padding: '4px 9px',
+    borderRadius: 8,
+    padding: '7px 10px',
   },
   badgeCheck: {
     color: '#1AAD5E',
