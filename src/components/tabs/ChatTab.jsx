@@ -268,6 +268,15 @@ function WatchlistView({ session, onAskAI }) {
   const [detailLoading, setDetailLoading] = useState(null);
   const [sortBy, setSortBy] = useState('recent');
 
+  useEffect(() => {
+    const cachedQuotes = localStorage.getItem('uptik_wl_quotes');
+    const cachedDcf = localStorage.getItem('uptik_wl_dcf');
+    const cachedDetails = localStorage.getItem('uptik_wl_details');
+    if (cachedQuotes) try { setQuoteData(JSON.parse(cachedQuotes)); } catch {}
+    if (cachedDcf) try { setDcfData(JSON.parse(cachedDcf)); } catch {}
+    if (cachedDetails) try { setDetailData(JSON.parse(cachedDetails)); } catch {}
+  }, []);
+
   useEffect(() => { loadWatchlist(); }, [session?.user?.id]);
 
   const loadWatchlist = async () => {
@@ -283,7 +292,7 @@ function WatchlistView({ session, onAskAI }) {
   };
 
   const fetchBatchData = async (symbols) => {
-    if (isWeekend() || isMarketHoliday() || symbols.length === 0) return;
+    if (symbols.length === 0) return;
     const joined = symbols.join(',');
     try {
       const [qRes, dRes] = await Promise.all([
@@ -295,11 +304,13 @@ function WatchlistView({ session, onAskAI }) {
         const qm = {};
         qJson.forEach(q => { qm[q.symbol] = q; });
         setQuoteData(qm);
+        localStorage.setItem('uptik_wl_quotes', JSON.stringify(qm));
       }
       if (Array.isArray(dJson)) {
         const dm = {};
         dJson.forEach(d => { dm[d.symbol] = d; });
         setDcfData(dm);
+        localStorage.setItem('uptik_wl_dcf', JSON.stringify(dm));
       }
     } catch (e) { console.error('Watchlist batch fetch error:', e); }
   };
@@ -320,22 +331,24 @@ function WatchlistView({ session, onAskAI }) {
       const r = Array.isArray(rat) ? rat[0] : {};
       const g = Array.isArray(grow) ? grow[0] : {};
       const nextEarnings = Array.isArray(earn) ? earn.find(e => new Date(e.date) > new Date())?.date : null;
-      setDetailData(prev => ({
-        ...prev,
-        [symbol]: {
-          companyName: p?.companyName || symbol,
-          sector: p?.sector || '',
-          mktCap: p?.mktCap || 0,
-          image: p?.image || '',
-          forwardPE: r?.peForwardTTM || r?.forwardPE || null,
-          pegRatio: r?.pegRatio || r?.priceEarningsToGrowthRatio || null,
-          netMargin: r?.netProfitMarginTTM || null,
-          debtEquity: r?.debtEquityRatioTTM || null,
-          revenueGrowth: g?.revenueGrowth || g?.growthRevenue || null,
-          epsGrowth: g?.epsgrowth || g?.growthEPS || null,
-          nextEarnings,
-        },
-      }));
+      const newDetail = {
+        companyName: p?.companyName || symbol,
+        sector: p?.sector || '',
+        mktCap: p?.mktCap || 0,
+        image: p?.image || '',
+        forwardPE: r?.peForwardTTM || r?.forwardPE || null,
+        pegRatio: r?.pegRatio || r?.priceEarningsToGrowthRatio || null,
+        netMargin: r?.netProfitMarginTTM || null,
+        debtEquity: r?.debtEquityRatioTTM || null,
+        revenueGrowth: g?.revenueGrowth || g?.growthRevenue || null,
+        epsGrowth: g?.epsgrowth || g?.growthEPS || null,
+        nextEarnings,
+      };
+      setDetailData(prev => {
+        const updated = { ...prev, [symbol]: newDetail };
+        localStorage.setItem('uptik_wl_details', JSON.stringify(updated));
+        return updated;
+      });
     } catch (e) { console.error('Detail fetch error:', e); }
     setDetailLoading(null);
   };
