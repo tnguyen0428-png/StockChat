@@ -340,14 +340,14 @@ export default function AlertsTab({ session, group }) {
   const heroAlert = filtered.find(a => a.isAlertOfDay) || filtered[0];
   const otherAlerts = filtered.filter(a => a !== heroAlert);
 
-  const card = { background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,.06)", overflow: "hidden" };
+  const card = { background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,.06)", overflow: "visible" };
 
   return (
     <div className="alerts-container">
       <style>{`
         *, *::before, *::after { box-sizing: border-box; }
-        html, body { overflow-x: hidden; width: 100%; }
-        .alerts-container { max-width: 480px; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
+        html, body { width: 100%; }
+        .alerts-container { max-width: 480px; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; flex-shrink: 0; }
         .hero-header { display: flex; justify-content: space-between; align-items: flex-start; }
         .hero-ticker { font-size: 24px; font-weight: 700; color: #0f172a; margin: 0; }
         .hero-price { font-size: 24px; font-weight: 700; color: #0f172a; margin: 0; }
@@ -369,7 +369,6 @@ export default function AlertsTab({ session, group }) {
             gap: 12px;
             max-width: 100% !important;
             width: 100% !important;
-            overflow-x: hidden;
           }
           .hero-header {
             flex-direction: column;
@@ -519,7 +518,7 @@ export default function AlertsTab({ session, group }) {
 
           {/* OTHER ALERTS */}
           {otherAlerts.length > 0 && (
-            <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,.06)", overflow: "hidden" }}>
+            <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,.06)" }}>
               <button
                 onClick={() => setShowMore(!showMore)}
                 style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer" }}
