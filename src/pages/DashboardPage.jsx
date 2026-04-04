@@ -17,7 +17,7 @@ import ProfileTab from '../components/tabs/ProfileTab';
 import HelpTab    from '../components/tabs/HelpTab';
 import AITab      from '../components/tabs/AITab';
 import PortfolioTab from '../components/tabs/PortfolioTab';
-import DarkPoolOptionsTab from '../components/tabs/DarkPoolOptionsTab';
+// DarkPoolOptionsTab merged into AlertsTabRedesign
 
 // Shared components
 import Header     from '../components/shared/Header';
@@ -196,9 +196,6 @@ export default function DashboardPage({ session }) {
         {activeTab === 'ai' && <AITab session={session} />}
         {activeTab === 'alerts' && (
           <AlertsTab session={session} group={activeGroup} />
-        )}
-        {activeTab === 'flow' && (
-          <DarkPoolOptionsTab session={session} group={activeGroup} />
         )}
         {activeTab === 'chat' && activeGroup && (
           <ChatTab

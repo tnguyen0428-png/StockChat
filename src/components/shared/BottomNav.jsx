@@ -49,7 +49,6 @@ const TABS = [
   { id: 'home',      label: 'Home',      Icon: HomeIcon      },
   { id: 'alerts',    label: 'Alerts',    Icon: AlertsIcon    },
   { id: 'chat',      label: 'Chat',      Icon: ChatIcon      },
-  { id: 'flow',      label: 'Flow',      Icon: FlowIcon      },
   { id: 'challenge', label: 'Challenge', Icon: ChallengeIcon },
   { id: 'profile',   label: 'Profile',   Icon: ProfileIcon   },
 ];
