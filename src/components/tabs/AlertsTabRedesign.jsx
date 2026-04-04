@@ -254,9 +254,9 @@ function Modal({ alert, onClose }) {
               <p style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", margin: "4px 0 0" }}>${alert.resistance.toFixed(2)}</p>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            <button style={{ flex: 1, padding: "14px 0", borderRadius: 14, background: "#16a34a", color: "#fff", fontWeight: 600, fontSize: 14, border: "none", cursor: "pointer", boxShadow: "0 1px 3px rgba(22,163,74,.3)" }}>Add to Watchlist</button>
-            <button style={{ flex: 1, padding: "14px 0", borderRadius: 14, background: "transparent", color: "#64748b", fontWeight: 600, fontSize: 14, border: "2px solid #e2e8f0", cursor: "pointer" }}>Discuss in Chat</button>
+          <div className="btn-row" style={{ padding: 0 }}>
+            <button className="btn-primary">Add to Watchlist</button>
+            <button className="btn-secondary">Discuss in Chat</button>
           </div>
         </div>
       </div>
@@ -275,7 +275,7 @@ function AlertCard({ alert, onClick }) {
       onMouseLeave={e => e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,.06)"}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{alert.ticker}</h4>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 12, background: "#f1f5f9", color: "#475569", fontSize: 10, fontWeight: 600 }}>
@@ -284,10 +284,10 @@ function AlertCard({ alert, onClick }) {
           </div>
           <p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{alert.company}</p>
         </div>
-        <div style={{ textAlign: "right", minWidth: 0 }}>
+        <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
           <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>${alert.price.toFixed(2)}</p>
           <p style={{ margin: "2px 0 0", fontSize: 13, fontWeight: 600, color: isPositive ? "#16a34a" : "#dc2626" }}>
-            {isPositive ? "+" : ""}${alert.change.toFixed(2)} ({isPositive ? "+" : ""}{alert.changePercent}%)
+            {isPositive ? "+" : ""}${Math.abs(alert.change).toFixed(2)} ({isPositive ? "+" : ""}{alert.changePercent}%)
           </p>
         </div>
       </div>
@@ -343,8 +343,41 @@ export default function AlertsTab({ session, group }) {
   const card = { background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,.06)", overflow: "hidden" };
 
   return (
-    <div style={{ margin: "0 auto", padding: "20px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
-      <style>{`*, *::before, *::after { box-sizing: border-box; }`}</style>
+    <div className="alerts-container">
+      <style>{`
+        *, *::before, *::after { box-sizing: border-box; }
+        .alerts-container { max-width: 480px; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
+        .hero-header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .hero-ticker { font-size: 24px; font-weight: 700; color: #0f172a; margin: 0; }
+        .hero-price { font-size: 24px; font-weight: 700; color: #0f172a; margin: 0; }
+        .hero-company { font-size: 14px; color: #64748b; margin: 2px 0 0; }
+        .hero-change { font-size: 14px; font-weight: 600; margin: 2px 0 0; }
+        .btn-row { display: flex; flex-direction: row; gap: 12px; padding: 0 20px 20px; }
+        .btn-row button { flex: 1; padding: 12px 0; border-radius: 14px; font-weight: 600; font-size: 14px; cursor: pointer; }
+        .btn-primary { background: #16a34a; color: #fff; border: none; box-shadow: 0 1px 3px rgba(22,163,74,.3); }
+        .btn-secondary { background: transparent; color: #64748b; border: 2px solid #e2e8f0; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 0 20px 16px; }
+        .stats-cell { background: #f8fafc; border-radius: 10px; padding: 8px 10px; text-align: center; }
+        .card-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; margin-bottom: 2px; }
+        .mood-row { display: flex; align-items: center; gap: 6px; }
+        .filter-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+
+        @media (max-width: 400px) {
+          .hero-header { flex-direction: column; gap: 4px; }
+          .hero-header > div:last-child { text-align: left; }
+          .hero-ticker { font-size: 20px; }
+          .hero-price { font-size: 20px; }
+          .hero-company { font-size: 13px; }
+          .hero-change { font-size: 13px; }
+          .btn-row { flex-direction: column; gap: 8px; }
+          .btn-row button { width: 100%; }
+          .stats-grid { grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+          .stats-cell { padding: 6px 4px; }
+          .stats-cell p:last-child { font-size: 14px !important; }
+          .mood-row { display: none; }
+          .alerts-container { padding: 12px 10px; gap: 12px; }
+        }
+      `}</style>
 
       {/* DEV TOGGLE */}
       <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -359,11 +392,11 @@ export default function AlertsTab({ session, group }) {
       {/* HEADER */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <h2 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1.5px" }}>Breakout Alerts</h2>
-        <MoodBar />
+        <div className="mood-row"><MoodBar /></div>
       </div>
 
       {/* FILTERS */}
-      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, WebkitOverflowScrolling: "touch" }}>
+      <div className="filter-row">
         {filterKeys.map(f=>{
           const count = f === "All" ? mockAlerts.length : mockAlerts.filter(a => a.scannerTag === filterMap[f]).length;
           return (
@@ -387,14 +420,14 @@ export default function AlertsTab({ session, group }) {
               )}
               <div style={{ ...card, cursor: "pointer", transition: "box-shadow .2s" }} onClick={()=>setModalAlert(heroAlert)}>
                 <div style={{ padding: "20px 20px 16px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div style={{ minWidth: 0 }}>
-                      <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#0f172a" }}>{heroAlert.ticker}</h3>
-                      <p style={{ margin: "2px 0 0", fontSize: 14, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{heroAlert.company}</p>
+                  <div className="hero-header">
+                    <div>
+                      <h3 className="hero-ticker">{heroAlert.ticker}</h3>
+                      <p className="hero-company">{heroAlert.company}</p>
                     </div>
-                    <div style={{ textAlign: "right", minWidth: 0 }}>
-                      <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#0f172a" }}>${heroAlert.price.toFixed(2)}</p>
-                      <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 600, color: heroAlert.change >= 0 ? "#16a34a" : "#dc2626" }}>
+                    <div style={{ textAlign: "right" }}>
+                      <p className="hero-price">${heroAlert.price.toFixed(2)}</p>
+                      <p className="hero-change" style={{ color: heroAlert.change >= 0 ? "#16a34a" : "#dc2626" }}>
                         {heroAlert.change >= 0 ? "+" : ""}${Math.abs(heroAlert.change).toFixed(2)} ({heroAlert.change >= 0 ? "+" : ""}{heroAlert.changePercent}%)
                       </p>
                     </div>
@@ -422,24 +455,24 @@ export default function AlertsTab({ session, group }) {
                   </div>
                 </div>
 
-                <div style={{ padding: "0 20px 16px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                  <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
+                <div className="stats-grid">
+                  <div className="stats-cell">
                     <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>Support <Tooltip text="A price level where this stock has historically stopped falling." /></p>
                     <p style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", margin: "2px 0 0" }}>${heroAlert.support.toFixed(2)}</p>
                   </div>
-                  <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
+                  <div className="stats-cell">
                     <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>Resistance <Tooltip text="A price level where this stock has historically stopped rising." /></p>
                     <p style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", margin: "2px 0 0" }}>${heroAlert.resistance.toFixed(2)}</p>
                   </div>
-                  <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
+                  <div className="stats-cell">
                     <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>Confidence</p>
                     <p style={{ fontSize: 15, fontWeight: 700, color: "#16a34a", margin: "2px 0 0" }}>{heroAlert.confidence}%</p>
                   </div>
                 </div>
 
-                <div style={{ padding: "0 20px 20px", display: "flex", gap: 8 }}>
-                  <button onClick={e=>e.stopPropagation()} style={{ flex: "1 1 0", minWidth: 0, padding: "12px 0", borderRadius: 14, background: "#16a34a", color: "#fff", fontWeight: 600, fontSize: 13, border: "none", cursor: "pointer", boxShadow: "0 1px 3px rgba(22,163,74,.3)" }}>Add to Watchlist</button>
-                  <button onClick={e=>e.stopPropagation()} style={{ flex: "1 1 0", minWidth: 0, padding: "12px 0", borderRadius: 14, background: "transparent", color: "#64748b", fontWeight: 600, fontSize: 13, border: "2px solid #e2e8f0", cursor: "pointer" }}>Discuss</button>
+                <div className="btn-row">
+                  <button className="btn-primary" onClick={e=>e.stopPropagation()}>Add to Watchlist</button>
+                  <button className="btn-secondary" onClick={e=>e.stopPropagation()}>Discuss in Chat</button>
                 </div>
               </div>
             </div>
