@@ -296,21 +296,28 @@ function WatchlistView({ session, onAskAI }) {
 
   const fetchBatchData = async (symbols) => {
     if (symbols.length === 0) return;
-    const joined = symbols.join(',');
-    // Quote-short supports batch
-    try {
-      const qRes = await fetch(`https://financialmodelingprep.com/stable/quote-short?symbol=${joined}&apikey=${FMP_KEY}`);
-      const qJson = await qRes.json();
-      if (Array.isArray(qJson)) {
-        const qm = {};
-        qJson.forEach(q => { qm[q.symbol] = q; });
-        setQuoteData(prev => {
-          const merged = { ...prev, ...qm };
-          localStorage.setItem('uptik_wl_quotes', JSON.stringify(merged));
-          return merged;
-        });
+    // Quote — individual calls (batch not supported on this plan)
+    const quotePromises = symbols.map(sym =>
+      fetch(`https://financialmodelingprep.com/stable/quote?symbol=${sym}&apikey=${FMP_KEY}`)
+        .then(r => r.json())
+        .then(json => {
+          const item = Array.isArray(json) ? json[0] : json;
+          return item?.symbol ? item : null;
+        })
+        .catch(() => null)
+    );
+    const quoteResults = await Promise.allSettled(quotePromises);
+    const qm = {};
+    quoteResults.forEach(r => {
+      if (r.status === 'fulfilled' && r.value) {
+        qm[r.value.symbol] = r.value;
       }
-    } catch (e) { console.error('Watchlist quote fetch error:', e); }
+    });
+    setQuoteData(prev => {
+      const merged = { ...prev, ...qm };
+      localStorage.setItem('uptik_wl_quotes', JSON.stringify(merged));
+      return merged;
+    });
     // DCF — individual calls
     const dcfPromises = symbols.map(sym =>
       fetch(`https://financialmodelingprep.com/stable/discounted-cash-flow?symbol=${sym}&apikey=${FMP_KEY}`)
@@ -376,7 +383,7 @@ function WatchlistView({ session, onAskAI }) {
       const newDetail = {
         companyName: p?.companyName || symbol,
         sector: p?.sector || '',
-        mktCap: p?.mktCap || 0,
+        mktCap: p?.marketCap || 0,
         image: p?.image || '',
         forwardPE: r?.priceToEarningsRatio || null,
         pegRatio: r?.priceToEarningsGrowthRatio || null,
@@ -506,7 +513,7 @@ function WatchlistView({ session, onAskAI }) {
                 <div style={{ ...ws.logoFallback, display: 'none' }}>{sym.slice(0, 2)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={ws.ticker}>{sym}</div>
-                  <div style={ws.companyName}>{det?.companyName || ''}</div>
+                  <div style={ws.companyName}>{det?.companyName || q.name || ''}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={ws.price}>{price ? `$${price.toFixed(2)}` : '—'}</div>
