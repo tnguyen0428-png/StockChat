@@ -275,17 +275,17 @@ function AlertCard({ alert, onClick }) {
       onMouseLeave={e => e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,.06)"}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <h4 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{alert.ticker}</h4>
+            <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{alert.ticker}</h4>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 12, background: "#f1f5f9", color: "#475569", fontSize: 10, fontWeight: 600 }}>
               {alert.scannerTag.toUpperCase()}
             </span>
           </div>
-          <p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748b" }}>{alert.company}</p>
+          <p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{alert.company}</p>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a" }}>${alert.price.toFixed(2)}</p>
+        <div style={{ textAlign: "right", minWidth: 0 }}>
+          <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>${alert.price.toFixed(2)}</p>
           <p style={{ margin: "2px 0 0", fontSize: 13, fontWeight: 600, color: isPositive ? "#16a34a" : "#dc2626" }}>
             {isPositive ? "+" : ""}${alert.change.toFixed(2)} ({isPositive ? "+" : ""}{alert.changePercent}%)
           </p>
@@ -343,7 +343,8 @@ export default function AlertsTab({ session, group }) {
   const card = { background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,.06)", overflow: "hidden" };
 
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto", padding: "20px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ margin: "0 auto", padding: "20px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <style>{`*, *::before, *::after { box-sizing: border-box; }`}</style>
 
       {/* DEV TOGGLE */}
       <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -387,12 +388,12 @@ export default function AlertsTab({ session, group }) {
               <div style={{ ...card, cursor: "pointer", transition: "box-shadow .2s" }} onClick={()=>setModalAlert(heroAlert)}>
                 <div style={{ padding: "20px 20px 16px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#0f172a" }}>{heroAlert.ticker}</h3>
-                      <p style={{ margin: "2px 0 0", fontSize: 14, color: "#64748b" }}>{heroAlert.company}</p>
+                    <div style={{ minWidth: 0 }}>
+                      <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#0f172a" }}>{heroAlert.ticker}</h3>
+                      <p style={{ margin: "2px 0 0", fontSize: 14, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{heroAlert.company}</p>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <p style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#0f172a" }}>${heroAlert.price.toFixed(2)}</p>
+                    <div style={{ textAlign: "right", minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#0f172a" }}>${heroAlert.price.toFixed(2)}</p>
                       <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 600, color: heroAlert.change >= 0 ? "#16a34a" : "#dc2626" }}>
                         {heroAlert.change >= 0 ? "+" : ""}${Math.abs(heroAlert.change).toFixed(2)} ({heroAlert.change >= 0 ? "+" : ""}{heroAlert.changePercent}%)
                       </p>
@@ -421,28 +422,24 @@ export default function AlertsTab({ session, group }) {
                   </div>
                 </div>
 
-                <div style={{ padding: "0 20px 16px", display: "flex", alignItems: "center", gap: 12, fontSize: 13, flexWrap: "wrap" }}>
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <span style={{ color: "#94a3b8", fontSize: 12 }}>Support</span>
-                    <Tooltip text="A price level where this stock has historically stopped falling." />
-                    <span style={{ fontWeight: 700, color: "#1e293b", marginLeft: 6 }}>${heroAlert.support.toFixed(2)}</span>
+                <div style={{ padding: "0 20px 16px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                  <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
+                    <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>Support <Tooltip text="A price level where this stock has historically stopped falling." /></p>
+                    <p style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", margin: "2px 0 0" }}>${heroAlert.support.toFixed(2)}</p>
                   </div>
-                  <div style={{ width: 1, height: 16, background: "#e2e8f0" }}/>
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <span style={{ color: "#94a3b8", fontSize: 12 }}>Resistance</span>
-                    <Tooltip text="A price level where this stock has historically stopped rising." />
-                    <span style={{ fontWeight: 700, color: "#1e293b", marginLeft: 6 }}>${heroAlert.resistance.toFixed(2)}</span>
+                  <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
+                    <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>Resistance <Tooltip text="A price level where this stock has historically stopped rising." /></p>
+                    <p style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", margin: "2px 0 0" }}>${heroAlert.resistance.toFixed(2)}</p>
                   </div>
-                  <div style={{ width: 1, height: 16, background: "#e2e8f0" }}/>
-                  <div>
-                    <span style={{ color: "#94a3b8", fontSize: 12 }}>Confidence </span>
-                    <span style={{ fontWeight: 700, color: "#16a34a" }}>{heroAlert.confidence}%</span>
+                  <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
+                    <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>Confidence</p>
+                    <p style={{ fontSize: 15, fontWeight: 700, color: "#16a34a", margin: "2px 0 0" }}>{heroAlert.confidence}%</p>
                   </div>
                 </div>
 
-                <div style={{ padding: "0 20px 20px", display: "flex", gap: 12 }}>
-                  <button onClick={e=>e.stopPropagation()} style={{ flex: 1, padding: "12px 0", borderRadius: 14, background: "#16a34a", color: "#fff", fontWeight: 600, fontSize: 14, border: "none", cursor: "pointer", boxShadow: "0 1px 3px rgba(22,163,74,.3)" }}>Add to Watchlist</button>
-                  <button onClick={e=>e.stopPropagation()} style={{ flex: 1, padding: "12px 0", borderRadius: 14, background: "transparent", color: "#64748b", fontWeight: 600, fontSize: 14, border: "2px solid #e2e8f0", cursor: "pointer" }}>Discuss in Chat</button>
+                <div style={{ padding: "0 20px 20px", display: "flex", gap: 8 }}>
+                  <button onClick={e=>e.stopPropagation()} style={{ flex: "1 1 0", minWidth: 0, padding: "12px 0", borderRadius: 14, background: "#16a34a", color: "#fff", fontWeight: 600, fontSize: 13, border: "none", cursor: "pointer", boxShadow: "0 1px 3px rgba(22,163,74,.3)" }}>Add to Watchlist</button>
+                  <button onClick={e=>e.stopPropagation()} style={{ flex: "1 1 0", minWidth: 0, padding: "12px 0", borderRadius: 14, background: "transparent", color: "#64748b", fontWeight: 600, fontSize: 13, border: "2px solid #e2e8f0", cursor: "pointer" }}>Discuss</button>
                 </div>
               </div>
             </div>
