@@ -56,7 +56,6 @@ export default function LandingPage() {
     'Live stock alerts',
     'Group chat',
     'Curated watchlists',
-    'Free to join',
   ];
 
   return (
@@ -67,7 +66,7 @@ export default function LandingPage() {
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        body { background: #f8faf9; }
+        body { background: #eef2f7; }
 
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(18px); }
@@ -97,16 +96,16 @@ export default function LandingPage() {
         {/* ── Nav ── */}
         <nav style={styles.nav}>
           <div style={styles.navLogo}>
-            <span style={styles.logoGreen}>UpTik</span>
-            <span style={styles.logoDark}>Alerts</span>
+            <img src="/uptik-GREEN-TIK.png" alt="UpTikAlerts" style={{ height: 32 }} />
+            <span style={styles.logoSlogan}>ONE TEAM, ONE TRADE</span>
           </div>
           <div style={styles.navRight}>
             <div style={styles.comingSoonPill}>Coming Soon</div>
             <button
               style={styles.betaLoginBtn}
               onClick={() => navigate('/login')}
-              onMouseEnter={e => e.currentTarget.style.color = '#1AAD5E'}
-              onMouseLeave={e => e.currentTarget.style.color = '#64748b'}
+              onMouseEnter={e => e.currentTarget.style.color = '#8cd9a0'}
+              onMouseLeave={e => e.currentTarget.style.color = '#fff'}
             >
               Beta Login
             </button>
@@ -220,8 +219,8 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     fontFamily: "'DM Sans', sans-serif",
-    background: '#f8faf9',
-    color: '#0f172a',
+    background: '#eef2f7',
+    color: '#1a2d4a',
   },
 
   // ── Nav ──
@@ -234,19 +233,21 @@ const styles = {
     alignItems: 'center',
     padding: '0 24px',
     height: 60,
-    background: 'rgba(255,255,255,0.85)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-    borderBottom: '1px solid rgba(0,0,0,0.07)',
+    background: '#132d52',
+    borderBottom: '1px solid rgba(255,255,255,0.08)',
   },
   navLogo: {
-    fontSize: 20,
-    fontWeight: 700,
-    fontFamily: "'Outfit', sans-serif",
-    letterSpacing: '-0.3px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
   },
-  logoGreen: { color: '#1AAD5E' },
-  logoDark:  { color: '#0f172a' },
+  logoSlogan: {
+    fontSize: 8,
+    fontStyle: 'italic',
+    textTransform: 'uppercase',
+    letterSpacing: '1.5px',
+    color: 'rgba(212,228,242,0.85)',
+  },
   navRight: {
     display: 'flex',
     alignItems: 'center',
@@ -257,7 +258,7 @@ const styles = {
     border: 'none',
     fontSize: 13,
     fontWeight: 600,
-    color: '#64748b',
+    color: '#fff',
     cursor: 'pointer',
     padding: 0,
     fontFamily: "'DM Sans', sans-serif",
@@ -266,9 +267,9 @@ const styles = {
   comingSoonPill: {
     fontSize: 11,
     fontWeight: 600,
-    color: '#1AAD5E',
-    background: 'rgba(26,173,94,0.1)',
-    border: '1px solid rgba(26,173,94,0.25)',
+    color: '#8cd9a0',
+    background: 'rgba(26,173,94,0.2)',
+    border: '1px solid rgba(26,173,94,0.4)',
     padding: '4px 12px',
     borderRadius: 20,
     letterSpacing: '0.3px',
@@ -288,8 +289,8 @@ const styles = {
     position: 'absolute',
     inset: 0,
     backgroundImage: `
-      linear-gradient(rgba(26,173,94,0.06) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(26,173,94,0.06) 1px, transparent 1px)
+      linear-gradient(rgba(26,173,94,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(26,173,94,0.04) 1px, transparent 1px)
     `,
     backgroundSize: '40px 40px',
     zIndex: 0,
@@ -346,7 +347,7 @@ const styles = {
     fontFamily: "'Outfit', sans-serif",
     fontSize: 48,
     fontWeight: 800,
-    color: '#0f172a',
+    color: '#1a2d4a',
     lineHeight: 1.15,
     letterSpacing: '-1px',
   },
@@ -355,7 +356,7 @@ const styles = {
   // ── Subtitle ──
   subtitle: {
     fontSize: 16,
-    color: '#475569',
+    color: '#7a8ea3',
     lineHeight: 1.7,
     fontWeight: 400,
     maxWidth: 440,
@@ -363,13 +364,13 @@ const styles = {
 
   // ── Waitlist Card ──
   card: {
-    background: '#fff',
+    background: '#f8fafc',
     borderRadius: 16,
     padding: '28px 28px 24px',
     width: '100%',
     maxWidth: 420,
     boxShadow: '0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)',
-    border: '1px solid rgba(0,0,0,0.06)',
+    border: '1px solid #d8e2ed',
   },
   form: {
     display: 'flex',
@@ -379,7 +380,7 @@ const styles = {
   cardLabel: {
     fontSize: 14,
     fontWeight: 700,
-    color: '#0f172a',
+    color: '#1a2d4a',
     marginBottom: 4,
     fontFamily: "'Outfit', sans-serif",
   },
@@ -387,10 +388,10 @@ const styles = {
     width: '100%',
     padding: '11px 14px',
     borderRadius: 9,
-    border: '1.5px solid #e2e8f0',
+    border: '1.5px solid #d8e2ed',
     fontSize: 14,
-    color: '#0f172a',
-    background: '#f8fafc',
+    color: '#1a2d4a',
+    background: '#ffffff',
     fontFamily: "'DM Sans', sans-serif",
     outline: 'none',
     transition: 'border-color 0.15s',
@@ -439,12 +440,12 @@ const styles = {
   successTitle: {
     fontSize: 17,
     fontWeight: 700,
-    color: '#0f172a',
+    color: '#1a2d4a',
     fontFamily: "'Outfit', sans-serif",
   },
   successSub: {
     fontSize: 13,
-    color: '#64748b',
+    color: '#7a8ea3',
     lineHeight: 1.6,
     textAlign: 'center',
   },
@@ -462,9 +463,9 @@ const styles = {
     gap: 6,
     fontSize: 12,
     fontWeight: 500,
-    color: '#475569',
-    background: '#fff',
-    border: '1px solid #e2e8f0',
+    color: '#1a2d4a',
+    background: '#f8fafc',
+    border: '1px solid #d8e2ed',
     borderRadius: 20,
     padding: '5px 12px',
   },
@@ -479,8 +480,8 @@ const styles = {
     textAlign: 'center',
     padding: '20px',
     fontSize: 12,
-    color: '#94a3b8',
-    borderTop: '1px solid #e2e8f0',
+    color: '#7a8ea3',
+    borderTop: '1px solid #d8e2ed',
     fontFamily: "'DM Sans', sans-serif",
   },
 };
