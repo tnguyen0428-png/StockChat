@@ -1,15 +1,76 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { supabase } from '../../lib/supabase';
+import { run52wHighScan, DEFAULT_THRESHOLD, runVolSurgeScan, DEFAULT_VOL_MULTIPLIER, runGapUpScan, DEFAULT_GAP_THRESHOLD, runMACrossScan, DEFAULT_SHORT_MA, DEFAULT_LONG_MA } from '../../lib/breakoutScanner';
+import { useGroup } from '../../context/GroupContext';
 
-// ===== MOCK ALERTS =====
+// Scanner tag mapping: DB alert_type → UI label
+const SCANNER_TAG_MAP = { '52w_high': 'Yearly High', 'vol_surge': 'Volume Spike', 'gap_up': 'Gap Up', 'ma_cross': 'Trend Change' };
+
+// Map a raw Supabase breakout_alerts row to the redesign card format
+function mapDbAlert(a, spyData) {
+  const ticker = a.ticker ?? a.tickers?.[0] ?? '—';
+  const type = a.signal_type ?? a.alert_type ?? 'vol_surge';
+  const rawVol = a.volume ?? a.current_volume;
+  const volume = rawVol ? (Number(rawVol) >= 1e6 ? (Number(rawVol) / 1e6).toFixed(1) + 'M' : Number(rawVol).toLocaleString()) : null;
+  const avgVolume = a.avg_volume ? (Number(a.avg_volume) >= 1e6 ? (Number(a.avg_volume) / 1e6).toFixed(1) + 'M' : Number(a.avg_volume).toLocaleString()) : null;
+
+  // Format time
+  let time = a.time ?? '';
+  if (!time && a.created_at) {
+    const d = new Date(a.created_at), today = new Date();
+    const t = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    time = d.toDateString() === today.toDateString() ? t : `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${t}`;
+  }
+
+  // Signal text
+  let signal = a.signal ?? a.notes ?? a.title ?? '';
+  if (!signal && type === '52w_high' && a.pct_from_high != null) signal = `Within ${a.pct_from_high}% of 52-week high`;
+  else if (!signal && type === 'gap_up' && a.gap_pct != null) signal = `Gapped up +${a.gap_pct.toFixed(2)}%`;
+  else if (!signal && type === 'ma_cross' && a.short_ma != null) signal = `${a.short_ma_period ?? 20}MA crossed above ${a.long_ma_period ?? 50}MA`;
+  else if (!signal && type === 'vol_surge' && a.volume_ratio != null) signal = `Volume surging ${a.volume_ratio}x above average`;
+
+  const change = a.change ?? a.change_pct ?? a.gap_pct ?? null;
+  const resistance = a.resistance ?? (type === '52w_high' ? a.high_52w : null);
+  const support = a.support ?? a.prev_close ?? null;
+
+  let confidence = a.confidence ?? 70;
+  if (a.confidence == null) {
+    if (a.volume_ratio > 2) confidence += 10;
+    if (a.pct_from_high != null && a.pct_from_high < 2) confidence += 5;
+    if (change != null && change > 3) confidence += 5;
+    confidence = Math.min(confidence, 95);
+  }
+
+  const vsSpy = a.rsVsSpy ?? (change != null && spyData?.change ? Number(change) - Number(spyData.change) : null);
+
+  // Generate whyAlerting bullets
+  const whyAlerting = [];
+  if (signal) whyAlerting.push({ icon: "📊", label: SCANNER_TAG_MAP[type] || type, text: signal });
+  if (volume) whyAlerting.push({ icon: "🔥", label: "Volume", text: `${volume} shares traded${avgVolume ? ` (avg: ${avgVolume})` : ''}` });
+  if (confidence >= 80) whyAlerting.push({ icon: "✅", label: "Strong Setup", text: "Technical indicators look positive" });
+  else whyAlerting.push({ icon: "🔍", label: "Watch Closely", text: "Moderate signal — monitor for confirmation" });
+
+  return {
+    ...a, id: a.id, ticker, company: a.name ?? ticker, price: a.price != null ? Number(a.price) : 0,
+    change: change != null ? Number(change) : 0, changePercent: change != null ? Number(change) : 0,
+    time, scannerTag: SCANNER_TAG_MAP[type] || 'Alert', volume: volume ?? '—', avgVolume: avgVolume ?? '—',
+    vsSpy: vsSpy ?? 0, confidence, support: support != null ? Number(support) : 0, resistance: resistance != null ? Number(resistance) : 0,
+    sector: a.sector ?? '—', marketCap: '—', description: a.context ?? '',
+    whyAlerting: whyAlerting.length > 0 ? whyAlerting : [{ icon: "📊", label: "Alert", text: "Breakout signal detected" }],
+    isAlertOfDay: false, _isLive: true,
+  };
+}
+
+// ===== MOCK ALERTS (fallback — Thursday Apr 3 closing prices) =====
 const mockAlerts = [
-  { id: 1, ticker: "TSLA", company: "Tesla Inc", price: 189.30, change: 9.36, changePercent: 5.2, time: "8:14 AM", scannerTag: "Gap Up", volume: "114.6M", avgVolume: "98.3M", vsSpy: 4.48, confidence: 95, support: 175.00, resistance: 200.00, sector: "Electric Vehicles", marketCap: "$604B", description: "Manufactures electric vehicles and energy storage systems.", whyAlerting: [{ icon: "📈", label: "Price Jumped", text: "Opened $9.36 higher than yesterday" }, { icon: "📊", label: "High Activity", text: "6x more people are trading this today" }, { icon: "✅", label: "Strong Setup", text: "Technical indicators look positive" }], isAlertOfDay: true },
-  { id: 2, ticker: "NVDA", company: "NVIDIA Corp", price: 891.15, change: 15.75, changePercent: 1.8, time: "9:31 AM", scannerTag: "Yearly High", volume: "62.3M", avgVolume: "45.1M", vsSpy: 1.12, confidence: 88, support: 860.00, resistance: 910.00, sector: "Semiconductors", marketCap: "$2.2T", description: "Designs GPUs and AI computing platforms.", whyAlerting: [{ icon: "🏔️", label: "Near Peak", text: "Within 1.8% of its highest price this year" }, { icon: "📊", label: "Strong Volume", text: "1.4x more trading than usual" }, { icon: "✅", label: "Momentum", text: "Price has been climbing steadily for 5 days" }], isAlertOfDay: false },
-  { id: 3, ticker: "SMCI", company: "Super Micro Computer", price: 94.66, change: 2.49, changePercent: 2.7, time: "9:45 AM", scannerTag: "Volume Spike", volume: "89.2M", avgVolume: "21.3M", vsSpy: 2.02, confidence: 82, support: 88.00, resistance: 102.00, sector: "IT Hardware", marketCap: "$55B", description: "Provides high-performance server and storage solutions for AI.", whyAlerting: [{ icon: "🔥", label: "Volume Surge", text: "4.2x more shares traded than a normal day" }, { icon: "📈", label: "Price Moving", text: "Up 2.7% so far today" }, { icon: "💡", label: "Sector Buzz", text: "AI server demand driving interest" }], isAlertOfDay: false },
-  { id: 4, ticker: "AAPL", company: "Apple Inc", price: 218.45, change: 3.12, changePercent: 1.45, time: "10:02 AM", scannerTag: "Trend Change", volume: "78.5M", avgVolume: "65.2M", vsSpy: 0.77, confidence: 79, support: 210.00, resistance: 225.00, sector: "Consumer Electronics", marketCap: "$3.4T", description: "Designs and sells smartphones, computers, and digital services.", whyAlerting: [{ icon: "🔄", label: "Trend Shift", text: "Short-term trend just crossed above long-term trend" }, { icon: "📊", label: "Increasing Volume", text: "1.2x more trading activity than normal" }, { icon: "✅", label: "Bullish Signal", text: "This pattern has led to gains 68% of the time" }], isAlertOfDay: false },
-  { id: 5, ticker: "AMZN", company: "Amazon.com Inc", price: 198.72, change: 6.83, changePercent: 3.56, time: "8:05 AM", scannerTag: "Catalyst News", volume: "95.1M", avgVolume: "52.7M", vsSpy: 2.88, confidence: 91, support: 188.00, resistance: 210.00, sector: "E-Commerce / Cloud", marketCap: "$2.1T", description: "Operates online retail marketplace and Amazon Web Services cloud platform.", whyAlerting: [{ icon: "📰", label: "Breaking News", text: "Announced major new AWS AI partnership this morning" }, { icon: "📈", label: "Price Jumping", text: "Opened $6.83 higher on the news" }, { icon: "🔥", label: "Volume Surge", text: "1.8x more trading than usual" }], isAlertOfDay: false },
-  { id: 6, ticker: "META", company: "Meta Platforms", price: 542.18, change: 18.40, changePercent: 3.51, time: "9:33 AM", scannerTag: "Gap Up", volume: "44.8M", avgVolume: "28.1M", vsSpy: 2.83, confidence: 87, support: 515.00, resistance: 560.00, sector: "Social Media / AI", marketCap: "$1.4T", description: "Operates Facebook, Instagram, WhatsApp and invests heavily in AI and metaverse.", whyAlerting: [{ icon: "📈", label: "Price Jumped", text: "Opened $18.40 higher than yesterday's close" }, { icon: "📊", label: "High Activity", text: "1.6x more people trading today" }, { icon: "💡", label: "AI Catalyst", text: "New AI model announcement driving interest" }], isAlertOfDay: false },
-  { id: 7, ticker: "AMD", company: "Advanced Micro Devices", price: 164.20, change: -1.81, changePercent: -1.1, time: "10:15 AM", scannerTag: "Volume Spike", volume: "102.3M", avgVolume: "55.8M", vsSpy: -1.78, confidence: 72, support: 155.00, resistance: 172.00, sector: "Semiconductors", marketCap: "$265B", description: "Designs CPUs and GPUs for gaming, data centers, and AI applications.", whyAlerting: [{ icon: "🔥", label: "Volume Explosion", text: "1.8x more shares traded than normal" }, { icon: "⚠️", label: "Price Dipping", text: "Down 1.1% — unusual on high volume" }, { icon: "🔍", label: "Watch Closely", text: "Big volume on a down day can signal a reversal" }], isAlertOfDay: false },
-  { id: 8, ticker: "GOOGL", company: "Alphabet Inc", price: 172.55, change: 2.05, changePercent: 1.2, time: "9:50 AM", scannerTag: "Yearly High", volume: "35.6M", avgVolume: "28.4M", vsSpy: 0.52, confidence: 84, support: 165.00, resistance: 178.00, sector: "Internet / AI", marketCap: "$2.1T", description: "Operates Google search, YouTube, cloud computing, and AI research.", whyAlerting: [{ icon: "🏔️", label: "Approaching Peak", text: "Within 3.1% of its highest price this year" }, { icon: "📊", label: "Steady Volume", text: "1.25x above average trading" }, { icon: "✅", label: "Positive Trend", text: "Price has gained 4 out of the last 5 days" }], isAlertOfDay: false },
+  { id: 1, ticker: "TSLA", company: "Tesla Inc", price: 360.59, change: -20.67, changePercent: -5.42, time: "4:00 PM", scannerTag: "Volume Spike", volume: "82.5M", avgVolume: "58.3M", vsSpy: -5.51, confidence: 85, support: 340.00, resistance: 381.26, sector: "Electric Vehicles", marketCap: "$1.35T", description: "Manufactures electric vehicles and energy storage systems.", whyAlerting: [{ icon: "🔥", label: "Volume Surge", text: "82.5M shares traded — well above average" }, { icon: "⚠️", label: "Sharp Move", text: "Dropped $20.67 (-5.42%) on heavy volume" }, { icon: "🔍", label: "Watch Closely", text: "Big volume on a down day — potential reversal setup" }], isAlertOfDay: true },
+  { id: 2, ticker: "NVDA", company: "NVIDIA Corp", price: 177.39, change: 1.64, changePercent: 0.93, time: "4:00 PM", scannerTag: "Yearly High", volume: "141.4M", avgVolume: "85.2M", vsSpy: 0.84, confidence: 88, support: 165.00, resistance: 195.95, sector: "Semiconductors", marketCap: "$4.3T", description: "Designs GPUs and AI computing platforms.", whyAlerting: [{ icon: "🏔️", label: "Near Peak", text: "Within 9.5% of its 52-week high of $195.95" }, { icon: "📊", label: "Strong Volume", text: "141.4M shares — 1.7x normal volume" }, { icon: "✅", label: "Momentum", text: "Holding above key moving averages" }], isAlertOfDay: false },
+  { id: 3, ticker: "SMCI", company: "Super Micro Computer", price: 23.22, change: 0.71, changePercent: 3.15, time: "4:00 PM", scannerTag: "Gap Up", volume: "29.8M", avgVolume: "18.5M", vsSpy: 3.06, confidence: 78, support: 20.00, resistance: 28.00, sector: "IT Hardware", marketCap: "$13.7B", description: "Provides high-performance server and storage solutions for AI.", whyAlerting: [{ icon: "📈", label: "Price Jumped", text: "Up 3.15% — outperforming the market" }, { icon: "📊", label: "Above Average Volume", text: "29.8M shares vs 18.5M average" }, { icon: "💡", label: "AI Demand", text: "Continued interest in AI server infrastructure" }], isAlertOfDay: false },
+  { id: 4, ticker: "AAPL", company: "Apple Inc", price: 255.92, change: 0.28, changePercent: 0.11, time: "4:00 PM", scannerTag: "Yearly High", volume: "26.7M", avgVolume: "42.1M", vsSpy: 0.02, confidence: 82, support: 245.00, resistance: 260.10, sector: "Consumer Electronics", marketCap: "$3.9T", description: "Designs and sells smartphones, computers, and digital services.", whyAlerting: [{ icon: "🏔️", label: "Near Peak", text: "Within 1.6% of 52-week high of $260.10" }, { icon: "✅", label: "Steady Climb", text: "Holding near all-time highs" }, { icon: "📊", label: "Quiet Strength", text: "Low volume suggests consolidation, not weakness" }], isAlertOfDay: false },
+  { id: 5, ticker: "AMZN", company: "Amazon.com Inc", price: 209.77, change: -0.80, changePercent: -0.38, time: "4:00 PM", scannerTag: "Volume Spike", volume: "30.1M", avgVolume: "22.7M", vsSpy: -0.47, confidence: 76, support: 195.00, resistance: 242.52, sector: "E-Commerce / Cloud", marketCap: "$2.2T", description: "Operates online retail marketplace and Amazon Web Services cloud platform.", whyAlerting: [{ icon: "📊", label: "Volume Up", text: "30.1M shares — 1.3x above average" }, { icon: "🔍", label: "Pullback", text: "Slight dip — watching for support at $195" }, { icon: "💡", label: "Cloud Growth", text: "AWS continues strong revenue momentum" }], isAlertOfDay: false },
+  { id: 6, ticker: "META", company: "Meta Platforms", price: 574.46, change: -4.73, changePercent: -0.82, time: "4:00 PM", scannerTag: "Trend Change", volume: "13.2M", avgVolume: "16.8M", vsSpy: -0.91, confidence: 74, support: 550.00, resistance: 600.00, sector: "Social Media / AI", marketCap: "$1.46T", description: "Operates Facebook, Instagram, WhatsApp and invests heavily in AI and metaverse.", whyAlerting: [{ icon: "🔄", label: "Trend Shift", text: "Pulling back from recent highs" }, { icon: "📊", label: "Lower Volume", text: "13.2M shares — below average" }, { icon: "💡", label: "AI Focus", text: "Heavy investment in AI infrastructure continues" }], isAlertOfDay: false },
+  { id: 7, ticker: "AMD", company: "Advanced Micro Devices", price: 217.50, change: 7.29, changePercent: 3.47, time: "4:00 PM", scannerTag: "Gap Up", volume: "38.1M", avgVolume: "28.4M", vsSpy: 3.38, confidence: 86, support: 200.00, resistance: 227.30, sector: "Semiconductors", marketCap: "$352B", description: "Designs CPUs and GPUs for gaming, data centers, and AI applications.", whyAlerting: [{ icon: "📈", label: "Strong Rally", text: "Up $7.29 (+3.47%) — leading the chip sector" }, { icon: "🔥", label: "Volume Surge", text: "38.1M shares — 1.3x above average" }, { icon: "✅", label: "Approaching High", text: "Within 4.3% of 52-week high of $227.30" }], isAlertOfDay: false },
+  { id: 8, ticker: "PLTR", company: "Palantir Technologies", price: 148.46, change: 1.96, changePercent: 1.34, time: "4:00 PM", scannerTag: "Volume Spike", volume: "29.8M", avgVolume: "22.1M", vsSpy: 1.25, confidence: 83, support: 140.00, resistance: 167.57, sector: "AI / Data Analytics", marketCap: "$347B", description: "Provides AI-driven data analytics platforms to governments and enterprises.", whyAlerting: [{ icon: "📊", label: "Volume Up", text: "29.8M shares — 1.35x above average" }, { icon: "📈", label: "Steady Gains", text: "Up 1.34% on continued AI sector strength" }, { icon: "✅", label: "Positive Trend", text: "Holding above key support levels" }], isAlertOfDay: false },
 ];
 
 const filterMap = { "All": null, "Yearly High": "Yearly High", "Volume Spike": "Volume Spike", "Trend Change": "Trend Change", "Gap Up": "Gap Up", "Catalyst News": "Catalyst News" };
@@ -155,8 +216,12 @@ function AlertCard({ alert, onClick, onBigMoneyClick }) {
   );
 }
 
-function MoodBar() {
-  return (<div style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontSize: 11, color: "#94a3b8" }}>MOOD:</span><span style={{ fontSize: 12, fontWeight: 700, color: "#f97316" }}>Fearful</span><div style={{ width: 48, height: 6, borderRadius: 3, background: "#e2e8f0", overflow: "hidden" }}><div style={{ width: "34%", height: "100%", borderRadius: 3, background: "linear-gradient(90deg, #ef4444, #f59e0b)" }}/></div><span style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>34</span></div>);
+function MoodBar({ score }) {
+  const s = score ?? 34;
+  const label = s > 30 ? "Fearful" : s > 20 ? "Neutral" : s > 10 ? "Greedy" : "Very Greedy";
+  const color = s > 30 ? "#f97316" : s > 20 ? "#eab308" : "#22c55e";
+  const pct = Math.min(Math.max(s / 50, 0), 1) * 100;
+  return (<div style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontSize: 11, color: "#94a3b8" }}>MOOD:</span><span style={{ fontSize: 12, fontWeight: 700, color }}>{label}</span><div style={{ width: 48, height: 6, borderRadius: 3, background: "#e2e8f0", overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", borderRadius: 3, background: `linear-gradient(90deg, #ef4444, ${color})` }}/></div><span style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>{Math.round(s)}</span></div>);
 }
 
 // ===== FLOW CARDS =====
@@ -222,6 +287,7 @@ function SmartBetCard({ bet, isExpanded, onToggle }) {
 
 // ===== MAIN =====
 export default function AlertsTab({ session, group }) {
+  const { isAdmin } = useGroup();
   const [view, setView] = useState("loading");
   const [filter, setFilter] = useState("All");
   const [modalAlert, setModalAlert] = useState(null);
@@ -234,9 +300,67 @@ export default function AlertsTab({ session, group }) {
   const [flowShowAll, setFlowShowAll] = useState(false);
   const flowRef = useRef(null);
 
-  useEffect(() => { if (view === "loading") { const t = setTimeout(() => setView("active"), 2000); return () => clearTimeout(t); } }, [view]);
+  // ── Live data state ──
+  const [liveAlerts, setLiveAlerts] = useState([]);
+  const [fearScore, setFearScore] = useState(null);
+  const [spyData, setSpyData] = useState(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanning52w, setScanning52w] = useState(false);
+  const [scan52wProgress, setScan52wProgress] = useState(0);
+  const [scanningVol, setScanningVol] = useState(false);
+  const [scanVolProgress, setScanVolProgress] = useState(0);
+  const [scanningGap, setScanningGap] = useState(false);
+  const [scanGapProgress, setScanGapProgress] = useState(0);
+  const [scanningMA, setScanningMA] = useState(false);
+  const [scanMAProgress, setScanMAProgress] = useState(0);
 
-  const filtered = filter === "All" ? mockAlerts : mockAlerts.filter(a => a.scannerTag === filterMap[filter]);
+  // ── Fetch breakout_alerts + realtime ──
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('breakout_alerts').select('*').order('created_at', { ascending: false }).limit(50);
+      if (data) setLiveAlerts(data);
+      setView("active");
+    };
+    load();
+    const channel = supabase.channel('alerts_feed_redesign')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'breakout_alerts' }, (payload) => {
+        setLiveAlerts(prev => [payload.new, ...prev]);
+      }).subscribe();
+    return () => supabase.removeChannel(channel);
+  }, []);
+
+  // ── Fetch market_data (VIX, SPY) ──
+  useEffect(() => {
+    supabase.from('market_data').select('*').then(({ data }) => {
+      if (!data) return;
+      data.forEach(row => {
+        if (row.key === 'vix_score') setFearScore(row.value?.score ?? null);
+        if (row.key === 'spy_price') setSpyData(row.value);
+      });
+    });
+  }, []);
+
+  // ── Scanner handlers ──
+  const handle52wScan = async () => { setScanning52w(true); setScan52wProgress(0); try { await run52wHighScan(DEFAULT_THRESHOLD, setScan52wProgress); } catch {} setScanning52w(false); };
+  const handleVolScan = async () => { setScanningVol(true); setScanVolProgress(0); try { await runVolSurgeScan(DEFAULT_VOL_MULTIPLIER, setScanVolProgress); } catch {} setScanningVol(false); };
+  const handleGapScan = async () => { setScanningGap(true); setScanGapProgress(0); try { await runGapUpScan(DEFAULT_GAP_THRESHOLD, setScanGapProgress); } catch {} setScanningGap(false); };
+  const handleMAScan = async () => { setScanningMA(true); setScanMAProgress(0); try { await runMACrossScan(DEFAULT_SHORT_MA, DEFAULT_LONG_MA, setScanMAProgress); } catch {} setScanningMA(false); };
+
+  // ── Build display alerts: live mapped data OR mock fallback ──
+  const displayAlerts = useMemo(() => {
+    if (liveAlerts.length > 0) {
+      const mapped = liveAlerts.map(a => mapDbAlert(a, spyData));
+      // Mark highest confidence as alert of day
+      if (mapped.length > 0) {
+        const best = mapped.reduce((b, a) => a.confidence > b.confidence ? a : b);
+        best.isAlertOfDay = true;
+      }
+      return mapped;
+    }
+    return mockAlerts;
+  }, [liveAlerts, spyData]);
+
+  const filtered = filter === "All" ? displayAlerts : displayAlerts.filter(a => a.scannerTag === filterMap[filter]);
   const heroAlert = filtered.find(a => a.isAlertOfDay) || filtered[0];
   const otherAlerts = filtered.filter(a => a !== heroAlert);
   const card = { background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,.06)", overflow: "visible" };
@@ -298,16 +422,31 @@ export default function AlertsTab({ session, group }) {
       {/* HEADER */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <h2 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1.5px" }}>Breakout Alerts</h2>
-        <div className="mood-row"><MoodBar /></div>
+        <div className="mood-row"><MoodBar score={fearScore} /></div>
       </div>
 
       {/* FILTERS */}
       <div className="filter-row">
         {filterKeys.map(f=>{
-          const count = f==="All"?mockAlerts.length:mockAlerts.filter(a=>a.scannerTag===filterMap[f]).length;
+          const count = f==="All"?displayAlerts.length:displayAlerts.filter(a=>a.scannerTag===filterMap[f]).length;
           return (<button key={f} onClick={()=>setFilter(f)} style={{ flexShrink: 0, padding: "8px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, border: filter===f?"none":"1px solid #e2e8f0", background: filter===f?"#1e293b":"#fff", color: filter===f?"#fff":"#475569", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>{f}<span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 10, background: filter===f?"rgba(255,255,255,.2)":"#f1f5f9", color: filter===f?"#fff":"#94a3b8" }}>{count}</span></button>);
         })}
       </div>
+
+      {/* SCANNER BUTTONS (admin only) */}
+      {isAdmin && (
+        <div>
+          <button onClick={() => setScannerOpen(o => !o)} style={{ fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 16, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer" }}>{scannerOpen ? "Hide Scanners ▲" : "Run Scanners ▼"}</button>
+          {scannerOpen && (
+            <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+              <button onClick={handle52wScan} disabled={scanning52w} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#15803d", cursor: scanning52w ? "default" : "pointer", opacity: scanning52w ? 0.6 : 1 }}>{scanning52w ? `52W… ${scan52wProgress}%` : "52W High"}</button>
+              <button onClick={handleVolScan} disabled={scanningVol} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: "1px solid #bfdbfe", background: "#eff6ff", color: "#2563eb", cursor: scanningVol ? "default" : "pointer", opacity: scanningVol ? 0.6 : 1 }}>{scanningVol ? `Vol… ${scanVolProgress}%` : "Vol Surge"}</button>
+              <button onClick={handleGapScan} disabled={scanningGap} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: "1px solid #fde68a", background: "#fffbeb", color: "#d97706", cursor: scanningGap ? "default" : "pointer", opacity: scanningGap ? 0.6 : 1 }}>{scanningGap ? `Gap… ${scanGapProgress}%` : "Gap Up"}</button>
+              <button onClick={handleMAScan} disabled={scanningMA} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: "1px solid #c4b5fd", background: "#f5f3ff", color: "#7c3aed", cursor: scanningMA ? "default" : "pointer", opacity: scanningMA ? 0.6 : 1 }}>{scanningMA ? `MA… ${scanMAProgress}%` : "MA Cross"}</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* STATES */}
       {view === "loading" && <><SkeletonCard /><SkeletonCard /></>}
