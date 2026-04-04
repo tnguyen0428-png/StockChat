@@ -96,19 +96,33 @@ export default function LandingPage() {
         {/* ── Nav ── */}
         <nav style={styles.nav}>
           <div style={styles.navLogo}>
-            <img src="/uptik-GREEN-TIK.png" alt="UpTikAlerts" style={{ height: 32 }} />
-            <span style={styles.logoSlogan}>ONE TEAM, ONE TRADE</span>
+            <svg width="38" height="38" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3" />
+              <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.2" opacity="0.6" />
+              <path d="M25 22 L25 30 C25 34 25 34 25 30 L25 22" strokeWidth="1.5" opacity="0.35" />
+              <path d="M35 8 L29 14 M35 8 L41 14" strokeWidth="3" />
+            </svg>
+            <div>
+              <div style={styles.logoRow}>
+                <span style={styles.logoUp}>Up</span>
+                <span style={styles.logoTik}>tik</span>
+              </div>
+              <div style={styles.logoAlerts}>alerts</div>
+            </div>
           </div>
           <div style={styles.navRight}>
-            <div style={styles.comingSoonPill}>Coming Soon</div>
-            <button
-              style={styles.betaLoginBtn}
-              onClick={() => navigate('/login')}
-              onMouseEnter={e => e.currentTarget.style.color = '#8cd9a0'}
-              onMouseLeave={e => e.currentTarget.style.color = '#fff'}
-            >
-              Beta Login
-            </button>
+            <div style={styles.logoSlogan}>ONE TEAM, ONE TRADE</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={styles.comingSoonPill}>Coming Soon</div>
+              <button
+                style={styles.betaLoginBtn}
+                onClick={() => navigate('/login')}
+                onMouseEnter={e => e.currentTarget.style.color = '#8cd9a0'}
+                onMouseLeave={e => e.currentTarget.style.color = '#fff'}
+              >
+                Beta Login
+              </button>
+            </div>
           </div>
         </nav>
 
@@ -231,8 +245,8 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '0 24px',
-    height: 60,
+    padding: '10px 16px',
+    minHeight: 70,
     background: '#132d52',
     borderBottom: '1px solid rgba(255,255,255,0.08)',
   },
@@ -241,17 +255,24 @@ const styles = {
     alignItems: 'center',
     gap: 10,
   },
+  logoRow: { display: 'flex', alignItems: 'baseline' },
+  logoUp: { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
+  logoTik: { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
+  logoAlerts: {
+    fontSize: 14, fontWeight: 300, color: '#d4e4f2', letterSpacing: 2,
+    fontFamily: "'Avenir Next', 'Avenir', 'Nunito Sans', sans-serif",
+    marginTop: -4, paddingLeft: 18,
+  },
   logoSlogan: {
-    fontSize: 8,
-    fontStyle: 'italic',
-    textTransform: 'uppercase',
-    letterSpacing: '1.5px',
-    color: 'rgba(212,228,242,0.85)',
+    fontSize: 10, fontWeight: 300, fontStyle: 'italic',
+    color: '#d4e4f2', letterSpacing: 1,
+    fontFamily: "'Avenir Next', 'Avenir', 'Nunito Sans', sans-serif",
   },
   navRight: {
     display: 'flex',
-    alignItems: 'center',
-    gap: 14,
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 6,
   },
   betaLoginBtn: {
     background: 'none',
