@@ -137,7 +137,7 @@ export default function LandingPage() {
               <path d="M25 22 L25 30 C25 34 25 34 25 30 L25 22" strokeWidth="1.5" opacity="0.35" />
               <path d="M35 8 L29 14 M35 8 L41 14" strokeWidth="3" />
             </svg>
-            <div>
+            <div style={{ borderLeft: '1px solid rgba(140,217,160,0.25)', paddingLeft: 4, marginLeft: -3, lineHeight: 0.9 }}>
               <div style={styles.logoRow}>
                 <span style={styles.logoUp}>Up</span>
                 <span style={styles.logoTik}>tik</span>
@@ -321,15 +321,14 @@ const styles = {
   navLogo: {
     display: 'flex',
     alignItems: 'center',
-    gap: 2,
   },
   logoRow: { display: 'flex', alignItems: 'baseline' },
-  logoUp: { fontSize: 22, fontWeight: 500, color: '#f0ede8' },
-  logoTik: { fontSize: 22, fontWeight: 500, color: '#8cd9a0' },
+  logoUp: { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
+  logoTik: { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
   logoAlerts: {
-    fontSize: 16, fontWeight: 300, color: '#f0ede8', letterSpacing: 2,
+    fontSize: 12, fontWeight: 300, color: '#d4e4f2', letterSpacing: 2.5,
     fontFamily: "'Outfit', sans-serif",
-    marginTop: -1, paddingLeft: 4,
+    marginTop: 0, paddingLeft: 0,
   },
   logoSlogan: {
     fontSize: 12, fontWeight: 300, fontStyle: 'italic',
