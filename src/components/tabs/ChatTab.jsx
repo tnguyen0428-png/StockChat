@@ -263,6 +263,7 @@ function WatchlistView({ session, onAskAI }) {
   const [newTicker, setNewTicker] = useState('');
   const [quoteData, setQuoteData] = useState({});
   const [dcfData, setDcfData] = useState({});
+  const [ratioData, setRatioData] = useState({});
   const [detailData, setDetailData] = useState({});
   const [expanded, setExpanded] = useState(null);
   const [detailLoading, setDetailLoading] = useState(null);
@@ -271,9 +272,11 @@ function WatchlistView({ session, onAskAI }) {
   useEffect(() => {
     const cachedQuotes = localStorage.getItem('uptik_wl_quotes');
     const cachedDcf = localStorage.getItem('uptik_wl_dcf');
+    const cachedRatios = localStorage.getItem('uptik_wl_ratios');
     const cachedDetails = localStorage.getItem('uptik_wl_details');
     if (cachedQuotes) try { setQuoteData(JSON.parse(cachedQuotes)); } catch {}
     if (cachedDcf) try { setDcfData(JSON.parse(cachedDcf)); } catch {}
+    if (cachedRatios) try { setRatioData(JSON.parse(cachedRatios)); } catch {}
     if (cachedDetails) try { setDetailData(JSON.parse(cachedDetails)); } catch {}
   }, []);
 
@@ -308,7 +311,7 @@ function WatchlistView({ session, onAskAI }) {
         });
       }
     } catch (e) { console.error('Watchlist quote fetch error:', e); }
-    // DCF does NOT support batch — individual calls
+    // DCF — individual calls
     const dcfPromises = symbols.map(sym =>
       fetch(`https://financialmodelingprep.com/stable/discounted-cash-flow?symbol=${sym}&apikey=${FMP_KEY}`)
         .then(r => r.json())
@@ -330,6 +333,28 @@ function WatchlistView({ session, onAskAI }) {
       localStorage.setItem('uptik_wl_dcf', JSON.stringify(merged));
       return merged;
     });
+    // Ratios — individual calls for Fwd P/E on collapsed row
+    const ratioPromises = symbols.map(sym =>
+      fetch(`https://financialmodelingprep.com/stable/ratios?symbol=${sym}&limit=1&apikey=${FMP_KEY}`)
+        .then(r => r.json())
+        .then(json => {
+          const item = Array.isArray(json) ? json[0] : json;
+          return item?.symbol ? { symbol: item.symbol, pe: item.priceToEarningsRatio } : null;
+        })
+        .catch(() => null)
+    );
+    const ratioResults = await Promise.allSettled(ratioPromises);
+    const rm = {};
+    ratioResults.forEach(r => {
+      if (r.status === 'fulfilled' && r.value) {
+        rm[r.value.symbol] = r.value;
+      }
+    });
+    setRatioData(prev => {
+      const merged = { ...prev, ...rm };
+      localStorage.setItem('uptik_wl_ratios', JSON.stringify(merged));
+      return merged;
+    });
   };
 
   const fetchDetail = async (symbol) => {
@@ -340,7 +365,7 @@ function WatchlistView({ session, onAskAI }) {
       const [profRes, ratRes, growRes, earnRes] = await Promise.all([
         fetch(`${base}/profile?symbol=${symbol}&apikey=${FMP_KEY}`),
         fetch(`${base}/ratios?symbol=${symbol}&limit=1&apikey=${FMP_KEY}`),
-        fetch(`${base}/income-growth?symbol=${symbol}&limit=1&apikey=${FMP_KEY}`),
+        fetch(`${base}/income-statement-growth?symbol=${symbol}&limit=1&apikey=${FMP_KEY}`),
         fetch(`${base}/earnings?symbol=${symbol}&apikey=${FMP_KEY}`),
       ]);
       const [prof, rat, grow, earn] = await Promise.all([profRes.json(), ratRes.json(), growRes.json(), earnRes.json()]);
@@ -353,10 +378,10 @@ function WatchlistView({ session, onAskAI }) {
         sector: p?.sector || '',
         mktCap: p?.mktCap || 0,
         image: p?.image || '',
-        forwardPE: r?.peForwardTTM || r?.forwardPE || null,
-        pegRatio: r?.pegRatio || r?.priceEarningsToGrowthRatio || null,
-        netMargin: r?.netProfitMarginTTM || null,
-        debtEquity: r?.debtEquityRatioTTM || null,
+        forwardPE: r?.priceToEarningsRatio || null,
+        pegRatio: r?.priceToEarningsGrowthRatio || null,
+        netMargin: r?.netProfitMargin || null,
+        debtEquity: r?.debtToEquityRatio || null,
         revenueGrowth: g?.revenueGrowth || g?.growthRevenue || null,
         epsGrowth: g?.epsgrowth || g?.growthEPS || null,
         nextEarnings,
@@ -408,8 +433,8 @@ function WatchlistView({ session, onAskAI }) {
 
   const sorted = [...watchlist].sort((a, b) => {
     if (sortBy === 'change') {
-      const ca = quoteData[a.symbol]?.changesPercentage || 0;
-      const cb = quoteData[b.symbol]?.changesPercentage || 0;
+      const ca = quoteData[a.symbol]?.changePercentage || 0;
+      const cb = quoteData[b.symbol]?.changePercentage || 0;
       return cb - ca;
     }
     return new Date(b.created_at) - new Date(a.created_at);
@@ -454,20 +479,24 @@ function WatchlistView({ session, onAskAI }) {
           const sym = item.symbol;
           const q = quoteData[sym] || {};
           const dcf = dcfData[sym];
+          const ratio = ratioData[sym];
           const isExp = expanded === sym;
           const det = detailData[sym];
           const price = q.price || 0;
           const chg = q.change || 0;
-          const chgPct = q.changesPercentage || 0;
+          const chgPct = q.changePercentage || 0;
           const isUp = chgPct >= 0;
           const dcfVal = dcf?.dcf;
           const dcfDiff = dcfVal && price ? ((dcfVal - price) / price) * 100 : null;
           const dcfUp = dcfDiff != null ? dcfDiff >= 0 : null;
+          const pe = ratio?.pe;
+          const peColor = pe == null ? '#7a8ea3' : pe < 0 || pe > 50 ? '#E05252' : '#1a2d4a';
+          const dotColor = dcfUp === true ? '#1AAD5E' : dcfUp === false ? '#E05252' : null;
 
           return (
-            <div key={item.id} style={ws.card}>
-              {/* Collapsed row */}
-              <div style={ws.cardTop} onClick={() => toggleExpand(sym)}>
+            <div key={item.id} style={ws.card} onClick={() => toggleExpand(sym)}>
+              {/* Top row */}
+              <div style={ws.cardTop}>
                 <img
                   src={`https://images.financialmodelingprep.com/symbol/${sym}.png`}
                   alt=""
@@ -479,59 +508,61 @@ function WatchlistView({ session, onAskAI }) {
                   <div style={ws.ticker}>{sym}</div>
                   <div style={ws.companyName}>{det?.companyName || ''}</div>
                 </div>
-                <div style={{ textAlign: 'right', marginRight: 6 }}>
+                <div style={{ textAlign: 'right' }}>
                   <div style={ws.price}>{price ? `$${price.toFixed(2)}` : '—'}</div>
                   <div style={{ ...ws.change, color: isUp ? '#1AAD5E' : '#E05252' }}>
                     {price ? `${isUp ? '+' : ''}$${chg.toFixed(2)} (${isUp ? '+' : ''}${chgPct.toFixed(2)}%)` : ''}
                   </div>
                 </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a8ea3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: isExp ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
-                  <polyline points="9 18 15 12 9 6" />
+              </div>
+              {/* Bottom row */}
+              <div style={ws.cardBottom}>
+                <span style={{ fontSize: 12, color: '#7a8ea3' }}>Fwd P/E</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: peColor }}>{pe != null ? pe.toFixed(1) : '—'}</span>
+                {dotColor && <div style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={dotColor || '#7a8ea3'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginLeft: 'auto', transform: isExp ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                  <polyline points="6 9 12 15 18 9" />
                 </svg>
               </div>
 
-              {/* DCF bar */}
-              {dcfVal != null && (
-                <div style={{ ...ws.dcfBar, background: dcfUp ? 'rgba(26,173,94,0.06)' : 'rgba(224,82,82,0.04)', borderLeft: `3px solid ${dcfUp ? '#1AAD5E' : '#E05252'}` }}>
-                  <div>
-                    <span style={ws.dcfLabel}>DCF value </span>
-                    <span style={ws.dcfValue}>${dcfVal.toFixed(2)}</span>
-                  </div>
-                  <span style={{ ...ws.dcfDiff, color: dcfUp ? '#1AAD5E' : '#E05252' }}>
-                    {dcfDiff != null ? `${dcfUp ? '+' : ''}${dcfDiff.toFixed(1)}% ${dcfUp ? 'upside' : 'over'}` : ''}
-                  </span>
-                </div>
-              )}
-              {dcfVal == null && price > 0 && (
-                <div style={{ ...ws.dcfBar, background: '#f8fafc', borderLeft: '3px solid #d8e2ed' }}>
-                  <span style={ws.dcfLabel}>DCF loading...</span>
-                </div>
-              )}
-
               {/* Expanded detail */}
               {isExp && (
-                <div style={ws.detail}>
+                <div style={ws.detail} onClick={e => e.stopPropagation()}>
                   {detailLoading === sym ? (
                     <div style={{ fontSize: 13, color: '#7a8ea3', padding: '10px 0', textAlign: 'center' }}>Loading fundamentals...</div>
-                  ) : det ? (
+                  ) : (
                     <>
-                      {/* Smart tags */}
-                      <div style={ws.tagRow}>
-                        {det.sector && <span style={{ ...ws.tag, background: 'rgba(74,144,217,0.1)', color: '#4A90D9' }}>{det.sector}</span>}
-                        {det.nextEarnings && (() => {
-                          const days = Math.ceil((new Date(det.nextEarnings) - new Date()) / 86400000);
-                          if (days > 0 && days <= 14) return <span style={{ ...ws.tag, background: 'rgba(212,160,23,0.1)', color: '#D4A017' }}>ER in {days}d</span>;
-                          if (days > 14) return <span style={{ ...ws.tag, background: 'rgba(212,160,23,0.1)', color: '#D4A017' }}>ER {new Date(det.nextEarnings).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>;
-                          return null;
-                        })()}
-                        {dcfUp === true && <span style={{ ...ws.tag, background: 'rgba(26,173,94,0.1)', color: '#1AAD5E' }}>Undervalued</span>}
-                        {dcfUp === false && <span style={{ ...ws.tag, background: 'rgba(224,82,82,0.08)', color: '#E05252' }}>Overvalued</span>}
-                        {det.debtEquity != null && det.debtEquity > 1.5 && <span style={{ ...ws.tag, background: 'rgba(224,82,82,0.08)', color: '#E05252' }}>High Debt</span>}
-                      </div>
+                      {/* DCF bar */}
+                      {dcfVal > 0 && price > 0 && (
+                        <div style={{ ...ws.dcfBar, background: dcfUp ? 'rgba(26,173,94,0.06)' : 'rgba(224,82,82,0.04)', borderLeft: `3px solid ${dcfUp ? '#1AAD5E' : '#E05252'}` }}>
+                          <div>
+                            <span style={ws.dcfLabel}>DCF fair value </span>
+                            <span style={ws.dcfValue}>${dcfVal.toFixed(2)}</span>
+                          </div>
+                          <span style={{ ...ws.dcfDiff, color: dcfUp ? '#1AAD5E' : '#E05252' }}>
+                            {dcfDiff != null ? `${dcfUp ? '+' : ''}${dcfDiff.toFixed(1)}% ${dcfUp ? 'upside' : 'over'}` : ''}
+                          </span>
+                        </div>
+                      )}
 
-                      {/* Metric rows */}
-                      {[
-                        { label: 'Fwd P/E', value: det.forwardPE != null ? det.forwardPE.toFixed(1) : '—' },
+                      {/* Smart tags */}
+                      {det && (
+                        <div style={ws.tagRow}>
+                          {det.sector && <span style={{ ...ws.tag, background: 'rgba(74,144,217,0.1)', color: '#4A90D9' }}>{det.sector}</span>}
+                          {det.nextEarnings && (() => {
+                            const days = Math.ceil((new Date(det.nextEarnings) - new Date()) / 86400000);
+                            if (days > 0 && days <= 14) return <span style={{ ...ws.tag, background: 'rgba(212,160,23,0.1)', color: '#D4A017' }}>ER in {days}d</span>;
+                            if (days > 14) return <span style={{ ...ws.tag, background: 'rgba(212,160,23,0.1)', color: '#D4A017' }}>ER {new Date(det.nextEarnings).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>;
+                            return null;
+                          })()}
+                          {dcfUp === true && <span style={{ ...ws.tag, background: 'rgba(26,173,94,0.1)', color: '#1AAD5E' }}>Undervalued</span>}
+                          {dcfUp === false && <span style={{ ...ws.tag, background: 'rgba(224,82,82,0.08)', color: '#E05252' }}>Overvalued</span>}
+                          {det.debtEquity != null && det.debtEquity > 1.5 && <span style={{ ...ws.tag, background: 'rgba(224,82,82,0.08)', color: '#E05252' }}>High Debt</span>}
+                        </div>
+                      )}
+
+                      {/* Metric rows (no Fwd P/E — already on collapsed) */}
+                      {det && [
                         { label: 'PEG ratio', value: det.pegRatio != null ? det.pegRatio.toFixed(2) : '—' },
                         { label: 'Net margin', value: fmtPct(det.netMargin) },
                         { label: 'EPS growth', value: fmtPct(det.epsGrowth), color: det.epsGrowth != null ? (det.epsGrowth >= 0 ? '#1AAD5E' : '#E05252') : null },
@@ -555,7 +586,7 @@ function WatchlistView({ session, onAskAI }) {
                         </button>
                       </div>
                     </>
-                  ) : null}
+                  )}
                 </div>
               )}
             </div>
@@ -572,8 +603,9 @@ function WatchlistView({ session, onAskAI }) {
 }
 
 const ws = {
-  card: { background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 10, marginBottom: 8, overflow: 'hidden' },
-  cardTop: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer' },
+  card: { background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 10, marginBottom: 8, overflow: 'hidden', cursor: 'pointer' },
+  cardTop: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px 4px' },
+  cardBottom: { display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px 10px 50px' },
   logo: { width: 30, height: 30, borderRadius: 7, objectFit: 'contain', flexShrink: 0 },
   logoFallback: { width: 30, height: 30, borderRadius: 7, background: '#d8e2ed', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#7a8ea3', flexShrink: 0 },
   ticker: { fontSize: 15, fontWeight: 700, color: '#1a2d4a' },
