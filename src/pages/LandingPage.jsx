@@ -111,7 +111,6 @@ export default function LandingPage() {
             </div>
           </div>
           <div style={styles.navRight}>
-            <div style={styles.logoSlogan}>ONE TEAM, ONE TRADE</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={styles.comingSoonPill}>Coming Soon</div>
               <button
@@ -123,6 +122,7 @@ export default function LandingPage() {
                 Beta Login
               </button>
             </div>
+            <div style={styles.logoSlogan}>ONE TEAM, ONE TRADE</div>
           </div>
         </nav>
 
@@ -253,7 +253,7 @@ const styles = {
   navLogo: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
+    gap: 5,
   },
   logoRow: { display: 'flex', alignItems: 'baseline' },
   logoUp: { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
@@ -272,7 +272,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-end',
-    gap: 6,
+    gap: 4,
   },
   betaLoginBtn: {
     background: 'none',
