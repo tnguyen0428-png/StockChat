@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useGroup } from '../../context/GroupContext';
 import { runScreener, SECTOR_MAP } from '../../lib/screener';
 
 // ── Admin Panel ──
@@ -393,8 +394,12 @@ function AdminPanel({ session, profile }) {
 
 // ── Main ProfileTab ──
 export default function ProfileTab({ session, profile, group, isAdmin, onSignOut }) {
+  const { refreshGroups } = useGroup();
   const [notifications, setNotifications] = useState({ alerts: true, briefing: true, broadcasts: true, chat: false });
   const [copied, setCopied] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [savingName, setSavingName] = useState(false);
 
   const copyInviteLink = () => {
     navigator.clipboard?.writeText(`${window.location.origin}/join/${group?.invite_code}`).catch(() => {});
@@ -402,6 +407,22 @@ export default function ProfileTab({ session, profile, group, isAdmin, onSignOut
   };
 
   const toggleNotification = (key) => setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const saveUsername = async () => {
+    if (!newUsername.trim() || !session?.user?.id || savingName) return;
+    setSavingName(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ username: newUsername.trim() })
+      .eq('id', session.user.id);
+    if (!error) {
+      await refreshGroups();
+      setEditingName(false);
+    }
+    setSavingName(false);
+    document.activeElement?.blur();
+  };
+
   const formatDate = (ts) => new Date(ts).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 
   return (
@@ -453,15 +474,39 @@ export default function ProfileTab({ session, profile, group, isAdmin, onSignOut
 
       <div style={styles.secLabel}>Account</div>
       <div style={styles.settingsCard}>
-        {[{ label: 'Trader Name', value: profile?.username }, { label: 'Email', value: session?.user?.email?.split('@')[0] + '...' }].map((item, i, arr) => (
-          <div key={item.label} style={{ ...styles.settingRow, borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
-            <span style={styles.settingLabel}>{item.label}</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {item.value && <span style={styles.settingValue}>{item.value}</span>}
-              <span style={styles.settingArrow}>›</span>
+        <div style={{ ...styles.settingRow, borderBottom: '1px solid var(--border)' }}>
+          {editingName ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+              <input
+                style={styles.nameInput}
+                value={newUsername}
+                onChange={e => setNewUsername(e.target.value.slice(0, 20))}
+                placeholder="New name"
+                autoFocus
+                maxLength={20}
+                onKeyDown={e => e.key === 'Enter' && saveUsername()}
+                enterKeyHint="done"
+              />
+              <button style={styles.nameSaveBtn} onClick={saveUsername} disabled={savingName}>
+                {savingName ? '..' : 'Save'}
+              </button>
+              <button style={styles.nameCancelBtn} onClick={() => { setEditingName(false); document.activeElement?.blur(); }}>✕</button>
             </div>
-          </div>
-        ))}
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', cursor: 'pointer' }}
+              onClick={() => { setEditingName(true); setNewUsername(profile?.username || ''); }}>
+              <span style={styles.settingLabel}>Trader Name</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={styles.settingValue}>{profile?.username || 'Trader'}</span>
+                <span style={{ fontSize: 10, color: '#3B6D11', fontWeight: 500 }}>edit</span>
+              </div>
+            </div>
+          )}
+        </div>
+        <div style={styles.settingRow}>
+          <span style={styles.settingLabel}>Email</span>
+          <span style={styles.settingValue}>{session?.user?.email?.split('@')[0] + '...'}</span>
+        </div>
       </div>
 
       <div style={styles.secLabel}>Account Actions</div>
@@ -524,4 +569,18 @@ const styles = {
   toggle: { width: 40, height: 24, borderRadius: 12, position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 },
   toggleKnob: { position: 'absolute', top: 4, width: 16, height: 16, background: '#fff', borderRadius: '50%', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.15)' },
   signOutBtn: { width: '100%', background: 'var(--red-bg)', border: '1px solid rgba(224,82,82,0.2)', color: 'var(--red)', padding: 13, borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', marginBottom: 8 },
+  nameInput: {
+    flex: 1, background: 'var(--card2)', border: '1px solid var(--border)',
+    borderRadius: 6, padding: '8px 10px', fontSize: 13, color: 'var(--text1)',
+    fontFamily: 'var(--font)', outline: 'none', fontWeight: 500,
+  },
+  nameSaveBtn: {
+    background: '#3B6D11', color: '#fff', border: 'none', borderRadius: 6,
+    padding: '8px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+    fontFamily: 'var(--font)', flexShrink: 0,
+  },
+  nameCancelBtn: {
+    background: 'transparent', border: 'none', color: 'var(--text3)',
+    fontSize: 16, cursor: 'pointer', padding: '4px 6px', lineHeight: 1,
+  },
 };
