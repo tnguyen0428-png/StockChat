@@ -709,27 +709,34 @@ export default function PortfolioTab({ session }) {
 
               {/* Card 3: Badges */}
               <div style={s.cardDefault}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text1)', marginBottom: 6 }}>Badges earned</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {Object.entries(BADGE_DEFS).map(([key, def]) => {
-                    const earned = userBadges.includes(key);
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text1)', marginBottom: 6 }}>Badges</div>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {(() => {
+                    const earnedEntries = Object.entries(BADGE_DEFS).filter(([key]) => userBadges.includes(key));
+                    const lockedCount = Object.keys(BADGE_DEFS).filter(key => !userBadges.includes(key)).length;
+                    const pillStyle = (bg, border, color) => ({
+                      display: 'inline-flex', alignItems: 'center', gap: 3,
+                      padding: '2px 6px', borderRadius: 10,
+                      fontSize: 8, fontWeight: 700,
+                      background: bg, border: `1px solid ${border}`, color,
+                    });
                     return (
-                      <div key={key} style={{ textAlign: 'center' }}>
-                        <div style={{
-                          width: 32, height: 32, borderRadius: '50%',
-                          background: earned ? def.bg : 'transparent',
-                          border: earned ? `2px solid ${def.border}` : '2px dashed var(--border)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 12, fontWeight: 700, color: earned ? def.color : 'var(--text3)',
-                        }}>
-                          {earned ? def.label[0] : '?'}
-                        </div>
-                        <div style={{ fontSize: 8, color: earned ? def.color : 'var(--text3)', marginTop: 2 }}>
-                          {earned ? def.label : 'Locked'}
-                        </div>
-                      </div>
+                      <>
+                        {earnedEntries.map(([key, def]) => (
+                          <span key={key} style={pillStyle(def.bg, def.border, def.color)}>
+                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: def.border, flexShrink: 0 }} />
+                            {def.label}
+                          </span>
+                        ))}
+                        {lockedCount > 0 && (
+                          <span style={pillStyle('transparent', 'var(--border)', 'var(--text3)')}>
+                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--border)', flexShrink: 0 }} />
+                            {lockedCount} locked
+                          </span>
+                        )}
+                      </>
                     );
-                  })}
+                  })()}
                 </div>
               </div>
 
