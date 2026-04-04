@@ -239,7 +239,7 @@ function Modal({ alert, onClose }) {
               {alert.whyAlerting.map((w,i)=>(
                 <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, background: "#f8fafc", borderRadius: 14, padding: "12px 16px" }}>
                   <span style={{ fontSize: 18, marginTop: 2 }}>{w.icon}</span>
-                  <div><p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#1e293b" }}>{w.label}</p><p style={{ margin: "2px 0 0", fontSize: 14, color: "#64748b" }}>{w.text}</p></div>
+                  <div><p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#1e293b" }}>{w.label}</p><p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748b", lineHeight: 1.4 }}>{w.text}</p></div>
                 </div>
               ))}
             </div>
@@ -295,7 +295,7 @@ function AlertCard({ alert, onClick }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", borderRadius: 10, padding: "8px 12px" }}>
         <span style={{ fontSize: 14 }}>{alert.whyAlerting[0].icon}</span>
         <span style={{ fontSize: 13, color: "#475569" }}>
-          <strong style={{ color: "#1e293b" }}>{alert.whyAlerting[0].label}</strong> — {alert.whyAlerting[0].text}
+          <span><strong style={{ color: "#1e293b" }}>{alert.whyAlerting[0].label}</strong><br/><span style={{ fontSize: 12 }}>{alert.whyAlerting[0].text}</span></span>
         </span>
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
@@ -362,7 +362,7 @@ export default function AlertsTab({ session, group }) {
       </div>
 
       {/* FILTERS */}
-      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, WebkitOverflowScrolling: "touch" }}>
         {filterKeys.map(f=>{
           const count = f === "All" ? mockAlerts.length : mockAlerts.filter(a => a.scannerTag === filterMap[f]).length;
           return (
@@ -413,15 +413,15 @@ export default function AlertsTab({ session, group }) {
                       <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, background: "#f8fafc", borderRadius: 14, padding: "12px 16px" }}>
                         <span style={{ fontSize: 16, marginTop: 2, flexShrink: 0 }}>{w.icon}</span>
                         <div>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#1e293b" }}>{w.label}</span>
-                          <span style={{ fontSize: 14, color: "#64748b", marginLeft: 6 }}>— {w.text}</span>
+                          <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#1e293b" }}>{w.label}</p>
+                          <p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748b", lineHeight: 1.4 }}>{w.text}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div style={{ padding: "0 20px 16px", display: "flex", alignItems: "center", gap: 16, fontSize: 13 }}>
+                <div style={{ padding: "0 20px 16px", display: "flex", alignItems: "center", gap: 12, fontSize: 13, flexWrap: "wrap" }}>
                   <div style={{ display: "flex", alignItems: "center" }}>
                     <span style={{ color: "#94a3b8", fontSize: 12 }}>Support</span>
                     <Tooltip text="A price level where this stock has historically stopped falling." />
