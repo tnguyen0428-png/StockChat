@@ -53,9 +53,45 @@ export default function LandingPage() {
   };
 
   const FEATURES = [
-    'Live stock alerts',
+    'Breakout alerts',
+    'Dark pool flow',
+    'AI research',
     'Group chat',
-    'Curated watchlists',
+    'Portfolio challenge',
+    'Daily briefings',
+    'Options flow',
+    'Voice input',
+  ];
+
+  const INSIDE = [
+    {
+      icon: '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>',
+      iconColor: '#1AAD5E',
+      iconBg: 'rgba(26,173,94,0.1)',
+      title: 'Smart alerts & dark pool flow',
+      desc: 'Breakout alerts, options activity, and dark pool orders — see where big money is moving before everyone else.',
+    },
+    {
+      icon: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+      iconColor: '#8B5CF6',
+      iconBg: 'rgba(139,92,246,0.1)',
+      title: 'AI-powered research',
+      desc: 'Ask UpTik AI about any stock — earnings, fundamentals, sector momentum. Voice or text, right in your chat.',
+    },
+    {
+      icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+      iconColor: '#4A90D9',
+      iconBg: 'rgba(74,144,217,0.1)',
+      title: 'Trade with your team',
+      desc: 'Sector chat rooms, private groups, daily briefings, and curated watchlists — all shared with your crew.',
+    },
+    {
+      icon: '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
+      iconColor: '#D4A017',
+      iconBg: 'rgba(212,160,23,0.1)',
+      title: 'Portfolio challenge',
+      desc: 'Start with $50K paper cash. Compete on the leaderboard, earn badges, talk trash — prove who trades best.',
+    },
   ];
 
   return (
@@ -96,7 +132,7 @@ export default function LandingPage() {
         {/* ── Nav ── */}
         <nav style={styles.nav}>
           <div style={styles.navLogo}>
-            <svg width="38" height="38" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="32" height="32" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3" />
               <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.2" opacity="0.6" />
               <path d="M25 22 L25 30 C25 34 25 34 25 30 L25 22" strokeWidth="1.5" opacity="0.35" />
@@ -148,13 +184,12 @@ export default function LandingPage() {
               className={`land-section d2${visible ? ' visible' : ''} hero-title`}
               style={styles.headline}
             >
-              Trade <span style={styles.headlineGreen}>Smarter</span> as a Group
+              Trade <span style={styles.headlineGreen}>Smarter</span> as a Team
             </h1>
 
             {/* Subtitle */}
             <p className={`land-section d3${visible ? ' visible' : ''}`} style={styles.subtitle}>
-              Daily briefings and real-time alerts that filter the noise —<br />
-              so you don't have to stare at charts all day.
+              AI-powered research, real-time alerts, dark pool flow, and a paper trading challenge — built for friends who trade together.
             </p>
 
             {/* Waitlist Card */}
@@ -204,12 +239,43 @@ export default function LandingPage() {
               )}
             </div>
 
+            {/* Social proof */}
+            <div className={`land-section d5${visible ? ' visible' : ''}`} style={styles.socialProof}>
+              <div style={styles.avatarStack}>
+                {[
+                  { letter: 'T', bg: 'linear-gradient(135deg,#1AAD5E,#0d8a47)' },
+                  { letter: 'N', bg: 'linear-gradient(135deg,#4A90D9,#2d6cb5)' },
+                  { letter: 'D', bg: 'linear-gradient(135deg,#D4A017,#b58a12)' },
+                  { letter: 'E', bg: 'linear-gradient(135deg,#8B5CF6,#6D28D9)' },
+                ].map((a, i) => (
+                  <div key={a.letter} style={{ ...styles.socialAvatar, background: a.bg, marginLeft: i > 0 ? -6 : 0 }}>{a.letter}</div>
+                ))}
+              </div>
+              <span style={styles.socialText}>Join traders already on the list</span>
+            </div>
+
             {/* Feature badges */}
             <div className={`land-section d5${visible ? ' visible' : ''}`} style={styles.badges}>
               {FEATURES.map(f => (
                 <div key={f} style={styles.badge}>
                   <span style={styles.badgeCheck}>✓</span>
                   {f}
+                </div>
+              ))}
+            </div>
+
+            {/* What's inside */}
+            <div className={`land-section d5${visible ? ' visible' : ''}`} style={styles.insideSection}>
+              <div style={styles.insideTitle}>What's inside</div>
+              {INSIDE.map(f => (
+                <div key={f.title} style={styles.insideCard}>
+                  <div style={{ ...styles.insideIcon, background: f.iconBg }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={f.iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: f.icon }} />
+                  </div>
+                  <div>
+                    <div style={styles.insideCardTitle}>{f.title}</div>
+                    <div style={styles.insideCardDesc}>{f.desc}</div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -245,27 +311,27 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '10px 16px',
-    minHeight: 70,
+    padding: '8px 14px',
+    minHeight: 58,
     background: '#132d52',
     borderBottom: '1px solid rgba(255,255,255,0.08)',
   },
   navLogo: {
     display: 'flex',
     alignItems: 'center',
-    gap: 5,
+    gap: 2,
   },
   logoRow: { display: 'flex', alignItems: 'baseline' },
-  logoUp: { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
-  logoTik: { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
+  logoUp: { fontSize: 17, fontWeight: 500, color: '#f0ede8' },
+  logoTik: { fontSize: 17, fontWeight: 500, color: '#8cd9a0' },
   logoAlerts: {
-    fontSize: 14, fontWeight: 300, color: '#d4e4f2', letterSpacing: 2,
+    fontSize: 12, fontWeight: 300, color: '#d4e4f2', letterSpacing: 1.8,
     fontFamily: "'Avenir Next', 'Avenir', 'Nunito Sans', sans-serif",
-    marginTop: -4, paddingLeft: 18,
+    marginTop: -1, paddingLeft: 3,
   },
   logoSlogan: {
-    fontSize: 10, fontWeight: 300, fontStyle: 'italic',
-    color: '#d4e4f2', letterSpacing: 1,
+    fontSize: 8, fontWeight: 300, fontStyle: 'italic',
+    color: 'rgba(212,228,242,0.65)', letterSpacing: 1,
     fontFamily: "'Avenir Next', 'Avenir', 'Nunito Sans', sans-serif",
   },
   navRight: {
@@ -303,7 +369,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '60px 20px 40px',
+    padding: '28px 20px 24px',
     overflow: 'hidden',
   },
   gridBg: {
@@ -336,7 +402,7 @@ const styles = {
     textAlign: 'center',
     maxWidth: 560,
     width: '100%',
-    gap: 20,
+    gap: 14,
   },
 
   // ── Pill tag ──
@@ -345,7 +411,7 @@ const styles = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 7,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 600,
     color: '#1AAD5E',
     background: 'rgba(26,173,94,0.08)',
@@ -366,7 +432,7 @@ const styles = {
   // ── Headline ──
   headline: {
     fontFamily: "'Outfit', sans-serif",
-    fontSize: 48,
+    fontSize: 44,
     fontWeight: 800,
     color: '#1a2d4a',
     lineHeight: 1.15,
@@ -376,27 +442,27 @@ const styles = {
 
   // ── Subtitle ──
   subtitle: {
-    fontSize: 16,
+    fontSize: 13,
     color: '#7a8ea3',
-    lineHeight: 1.7,
+    lineHeight: 1.5,
     fontWeight: 400,
-    maxWidth: 440,
+    maxWidth: 380,
   },
 
   // ── Waitlist Card ──
   card: {
     background: '#f8fafc',
     borderRadius: 16,
-    padding: '28px 28px 24px',
+    padding: '18px 16px 16px',
     width: '100%',
-    maxWidth: 420,
-    boxShadow: '0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)',
+    maxWidth: 380,
+    boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
     border: '1px solid #d8e2ed',
   },
   form: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 10,
+    gap: 7,
   },
   cardLabel: {
     fontSize: 14,
@@ -471,24 +537,30 @@ const styles = {
     textAlign: 'center',
   },
 
+  // ── Social proof ──
+  socialProof: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  avatarStack: { display: 'flex' },
+  socialAvatar: { width: 24, height: 24, borderRadius: '50%', border: '2px solid #eef2f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fff' },
+  socialText: { fontSize: 11, color: '#7a8ea3', fontWeight: 500 },
+
   // ── Feature badges ──
   badges: {
     display: 'flex',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 8,
+    gap: 5,
   },
   badge: {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 500,
     color: '#1a2d4a',
     background: '#f8fafc',
     border: '1px solid #d8e2ed',
     borderRadius: 20,
-    padding: '5px 12px',
+    padding: '4px 9px',
   },
   badgeCheck: {
     color: '#1AAD5E',
@@ -496,10 +568,18 @@ const styles = {
     fontSize: 12,
   },
 
+  // ── What's inside ──
+  insideSection: { textAlign: 'left', maxWidth: 380, margin: '0 auto' },
+  insideTitle: { fontSize: 12, fontWeight: 700, color: '#1a2d4a', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center', fontFamily: "'Outfit', sans-serif" },
+  insideCard: { background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 10, padding: '10px 12px', display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 6 },
+  insideIcon: { width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  insideCardTitle: { fontSize: 12, fontWeight: 600, color: '#1a2d4a', marginBottom: 2 },
+  insideCardDesc: { fontSize: 11, color: '#7a8ea3', lineHeight: 1.4 },
+
   // ── Footer ──
   footer: {
     textAlign: 'center',
-    padding: '20px',
+    padding: '14px',
     fontSize: 12,
     color: '#7a8ea3',
     borderTop: '1px solid #d8e2ed',
