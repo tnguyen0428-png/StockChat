@@ -402,24 +402,29 @@ export default function ProfileTab({ session, profile, group, isAdmin, onSignOut
   const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
-    if (profile?.notification_prefs) {
-      setNotifications(prev => ({ ...prev, ...profile.notification_prefs }));
-    }
-  }, [profile?.notification_prefs]);
+    if (!session?.user?.id) return;
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('notif_prefs')
+        .eq('id', session.user.id)
+        .single();
+      if (data?.notif_prefs) setNotifications(data.notif_prefs);
+    })();
+  }, [session?.user?.id]);
 
   const copyInviteLink = () => {
     navigator.clipboard?.writeText(`${window.location.origin}/join/${group?.invite_code}`).catch(() => {});
     setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
 
-  const toggleNotification = (key) => {
-    setNotifications(prev => {
-      const updated = { ...prev, [key]: !prev[key] };
-      if (session?.user?.id) {
-        supabase.from('profiles').update({ notification_prefs: updated }).eq('id', session.user.id);
-      }
-      return updated;
-    });
+  const handleToggle = async (key) => {
+    const updated = { ...notifications, [key]: !notifications[key] };
+    setNotifications(updated);
+    await supabase
+      .from('profiles')
+      .update({ notif_prefs: updated })
+      .eq('id', session.user.id);
   };
 
   const saveUsername = async () => {
@@ -479,7 +484,7 @@ export default function ProfileTab({ session, profile, group, isAdmin, onSignOut
         {[{ key: 'alerts', label: 'Breakout Alerts' }, { key: 'briefing', label: 'Daily Briefing' }, { key: 'broadcasts', label: 'Admin Broadcasts' }, { key: 'chat', label: 'Chat Messages' }].map((item, i, arr) => (
           <div key={item.key} style={{ ...styles.settingRow, borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
             <span style={styles.settingLabel}>{item.label}</span>
-            <div style={{ ...styles.toggle, background: notifications[item.key] ? 'var(--green)' : 'var(--border)' }} onClick={() => toggleNotification(item.key)}>
+            <div style={{ ...styles.toggle, background: notifications[item.key] ? 'var(--green)' : 'var(--border)' }} onClick={() => handleToggle(item.key)}>
               <div style={{ ...styles.toggleKnob, left: notifications[item.key] ? 'auto' : 3, right: notifications[item.key] ? 3 : 'auto' }} />
             </div>
           </div>
