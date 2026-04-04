@@ -294,25 +294,42 @@ function WatchlistView({ session, onAskAI }) {
   const fetchBatchData = async (symbols) => {
     if (symbols.length === 0) return;
     const joined = symbols.join(',');
+    // Quote-short supports batch
     try {
-      const [qRes, dRes] = await Promise.all([
-        fetch(`https://financialmodelingprep.com/stable/quote-short?symbol=${joined}&apikey=${FMP_KEY}`),
-        fetch(`https://financialmodelingprep.com/stable/dcf?symbol=${joined}&apikey=${FMP_KEY}`),
-      ]);
-      const [qJson, dJson] = await Promise.all([qRes.json(), dRes.json()]);
+      const qRes = await fetch(`https://financialmodelingprep.com/stable/quote-short?symbol=${joined}&apikey=${FMP_KEY}`);
+      const qJson = await qRes.json();
       if (Array.isArray(qJson)) {
         const qm = {};
         qJson.forEach(q => { qm[q.symbol] = q; });
-        setQuoteData(qm);
-        localStorage.setItem('uptik_wl_quotes', JSON.stringify(qm));
+        setQuoteData(prev => {
+          const merged = { ...prev, ...qm };
+          localStorage.setItem('uptik_wl_quotes', JSON.stringify(merged));
+          return merged;
+        });
       }
-      if (Array.isArray(dJson)) {
-        const dm = {};
-        dJson.forEach(d => { dm[d.symbol] = d; });
-        setDcfData(dm);
-        localStorage.setItem('uptik_wl_dcf', JSON.stringify(dm));
+    } catch (e) { console.error('Watchlist quote fetch error:', e); }
+    // DCF does NOT support batch — individual calls
+    const dcfPromises = symbols.map(sym =>
+      fetch(`https://financialmodelingprep.com/stable/dcf?symbol=${sym}&apikey=${FMP_KEY}`)
+        .then(r => r.json())
+        .then(json => {
+          const item = Array.isArray(json) ? json[0] : json;
+          return item?.symbol ? item : null;
+        })
+        .catch(() => null)
+    );
+    const dcfResults = await Promise.allSettled(dcfPromises);
+    const dm = {};
+    dcfResults.forEach(r => {
+      if (r.status === 'fulfilled' && r.value) {
+        dm[r.value.symbol] = r.value;
       }
-    } catch (e) { console.error('Watchlist batch fetch error:', e); }
+    });
+    setDcfData(prev => {
+      const merged = { ...prev, ...dm };
+      localStorage.setItem('uptik_wl_dcf', JSON.stringify(merged));
+      return merged;
+    });
   };
 
   const fetchDetail = async (symbol) => {
