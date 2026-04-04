@@ -1,23 +1,58 @@
 import { useState } from "react";
 
 // ===== MOCK DATA =====
-const mockDarkPool = [
-  { id: 1, ticker: "TSLA", company: "Tesla Inc", price: 189.30, size: "2.4M", value: "$454M", sentiment: "bullish", time: "9:42 AM", premium: null, type: "block", exchange: "FINRA ADF", avgSize: "180K", sizeVsAvg: 13.3 },
-  { id: 2, ticker: "AAPL", company: "Apple Inc", price: 218.45, size: "1.8M", value: "$393M", sentiment: "neutral", time: "9:38 AM", premium: null, type: "block", exchange: "FINRA ADF", avgSize: "220K", sizeVsAvg: 8.2 },
-  { id: 3, ticker: "NVDA", company: "NVIDIA Corp", price: 891.15, size: "850K", value: "$758M", sentiment: "bullish", time: "9:35 AM", premium: null, type: "sweep", exchange: "BATS", avgSize: "95K", sizeVsAvg: 8.9 },
-  { id: 4, ticker: "META", company: "Meta Platforms", price: 542.18, size: "620K", value: "$336M", sentiment: "bearish", time: "9:31 AM", premium: null, type: "block", exchange: "IEX", avgSize: "110K", sizeVsAvg: 5.6 },
-  { id: 5, ticker: "AMZN", company: "Amazon.com", price: 198.72, size: "1.2M", value: "$238M", sentiment: "bullish", time: "9:28 AM", premium: null, type: "block", exchange: "FINRA ADF", avgSize: "300K", sizeVsAvg: 4.0 },
+const now = new Date();
+const mins = (m) => new Date(now.getTime() - m * 60000);
+
+const mockBigMoney = [
+  { id: 1, ticker: "TSLA", company: "Tesla Inc", price: 189.30, shares: "2.4M", dollarValue: "$454M", direction: "buying", time: mins(2), multiplier: 13.3, note: "This is 13x the normal trade size — a major institution is loading up." },
+  { id: 2, ticker: "NVDA", company: "NVIDIA Corp", price: 891.15, shares: "850K", dollarValue: "$758M", direction: "buying", time: mins(9), multiplier: 8.9, note: "Largest dark pool trade today. 9x normal size — likely a hedge fund." },
+  { id: 3, ticker: "AAPL", company: "Apple Inc", price: 218.45, shares: "1.8M", dollarValue: "$393M", direction: "neutral", time: mins(6), multiplier: 8.2, note: "Big trade but direction unclear — could be a portfolio rebalance." },
+  { id: 4, ticker: "META", company: "Meta Platforms", price: 542.18, shares: "620K", dollarValue: "$336M", direction: "selling", time: mins(13), multiplier: 5.6, note: "An institution appears to be reducing their META position." },
+  { id: 5, ticker: "AMZN", company: "Amazon.com", price: 198.72, shares: "1.2M", dollarValue: "$238M", direction: "buying", time: mins(16), multiplier: 4.0, note: "Moderate-sized institutional buy. 4x normal trade size." },
 ];
 
-const mockOptions = [
-  { id: 1, ticker: "TSLA", type: "CALL", strike: 200, expiry: "Apr 11", premium: "$4.85", volume: "42.3K", openInterest: "18.2K", iv: "68%", sentiment: "bullish", time: "9:44 AM", flow: "sweep", size: "$20.5M", unusual: true },
-  { id: 2, ticker: "NVDA", type: "CALL", strike: 920, expiry: "Apr 18", premium: "$18.20", volume: "28.1K", openInterest: "5.4K", iv: "52%", sentiment: "bullish", time: "9:41 AM", flow: "block", size: "$51.2M", unusual: true },
-  { id: 3, ticker: "SPY", type: "PUT", strike: 510, expiry: "Apr 11", premium: "$3.40", volume: "85.6K", openInterest: "42.1K", iv: "22%", sentiment: "bearish", time: "9:39 AM", flow: "sweep", size: "$29.1M", unusual: false },
-  { id: 4, ticker: "AAPL", type: "CALL", strike: 225, expiry: "Apr 25", premium: "$2.95", volume: "35.8K", openInterest: "12.7K", iv: "31%", sentiment: "bullish", time: "9:36 AM", flow: "block", size: "$10.6M", unusual: true },
-  { id: 5, ticker: "AMD", type: "PUT", strike: 155, expiry: "Apr 11", premium: "$2.10", volume: "22.4K", openInterest: "8.9K", iv: "58%", sentiment: "bearish", time: "9:33 AM", flow: "sweep", size: "$4.7M", unusual: false },
-  { id: 6, ticker: "META", type: "CALL", strike: 560, expiry: "May 16", premium: "$22.50", volume: "15.2K", openInterest: "3.1K", iv: "45%", sentiment: "bullish", time: "9:30 AM", flow: "block", size: "$34.2M", unusual: true },
+const mockSmartBets = [
+  { id: 1, ticker: "TSLA", company: "Tesla Inc", direction: "up", bet: "Above $200 by Apr 11", amount: "$20.5M", odds: "High risk", unusual: true, time: mins(1), detail: "Someone just bet $20.5M that Tesla will rise above $200 in the next week. This is unusual — volume is much higher than existing bets, suggesting a brand new large position.", premium: "$4.85", volume: "42.3K", openInterest: "18.2K", uncertainty: "High — bigger potential swings" },
+  { id: 2, ticker: "NVDA", company: "NVIDIA Corp", direction: "up", bet: "Above $920 by Apr 18", amount: "$51.2M", odds: "Moderate risk", unusual: true, time: mins(4), detail: "The largest options bet today. $51.2M that NVIDIA goes above $920 in two weeks. Unusual volume signals a big player making a move.", premium: "$18.20", volume: "28.1K", openInterest: "5.4K", uncertainty: "Moderate — steady price range" },
+  { id: 3, ticker: "SPY", company: "S&P 500 ETF", direction: "down", bet: "Below $510 by Apr 11", amount: "$29.1M", odds: "Lower risk", unusual: false, time: mins(7), detail: "A large bet that the overall market will dip below $510 this week. SPY puts are common hedging tools — this could be protection rather than a directional bet.", premium: "$3.40", volume: "85.6K", openInterest: "42.1K", uncertainty: "Low — market is relatively stable" },
+  { id: 4, ticker: "AAPL", company: "Apple Inc", direction: "up", bet: "Above $225 by Apr 25", amount: "$10.6M", odds: "Moderate risk", unusual: true, time: mins(10), detail: "Unusual activity — someone bet $10.6M that Apple crosses $225 in three weeks. Volume far exceeds existing positions.", premium: "$2.95", volume: "35.8K", openInterest: "12.7K", uncertainty: "Moderate" },
+  { id: 5, ticker: "AMD", company: "AMD Inc", direction: "down", bet: "Below $155 by Apr 11", amount: "$4.7M", odds: "Higher risk", unusual: false, time: mins(14), detail: "A bet that AMD drops below $155 this week. Higher implied volatility means the market expects bigger price swings.", premium: "$2.10", volume: "22.4K", openInterest: "8.9K", uncertainty: "High — expect volatility" },
+  { id: 6, ticker: "META", company: "Meta Platforms", direction: "up", bet: "Above $560 by May 16", amount: "$34.2M", odds: "Moderate risk", unusual: true, time: mins(18), detail: "A longer-term bet of $34.2M that Meta rises above $560 by mid-May. Unusual activity with volume 5x higher than open interest.", premium: "$22.50", volume: "15.2K", openInterest: "3.1K", uncertainty: "Moderate" },
 ];
 
+// Cross-reference
+const spotlight = (() => {
+  const dpTickers = new Map(mockBigMoney.map(d => [d.ticker, d]));
+  const matches = mockSmartBets.filter(o => dpTickers.has(o.ticker) && o.direction === "up" && dpTickers.get(o.ticker).direction === "buying");
+  if (matches.length === 0) return null;
+  const best = matches.sort((a, b) => b.amount.replace(/[$M]/g, "") - a.amount.replace(/[$M]/g, ""))[0];
+  const dp = dpTickers.get(best.ticker);
+  return { ticker: best.ticker, company: best.company, dpValue: dp.dollarValue, dpMultiplier: dp.multiplier, betAmount: best.amount, betDescription: best.bet, unusual: best.unusual };
+})();
+
+// ===== HELPERS =====
+function relTime(ts) {
+  const d = Math.floor((now - ts) / 60000);
+  if (d < 1) return "Just now";
+  if (d === 1) return "1 min ago";
+  if (d < 60) return `${d} min ago`;
+  return `${Math.floor(d / 60)}h ago`;
+}
+
+function freshDotColor(ts) {
+  const d = Math.floor((now - ts) / 60000);
+  if (d <= 5) return "#22c55e";
+  if (d <= 15) return "#f59e0b";
+  return "#cbd5e1";
+}
+
+function cardOpacity(ts) {
+  const d = Math.floor((now - ts) / 60000);
+  return d > 15 ? 0.75 : 1;
+}
+
+// ===== COMPONENTS =====
 function Tooltip({ text }) {
   const [show, setShow] = useState(false);
   return (
@@ -31,258 +66,356 @@ function Tooltip({ text }) {
   );
 }
 
-function SentimentDot({ sentiment }) {
-  const colors = { bullish: "#16a34a", bearish: "#dc2626", neutral: "#f59e0b" };
-  return <span style={{ width: 8, height: 8, borderRadius: "50%", background: colors[sentiment], display: "inline-block", flexShrink: 0 }} />;
-}
-
-function SentimentBadge({ sentiment }) {
-  const s = {
-    bullish: { bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
-    bearish: { bg: "#fef2f2", color: "#dc2626", border: "#fecaca" },
-    neutral: { bg: "#fffbeb", color: "#d97706", border: "#fde68a" },
-  }[sentiment];
+// ===== SPOTLIGHT HERO =====
+function SpotlightHero({ data }) {
+  if (!data) return null;
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 10, background: s.bg, color: s.color, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px", border: `1px solid ${s.border}` }}>
-      <SentimentDot sentiment={sentiment} /> {sentiment}
-    </span>
+    <div style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f0fdf4 100%)", borderRadius: 16, border: "2px solid #22c55e", padding: "18px 18px 16px", boxShadow: "0 0 24px rgba(34,197,94,.1)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+        <span style={{ fontSize: 14 }}>🎯</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: "#15803d", textTransform: "uppercase", letterSpacing: "1.5px" }}>Smart Money Spotlight</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
+        <h3 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a" }}>{data.ticker}</h3>
+        <span style={{ padding: "3px 10px", borderRadius: 10, background: "#22c55e", color: "#fff", fontSize: 11, fontWeight: 700 }}>Both Signals Bullish</span>
+      </div>
+      <p style={{ margin: "0 0 14px", fontSize: 13, color: "#64748b" }}>{data.company}</p>
+      <div style={{ background: "rgba(255,255,255,.8)", borderRadius: 12, padding: "12px 14px", marginBottom: 0 }}>
+        <p style={{ margin: 0, fontSize: 14, color: "#1e293b", lineHeight: 1.6 }}>
+          Institutions quietly bought <strong>{data.dpValue}</strong> in large block trades ({data.dpMultiplier}x normal size)
+          <strong> AND </strong>
+          someone placed a <strong>{data.betAmount}</strong> bet that {data.ticker} goes {data.betDescription.toLowerCase()}.
+          {data.unusual && " This options activity is flagged as unusual."}
+        </p>
+        <p style={{ margin: "8px 0 0", fontSize: 13, color: "#15803d", fontWeight: 600 }}>
+          👉 When big money buys stock AND bets it goes higher, that's a strong bullish signal.
+        </p>
+      </div>
+    </div>
   );
 }
 
-function FlowBadge({ type }) {
-  const isSweep = type === "sweep";
-  return (
-    <span style={{ padding: "2px 8px", borderRadius: 10, background: isSweep ? "#eff6ff" : "#f8fafc", color: isSweep ? "#2563eb" : "#475569", fontSize: 10, fontWeight: 600, textTransform: "uppercase" }}>
-      {isSweep ? "⚡ Sweep" : "📦 Block"}
-    </span>
-  );
-}
+// ===== SUMMARY ROW =====
+function SummaryRow({ tab }) {
+  const buyCount = mockBigMoney.filter(d => d.direction === "buying").length;
+  const upCount = mockSmartBets.filter(o => o.direction === "up").length;
+  const downCount = mockSmartBets.filter(o => o.direction === "down").length;
 
-function DarkPoolCard({ trade }) {
-  const [expanded, setExpanded] = useState(false);
   return (
-    <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", padding: "14px 16px", cursor: "pointer", transition: "box-shadow .2s" }}
-      onClick={() => setExpanded(!expanded)}
-      onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,.08)"}
-      onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{trade.ticker}</h4>
-          <SentimentBadge sentiment={trade.sentiment} />
-          <FlowBadge type={trade.type} />
-        </div>
-        <span style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", flexShrink: 0, marginLeft: 8 }}>{trade.value}</span>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>{trade.size} shares @ ${trade.price.toFixed(2)}</p>
-        <span style={{ fontSize: 11, color: "#94a3b8" }}>{trade.time}</span>
-      </div>
-      {expanded && (
-        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #f1f5f9", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-          <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
-            <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>Size vs Avg</p>
-            <p style={{ fontSize: 16, fontWeight: 700, color: trade.sizeVsAvg >= 5 ? "#16a34a" : "#0f172a", margin: "2px 0 0" }}>{trade.sizeVsAvg}x</p>
-          </div>
-          <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
-            <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>Avg Block</p>
-            <p style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", margin: "2px 0 0" }}>{trade.avgSize}</p>
-          </div>
-          <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
-            <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>Exchange</p>
-            <p style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", margin: "2px 0 0" }}>{trade.exchange}</p>
-          </div>
-        </div>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+      {tab === "bigmoney" ? (
+        <>
+          <StatBox label="Total Traded" value="$2.2B" />
+          <StatBox label="Buying" value={`${buyCount} of ${mockBigMoney.length}`} valueColor="#16a34a" />
+          <StatBox label="Biggest" value="NVDA" sub="$758M" />
+        </>
+      ) : (
+        <>
+          <StatBox label="Total Bets" value="$150M" />
+          <StatBox label="Betting Up" value={`${upCount}`} valueColor="#16a34a" sub={`vs ${downCount} down`} />
+          <StatBox label="Unusual" value={`${mockSmartBets.filter(o => o.unusual).length}`} valueColor="#d97706" sub="worth watching" />
+        </>
       )}
     </div>
   );
 }
 
-function OptionsCard({ option }) {
-  const [expanded, setExpanded] = useState(false);
-  const isCall = option.type === "CALL";
+function StatBox({ label, value, valueColor, sub }) {
   return (
-    <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${isCall ? "#bbf7d0" : "#fecaca"}`, borderLeft: `3px solid ${isCall ? "#16a34a" : "#dc2626"}`, padding: "14px 16px", cursor: "pointer", transition: "box-shadow .2s" }}
-      onClick={() => setExpanded(!expanded)}
+    <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", padding: "10px 8px", textAlign: "center" }}>
+      <p style={{ margin: 0, fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".5px" }}>{label}</p>
+      <p style={{ margin: "2px 0 0", fontSize: 18, fontWeight: 700, color: valueColor || "#0f172a" }}>{value}</p>
+      {sub && <p style={{ margin: "1px 0 0", fontSize: 10, color: "#94a3b8" }}>{sub}</p>}
+    </div>
+  );
+}
+
+// ===== BIG MONEY CARD =====
+function BigMoneyCard({ trade }) {
+  const [expanded, setExpanded] = useState(false);
+  const dirColors = { buying: { bg: "#f0fdf4", border: "#22c55e", icon: "↑", label: "Buying", color: "#15803d" }, selling: { bg: "#fef2f2", border: "#ef4444", icon: "↓", label: "Selling", color: "#dc2626" }, neutral: { bg: "#fffbeb", border: "#f59e0b", icon: "→", label: "Unclear", color: "#d97706" } };
+  const dc = dirColors[trade.direction];
+  const thick = trade.multiplier >= 8 ? 4 : trade.multiplier >= 5 ? 3 : 2;
+
+  return (
+    <div onClick={() => setExpanded(!expanded)}
+      style={{ background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", borderLeft: `${thick}px solid ${dc.border}`, padding: "14px 16px", cursor: "pointer", transition: "all .2s", opacity: cardOpacity(trade.time) }}
       onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,.08)"}
       onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{option.ticker}</h4>
-          <span style={{ padding: "2px 8px", borderRadius: 8, background: isCall ? "#f0fdf4" : "#fef2f2", color: isCall ? "#15803d" : "#dc2626", fontSize: 11, fontWeight: 700 }}>{option.type}</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>${option.strike}</span>
-          <span style={{ fontSize: 12, color: "#94a3b8" }}>{option.expiry}</span>
-          {option.unusual && <span style={{ padding: "2px 6px", borderRadius: 8, background: "#fef3c7", color: "#92400e", fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>🔥 Unusual</span>}
-        </div>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
+
+      {/* Row 1: Ticker + Direction + Value */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <FlowBadge type={option.flow} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{option.size}</span>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: dc.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: dc.color }}>{dc.icon}</div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{trade.ticker}</h4>
+            <p style={{ margin: 0, fontSize: 11, color: "#64748b" }}>{trade.company}</p>
+          </div>
         </div>
-        <span style={{ fontSize: 11, color: "#94a3b8" }}>{option.time}</span>
+        <div style={{ textAlign: "right" }}>
+          <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{trade.dollarValue}</p>
+          <span style={{ fontSize: 10, fontWeight: 600, color: dc.color, textTransform: "uppercase" }}>{dc.label}</span>
+        </div>
       </div>
+
+      {/* Row 2: Quick info */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>{trade.shares} shares · ${trade.price.toFixed(2)}</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: freshDotColor(trade.time), display: "inline-block" }} />
+          <span style={{ fontSize: 11, color: "#94a3b8" }}>{relTime(trade.time)}</span>
+        </div>
+      </div>
+
+      {/* Size warning */}
+      {trade.multiplier >= 8 && !expanded && (
+        <div style={{ marginTop: 8, background: "#fffbeb", borderRadius: 8, padding: "6px 10px", display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <span style={{ fontSize: 11 }}>⚠️</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#92400e" }}>{trade.multiplier}x bigger than normal</span>
+        </div>
+      )}
+
+      {/* Expanded */}
       {expanded && (
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #f1f5f9" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-            <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
-              <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>Premium</p>
-              <p style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: "2px 0 0" }}>{option.premium}</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+            <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 12px", textAlign: "center" }}>
+              <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>Trade Size</p>
+              <p style={{ fontSize: 18, fontWeight: 700, color: trade.multiplier >= 5 ? "#16a34a" : "#0f172a", margin: "2px 0 0" }}>{trade.multiplier}x normal</p>
             </div>
-            <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
-              <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>Volume</p>
-              <p style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: "2px 0 0" }}>{option.volume}</p>
-            </div>
-            <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
-              <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>Open Int.</p>
-              <p style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: "2px 0 0" }}>{option.openInterest}</p>
+            <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 12px", textAlign: "center" }}>
+              <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>Direction</p>
+              <p style={{ fontSize: 18, fontWeight: 700, color: dc.color, margin: "2px 0 0" }}>{dc.label}</p>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
-              <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>Implied Vol.</p>
-              <p style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: "2px 0 0" }}>{option.iv}</p>
-            </div>
-            <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
-              <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>Sentiment</p>
-              <div style={{ margin: "4px 0 0" }}><SentimentBadge sentiment={option.sentiment} /></div>
-            </div>
-          </div>
-          <div style={{ marginTop: 10, background: isCall ? "#f0fdf9" : "#fef2f2", borderRadius: 10, padding: "10px 14px" }}>
-            <p style={{ margin: 0, fontSize: 13, color: "#475569", lineHeight: 1.5 }}>
-              {isCall
-                ? `Someone is betting ${option.size} that ${option.ticker} will be above $${option.strike} by ${option.expiry}. ${option.unusual ? "This is unusual activity — volume is much higher than open interest." : ""}`
-                : `Someone is betting ${option.size} that ${option.ticker} will drop below $${option.strike} by ${option.expiry}. ${option.unusual ? "This is unusual activity — volume is much higher than open interest." : ""}`
-              }
-            </p>
+          <div style={{ background: dc.bg, borderRadius: 10, padding: "10px 14px" }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#475569", marginBottom: 4 }}>💡 What this means:</p>
+            <p style={{ margin: 0, fontSize: 13, color: "#475569", lineHeight: 1.6 }}>{trade.note}</p>
           </div>
         </div>
       )}
+
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
+        <span style={{ fontSize: 11, color: "#94a3b8" }}>{expanded ? "Less ▴" : "More ▾"}</span>
+      </div>
     </div>
   );
 }
 
-function FlowSummary({ data }) {
-  const bullish = data.filter(d => d.sentiment === "bullish").length;
-  const bearish = data.filter(d => d.sentiment === "bearish").length;
-  const total = data.length;
-  const bullPct = Math.round((bullish / total) * 100);
+// ===== SMART BETS CARD =====
+function SmartBetCard({ bet }) {
+  const [expanded, setExpanded] = useState(false);
+  const isUp = bet.direction === "up";
+  const dc = isUp
+    ? { bg: "#f0fdf4", border: "#22c55e", icon: "📈", label: "Betting stock goes UP", color: "#15803d" }
+    : { bg: "#fef2f2", border: "#ef4444", icon: "📉", label: "Betting stock goes DOWN", color: "#dc2626" };
+  const thick = parseFloat(bet.amount.replace(/[$M]/g, "")) >= 20 ? 4 : 3;
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-      <div style={{ flex: 1, height: 8, borderRadius: 4, background: "#fecaca", overflow: "hidden", position: "relative" }}>
-        <div style={{ width: `${bullPct}%`, height: "100%", borderRadius: 4, background: "#22c55e", transition: "width .3s" }} />
+    <div onClick={() => setExpanded(!expanded)}
+      style={{ background: "#fff", borderRadius: 14, border: `1px solid ${isUp ? "#d1fae5" : "#fecaca"}`, borderLeft: `${thick}px solid ${dc.border}`, padding: "14px 16px", cursor: "pointer", transition: "all .2s", opacity: cardOpacity(bet.time) }}
+      onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,.08)"}
+      onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
+
+      {/* Row 1 */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 20 }}>{dc.icon}</span>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{bet.ticker}</h4>
+              {bet.unusual && <span style={{ padding: "2px 6px", borderRadius: 8, background: "#fef3c7", color: "#92400e", fontSize: 9, fontWeight: 700 }}>🔥 UNUSUAL</span>}
+            </div>
+            <p style={{ margin: 0, fontSize: 11, color: "#64748b" }}>{bet.company}</p>
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{bet.amount}</p>
+        </div>
       </div>
-      <div style={{ display: "flex", gap: 8, fontSize: 11, flexShrink: 0 }}>
-        <span style={{ color: "#16a34a", fontWeight: 700 }}>🟢 {bullish} Bullish</span>
-        <span style={{ color: "#dc2626", fontWeight: 700 }}>🔴 {bearish} Bearish</span>
+
+      {/* Row 2: The bet in plain English */}
+      <div style={{ background: dc.bg, borderRadius: 8, padding: "6px 10px", marginBottom: 6 }}>
+        <p style={{ margin: 0, fontSize: 13, color: dc.color, fontWeight: 600 }}>
+          {dc.label}: {bet.bet}
+        </p>
+      </div>
+
+      {/* Row 3: Meta */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 11, color: "#94a3b8" }}>{bet.odds}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: freshDotColor(bet.time), display: "inline-block" }} />
+          <span style={{ fontSize: 11, color: "#94a3b8" }}>{relTime(bet.time)}</span>
+        </div>
+      </div>
+
+      {/* Expanded */}
+      {expanded && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #f1f5f9" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
+            <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
+              <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>
+                Cost Per Bet
+                <Tooltip text="The price someone paid for each contract. Higher = more conviction." />
+              </p>
+              <p style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: "2px 0 0" }}>{bet.premium}</p>
+            </div>
+            <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
+              <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>
+                Today's Bets
+                <Tooltip text="How many of these contracts traded today." />
+              </p>
+              <p style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: "2px 0 0" }}>{bet.volume}</p>
+            </div>
+            <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
+              <p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>
+                Existing Bets
+                <Tooltip text="How many of these contracts were already open. High volume vs. low existing = unusual." />
+              </p>
+              <p style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: "2px 0 0" }}>{bet.openInterest}</p>
+            </div>
+          </div>
+          <div style={{ background: "#f8fafc", borderRadius: 10, padding: "8px 12px", marginBottom: 10 }}>
+            <p style={{ margin: 0, fontSize: 10, color: "#94a3b8", textTransform: "uppercase" }}>
+              Uncertainty Level
+              <Tooltip text="Higher uncertainty = bigger potential gains AND losses. The market expects this stock to swing more." />
+            </p>
+            <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 600, color: "#475569" }}>{bet.uncertainty}</p>
+          </div>
+          <div style={{ background: dc.bg, borderRadius: 10, padding: "10px 14px" }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#475569", marginBottom: 4 }}>💡 What this means:</p>
+            <p style={{ margin: 0, fontSize: 13, color: "#475569", lineHeight: 1.6 }}>{bet.detail}</p>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
+        <span style={{ fontSize: 11, color: "#94a3b8" }}>{expanded ? "Less ▴" : "More ▾"}</span>
       </div>
     </div>
   );
 }
 
-// ===== MAIN COMPONENT =====
+// ===== EXPLAINER BANNER =====
+function ExplainerBanner({ type, onDismiss }) {
+  const c = type === "bigmoney"
+    ? { bg: "#eff6ff", border: "#bfdbfe", color: "#1e40af", text: "These are large trades made by institutions (hedge funds, banks) away from regular exchanges. When big players buy or sell in bulk, it can hint at where a stock is heading." }
+    : { bg: "#fefce8", border: "#fde68a", color: "#854d0e", text: "These are large bets on whether a stock will go up or down by a specific date. \"Unusual\" means someone is betting way more than normal — that's often worth watching." };
+  return (
+    <div style={{ background: c.bg, borderRadius: 12, padding: "10px 14px", border: `1px solid ${c.border}`, display: "flex", alignItems: "flex-start", gap: 8 }}>
+      <div style={{ flex: 1 }}>
+        <p style={{ margin: 0, fontSize: 12, color: c.color, lineHeight: 1.5 }}>{c.text}</p>
+      </div>
+      <button onClick={onDismiss} style={{ background: "none", border: "none", color: c.color, opacity: 0.5, cursor: "pointer", fontSize: 14, padding: 2, flexShrink: 0, marginTop: -2 }}>✕</button>
+    </div>
+  );
+}
+
+// ===== MAIN =====
 export default function DarkPoolOptionsTab({ session, group }) {
-  const [activeTab, setActiveTab] = useState("darkpool");
-  const [dpFilter, setDpFilter] = useState("all");
-  const [optFilter, setOptFilter] = useState("all");
+  const [tab, setTab] = useState("bigmoney");
+  const [filter, setFilter] = useState("all");
+  const [sort, setSort] = useState("time");
+  const [showExplainer, setShowExplainer] = useState({ bigmoney: true, smartbets: true });
 
-  const filteredDP = dpFilter === "all" ? mockDarkPool
-    : mockDarkPool.filter(d => d.sentiment === dpFilter);
+  const filteredBM = (filter === "all" ? mockBigMoney : mockBigMoney.filter(d => d.direction === filter))
+    .sort((a, b) => sort === "time" ? b.time - a.time : parseFloat(b.dollarValue.replace(/[$MBK]/g, "")) - parseFloat(a.dollarValue.replace(/[$MBK]/g, "")));
 
-  const filteredOpt = optFilter === "all" ? mockOptions
-    : optFilter === "unusual" ? mockOptions.filter(o => o.unusual)
-    : optFilter === "calls" ? mockOptions.filter(o => o.type === "CALL")
-    : mockOptions.filter(o => o.type === "PUT");
+  const filteredSB = (filter === "all" ? mockSmartBets
+    : filter === "unusual" ? mockSmartBets.filter(o => o.unusual)
+    : filter === "up" ? mockSmartBets.filter(o => o.direction === "up")
+    : mockSmartBets.filter(o => o.direction === "down"))
+    .sort((a, b) => sort === "time" ? b.time - a.time : parseFloat(b.amount.replace(/[$M]/g, "")) - parseFloat(a.amount.replace(/[$M]/g, "")));
 
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto", padding: "20px 16px", display: "flex", flexDirection: "column", gap: 16, flexShrink: 0 }}>
+    <div style={{ maxWidth: 480, margin: "0 auto", padding: "20px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
       <style>{`
-        *, *::before, *::after { box-sizing: border-box; }
+        @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
         @media (max-width: 480px) {
-          .dp-container { padding: 12px 8px !important; }
-          .dp-tab-btn { padding: 10px 0 !important; font-size: 13px !important; }
+          .flow-main { padding: 12px 8px !important; gap: 12px !important; max-width: 100% !important; }
         }
       `}</style>
 
       {/* Tab Toggle */}
-      <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", display: "flex", overflow: "hidden" }}>
+      <div style={{ background: "#f1f5f9", borderRadius: 14, padding: 4, display: "flex", gap: 4 }}>
         {[
-          { key: "darkpool", label: "🏦 Dark Pool", sub: "Institutional Trades" },
-          { key: "options", label: "📋 Options Flow", sub: "Smart Money Bets" },
-        ].map(tab => (
-          <button key={tab.key} className="dp-tab-btn" onClick={() => setActiveTab(tab.key)}
-            style={{ flex: 1, padding: "12px 0", background: activeTab === tab.key ? "#1e293b" : "transparent", color: activeTab === tab.key ? "#fff" : "#64748b", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600, transition: "all .2s", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, borderRadius: activeTab === tab.key ? 12 : 0 }}>
-            {tab.label}
-            <span style={{ fontSize: 10, fontWeight: 400, opacity: 0.7 }}>{tab.sub}</span>
+          { key: "bigmoney", label: "🏦 Big Money Trades" },
+          { key: "smartbets", label: "🎯 Smart Bets" },
+        ].map(t => (
+          <button key={t.key} onClick={() => { setTab(t.key); setFilter("all"); }}
+            style={{ flex: 1, padding: "12px 8px", borderRadius: 11, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", transition: "all .2s", background: tab === t.key ? "#fff" : "transparent", color: tab === t.key ? "#0f172a" : "#64748b", boxShadow: tab === t.key ? "0 1px 3px rgba(0,0,0,.1)" : "none" }}>
+            {t.label}
           </button>
         ))}
       </div>
 
-      {/* DARK POOL TAB */}
-      {activeTab === "darkpool" && (
-        <>
-          <div style={{ background: "#eff6ff", borderRadius: 14, padding: "14px 16px", border: "1px solid #bfdbfe" }}>
-            <p style={{ margin: 0, fontSize: 13, color: "#1e40af", lineHeight: 1.5 }}>
-              <strong>What is this?</strong> Dark pool trades are large orders from institutions (hedge funds, banks) that happen off the regular exchange. Big block trades can signal where "smart money" is moving.
-            </p>
-          </div>
+      {/* Spotlight — only when relevant */}
+      {spotlight && <SpotlightHero data={spotlight} />}
 
-          <div style={{ display: "flex", gap: 6 }}>
-            {[
-              { key: "all", label: "All" },
-              { key: "bullish", label: "🟢 Bullish" },
-              { key: "bearish", label: "🔴 Bearish" },
-            ].map(f => (
-              <button key={f.key} onClick={() => setDpFilter(f.key)}
-                style={{ padding: "6px 14px", borderRadius: 16, fontSize: 12, fontWeight: 600, border: dpFilter === f.key ? "none" : "1px solid #e2e8f0", background: dpFilter === f.key ? "#1e293b" : "#fff", color: dpFilter === f.key ? "#fff" : "#475569", cursor: "pointer" }}>
-                {f.label}
+      {/* Summary */}
+      <SummaryRow tab={tab} />
+
+      {/* Sort + Count */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>
+          {tab === "bigmoney" ? `${filteredBM.length} trades` : `${filteredSB.length} bets`}
+        </p>
+        <div style={{ display: "flex", gap: 4 }}>
+          {[{ k: "time", l: "Newest" }, { k: "size", l: "Largest" }].map(s => (
+            <button key={s.k} onClick={() => setSort(s.k)}
+              style={{ padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600, border: sort === s.k ? "none" : "1px solid #e2e8f0", background: sort === s.k ? "#1e293b" : "#fff", color: sort === s.k ? "#fff" : "#64748b", cursor: "pointer" }}>
+              {s.l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ===== BIG MONEY TAB ===== */}
+      {tab === "bigmoney" && (
+        <>
+          {showExplainer.bigmoney && <ExplainerBanner type="bigmoney" onDismiss={() => setShowExplainer(p => ({ ...p, bigmoney: false }))} />}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {[{ k: "all", l: "All" }, { k: "buying", l: "↑ Buying" }, { k: "selling", l: "↓ Selling" }].map(f => (
+              <button key={f.k} onClick={() => setFilter(f.k)}
+                style={{ padding: "6px 14px", borderRadius: 16, fontSize: 12, fontWeight: 600, border: filter === f.k ? "none" : "1px solid #e2e8f0", background: filter === f.k ? "#1e293b" : "#fff", color: filter === f.k ? "#fff" : "#475569", cursor: "pointer" }}>
+                {f.l}
               </button>
             ))}
           </div>
-
-          <FlowSummary data={mockDarkPool} />
-
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {filteredDP.map(trade => <DarkPoolCard key={trade.id} trade={trade} />)}
+            {filteredBM.map(t => <BigMoneyCard key={t.id} trade={t} />)}
+            {filteredBM.length === 0 && (
+              <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", padding: "40px 24px", textAlign: "center" }}>
+                <p style={{ fontSize: 36, margin: "0 0 8px" }}>🔍</p>
+                <p style={{ fontSize: 14, color: "#64748b", margin: 0 }}>No {filter} trades found. Try another filter.</p>
+              </div>
+            )}
           </div>
         </>
       )}
 
-      {/* OPTIONS FLOW TAB */}
-      {activeTab === "options" && (
+      {/* ===== SMART BETS TAB ===== */}
+      {tab === "smartbets" && (
         <>
-          <div style={{ background: "#fefce8", borderRadius: 14, padding: "14px 16px", border: "1px solid #fde68a" }}>
-            <p style={{ margin: 0, fontSize: 13, color: "#854d0e", lineHeight: 1.5 }}>
-              <strong>What is this?</strong> Options flow shows large bets traders are making on whether a stock will go up (Calls) or down (Puts). "Unusual" activity means someone is making a much bigger bet than normal — worth paying attention to.
-            </p>
-          </div>
-
+          {showExplainer.smartbets && <ExplainerBanner type="smartbets" onDismiss={() => setShowExplainer(p => ({ ...p, smartbets: false }))} />}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {[
-              { key: "all", label: "All Flow" },
-              { key: "unusual", label: "🔥 Unusual Only" },
-              { key: "calls", label: "📈 Calls" },
-              { key: "puts", label: "📉 Puts" },
-            ].map(f => (
-              <button key={f.key} onClick={() => setOptFilter(f.key)}
-                style={{ padding: "6px 14px", borderRadius: 16, fontSize: 12, fontWeight: 600, border: optFilter === f.key ? "none" : "1px solid #e2e8f0", background: optFilter === f.key ? "#1e293b" : "#fff", color: optFilter === f.key ? "#fff" : "#475569", cursor: "pointer" }}>
-                {f.label}
+            {[{ k: "all", l: "All" }, { k: "unusual", l: "🔥 Unusual" }, { k: "up", l: "📈 Betting Up" }, { k: "down", l: "📉 Betting Down" }].map(f => (
+              <button key={f.k} onClick={() => setFilter(f.k)}
+                style={{ padding: "6px 14px", borderRadius: 16, fontSize: 12, fontWeight: 600, border: filter === f.k ? "none" : "1px solid #e2e8f0", background: filter === f.k ? "#1e293b" : "#fff", color: filter === f.k ? "#fff" : "#475569", cursor: "pointer" }}>
+                {f.l}
               </button>
             ))}
           </div>
-
-          <FlowSummary data={mockOptions} />
-
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {filteredOpt.map(opt => <OptionsCard key={opt.id} option={opt} />)}
+            {filteredSB.map(b => <SmartBetCard key={b.id} bet={b} />)}
+            {filteredSB.length === 0 && (
+              <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", padding: "40px 24px", textAlign: "center" }}>
+                <p style={{ fontSize: 36, margin: "0 0 8px" }}>🔍</p>
+                <p style={{ fontSize: 14, color: "#64748b", margin: 0 }}>No matching bets. Try another filter.</p>
+              </div>
+            )}
           </div>
-
-          {filteredOpt.length === 0 && (
-            <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", padding: "40px 24px", textAlign: "center" }}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>🔍</div>
-              <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1e293b", margin: "0 0 6px" }}>No matching options flow</h3>
-              <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>Try a different filter to see more results.</p>
-            </div>
-          )}
         </>
       )}
     </div>
