@@ -121,7 +121,7 @@ export default function LandingPage() {
         .land-section.d5 { animation-delay: 0.54s; }
 
         @media (max-width: 520px) {
-          .hero-title { font-size: 36px !important; }
+          .hero-title { font-size: 38px !important; }
           .waitlist-card { padding: 24px 18px !important; }
         }
       `}</style>
@@ -324,17 +324,17 @@ const styles = {
     gap: 2,
   },
   logoRow: { display: 'flex', alignItems: 'baseline' },
-  logoUp: { fontSize: 17, fontWeight: 500, color: '#f0ede8' },
-  logoTik: { fontSize: 17, fontWeight: 500, color: '#8cd9a0' },
+  logoUp: { fontSize: 22, fontWeight: 500, color: '#f0ede8' },
+  logoTik: { fontSize: 22, fontWeight: 500, color: '#8cd9a0' },
   logoAlerts: {
-    fontSize: 14, fontWeight: 300, color: '#d4e4f2', letterSpacing: 2,
-    fontFamily: "'Avenir Next', 'Avenir', 'Nunito Sans', sans-serif",
+    fontSize: 16, fontWeight: 300, color: '#f0ede8', letterSpacing: 2,
+    fontFamily: "'Outfit', sans-serif",
     marginTop: -1, paddingLeft: 4,
   },
   logoSlogan: {
-    fontSize: 10, fontWeight: 300, fontStyle: 'italic',
-    color: '#d4e4f2', letterSpacing: 1,
-    fontFamily: "'Avenir Next', 'Avenir', 'Nunito Sans', sans-serif",
+    fontSize: 12, fontWeight: 300, fontStyle: 'italic',
+    color: '#f0ede8', letterSpacing: 1,
+    fontFamily: "'Outfit', sans-serif",
   },
   navRight: {
     display: 'flex',
@@ -345,7 +345,7 @@ const styles = {
   betaLoginBtn: {
     background: 'none',
     border: 'none',
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: 600,
     color: '#fff',
     cursor: 'pointer',
@@ -354,7 +354,7 @@ const styles = {
     transition: 'color 0.15s',
   },
   comingSoonPill: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: 600,
     color: '#8cd9a0',
     background: 'rgba(26,173,94,0.2)',
@@ -413,7 +413,7 @@ const styles = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 7,
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: 600,
     color: '#1AAD5E',
     background: 'rgba(26,173,94,0.08)',
@@ -434,7 +434,7 @@ const styles = {
   // ── Headline ──
   headline: {
     fontFamily: "'Outfit', sans-serif",
-    fontSize: 44,
+    fontSize: 48,
     fontWeight: 800,
     color: '#1a2d4a',
     lineHeight: 1.15,
@@ -444,7 +444,7 @@ const styles = {
 
   // ── Subtitle ──
   subtitle: {
-    fontSize: 13,
+    fontSize: 16,
     color: '#7a8ea3',
     lineHeight: 1.5,
     fontWeight: 400,
@@ -478,7 +478,7 @@ const styles = {
     padding: '11px 14px',
     borderRadius: 9,
     border: '1.5px solid #d8e2ed',
-    fontSize: 14,
+    fontSize: 16,
     color: '#1a2d4a',
     background: '#ffffff',
     fontFamily: "'DM Sans', sans-serif",
@@ -492,7 +492,7 @@ const styles = {
     border: 'none',
     borderRadius: 9,
     padding: '13px 0',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 700,
     fontFamily: "'Outfit', sans-serif",
     cursor: 'pointer',
@@ -527,13 +527,13 @@ const styles = {
     marginBottom: 4,
   },
   successTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: 700,
     color: '#1a2d4a',
     fontFamily: "'Outfit', sans-serif",
   },
   successSub: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#7a8ea3',
     lineHeight: 1.6,
     textAlign: 'center',
@@ -542,8 +542,8 @@ const styles = {
   // ── Social proof ──
   socialProof: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
   avatarStack: { display: 'flex' },
-  socialAvatar: { width: 24, height: 24, borderRadius: '50%', border: '2px solid #eef2f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fff' },
-  socialText: { fontSize: 11, color: '#7a8ea3', fontWeight: 500 },
+  socialAvatar: { width: 24, height: 24, borderRadius: '50%', border: '2px solid #eef2f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff' },
+  socialText: { fontSize: 14, color: '#7a8ea3', fontWeight: 500 },
 
   // ── Feature badges ──
   badges: {
@@ -558,7 +558,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: 500,
     color: '#1a2d4a',
     background: '#f8fafc',
@@ -569,22 +569,22 @@ const styles = {
   badgeCheck: {
     color: '#1AAD5E',
     fontWeight: 700,
-    fontSize: 12,
+    fontSize: 14,
   },
 
   // ── What's inside ──
   insideSection: { textAlign: 'left', maxWidth: 380, margin: '0 auto' },
-  insideTitle: { fontSize: 12, fontWeight: 700, color: '#1a2d4a', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center', fontFamily: "'Outfit', sans-serif" },
+  insideTitle: { fontSize: 16, fontWeight: 700, color: '#1a2d4a', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center', fontFamily: "'Outfit', sans-serif" },
   insideCard: { background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 10, padding: '10px 12px', display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 6 },
   insideIcon: { width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  insideCardTitle: { fontSize: 12, fontWeight: 600, color: '#1a2d4a', marginBottom: 2 },
-  insideCardDesc: { fontSize: 11, color: '#7a8ea3', lineHeight: 1.4 },
+  insideCardTitle: { fontSize: 15, fontWeight: 600, color: '#1a2d4a', marginBottom: 2 },
+  insideCardDesc: { fontSize: 14, color: '#7a8ea3', lineHeight: 1.4 },
 
   // ── Footer ──
   footer: {
     textAlign: 'center',
     padding: '14px',
-    fontSize: 12,
+    fontSize: 14,
     color: '#7a8ea3',
     borderTop: '1px solid #d8e2ed',
     fontFamily: "'DM Sans', sans-serif",
