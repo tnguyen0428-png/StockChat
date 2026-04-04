@@ -233,11 +233,11 @@ function Modal({ alert, onClose }) {
               ))}
             </div>
           </div>
-          <div>
+          <div className="why-row">
             <h4 style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px" }}>Why It's Alerting</h4>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {alert.whyAlerting.map((w,i)=>(
-                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, background: "#f8fafc", borderRadius: 14, padding: "12px 16px" }}>
+                <div key={i} className="why-bullet" style={{ display: "flex", alignItems: "flex-start", gap: 12, background: "#f8fafc", borderRadius: 14, padding: "12px 16px" }}>
                   <span style={{ fontSize: 18, marginTop: 2 }}>{w.icon}</span>
                   <div><p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#1e293b" }}>{w.label}</p><p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748b", lineHeight: 1.4 }}>{w.text}</p></div>
                 </div>
@@ -346,36 +346,75 @@ export default function AlertsTab({ session, group }) {
     <div className="alerts-container">
       <style>{`
         *, *::before, *::after { box-sizing: border-box; }
+        html, body { overflow-x: hidden; width: 100%; }
         .alerts-container { max-width: 480px; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
         .hero-header { display: flex; justify-content: space-between; align-items: flex-start; }
         .hero-ticker { font-size: 24px; font-weight: 700; color: #0f172a; margin: 0; }
         .hero-price { font-size: 24px; font-weight: 700; color: #0f172a; margin: 0; }
         .hero-company { font-size: 14px; color: #64748b; margin: 2px 0 0; }
         .hero-change { font-size: 14px; font-weight: 600; margin: 2px 0 0; }
-        .btn-row { display: flex; flex-direction: row; gap: 12px; padding: 0 20px 20px; }
+        .btn-row { display: flex; flex-direction: row; gap: 12px; padding: 0 16px 16px; }
         .btn-row button { flex: 1; padding: 12px 0; border-radius: 14px; font-weight: 600; font-size: 14px; cursor: pointer; }
         .btn-primary { background: #16a34a; color: #fff; border: none; box-shadow: 0 1px 3px rgba(22,163,74,.3); }
         .btn-secondary { background: transparent; color: #64748b; border: 2px solid #e2e8f0; }
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 0 20px 16px; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 0 16px 16px; }
         .stats-cell { background: #f8fafc; border-radius: 10px; padding: 8px 10px; text-align: center; }
         .card-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; margin-bottom: 2px; }
         .mood-row { display: flex; align-items: center; gap: 6px; }
         .filter-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
 
-        @media (max-width: 400px) {
-          .hero-header { flex-direction: column; gap: 4px; }
-          .hero-header > div:last-child { text-align: left; }
-          .hero-ticker { font-size: 20px; }
-          .hero-price { font-size: 20px; }
-          .hero-company { font-size: 13px; }
-          .hero-change { font-size: 13px; }
-          .btn-row { flex-direction: column; gap: 8px; }
-          .btn-row button { width: 100%; }
-          .stats-grid { grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-          .stats-cell { padding: 6px 4px; }
-          .stats-cell p:last-child { font-size: 14px !important; }
-          .mood-row { display: none; }
-          .alerts-container { padding: 12px 10px; gap: 12px; }
+        @media (max-width: 480px) {
+          .alerts-container {
+            padding: 12px 8px;
+            gap: 12px;
+            max-width: 100% !important;
+            width: 100% !important;
+            overflow-x: hidden;
+          }
+          .hero-header {
+            flex-direction: column;
+            gap: 2px;
+          }
+          .hero-header > div:last-child {
+            text-align: left;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+          }
+          .hero-ticker { font-size: 22px; }
+          .hero-price { font-size: 22px; }
+          .btn-row {
+            flex-direction: column;
+            gap: 8px;
+            padding: 0 16px 16px;
+          }
+          .btn-row button {
+            width: 100% !important;
+            flex: none !important;
+          }
+          .stats-grid {
+            padding: 0 16px 12px;
+            gap: 6px;
+          }
+          .stats-cell p:last-child {
+            font-size: 13px !important;
+          }
+          .mood-row {
+            display: none;
+          }
+          .filter-row {
+            padding: 0 0 4px;
+          }
+          .filter-row button {
+            padding: 6px 12px !important;
+            font-size: 11px !important;
+          }
+          .why-row {
+            padding: 0 16px 12px !important;
+          }
+          .why-bullet {
+            padding: 10px 12px !important;
+          }
         }
       `}</style>
 
@@ -419,7 +458,7 @@ export default function AlertsTab({ session, group }) {
                 <p style={{ fontSize: 12, fontWeight: 700, color: "#16a34a", textTransform: "uppercase", letterSpacing: "1.5px", margin: "0 0 8px", display: "flex", alignItems: "center", gap: 6 }}>⭐ Alert of the Day</p>
               )}
               <div style={{ ...card, cursor: "pointer", transition: "box-shadow .2s" }} onClick={()=>setModalAlert(heroAlert)}>
-                <div style={{ padding: "20px 20px 16px" }}>
+                <div style={{ padding: "16px 16px 12px" }}>
                   <div className="hero-header">
                     <div>
                       <h3 className="hero-ticker">{heroAlert.ticker}</h3>
@@ -440,11 +479,11 @@ export default function AlertsTab({ session, group }) {
                   </div>
                 </div>
 
-                <div style={{ padding: "0 20px 16px" }}>
+                <div className="why-row" style={{ padding: "0 16px 12px" }}>
                   <p style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 10px" }}>Why It's Alerting</p>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {heroAlert.whyAlerting.map((w,i)=>(
-                      <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, background: "#f8fafc", borderRadius: 14, padding: "12px 16px" }}>
+                      <div key={i} className="why-bullet" style={{ display: "flex", alignItems: "flex-start", gap: 12, background: "#f8fafc", borderRadius: 14, padding: "12px 16px" }}>
                         <span style={{ fontSize: 16, marginTop: 2, flexShrink: 0 }}>{w.icon}</span>
                         <div>
                           <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#1e293b" }}>{w.label}</p>
@@ -483,7 +522,7 @@ export default function AlertsTab({ session, group }) {
             <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,.06)", overflow: "hidden" }}>
               <button
                 onClick={() => setShowMore(!showMore)}
-                style={{ width: "100%", padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer" }}
+                style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer" }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
@@ -517,7 +556,7 @@ export default function AlertsTab({ session, group }) {
 
           {/* TRACK RECORD */}
           <div style={card}>
-            <div style={{ padding: "20px 20px 16px" }}>
+            <div style={{ padding: "16px 16px 12px" }}>
               <p style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 16px" }}>Track Record</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
                 {[{l:"Hit Rate",v:`${mockTrack.hitRate}%`,c:"#1e293b"},{l:"Avg Return",v:`+${mockTrack.avgReturn}%`,c:"#16a34a"},{l:"Streak",v:mockTrack.streak,c:"#1e293b"}].map(x=>(
@@ -537,7 +576,7 @@ export default function AlertsTab({ session, group }) {
             </div>
             <div style={{ borderTop: "1px solid #f1f5f9" }}>
               {mockTrack.history.map((h,i)=>(
-                <div key={i} style={{ padding: "14px 20px", display: "flex", alignItems: "center", gap: 12, borderTop: i>0 ? "1px solid #f8fafc" : "none" }}>
+                <div key={i} style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, borderTop: i>0 ? "1px solid #f8fafc" : "none" }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8", background: "#f1f5f9", padding: "4px 8px", borderRadius: 6, flexShrink: 0 }}>{h.date}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#1e293b" }}>{h.ticker}</p>
