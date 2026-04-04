@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from '
 import { supabase } from '../../lib/supabase';
 import { run52wHighScan, DEFAULT_THRESHOLD, runVolSurgeScan, DEFAULT_VOL_MULTIPLIER, runGapUpScan, DEFAULT_GAP_THRESHOLD, runMACrossScan, DEFAULT_SHORT_MA, DEFAULT_LONG_MA } from '../../lib/breakoutScanner';
 import { useGroup } from '../../context/GroupContext';
-import { MOCK_FEAR_SCORE, MOCK_SECTORS, MOCK_ALERTS, MOCK_AOTD_HISTORY, BADGE_CONFIG, DARK_THEME, LIGHT_THEME, MOCK_KEY_STATS } from './alertsMockData';
+import { MOCK_FEAR_SCORE, MOCK_ALERTS, MOCK_AOTD_HISTORY, BADGE_CONFIG, DARK_THEME, LIGHT_THEME, MOCK_KEY_STATS } from './alertsMockData';
 import { styles, swipeStyles, heatStyles, ovStyles } from './alertsTabStyles';
 
 // ── Swipeable card wrapper ──────────────────────────────────────────
@@ -727,7 +727,6 @@ export default function AlertsTab({ session }) {
 
   // Live market data from Supabase market_data table
   const [fearScore, setFearScore]           = useState(null);
-  const [sectors, setSectors]               = useState(null);
   const [spyData, setSpyData]               = useState(null);
   const [marketUpdatedAt, setMarketUpdatedAt] = useState(null);
   const lastFetchedAt = useRef(0);
@@ -741,7 +740,6 @@ export default function AlertsTab({ session }) {
       let latestUpdated = null;
       data.forEach(row => {
         if (row.key === 'vix_score')            setFearScore(row.value?.score ?? null);
-        if (row.key === 'sector_performance')   setSectors(row.value);
         if (row.key === 'spy_price')            setSpyData(row.value);
         if (row.updated_at && (!latestUpdated || row.updated_at > latestUpdated)) {
           latestUpdated = row.updated_at;
@@ -899,13 +897,80 @@ export default function AlertsTab({ session }) {
   // ── Derived data (memoized) ─────────────────────────────────────────
 
   const displayAlerts = useMemo(() => {
-    if (breakout_alerts.length > 0) {
-      return breakout_alerts.map(a => {
-        if (a.rsVsSpy != null || a.change == null || !spyData?.change) return a;
-        return { ...a, rsVsSpy: Number(a.change) - Number(spyData.change) };
-      });
-    }
-    return MOCK_ALERTS;
+    if (breakout_alerts.length === 0) return MOCK_ALERTS;
+
+    return breakout_alerts.map(a => {
+      const ticker = a.ticker ?? a.tickers?.[0] ?? '—';
+      const type = a.alert_type ?? a.signal_type ?? 'vol_surge';
+
+      // Format volume
+      const rawVol = a.volume ?? a.current_volume;
+      const volume = rawVol ? (Number(rawVol) >= 1e6 ? (Number(rawVol) / 1e6).toFixed(1) + 'M' : Number(rawVol).toLocaleString()) : null;
+
+      // Format time from created_at
+      const time = a.time ?? (a.created_at ? formatDate(a.created_at) : '');
+
+      // Auto-generate signal text from title/body or signal_type fields
+      let signal = a.signal ?? a.notes ?? a.title ?? '';
+      if (!signal && type === '52w_high' && a.pct_from_high != null) {
+        signal = `Within ${a.pct_from_high}% of 52-week high of $${a.high_52w?.toFixed(2) ?? '—'}`;
+      } else if (!signal && type === 'gap_up' && a.gap_pct != null) {
+        signal = `Gapped up +${a.gap_pct.toFixed(2)}% from prev close $${a.prev_close?.toFixed(2) ?? '—'}`;
+      } else if (!signal && type === 'ma_cross' && a.short_ma != null) {
+        signal = `${a.short_ma_period ?? 20}MA $${a.short_ma.toFixed(2)} crossed above ${a.long_ma_period ?? 50}MA $${a.long_ma?.toFixed(2) ?? '—'}`;
+      } else if (!signal && type === 'vol_surge' && a.volume_ratio != null) {
+        signal = `Volume surging ${a.volume_ratio}x above 30-day average`;
+      }
+
+      // Compute change from available data
+      const change = a.change ?? a.change_pct ?? a.gap_pct ?? null;
+
+      // Support / resistance
+      const resistance = a.resistance ?? (type === '52w_high' ? a.high_52w : null);
+      const support = a.support ?? a.prev_close ?? null;
+
+      // TODO: Replace with proper ML confidence model
+      let confidence = a.confidence ?? 70;
+      if (a.confidence == null) {
+        if (a.volume_ratio > 2 || (a.current_volume && a.avg_volume && a.current_volume / a.avg_volume > 2)) confidence += 10;
+        if (a.pct_from_high != null && a.pct_from_high < 2) confidence += 5;
+        if (change != null && change > 3) confidence += 5;
+        confidence = Math.min(confidence, 95);
+      }
+
+      // Auto-generate confidence reason
+      let confidenceReason = a.confidenceReason ?? null;
+      if (!confidenceReason) {
+        if (confidence >= 85) confidenceReason = `High confidence: strong ${type.replace('_', ' ')} setup with favorable technicals.`;
+        else if (confidence >= 70) confidenceReason = `Moderate confidence: valid ${type.replace('_', ' ')} signal — watch for follow-through.`;
+        else confidenceReason = `Lower confidence: ${type.replace('_', ' ')} detected but conditions are mixed.`;
+      }
+
+      // TODO: Look up sector from FMP
+      const sector = a.sector ?? null;
+
+      // rsVsSpy
+      const rsVsSpy = a.rsVsSpy ?? (change != null && spyData?.change ? Number(change) - Number(spyData.change) : null);
+
+      return {
+        ...a,
+        ticker,
+        alert_type: type,
+        volume,
+        time,
+        signal,
+        change,
+        resistance,
+        support,
+        confidence,
+        confidenceReason,
+        sector,
+        name: a.name ?? null,
+        context: a.context ?? null,
+        recentPrices: a.recentPrices ?? null,
+        rsVsSpy,
+      };
+    });
   }, [breakout_alerts, spyData]);
 
   const alertOfTheDay = useMemo(() => {
@@ -1072,8 +1137,6 @@ export default function AlertsTab({ session }) {
         </div>
       )}
 
-      {/* Sector Heat Map — live from market_data, falls back to mock */}
-      <SectorHeatMap sectors={sectors ?? MOCK_SECTORS} />
 
       {/* Alert of the Day — highest confidence, auto-expanded, excluded from list */}
       {alertOfTheDay && aotdBadge && (
