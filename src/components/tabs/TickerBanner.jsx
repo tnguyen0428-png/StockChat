@@ -5,6 +5,7 @@
 
 import { useState, useEffect, memo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { isWeekend, isMarketHoliday } from '../../utils/marketUtils';
 
 const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
 const REFRESH_INTERVAL = 60000;
@@ -19,6 +20,7 @@ const TickerBanner = memo(({ groupId }) => {
     let mounted = true;
 
     const fetchQuotes = async () => {
+      if (isWeekend() || isMarketHoliday()) { if (mounted) setLoading(false); return; }
       try {
         const { data: lists } = await supabase
           .from('curated_lists')
@@ -135,28 +137,25 @@ const TickerBanner = memo(({ groupId }) => {
 });
 
 async function fetchPrevDayQuotes(tickers) {
-  const results = await Promise.allSettled(
-    tickers.map(async (ticker) => {
+  if (isWeekend() || isMarketHoliday()) return [];
+  const allQuotes = [];
+  for (let i = 0; i < tickers.length; i += 20) {
+    if (i > 0) await new Promise(r => setTimeout(r, 1000));
+    const batch = tickers.slice(i, i + 20);
+    try {
       const res = await fetch(
-        `https://api.polygon.io/v2/aggs/ticker/${ticker}/prev?adjusted=true&apiKey=${POLYGON_KEY}`
+        `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${batch.join(',')}&apiKey=${POLYGON_KEY}`
       );
       const data = await res.json();
-      const result = data.results?.[0];
-      if (!result) return null;
-      const change = result.c - result.o;
-      const changePercent = (change / result.o) * 100;
-      return {
-        symbol: ticker,
-        price: result.c || 0,
-        change,
-        changePercent,
-      };
-    })
-  );
-
-  return results
-    .filter(r => r.status === 'fulfilled' && r.value !== null)
-    .map(r => r.value);
+      (data.tickers || []).forEach(t => {
+        const price = t.day?.c || t.prevDay?.c || 0;
+        const change = t.todaysChange || 0;
+        const changePercent = t.todaysChangePerc || 0;
+        allQuotes.push({ symbol: t.ticker, price, change, changePercent });
+      });
+    } catch {}
+  }
+  return allQuotes;
 }
 
 export default TickerBanner;

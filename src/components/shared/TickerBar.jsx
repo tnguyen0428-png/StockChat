@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { isWeekend, isMarketHoliday } from '../../utils/marketUtils';
 
 export default function TickerBar({ isAdmin, groupId }) {
   const [tickers, setTickers]     = useState([]);
@@ -47,25 +48,27 @@ export default function TickerBar({ isAdmin, groupId }) {
     if (!tickers.length) return;
 
     const fetchPrices = async () => {
+      if (isWeekend() || isMarketHoliday()) return;
       const apiKey = import.meta.env.VITE_POLYGON_API_KEY;
       const results = {};
 
-      await Promise.all(tickers.map(async (sym) => {
+      for (let i = 0; i < tickers.length; i += 20) {
+        if (i > 0) await new Promise(r => setTimeout(r, 1000));
+        const batch = tickers.slice(i, i + 20);
         try {
           const res = await fetch(
-            `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${sym}?apiKey=${apiKey}`
+            `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${batch.join(',')}&apiKey=${apiKey}`
           );
           const data = await res.json();
-          const snap = data?.ticker;
-          if (snap) {
-            results[sym] = {
-              price: snap.day?.c || snap.prevDay?.c || 0,
-              change: snap.todaysChange || 0,
-              changePct: snap.todaysChangePerc || 0,
+          (data.tickers || []).forEach(t => {
+            results[t.ticker] = {
+              price: t.day?.c || t.prevDay?.c || 0,
+              change: t.todaysChange || 0,
+              changePct: t.todaysChangePerc || 0,
             };
-          }
+          });
         } catch {}
-      }));
+      }
 
       setPrices(results);
     };

@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
+import { isWeekend, isMarketHoliday, isMarketOpen, isAfterHours } from '../../utils/marketUtils';
 
 const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
 
@@ -128,9 +129,18 @@ export default function HomeTab({ session, onGroupSelect, onAIPress, onSignOut, 
       const tickers = indicators.map(m => m.ticker);
       if (tickers.length === 0) return;
 
+      // Weekends/holidays: skip all Polygon calls
+      if (isWeekend() || isMarketHoliday()) return;
+
+      // After hours: only fetch core ETFs for futures display
+      const fetchTickers = isAfterHours()
+        ? tickers.filter(t => ['SPY', 'QQQ', 'DIA'].includes(t))
+        : tickers;
+      if (fetchTickers.length === 0) return;
+
       // Use v3 snapshot for extended hours support
       const res = await fetch(
-        `https://api.polygon.io/v3/snapshot?ticker.any_of=${tickers.join(',')}&apiKey=${POLYGON_KEY}`
+        `https://api.polygon.io/v3/snapshot?ticker.any_of=${fetchTickers.join(',')}&apiKey=${POLYGON_KEY}`
       );
       const data = await res.json();
       const pulse = {};
@@ -157,16 +167,23 @@ export default function HomeTab({ session, onGroupSelect, onAIPress, onSignOut, 
         pulse[t.ticker] = { price, change, label };
       });
 
-      // Fallback for missing tickers (GLD, SLV etc)
-      const missing = tickers.filter(t => !pulse[t]);
-      await Promise.all(missing.map(async (ticker) => {
-        try {
-          const r = await fetch(`https://api.polygon.io/v2/aggs/ticker/${ticker}/prev?adjusted=true&apiKey=${POLYGON_KEY}`);
-          const d = await r.json();
-          const result = d.results?.[0];
-          if (result) pulse[ticker] = { price: result.c, change: ((result.c - result.o) / result.o) * 100, label: '' };
-        } catch {}
-      }));
+      // Fallback for missing tickers (GLD, SLV etc) — batched snapshot, market hours only
+      if (isMarketOpen()) {
+        const missing = tickers.filter(t => !pulse[t]);
+        for (let i = 0; i < missing.length; i += 20) {
+          if (i > 0) await new Promise(r => setTimeout(r, 1000));
+          try {
+            const batch = missing.slice(i, i + 20);
+            const r = await fetch(`https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${batch.join(',')}&apiKey=${POLYGON_KEY}`);
+            const d = await r.json();
+            (d.tickers || []).forEach(t => {
+              const price = t.day?.c || t.prevDay?.c || 0;
+              const prev = t.prevDay?.c || t.day?.o || price;
+              pulse[t.ticker] = { price, change: prev ? ((price - prev) / prev) * 100 : 0, label: '' };
+            });
+          } catch {}
+        }
+      }
 
       setMarketPulse(pulse);
     } catch {}

@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { isWeekend, isMarketHoliday } from '../../utils/marketUtils';
 
 const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
 const REFRESH_INTERVAL = 60000;
@@ -47,6 +48,7 @@ export default function MarketIndicators({ isAdmin }) {
     let mounted = true;
 
     const fetchQuotes = async () => {
+      if (isWeekend() || isMarketHoliday()) { if (mounted) setLoading(false); return; }
       const tickers = indicators.map(i => i.ticker).join(',');
       try {
         const res = await fetch(
@@ -287,26 +289,24 @@ export default function MarketIndicators({ isAdmin }) {
 }
 
 async function fetchPrevDay(tickers) {
-  const results = await Promise.allSettled(
-    tickers.map(async (ticker) => {
+  if (isWeekend() || isMarketHoliday()) return {};
+  const map = {};
+  for (let i = 0; i < tickers.length; i += 20) {
+    if (i > 0) await new Promise(r => setTimeout(r, 1000));
+    const batch = tickers.slice(i, i + 20);
+    try {
       const res = await fetch(
-        `https://api.polygon.io/v2/aggs/ticker/${ticker}/prev?adjusted=true&apiKey=${POLYGON_KEY}`
+        `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${batch.join(',')}&apiKey=${POLYGON_KEY}`
       );
       const data = await res.json();
-      const r = data.results?.[0];
-      if (!r) return [ticker, null];
-      const change = r.c - r.o;
-      const changePercent = (change / r.o) * 100;
-      return [ticker, { price: r.c, change, changePercent }];
-    })
-  );
-
-  const map = {};
-  results.forEach(r => {
-    if (r.status === 'fulfilled' && r.value[1]) {
-      map[r.value[0]] = r.value[1];
-    }
-  });
+      (data.tickers || []).forEach(t => {
+        const price = t.day?.c || t.prevDay?.c || 0;
+        const change = t.todaysChange || 0;
+        const changePercent = t.todaysChangePerc || 0;
+        map[t.ticker] = { price, change, changePercent };
+      });
+    } catch {}
+  }
   return map;
 }
 
