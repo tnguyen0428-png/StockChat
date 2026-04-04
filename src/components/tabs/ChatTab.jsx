@@ -10,6 +10,9 @@ import { useGroup } from '../../context/GroupContext';
 import { askUpTikAI } from '../../lib/aiAgent';
 import FadingMessage from '../shared/FadingMessage';
 import TickerBanner from './TickerBanner';
+import { isWeekend, isMarketHoliday } from '../../utils/marketUtils';
+
+const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 
 const EMOJIS = ['🔥','📈','📉','🚀','💪','🎯','👀','💰','⚠️','✅','❌','😎','🤔','👋','🙌','😂','💎','🐂','🐻','⏰'];
 
@@ -255,13 +258,17 @@ function ListsView({ group, isAdmin, isModerator, isOpenList }) {
 }
 
 // ── Watchlist sub-view (global — no group filter) ──
-function WatchlistView({ session }) {
+function WatchlistView({ session, onAskAI }) {
   const [watchlist, setWatchlist] = useState([]);
   const [newTicker, setNewTicker] = useState('');
+  const [quoteData, setQuoteData] = useState({});
+  const [dcfData, setDcfData] = useState({});
+  const [detailData, setDetailData] = useState({});
+  const [expanded, setExpanded] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(null);
+  const [sortBy, setSortBy] = useState('recent');
 
-  useEffect(() => {
-    loadWatchlist();
-  }, [session?.user?.id]);
+  useEffect(() => { loadWatchlist(); }, [session?.user?.id]);
 
   const loadWatchlist = async () => {
     const { data } = await supabase
@@ -269,7 +276,68 @@ function WatchlistView({ session }) {
       .select('*')
       .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
-    if (data) setWatchlist(data);
+    if (data) {
+      setWatchlist(data);
+      if (data.length > 0) fetchBatchData(data.map(d => d.symbol));
+    }
+  };
+
+  const fetchBatchData = async (symbols) => {
+    if (isWeekend() || isMarketHoliday() || symbols.length === 0) return;
+    const joined = symbols.join(',');
+    try {
+      const [qRes, dRes] = await Promise.all([
+        fetch(`https://financialmodelingprep.com/stable/quote-short?symbol=${joined}&apikey=${FMP_KEY}`),
+        fetch(`https://financialmodelingprep.com/stable/dcf?symbol=${joined}&apikey=${FMP_KEY}`),
+      ]);
+      const [qJson, dJson] = await Promise.all([qRes.json(), dRes.json()]);
+      if (Array.isArray(qJson)) {
+        const qm = {};
+        qJson.forEach(q => { qm[q.symbol] = q; });
+        setQuoteData(qm);
+      }
+      if (Array.isArray(dJson)) {
+        const dm = {};
+        dJson.forEach(d => { dm[d.symbol] = d; });
+        setDcfData(dm);
+      }
+    } catch (e) { console.error('Watchlist batch fetch error:', e); }
+  };
+
+  const fetchDetail = async (symbol) => {
+    if (detailData[symbol]) return;
+    setDetailLoading(symbol);
+    const base = 'https://financialmodelingprep.com/stable';
+    try {
+      const [profRes, ratRes, growRes, earnRes] = await Promise.all([
+        fetch(`${base}/profile?symbol=${symbol}&apikey=${FMP_KEY}`),
+        fetch(`${base}/ratios?symbol=${symbol}&limit=1&apikey=${FMP_KEY}`),
+        fetch(`${base}/income-growth?symbol=${symbol}&limit=1&apikey=${FMP_KEY}`),
+        fetch(`${base}/earnings?symbol=${symbol}&apikey=${FMP_KEY}`),
+      ]);
+      const [prof, rat, grow, earn] = await Promise.all([profRes.json(), ratRes.json(), growRes.json(), earnRes.json()]);
+      const p = Array.isArray(prof) ? prof[0] : prof;
+      const r = Array.isArray(rat) ? rat[0] : {};
+      const g = Array.isArray(grow) ? grow[0] : {};
+      const nextEarnings = Array.isArray(earn) ? earn.find(e => new Date(e.date) > new Date())?.date : null;
+      setDetailData(prev => ({
+        ...prev,
+        [symbol]: {
+          companyName: p?.companyName || symbol,
+          sector: p?.sector || '',
+          mktCap: p?.mktCap || 0,
+          image: p?.image || '',
+          forwardPE: r?.peForwardTTM || r?.forwardPE || null,
+          pegRatio: r?.pegRatio || r?.priceEarningsToGrowthRatio || null,
+          netMargin: r?.netProfitMarginTTM || null,
+          debtEquity: r?.debtEquityRatioTTM || null,
+          revenueGrowth: g?.revenueGrowth || g?.growthRevenue || null,
+          epsGrowth: g?.epsgrowth || g?.growthEPS || null,
+          nextEarnings,
+        },
+      }));
+    } catch (e) { console.error('Detail fetch error:', e); }
+    setDetailLoading(null);
   };
 
   const addToWatchlist = async () => {
@@ -281,7 +349,11 @@ function WatchlistView({ session }) {
       .insert({ user_id: session.user.id, symbol: sym })
       .select()
       .single();
-    if (data) { setWatchlist(prev => [data, ...prev]); setNewTicker(''); }
+    if (data) {
+      setWatchlist(prev => [data, ...prev]);
+      setNewTicker('');
+      fetchBatchData([sym]);
+    }
   };
 
   const removeFromWatchlist = async (id) => {
@@ -289,43 +361,208 @@ function WatchlistView({ session }) {
     setWatchlist(prev => prev.filter(w => w.id !== id));
   };
 
-  const formatDate = (ts) => new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const toggleExpand = (symbol) => {
+    if (expanded === symbol) { setExpanded(null); return; }
+    setExpanded(symbol);
+    fetchDetail(symbol);
+  };
+
+  const fmtPct = (v) => v != null ? `${(v * 100).toFixed(1)}%` : '—';
+  const fmtCap = (v) => {
+    if (!v) return '—';
+    if (v >= 1e12) return `$${(v / 1e12).toFixed(1)}T`;
+    if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
+    if (v >= 1e6) return `$${(v / 1e6).toFixed(0)}M`;
+    return `$${v.toLocaleString()}`;
+  };
+
+  const sorted = [...watchlist].sort((a, b) => {
+    if (sortBy === 'change') {
+      const ca = quoteData[a.symbol]?.changesPercentage || 0;
+      const cb = quoteData[b.symbol]?.changesPercentage || 0;
+      return cb - ca;
+    }
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
 
   return (
     <div style={styles.subScroll}>
-      <div style={styles.secLabel}>My Watchlist · {watchlist.length} tickers</div>
-      <div style={styles.addRow}>
+      {/* Sort pills */}
+      <div style={{ display: 'flex', gap: 6, padding: '8px 14px 4px' }}>
+        {[{ key: 'recent', label: 'Recent' }, { key: 'change', label: '% Chg' }].map(s => (
+          <div key={s.key} onClick={() => setSortBy(s.key)} style={{
+            padding: '5px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            ...(sortBy === s.key
+              ? { background: '#1a2d4a', color: '#fff' }
+              : { background: '#f8fafc', border: '1px solid #d8e2ed', color: '#7a8ea3' }),
+          }}>{s.label}</div>
+        ))}
+      </div>
+
+      {/* Add input */}
+      <div style={{ ...styles.addRow, padding: '6px 14px' }}>
         <input
-          style={styles.addInput}
+          style={{ ...styles.addInput, fontSize: 14 }}
           value={newTicker}
           onChange={e => setNewTicker(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
           onKeyDown={e => e.key === 'Enter' && addToWatchlist()}
           placeholder="ADD TICKER"
           maxLength={5}
         />
-        <button style={styles.addBtn} onClick={addToWatchlist}>Add</button>
+        <button style={{ ...styles.addBtn, fontSize: 14 }} onClick={addToWatchlist}>Add</button>
       </div>
+
       {watchlist.length === 0 && (
         <div style={styles.emptyWrap}>
           <div style={styles.emptyText}>Add tickers you want to track personally</div>
         </div>
       )}
-      {watchlist.map(item => (
-        <div key={item.id} style={styles.listItem}>
-          <div style={{ flex: 1 }}>
-            <div style={styles.listTicker}>{item.symbol}</div>
-            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Added {formatDate(item.created_at)}</div>
-          </div>
-          <button style={styles.removeBtn} onClick={() => removeFromWatchlist(item.id)}>Remove</button>
-        </div>
-      ))}
-      <div style={styles.watchHint}>
-        Type $TICKER in chat to share with the group
+
+      {/* Ticker cards */}
+      <div style={{ padding: '0 14px' }}>
+        {sorted.map(item => {
+          const sym = item.symbol;
+          const q = quoteData[sym] || {};
+          const dcf = dcfData[sym];
+          const isExp = expanded === sym;
+          const det = detailData[sym];
+          const price = q.price || 0;
+          const chg = q.change || 0;
+          const chgPct = q.changesPercentage || 0;
+          const isUp = chgPct >= 0;
+          const dcfVal = dcf?.dcf;
+          const dcfDiff = dcfVal && price ? ((dcfVal - price) / price) * 100 : null;
+          const dcfUp = dcfDiff != null ? dcfDiff >= 0 : null;
+
+          return (
+            <div key={item.id} style={ws.card}>
+              {/* Collapsed row */}
+              <div style={ws.cardTop} onClick={() => toggleExpand(sym)}>
+                <img
+                  src={`https://images.financialmodelingprep.com/symbol/${sym}.png`}
+                  alt=""
+                  style={ws.logo}
+                  onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                />
+                <div style={{ ...ws.logoFallback, display: 'none' }}>{sym.slice(0, 2)}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={ws.ticker}>{sym}</div>
+                  <div style={ws.companyName}>{det?.companyName || ''}</div>
+                </div>
+                <div style={{ textAlign: 'right', marginRight: 6 }}>
+                  <div style={ws.price}>{price ? `$${price.toFixed(2)}` : '—'}</div>
+                  <div style={{ ...ws.change, color: isUp ? '#1AAD5E' : '#E05252' }}>
+                    {price ? `${isUp ? '+' : ''}$${chg.toFixed(2)} (${isUp ? '+' : ''}${chgPct.toFixed(2)}%)` : ''}
+                  </div>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a8ea3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: isExp ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </div>
+
+              {/* DCF bar */}
+              {dcfVal != null && (
+                <div style={{ ...ws.dcfBar, background: dcfUp ? 'rgba(26,173,94,0.06)' : 'rgba(224,82,82,0.04)', borderLeft: `3px solid ${dcfUp ? '#1AAD5E' : '#E05252'}` }}>
+                  <div>
+                    <span style={ws.dcfLabel}>DCF value </span>
+                    <span style={ws.dcfValue}>${dcfVal.toFixed(2)}</span>
+                  </div>
+                  <span style={{ ...ws.dcfDiff, color: dcfUp ? '#1AAD5E' : '#E05252' }}>
+                    {dcfDiff != null ? `${dcfUp ? '+' : ''}${dcfDiff.toFixed(1)}% ${dcfUp ? 'upside' : 'over'}` : ''}
+                  </span>
+                </div>
+              )}
+              {dcfVal == null && price > 0 && (
+                <div style={{ ...ws.dcfBar, background: '#f8fafc', borderLeft: '3px solid #d8e2ed' }}>
+                  <span style={ws.dcfLabel}>DCF loading...</span>
+                </div>
+              )}
+
+              {/* Expanded detail */}
+              {isExp && (
+                <div style={ws.detail}>
+                  {detailLoading === sym ? (
+                    <div style={{ fontSize: 13, color: '#7a8ea3', padding: '10px 0', textAlign: 'center' }}>Loading fundamentals...</div>
+                  ) : det ? (
+                    <>
+                      {/* Smart tags */}
+                      <div style={ws.tagRow}>
+                        {det.sector && <span style={{ ...ws.tag, background: 'rgba(74,144,217,0.1)', color: '#4A90D9' }}>{det.sector}</span>}
+                        {det.nextEarnings && (() => {
+                          const days = Math.ceil((new Date(det.nextEarnings) - new Date()) / 86400000);
+                          if (days > 0 && days <= 14) return <span style={{ ...ws.tag, background: 'rgba(212,160,23,0.1)', color: '#D4A017' }}>ER in {days}d</span>;
+                          if (days > 14) return <span style={{ ...ws.tag, background: 'rgba(212,160,23,0.1)', color: '#D4A017' }}>ER {new Date(det.nextEarnings).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>;
+                          return null;
+                        })()}
+                        {dcfUp === true && <span style={{ ...ws.tag, background: 'rgba(26,173,94,0.1)', color: '#1AAD5E' }}>Undervalued</span>}
+                        {dcfUp === false && <span style={{ ...ws.tag, background: 'rgba(224,82,82,0.08)', color: '#E05252' }}>Overvalued</span>}
+                        {det.debtEquity != null && det.debtEquity > 1.5 && <span style={{ ...ws.tag, background: 'rgba(224,82,82,0.08)', color: '#E05252' }}>High Debt</span>}
+                      </div>
+
+                      {/* Metric rows */}
+                      {[
+                        { label: 'Fwd P/E', value: det.forwardPE != null ? det.forwardPE.toFixed(1) : '—' },
+                        { label: 'PEG ratio', value: det.pegRatio != null ? det.pegRatio.toFixed(2) : '—' },
+                        { label: 'Net margin', value: fmtPct(det.netMargin) },
+                        { label: 'EPS growth', value: fmtPct(det.epsGrowth), color: det.epsGrowth != null ? (det.epsGrowth >= 0 ? '#1AAD5E' : '#E05252') : null },
+                        { label: 'Revenue growth', value: fmtPct(det.revenueGrowth), color: det.revenueGrowth != null ? (det.revenueGrowth >= 0 ? '#1AAD5E' : '#E05252') : null },
+                        { label: 'Debt / Equity', value: det.debtEquity != null ? det.debtEquity.toFixed(2) : '—', color: det.debtEquity > 1.5 ? '#E05252' : null },
+                        { label: 'Market cap', value: fmtCap(det.mktCap) },
+                      ].map(m => (
+                        <div key={m.label} style={ws.metricRow}>
+                          <span style={ws.metricLabel}>{m.label}</span>
+                          <span style={{ ...ws.metricValue, ...(m.color ? { color: m.color } : {}) }}>{m.value}</span>
+                        </div>
+                      ))}
+
+                      {/* Action buttons */}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                        <button style={ws.askAiBtn} onClick={() => onAskAI && onAskAI(sym)}>Ask AI</button>
+                        <button style={ws.removeBtn} onClick={() => removeFromWatchlist(item.id)}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E05252" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ ...styles.watchHint, padding: '10px 14px' }}>
+        Tap any ticker to see fundamentals. Type $TICKER in chat to share.
       </div>
       <div style={{ height: 20 }} />
     </div>
   );
 }
+
+const ws = {
+  card: { background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 10, marginBottom: 8, overflow: 'hidden' },
+  cardTop: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer' },
+  logo: { width: 30, height: 30, borderRadius: 7, objectFit: 'contain', flexShrink: 0 },
+  logoFallback: { width: 30, height: 30, borderRadius: 7, background: '#d8e2ed', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#7a8ea3', flexShrink: 0 },
+  ticker: { fontSize: 15, fontWeight: 700, color: '#1a2d4a' },
+  companyName: { fontSize: 12, color: '#7a8ea3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  price: { fontSize: 15, fontWeight: 600, color: '#1a2d4a' },
+  change: { fontSize: 12, fontWeight: 600 },
+  dcfBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', margin: '0 12px 8px', borderRadius: '0 6px 6px 0' },
+  dcfLabel: { fontSize: 12, color: '#7a8ea3' },
+  dcfValue: { fontSize: 14, fontWeight: 700, color: '#1a2d4a' },
+  dcfDiff: { fontSize: 13, fontWeight: 700 },
+  detail: { borderTop: '1px solid #d8e2ed', padding: '10px 12px', background: '#fff' },
+  tagRow: { display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 },
+  tag: { fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 4 },
+  metricRow: { display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #eef2f7' },
+  metricLabel: { fontSize: 13, color: '#7a8ea3' },
+  metricValue: { fontSize: 13, fontWeight: 600, color: '#1a2d4a' },
+  askAiBtn: { flex: 1, fontSize: 13, fontWeight: 600, color: '#8B5CF6', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontFamily: 'var(--font)' },
+  removeBtn: { width: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(224,82,82,0.06)', border: '1px solid rgba(224,82,82,0.2)', borderRadius: 8, cursor: 'pointer', padding: '7px 0' },
+};
 
 // ── Main ChatTab ──
 export default function ChatTab({ session, profile, group, isAdmin, isModerator, setUnreadChat }) {
@@ -503,7 +740,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
             style={{ ...styles.subTab, ...(subTab === t ? styles.subTabActive : {}) }}
             onClick={() => setSubTab(t)}
           >
-            {t === 'chat' ? 'Chat' : t === 'lists' ? 'Lists' : 'Watchlist'}
+            {t === 'chat' ? 'Chat' : t === 'lists' ? 'Lists' : `Watchlist (${watchlist.length})`}
           </div>
         ))}
       </div>
@@ -515,7 +752,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
 
       {/* Watchlist view */}
       {subTab === 'watchlist' && (
-        <WatchlistView session={session} />
+        <WatchlistView session={session} onAskAI={(sym) => { setSubTab('chat'); setInputText(`@AI Research $${sym}`); }} />
       )}
 
       {/* Chat view */}
