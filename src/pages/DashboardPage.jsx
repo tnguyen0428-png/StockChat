@@ -10,7 +10,8 @@ import { useGroup } from '../context/GroupContext';
 
 // Tab components
 import HomeTab    from '../components/tabs/HomeTab';
-import AlertsTab  from '../components/tabs/AlertsTab';
+// Original: import AlertsTab from '../components/tabs/AlertsTab';
+import AlertsTab  from '../components/tabs/AlertsTabRedesign';
 import ChatTab    from '../components/tabs/ChatTab';
 import ProfileTab from '../components/tabs/ProfileTab';
 import HelpTab    from '../components/tabs/HelpTab';
@@ -271,5 +272,5 @@ const styles = {
     borderRadius: '50%', display: 'flex',
     alignItems: 'center', justifyContent: 'center', lineHeight: 1,
   },
-  content: { flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: 90 },
+  content: { flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: 90 },
 };
