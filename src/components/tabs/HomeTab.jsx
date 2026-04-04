@@ -68,7 +68,7 @@ export default function HomeTab({ session, onGroupSelect, onAIPress, onSignOut, 
   };
 
   const loadGroupCounts = async () => {
-    const { data: counts } = await supabase.from('group_members').select('group_id, id');
+    const { data: counts } = await supabase.from('group_members').select('group_id, id').limit(500);
     if (counts) {
       const countMap = {};
       counts.forEach(c => { countMap[c.group_id] = (countMap[c.group_id] || 0) + 1; });

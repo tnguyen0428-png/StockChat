@@ -341,6 +341,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const [loading, setLoading]       = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef       = useRef(null);
+  const sendingRef     = useRef(false);
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -376,7 +377,8 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
       }, (payload) => {
         setMessages(prev => {
           if (prev.some(m => m.id === payload.new.id)) return prev;
-          return [...prev, payload.new];
+          const updated = [...prev, payload.new];
+          return updated.length > 200 ? updated.slice(-200) : updated;
         });
         setUnreadChat(true);
       })
@@ -428,21 +430,27 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   }, [group?.id, activeGroup?.name, profile?.username, watchlist, messages, aiLastTicker]);
 
   const handleSend = useCallback(async () => {
+    if (sendingRef.current) return;
     const text = aiMode ? `@AI ${inputText.trim()}` : inputText.trim();
     if (!inputText.trim() || !profile || !group) return;
-    setInputText('');
-    setShowEmoji(false);
-    setAiMode(false);
-    inputRef.current?.blur();
-    const { data, error } = await supabase.from('chat_messages').insert({
-      group_id: group.id, user_id: session.user.id,
-      username: profile.username, user_color: profile.color,
-      text, type: 'user', is_admin: isAdmin,
-    }).select().single();
-    if (data) setMessages(prev => [...prev, data]);
-    if (!error && /@AI\b/i.test(text)) {
-      const query = text.replace(/@AI\b/gi, '').trim() || text;
-      await callAI(query);
+    sendingRef.current = true;
+    try {
+      setInputText('');
+      setShowEmoji(false);
+      setAiMode(false);
+      inputRef.current?.blur();
+      const { data, error } = await supabase.from('chat_messages').insert({
+        group_id: group.id, user_id: session.user.id,
+        username: profile.username, user_color: profile.color,
+        text, type: 'user', is_admin: isAdmin,
+      }).select().single();
+      if (data) setMessages(prev => [...prev, data]);
+      if (!error && /@AI\b/i.test(text)) {
+        const query = text.replace(/@AI\b/gi, '').trim() || text;
+        await callAI(query);
+      }
+    } finally {
+      sendingRef.current = false;
     }
   }, [inputText, aiMode, profile, group, isAdmin, callAI, session]);
 

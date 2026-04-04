@@ -735,7 +735,7 @@ export default function AlertsTab({ session }) {
   const fetchMarketData = useCallback((force = false) => {
     if (!force && Date.now() - lastFetchedAt.current < STALE_TIME) return;
     lastFetchedAt.current = Date.now();
-    supabase.from('market_data').select('*').then(({ data }) => {
+    supabase.from('market_data').select('*').limit(100).then(({ data }) => {
       if (!data) return;
       let latestUpdated = null;
       data.forEach(row => {

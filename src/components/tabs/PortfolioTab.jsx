@@ -134,8 +134,8 @@ export default function PortfolioTab({ session }) {
   const loadLeaderboard = useCallback(async () => {
     setLbLoading(true);
     const [{ data: allPortfolios }, { data: allTrades }] = await Promise.all([
-      supabase.from('paper_portfolios').select('*, profiles(username)'),
-      supabase.from('paper_trades').select('*').eq('status', 'open'),
+      supabase.from('paper_portfolios').select('*, profiles(username)').limit(100),
+      supabase.from('paper_trades').select('*').eq('status', 'open').limit(500),
     ]);
     if (!allPortfolios) { setLbLoading(false); return; }
 
