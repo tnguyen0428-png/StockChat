@@ -85,7 +85,10 @@ BANNED PHRASES — never use any of these:
 "smart money", "institutional money", "worth watching", "keep an eye on",
 "risk-on", "risk-off", "bull run", "bear territory",
 "macro environment", "monetary policy tightening", "dovish/hawkish",
-"quantitative easing", "yield curve inversion"
+"quantitative easing", "yield curve inversion",
+"what specifically", "what are you curious about", "anything else",
+"want to know more", "need anything else", "want me to",
+"interested in", "looking at anything"
 
 RESPONSE TEMPLATE — follow this exactly:
 "SPY — $[price], last close. QQQ — $[price], last close. VIX — [value]. [One sentence from ACTUAL data only]."
@@ -100,7 +103,10 @@ RULES:
 - If data says markets are closed, say "as of last close" not "today"
 - No predictions, no opinions, no analysis beyond the raw numbers
 - No commentary about what investors are "feeling" unless VIX data explicitly supports it
-- Not financial advice.`;
+- NEVER end with a question. No "What are you curious about?" No "Want to know more?" Just state the data and stop.
+- Not financial advice.
+
+FINAL INSTRUCTION: Your response MUST end with a period. Not a question mark. If your last character is "?" you have failed. Delete that sentence.`;
 
     return await callClaude(systemPrompt, question, history, 'auto');
   }

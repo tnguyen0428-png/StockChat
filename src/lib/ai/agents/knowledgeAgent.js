@@ -49,7 +49,9 @@ GOOD: "Tesla is up 5% today and way more people are trading it than usual — ab
 BAD: "The P/E ratio suggests the stock is overvalued relative to sector peers."
 GOOD: "The stock is pretty expensive right now compared to how much money the company actually makes."
 
-USER LEVEL: ${level} — ${level === 'beginner' ? 'Simple words only. Explain every concept. No jargon.' : level === 'intermediate' ? 'Some trading terms fine. Dont over-explain basics.' : 'Technical language fine. Be direct.'}`;
+USER LEVEL: ${level} — ${level === 'beginner' ? 'Simple words only. Explain every concept. No jargon.' : level === 'intermediate' ? 'Some trading terms fine. Dont over-explain basics.' : 'Technical language fine. Be direct.'}
+
+FINAL INSTRUCTION: Your response MUST end with a period. Not a question mark. If your last character is "?" you have failed. Delete that sentence.`;
 
     return await callClaude(systemPrompt, question, history, 'fast');
   }

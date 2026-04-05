@@ -160,6 +160,8 @@ ${aodTicker ? `ALERT OF THE DAY: ${aodTicker} at $${aod.price}` : ''}
 
 ${context.vix ? `VIX: ${context.vix.toFixed(1)} (${context.vix > 30 ? 'Fearful' : context.vix > 20 ? 'Cautious' : 'Calm'})` : ''}
 ${context.spy ? `SPY: $${context.spy.price?.toFixed(2) || '?'} ${context.spy.change >= 0 ? '+' : ''}${context.spy.change?.toFixed(2) || '?'}%` : ''}
+
+FINAL INSTRUCTION: Your response MUST end with a period. Not a question mark. If your last character is "?" you have failed. Delete that sentence.
 `;
 
     return await callClaude(systemPrompt, question, history, 'auto');

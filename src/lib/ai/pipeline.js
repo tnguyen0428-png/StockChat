@@ -80,6 +80,10 @@ function checkForHallucination(response, context, agentType) {
     return "I don't have live market data right now. Markets may be closed. Check back when they open.";
   }
 
+  // Hard strip: remove any trailing sentence that ends with ?
+  response = response.replace(/\s*[^.!]*\?\s*$/, '').trim();
+  if (response && !response.endsWith('.') && !response.endsWith('!')) response += '.';
+
   return response.trim();
 }
 
