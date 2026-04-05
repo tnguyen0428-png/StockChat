@@ -38,6 +38,43 @@ const REACTIONS = [
   { emoji: '😂', label: 'cap' },
 ];
 
+function detectBehaviorBadges(userId, allTrades) {
+  const userTrades = allTrades.filter(t => t.user_id === userId && t.status === 'closed');
+  const badges = [];
+
+  const recentClosed = userTrades.filter(t => {
+    if (!t.sold_at) return false;
+    const age = Date.now() - new Date(t.sold_at).getTime();
+    return age < 7 * 86400000;
+  });
+  const dayTrades = recentClosed.filter(t => {
+    if (!t.sold_at || !t.bought_at) return false;
+    return (new Date(t.sold_at) - new Date(t.bought_at)) < 24 * 3600000;
+  });
+  if (dayTrades.length >= 3) badges.push({ type: 'day_traitor', label: 'DAY TRAITOR', bg: 'rgba(224,82,82,0.2)', color: '#F09595' });
+
+  const paperHands = recentClosed.some(t => {
+    if (!t.sold_at || !t.bought_at) return false;
+    const holdHours = (new Date(t.sold_at) - new Date(t.bought_at)) / 3600000;
+    return holdHours < 48 && Number(t.sold_price) < Number(t.entry_price);
+  });
+  if (paperHands) badges.push({ type: 'paper_hands', label: 'PAPER HANDS', bg: 'rgba(212,160,23,0.2)', color: '#FAC775' });
+
+  const openTrades = allTrades.filter(t => t.user_id === userId && t.status === 'open');
+  const diamond = openTrades.some(t => {
+    if (!t.bought_at) return false;
+    return (Date.now() - new Date(t.bought_at).getTime()) > 30 * 86400000;
+  });
+  if (diamond) badges.push({ type: 'diamond_hands', label: 'DIAMOND', bg: 'rgba(29,158,117,0.2)', color: '#5DCAA5' });
+
+  const lastThree = userTrades.sort((a, b) => new Date(b.sold_at) - new Date(a.sold_at)).slice(0, 3);
+  if (lastThree.length >= 3 && lastThree.every(t => Number(t.sold_price) > Number(t.entry_price))) {
+    badges.push({ type: 'hot_streak', label: 'HOT STREAK', bg: 'rgba(255,215,0,0.2)', color: '#FFD700' });
+  }
+
+  return badges;
+}
+
 export default function PortfolioTab({ session }) {
   const { profile } = useGroup();
   const [view, setView] = useState('portfolio');
@@ -137,13 +174,14 @@ export default function PortfolioTab({ session }) {
     setLbLoading(true);
     const [{ data: allPortfolios }, { data: allTrades }] = await Promise.all([
       supabase.from('paper_portfolios').select('*, profiles(username)').limit(100),
-      supabase.from('paper_trades').select('*').eq('status', 'open').limit(500),
+      supabase.from('paper_trades').select('*').limit(1000),
     ]);
     if (!allPortfolios) { setLbLoading(false); return; }
 
-    allTradesRef.current = allTrades || [];
+    const openTrades = (allTrades || []).filter(t => t.status === 'open');
+    allTradesRef.current = openTrades;
 
-    const allTickers = [...new Set((allTrades || []).map(t => t.ticker))];
+    const allTickers = [...new Set(openTrades.map(t => t.ticker))];
     let priceMap = { ...prices };
     if (allTickers.length > 0) {
       try {
@@ -157,25 +195,27 @@ export default function PortfolioTab({ session }) {
     }
 
     const entries = allPortfolios.map(pf => {
-      const userTrades = (allTrades || []).filter(t => t.user_id === pf.user_id);
-      const positionsValue = userTrades.reduce((sum, t) => {
+      const userOpenTrades = openTrades.filter(t => t.user_id === pf.user_id);
+      const positionsValue = userOpenTrades.reduce((sum, t) => {
         const curPrice = priceMap[t.ticker] || Number(t.entry_price);
         return sum + (Number(t.shares) * curPrice);
       }, 0);
       const totalValue = Number(pf.cash_balance) + positionsValue;
       const pctReturn = ((totalValue - STARTING_CASH) / STARTING_CASH) * 100;
+      const behaviorBadges = detectBehaviorBadges(pf.user_id, allTrades || []);
       return {
         userId: pf.user_id,
         username: pf.profiles?.username || 'Unknown',
         totalValue,
         pctReturn,
-        positions: userTrades.map(t => ({
+        positions: userOpenTrades.map(t => ({
           ticker: t.ticker,
           pctGain: priceMap[t.ticker]
             ? ((priceMap[t.ticker] - Number(t.entry_price)) / Number(t.entry_price)) * 100
             : 0,
         })),
-        openCount: userTrades.length,
+        openCount: userOpenTrades.length,
+        behaviorBadges,
       };
     });
 
@@ -1025,6 +1065,9 @@ export default function PortfolioTab({ session }) {
                         <div style={{ ...s.laneMedal, background: medalBg }}>{idx + 1}</div>
                         <span style={s.laneName}>{entry.username}{isMe ? ' ★' : ''}</span>
                         <span style={{ ...s.laneTier, background: tier.bg, color: tier.color }}>{tier.short}</span>
+                        {entry.behaviorBadges?.map(b => (
+                          <span key={b.type} style={{ fontSize: 11, padding: '1px 5px', borderRadius: 3, background: b.bg, color: b.color, fontWeight: 600 }}>{b.label}</span>
+                        ))}
                       </div>
                       <div style={s.laneBarWrap}><div style={{ ...s.laneBar, width: barWidth, background: barGrad }} /></div>
                       <span style={{ ...s.lanePct, color: pctColor }}>{entry.pctReturn >= 0 ? '+' : ''}{entry.pctReturn.toFixed(1)}%</span>
@@ -1042,6 +1085,9 @@ export default function PortfolioTab({ session }) {
             return (
               <div style={s.youStrip}>
                 <span style={s.youBadge}>#{myRank} YOU</span>
+                {myEntry?.behaviorBadges?.map(b => (
+                  <span key={b.type} style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: b.bg, color: b.color, fontWeight: 600 }}>{b.label}</span>
+                ))}
                 <div style={s.youMid}>
                   <span style={s.youVal}>
                     <strong>${totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> · {trades.length} pos
@@ -1141,6 +1187,9 @@ export default function PortfolioTab({ session }) {
                       <div style={{ fontSize: 9, color: 'var(--text3)', display: 'flex', gap: 6, marginTop: 1 }}>
                         <span>{entry.openCount} pos</span>
                         <span style={{ color: tier.color, fontWeight: 500 }}>{tier.short}</span>
+                        {entry.behaviorBadges?.map(b => (
+                          <span key={b.type} style={{ fontSize: 9, padding: '1px 4px', borderRadius: 2, background: b.bg, color: b.color, fontWeight: 600 }}>{b.label}</span>
+                        ))}
                       </div>
                     </div>
                     <div style={{ width: 40, height: 3, background: '#eef2f7', borderRadius: 2, overflow: 'hidden', flexShrink: 0 }}>
