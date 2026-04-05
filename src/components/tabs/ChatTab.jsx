@@ -17,7 +17,7 @@ const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 const EMOJIS = ['🔥','📈','📉','🚀','💪','🎯','👀','💰','⚠️','✅','❌','😎','🤔','👋','🙌','😂','💎','🐂','🐻','⏰'];
 
 // ── Message Item ──
-const MessageItem = memo(({ msg, currentUserId }) => {
+const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven }) => {
   const isAdmin = msg.is_admin;
   const isAI    = msg.user_id === 'user_ai';
 
@@ -56,6 +56,18 @@ const MessageItem = memo(({ msg, currentUserId }) => {
           <span style={styles.msgTime}>{formatTime(msg.created_at)}</span>
         </div>
         <div style={styles.msgText}>{parseText(msg.text)}</div>
+        {isAI && onFeedback && (
+          <div style={styles.feedbackRow}>
+            {feedbackGiven ? (
+              <span style={styles.feedbackThanks}>{feedbackGiven === 'up' ? '👍' : '👎'} Thanks!</span>
+            ) : (
+              <>
+                <button onClick={() => onFeedback(msg.id, 'up')} style={styles.feedbackBtn}>👍</button>
+                <button onClick={() => onFeedback(msg.id, 'down')} style={styles.feedbackBtn}>👎</button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -645,6 +657,29 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const [aiLoading, setAiLoading]   = useState(false);
   const [aiLastTicker, setAiLastTicker] = useState(null);
   const [aiMode, setAiMode]         = useState(false);
+  const [feedbackMap, setFeedbackMap] = useState({});
+
+  const handleFeedback = useCallback(async (msgId, rating) => {
+    setFeedbackMap(prev => ({ ...prev, [msgId]: rating }));
+    // Find the AI response and the question before it
+    const msgIndex = messages.findIndex(m => m.id === msgId);
+    const aiMsg = messages[msgIndex];
+    let question = '';
+    for (let i = msgIndex - 1; i >= 0; i--) {
+      if (messages[i].user_id !== 'user_ai') { question = messages[i].text; break; }
+    }
+    try {
+      await supabase.from('ai_feedback').insert({
+        user_id: session.user.id,
+        message_id: msgId,
+        question: question.replace(/@AI\b/gi, '').trim(),
+        response: aiMsg?.text || '',
+        rating,
+      });
+    } catch (err) {
+      console.warn('[Feedback] Save failed:', err.message);
+    }
+  }, [messages, session, supabase]);
   const [loading, setLoading]       = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef       = useRef(null);
@@ -844,7 +879,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
                 if (isAI || isAIQuestion) {
                   return (
                     <FadingMessage key={msg.id} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
-                      <MessageItem msg={msg} currentUserId={session?.user?.id} />
+                      <MessageItem msg={msg} currentUserId={session?.user?.id} onFeedback={isAI ? handleFeedback : undefined} feedbackGiven={feedbackMap[msg.id]} />
                     </FadingMessage>
                   );
                 }
@@ -1045,6 +1080,20 @@ const styles = {
     background: '#F5F3FF',
     border: '1px solid rgba(139,92,246,0.15)',
     borderRadius: 10, padding: '8px 10px',
+  },
+  feedbackRow: {
+    display: 'flex', alignItems: 'center', gap: 6,
+    marginTop: 6, paddingTop: 6,
+    borderTop: '1px solid rgba(139,92,246,0.1)',
+  },
+  feedbackBtn: {
+    background: 'none', border: '1px solid #e2e8f0',
+    borderRadius: 6, padding: '2px 8px', cursor: 'pointer',
+    fontSize: 14, lineHeight: 1,
+    transition: 'background .15s',
+  },
+  feedbackThanks: {
+    fontSize: 12, color: '#94a3b8',
   },
   msgTop: {
     display: 'flex', alignItems: 'center',
