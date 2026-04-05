@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from '../../lib/supabase';
-import { run52wHighScan, DEFAULT_THRESHOLD, runVolSurgeScan, DEFAULT_VOL_MULTIPLIER, runGapUpScan, DEFAULT_GAP_THRESHOLD, runMACrossScan, DEFAULT_SHORT_MA, DEFAULT_LONG_MA } from '../../lib/breakoutScanner';
 import { useGroup } from '../../context/GroupContext';
 import { useTheme, ChipField, DarkModeToggle } from './alertsCasinoComponents';
 
@@ -306,6 +305,7 @@ export default function AlertsTab({ session, group }) {
   const [filter, setFilter] = useState("All");
   const [modalAlert, setModalAlert] = useState(null);
   const [selectedChipId, setSelectedChipId] = useState(null);
+  const [expandedHistoryIdx, setExpandedHistoryIdx] = useState(null);
   const [showFlow, setShowFlow] = useState(false);
   const [flowTab, setFlowTab] = useState("bigmoney");
   const [flowSort, setFlowSort] = useState("time");
@@ -318,15 +318,6 @@ export default function AlertsTab({ session, group }) {
   const [liveAlerts, setLiveAlerts] = useState([]);
   const [fearScore, setFearScore] = useState(null);
   const [spyData, setSpyData] = useState(null);
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [scanning52w, setScanning52w] = useState(false);
-  const [scan52wProgress, setScan52wProgress] = useState(0);
-  const [scanningVol, setScanningVol] = useState(false);
-  const [scanVolProgress, setScanVolProgress] = useState(0);
-  const [scanningGap, setScanningGap] = useState(false);
-  const [scanGapProgress, setScanGapProgress] = useState(0);
-  const [scanningMA, setScanningMA] = useState(false);
-  const [scanMAProgress, setScanMAProgress] = useState(0);
 
   // ── Fetch breakout_alerts + realtime ──
   useEffect(() => {
@@ -358,12 +349,6 @@ export default function AlertsTab({ session, group }) {
       });
     });
   }, []);
-
-  // ── Scanner handlers ──
-  const handle52wScan = async () => { setScanning52w(true); setScan52wProgress(0); try { await run52wHighScan(DEFAULT_THRESHOLD, setScan52wProgress); } catch {} setScanning52w(false); };
-  const handleVolScan = async () => { setScanningVol(true); setScanVolProgress(0); try { await runVolSurgeScan(DEFAULT_VOL_MULTIPLIER, setScanVolProgress); } catch {} setScanningVol(false); };
-  const handleGapScan = async () => { setScanningGap(true); setScanGapProgress(0); try { await runGapUpScan(DEFAULT_GAP_THRESHOLD, setScanGapProgress); } catch {} setScanningGap(false); };
-  const handleMAScan = async () => { setScanningMA(true); setScanMAProgress(0); try { await runMACrossScan(DEFAULT_SHORT_MA, DEFAULT_LONG_MA, setScanMAProgress); } catch {} setScanningMA(false); };
 
   // ── Build display alerts: live mapped data OR mock fallback ──
   const displayAlerts = useMemo(() => {
@@ -431,21 +416,6 @@ export default function AlertsTab({ session, group }) {
           return (<button key={f} onClick={()=>setFilter(f)} style={{ flexShrink: 0, padding: "8px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, border: filter===f?"none":`1px solid ${t.border}`, background: filter===f?t.btnActive:t.card, color: filter===f?"#fff":t.text2, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "'DM Sans', sans-serif" }}>{f}<span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 10, background: filter===f?"rgba(255,255,255,.2)":t.surfaceAlt, color: filter===f?"#fff":t.text3 }}>{count}</span></button>);
         })}
       </div>
-
-      {/* SCANNER BUTTONS (admin only) */}
-      {isAdmin && (
-        <div>
-          <button onClick={() => setScannerOpen(o => !o)} style={{ fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 16, border: `1px solid ${t.border}`, background: t.card, color: t.text2, cursor: "pointer" }}>{scannerOpen ? "Hide Scanners ▲" : "Run Scanners ▼"}</button>
-          {scannerOpen && (
-            <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-              <button onClick={handle52wScan} disabled={scanning52w} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: `1px solid ${t.green}40`, background: t.greenBg, color: t.green, cursor: scanning52w ? "default" : "pointer", opacity: scanning52w ? 0.6 : 1 }}>{scanning52w ? `52W… ${scan52wProgress}%` : "52W High"}</button>
-              <button onClick={handleVolScan} disabled={scanningVol} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: `1px solid ${t.blue}40`, background: t.blueBg, color: t.blue, cursor: scanningVol ? "default" : "pointer", opacity: scanningVol ? 0.6 : 1 }}>{scanningVol ? `Vol… ${scanVolProgress}%` : "Vol Surge"}</button>
-              <button onClick={handleGapScan} disabled={scanningGap} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: `1px solid ${t.gold}40`, background: t.goldBg, color: t.gold, cursor: scanningGap ? "default" : "pointer", opacity: scanningGap ? 0.6 : 1 }}>{scanningGap ? `Gap… ${scanGapProgress}%` : "Gap Up"}</button>
-              <button onClick={handleMAScan} disabled={scanningMA} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: `1px solid ${t.purple}40`, background: t.purpleBg, color: t.purple, cursor: scanningMA ? "default" : "pointer", opacity: scanningMA ? 0.6 : 1 }}>{scanningMA ? `MA… ${scanMAProgress}%` : "MA Cross"}</button>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* STATES */}
       {view === "loading" && <><SkeletonCard t={t} /><SkeletonCard t={t} /></>}
@@ -535,25 +505,43 @@ export default function AlertsTab({ session, group }) {
             <div style={{ background: t.card, borderRadius: 12, border: `0.5px solid ${t.border}`, overflow: 'hidden' }}>
               {mockTrack.history.map((h, i) => {
                 const isHit = h.type === 'hit' || (h.result != null && h.result > 0);
+                const isOpen = expandedHistoryIdx === i;
                 return (
-                  <div key={i} style={{
-                    padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8,
-                    borderBottom: i < mockTrack.history.length - 1 ? `0.5px solid ${t.border}` : 'none',
-                  }}>
-                    <span style={{ fontSize: 11, color: t.text3, width: 36, flexShrink: 0, fontFamily: "'DM Sans', sans-serif" }}>{h.date}</span>
-                    <div style={{
-                      width: 28, height: 28, borderRadius: '50%',
-                      border: `1.5px solid ${isHit ? t.green : t.red}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  <div key={i} style={{ borderBottom: i < mockTrack.history.length - 1 ? `0.5px solid ${t.border}` : 'none' }}>
+                    <div onClick={() => setExpandedHistoryIdx(isOpen ? null : i)} style={{
+                      padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
                     }}>
-                      <span style={{ fontSize: 8, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{h.ticker}</span>
+                      <span style={{ fontSize: 11, color: t.text3, width: 36, flexShrink: 0, fontFamily: "'DM Sans', sans-serif" }}>{h.date}</span>
+                      <div style={{
+                        width: 28, height: 28, borderRadius: '50%',
+                        border: `1.5px solid ${isHit ? t.green : t.red}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      }}>
+                        <span style={{ fontSize: 8, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{h.ticker}</span>
+                      </div>
+                      <span style={{ fontSize: 13, color: t.text2, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'DM Sans', sans-serif" }}>{h.desc}</span>
+                      <span style={{
+                        fontSize: 12, fontWeight: 700, padding: '2px 8px', borderRadius: 6, flexShrink: 0,
+                        background: isHit ? t.greenBg : t.redBg,
+                        color: isHit ? t.green : t.red,
+                      }}>{isHit ? "+" : ""}{h.result}%</span>
                     </div>
-                    <span style={{ fontSize: 13, color: t.text2, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'DM Sans', sans-serif" }}>{h.desc}</span>
-                    <span style={{
-                      fontSize: 12, fontWeight: 700, padding: '2px 8px', borderRadius: 6, flexShrink: 0,
-                      background: isHit ? t.greenBg : t.redBg,
-                      color: isHit ? t.green : t.red,
-                    }}>{isHit ? "+" : ""}{h.result}%</span>
+                    {isOpen && (
+                      <div style={{ padding: '0 12px 10px', display: 'flex', gap: 6 }}>
+                        <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: 'center' }}>
+                          <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Entry</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${h.from}</div>
+                        </div>
+                        <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: 'center' }}>
+                          <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Next Day</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${h.to}</div>
+                        </div>
+                        <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: 'center' }}>
+                          <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Result</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: isHit ? t.green : t.red, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>{isHit ? "+" : ""}{h.result}%</div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

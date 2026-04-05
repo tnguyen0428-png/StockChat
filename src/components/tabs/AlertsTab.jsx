@@ -5,7 +5,6 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { run52wHighScan, DEFAULT_THRESHOLD, runVolSurgeScan, DEFAULT_VOL_MULTIPLIER, runGapUpScan, DEFAULT_GAP_THRESHOLD, runMACrossScan, DEFAULT_SHORT_MA, DEFAULT_LONG_MA } from '../../lib/breakoutScanner';
 import { useGroup } from '../../context/GroupContext';
 import { MOCK_FEAR_SCORE, MOCK_ALERTS, MOCK_AOTD_HISTORY, BADGE_CONFIG, DARK_THEME, LIGHT_THEME, MOCK_KEY_STATS } from './alertsMockData';
 import { styles, swipeStyles, heatStyles, ovStyles } from './alertsTabStyles';
@@ -720,7 +719,6 @@ export default function AlertsTab({ session }) {
   const [expandedId, setExpandedId]  = useState(null);
   const [filter, setFilter]          = useState('all');
   const [sort, setSort]              = useState('newest');
-  const [scannerOpen, setScannerOpen] = useState(false);
   const [subTab, setSubTab] = useState('live');
   const [refreshKey, setRefreshKey]  = useState(0);
   const [historyFilter, setHistoryFilter] = useState('all');
@@ -761,20 +759,6 @@ export default function AlertsTab({ session }) {
     try { localStorage.setItem('uptik_darkMode', String(darkMode)); } catch {}
   }, [darkMode]);
 
-  // Scanner state
-  const [scanning52w, setScanning52w]           = useState(false);
-  const [scan52wProgress, setScan52wProgress]   = useState(0);
-  const [scan52wStatus, setScan52wStatus]       = useState(null);
-  const [scanningVol, setScanningVol]           = useState(false);
-  const [scanVolProgress, setScanVolProgress]   = useState(0);
-  const [scanVolStatus, setScanVolStatus]       = useState(null);
-  const [scanningGap, setScanningGap]           = useState(false);
-  const [scanGapProgress, setScanGapProgress]   = useState(0);
-  const [scanGapStatus, setScanGapStatus]       = useState(null);
-  const [scanningMA, setScanningMA]             = useState(false);
-  const [scanMAProgress, setScanMAProgress]     = useState(0);
-  const [scanMAStatus, setScanMAStatus]         = useState(null);
-
   // ── Supabase: load alerts + realtime ──────────────────────────────
 
   useEffect(() => {
@@ -806,62 +790,6 @@ export default function AlertsTab({ session }) {
   }, []);
 
   // ── Scanner handlers (unchanged) ─────────────────────────────────
-
-  const handle52wScan = async () => {
-    setScanning52w(true);
-    setScan52wProgress(0);
-    setScan52wStatus(null);
-    try {
-      const { inserted } = await run52wHighScan(DEFAULT_THRESHOLD, setScan52wProgress);
-      setScan52wStatus({ inserted });
-    } catch (e) {
-      setScan52wStatus({ error: e.message });
-    } finally {
-      setScanning52w(false);
-    }
-  };
-
-  const handleVolScan = async () => {
-    setScanningVol(true);
-    setScanVolProgress(0);
-    setScanVolStatus(null);
-    try {
-      const { inserted } = await runVolSurgeScan(DEFAULT_VOL_MULTIPLIER, setScanVolProgress);
-      setScanVolStatus({ inserted });
-    } catch (e) {
-      setScanVolStatus({ error: e.message });
-    } finally {
-      setScanningVol(false);
-    }
-  };
-
-  const handleGapScan = async () => {
-    setScanningGap(true);
-    setScanGapProgress(0);
-    setScanGapStatus(null);
-    try {
-      const { inserted } = await runGapUpScan(DEFAULT_GAP_THRESHOLD, setScanGapProgress);
-      setScanGapStatus({ inserted });
-    } catch (e) {
-      setScanGapStatus({ error: e.message });
-    } finally {
-      setScanningGap(false);
-    }
-  };
-
-  const handleMAScan = async () => {
-    setScanningMA(true);
-    setScanMAProgress(0);
-    setScanMAStatus(null);
-    try {
-      const { inserted } = await runMACrossScan(DEFAULT_SHORT_MA, DEFAULT_LONG_MA, setScanMAProgress);
-      setScanMAStatus({ inserted });
-    } catch (e) {
-      setScanMAStatus({ error: e.message });
-    } finally {
-      setScanningMA(false);
-    }
-  };
 
   // ── Helpers ───────────────────────────────────────────────────────
 
@@ -1028,57 +956,13 @@ export default function AlertsTab({ session }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={styles.secLabel}>Breakout Alerts</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {isAdmin && (
-              <button style={styles.scanToggleBtn} onClick={() => setScannerOpen(o => !o)}>
-                {scannerOpen ? 'Hide Scanners ▲' : 'Run Scanners ▼'}
-              </button>
-            )}
             <button style={styles.darkModeBtn} onClick={() => setDarkMode(d => !d)} aria-label="Toggle dark mode">
               {darkMode ? '☀️' : '🌙'}
             </button>
           </div>
         </div>
 
-        {/* Scanner buttons (admin only) */}
-        {isAdmin && scannerOpen && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-            <button style={{ ...styles.scanBtn, opacity: scanning52w ? 0.6 : 1 }} onClick={handle52wScan} disabled={scanning52w}>
-              {scanning52w ? `52W… ${scan52wProgress}%` : '52W High'}
-            </button>
-            <button style={{ ...styles.scanBtn, ...styles.scanBtnBlue, opacity: scanningVol ? 0.6 : 1 }} onClick={handleVolScan} disabled={scanningVol}>
-              {scanningVol ? `Vol… ${scanVolProgress}%` : 'Vol Surge'}
-            </button>
-            <button style={{ ...styles.scanBtn, ...styles.scanBtnGold, opacity: scanningGap ? 0.6 : 1 }} onClick={handleGapScan} disabled={scanningGap}>
-              {scanningGap ? `Gap… ${scanGapProgress}%` : 'Gap Up'}
-            </button>
-            <button style={{ ...styles.scanBtn, ...styles.scanBtnPurple, opacity: scanningMA ? 0.6 : 1 }} onClick={handleMAScan} disabled={scanningMA}>
-              {scanningMA ? `MA… ${scanMAProgress}%` : 'MA Cross'}
-            </button>
-          </div>
-        )}
       </div>
-
-      {/* Scanner status messages */}
-      {isAdmin && scan52wStatus && (
-        <div style={{ ...styles.scanStatus, color: scan52wStatus.error ? 'var(--red)' : 'var(--green)' }}>
-          {scan52wStatus.error ? `52W scan error: ${scan52wStatus.error}` : scan52wStatus.inserted === 0 ? '52W scan — no new breakouts' : `52W scan — ${scan52wStatus.inserted} new alert${scan52wStatus.inserted > 1 ? 's' : ''} added`}
-        </div>
-      )}
-      {isAdmin && scanVolStatus && (
-        <div style={{ ...styles.scanStatus, color: scanVolStatus.error ? 'var(--red)' : 'var(--blue)' }}>
-          {scanVolStatus.error ? `Vol scan error: ${scanVolStatus.error}` : scanVolStatus.inserted === 0 ? 'Vol scan — no surges found' : `Vol scan — ${scanVolStatus.inserted} new alert${scanVolStatus.inserted > 1 ? 's' : ''} added`}
-        </div>
-      )}
-      {isAdmin && scanGapStatus && (
-        <div style={{ ...styles.scanStatus, color: scanGapStatus.error ? 'var(--red)' : '#D4A017' }}>
-          {scanGapStatus.error ? `Gap scan error: ${scanGapStatus.error}` : scanGapStatus.inserted === 0 ? 'Gap scan — no gaps found' : `Gap scan — ${scanGapStatus.inserted} new alert${scanGapStatus.inserted > 1 ? 's' : ''} added`}
-        </div>
-      )}
-      {isAdmin && scanMAStatus && (
-        <div style={{ ...styles.scanStatus, color: scanMAStatus.error ? 'var(--red)' : '#8B5CF6' }}>
-          {scanMAStatus.error ? `MA scan error: ${scanMAStatus.error}` : scanMAStatus.inserted === 0 ? 'MA scan — no crossovers found' : `MA scan — ${scanMAStatus.inserted} new alert${scanMAStatus.inserted > 1 ? 's' : ''} added`}
-        </div>
-      )}
 
       {/* Sub-tab toggle: Live / History */}
       <div style={styles.subTabBar}>
