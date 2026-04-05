@@ -218,36 +218,6 @@ function Modal({ alert, onClose, t: theme }) {
   );
 }
 
-// ===== ALERT CARD =====
-function AlertCard({ alert, onClick, onBigMoneyClick, t: theme }) {
-  const isPos = alert.change >= 0;
-  const tt = theme || {};
-  const cardBg = tt.card || "#fff";
-  const border = tt.border || "#e2e8f0";
-  const surface = tt.surface || "#f8fafc";
-  const surfaceAlt = tt.surfaceAlt || "#f1f5f9";
-  const text1 = tt.text1 || "#0f172a";
-  const text2 = tt.text2 || "#64748b";
-  const text3 = tt.text3 || "#94a3b8";
-  const green = tt.green || "#16a34a";
-  const red = tt.red || "#dc2626";
-  const shadow = tt.shadow || "0 1px 3px rgba(0,0,0,.06)";
-  return (
-    <div onClick={onClick} style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, boxShadow: shadow, padding: "16px 20px", cursor: "pointer", transition: "box-shadow .2s" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: text1 }}>{alert.ticker}</h4><span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 12, background: surfaceAlt, color: text2, fontSize: 10, fontWeight: 600 }}>{alert.scannerTag.toUpperCase()}</span></div>
-          <p style={{ margin: "2px 0 0", fontSize: 13, color: text2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{alert.company}</p>
-        </div>
-        <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}><p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: text1 }}>${alert.price.toFixed(2)}</p><p style={{ margin: "2px 0 0", fontSize: 13, fontWeight: 600, color: isPos ? green : red }}>{isPos?"+":""}${Math.abs(alert.change).toFixed(2)} ({isPos?"+":""}{alert.changePercent}%)</p></div>
-      </div>
-      <BigMoneyBadge ticker={alert.ticker} onClick={onBigMoneyClick} t={theme} />
-      <div style={{ display: "flex", alignItems: "center", gap: 8, background: surface, borderRadius: 10, padding: "8px 12px", marginTop: 8 }}><span style={{ fontSize: 14 }}>{alert.whyAlerting[0].icon}</span><span style={{ fontSize: 13, color: text2 }}><strong style={{ color: text1 }}>{alert.whyAlerting[0].label}</strong><br/><span style={{ fontSize: 12 }}>{alert.whyAlerting[0].text}</span></span></div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}><span style={{ fontSize: 11, color: text3 }}>{alert.time} · Confidence <strong style={{ color: alert.confidence >= 80 ? green : (tt.amber || "#f59e0b") }}>{alert.confidence}%</strong></span><span style={{ fontSize: 12, color: text2, fontWeight: 500 }}>View details →</span></div>
-    </div>
-  );
-}
-
 function MoodBar({ score, t: theme }) {
   const s = score ?? 34;
   const label = s > 30 ? "Fearful" : s > 20 ? "Neutral" : s > 10 ? "Greedy" : "Very Greedy";
@@ -342,7 +312,8 @@ export default function AlertsTab({ session, group }) {
   const t = useTheme(darkMode);
   const [filter, setFilter] = useState("All");
   const [modalAlert, setModalAlert] = useState(null);
-  const [showMore, setShowMore] = useState(false);
+  const [expandedAlertId, setExpandedAlertId] = useState(null);
+  const cardRefs = useRef({});
   const [showFlow, setShowFlow] = useState(false);
   const [flowTab, setFlowTab] = useState("bigmoney");
   const [flowSort, setFlowSort] = useState("time");
@@ -416,9 +387,11 @@ export default function AlertsTab({ session, group }) {
   }, [liveAlerts, spyData]);
 
   const filtered = filter === "All" ? displayAlerts : displayAlerts.filter(a => a.scannerTag === filterMap[filter]);
-  const heroAlert = filtered.find(a => a.isAlertOfDay) || filtered[0];
-  const otherAlerts = filtered.filter(a => a !== heroAlert);
-  const card = { background: t.card, borderRadius: 16, border: `1px solid ${t.border}`, boxShadow: t.shadow, overflow: "visible" };
+  const sorted = [...filtered].sort((a, b) => {
+    if (a.isAlertOfDay && !b.isAlertOfDay) return -1;
+    if (!a.isAlertOfDay && b.isAlertOfDay) return 1;
+    return b.confidence - a.confidence;
+  });
 
   // Flow data
   let flowBM = flowTickerFilter ? mockBigMoney.filter(d => d.ticker === flowTickerFilter) : mockBigMoney;
@@ -439,28 +412,10 @@ export default function AlertsTab({ session, group }) {
       <style>{`
         *, *::before, *::after { box-sizing: border-box; }
         .alerts-container { max-width: 480px; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; flex-shrink: 0; }
-        .hero-header { display: flex; justify-content: space-between; align-items: flex-start; }
-        .hero-ticker { font-size: 24px; font-weight: 700; color: ${t.text1}; margin: 0; font-family: 'Outfit', sans-serif; }
-        .hero-price { font-size: 24px; font-weight: 700; color: ${t.text1}; margin: 0; font-family: 'Outfit', sans-serif; }
-        .hero-company { font-size: 14px; color: ${t.text2}; margin: 2px 0 0; font-family: 'DM Sans', sans-serif; }
-        .hero-change { font-size: 14px; font-weight: 600; margin: 2px 0 0; }
-        .btn-row { display: flex; flex-direction: row; gap: 12px; padding: 0 16px 16px; }
-        .btn-row button { flex: 1; padding: 12px 0; border-radius: 14px; font-weight: 600; font-size: 14px; cursor: pointer; font-family: 'Outfit', sans-serif; }
-        .btn-primary { background: ${t.green}; color: #fff; border: none; }
-        .btn-secondary { background: transparent; color: ${t.text2}; border: 2px solid ${t.border}; }
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 0 16px 16px; }
-        .stats-cell { background: ${t.surface}; border-radius: 10px; padding: 8px 10px; text-align: center; }
         .filter-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
         .filter-row::-webkit-scrollbar { display: none; }
         @media (max-width: 480px) {
           .alerts-container { padding: 12px 8px; gap: 12px; max-width: 100% !important; width: 100% !important; }
-          .hero-header { flex-direction: column; gap: 2px; }
-          .hero-header > div:last-child { text-align: left; display: flex; align-items: baseline; gap: 8px; }
-          .hero-ticker { font-size: 22px; } .hero-price { font-size: 22px; }
-          .btn-row { flex-direction: column; gap: 8px; padding: 0 16px 16px; }
-          .btn-row button { width: 100% !important; flex: none !important; }
-          .stats-grid { padding: 0 16px 12px; gap: 6px; }
-          .stats-cell p:last-child { font-size: 13px !important; }
           .filter-row button { padding: 6px 12px !important; font-size: 11px !important; }
         }
       `}</style>
@@ -503,47 +458,123 @@ export default function AlertsTab({ session, group }) {
       {view === "active" && (
         <>
           {/* THE ARC — top 5 alerts on blackjack semicircle */}
-          <AlertArc alerts={displayAlerts} onTap={(a) => setModalAlert(a)} t={t} darkMode={darkMode} />
+          <AlertArc alerts={displayAlerts} onTap={(a) => {
+            setExpandedAlertId(expandedAlertId === a.id ? null : a.id);
+            setTimeout(() => { cardRefs.current[a.id]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 150);
+          }} t={t} darkMode={darkMode} />
 
           {/* BEAD PLATE — AOTD track record streak dots */}
           <BeadPlate history={mockTrack.history} t={t} />
 
-          {/* HERO */}
-          {heroAlert && (
-            <div>
-              {heroAlert.isAlertOfDay && <p style={{ fontSize: 12, fontWeight: 700, color: t.green, textTransform: "uppercase", letterSpacing: "1.5px", margin: "0 0 8px", display: "flex", alignItems: "center", gap: 6 }}>⭐ Alert of the Day</p>}
-              <div style={{ ...card, cursor: "pointer" }} onClick={()=>setModalAlert(heroAlert)}>
-                <div style={{ padding: "16px 16px 12px" }}>
-                  <div className="hero-header">
-                    <div><h3 className="hero-ticker">{heroAlert.ticker}</h3><p className="hero-company">{heroAlert.company}</p></div>
-                    <div style={{ textAlign: "right" }}><p className="hero-price">${heroAlert.price.toFixed(2)}</p><p className="hero-change" style={{ color: heroAlert.change>=0?t.green:t.red }}>{heroAlert.change>=0?"+":""}${Math.abs(heroAlert.change).toFixed(2)} ({heroAlert.change>=0?"+":""}{heroAlert.changePercent}%)</p></div>
+          {/* ALERT CARDS — flat list, each expandable inline */}
+          {sorted.length === 0 && (
+            <div style={{ textAlign: "center", padding: "24px 16px", color: t.text3, fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>
+              No alerts match this filter
+            </div>
+          )}
+          {sorted.map(alert => {
+            const isPos = alert.change >= 0;
+            const isExpanded = expandedAlertId === alert.id;
+            const isAOTD = alert.isAlertOfDay;
+            return (
+              <div key={alert.id} ref={el => cardRefs.current[alert.id] = el} style={{
+                background: t.card, borderRadius: 14,
+                border: `0.5px solid ${isAOTD ? t.gold + '60' : t.border}`,
+                boxShadow: t.shadow, overflow: "hidden",
+              }}>
+                {/* Collapsed header (always visible) */}
+                <div onClick={() => setExpandedAlertId(isExpanded ? null : alert.id)}
+                  style={{ padding: "12px 14px", cursor: "pointer" }}>
+                  {isAOTD && (
+                    <div style={{ marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: t.gold, textTransform: "uppercase", letterSpacing: "1px", fontFamily: "'Outfit', sans-serif" }}>⭐ Alert of the Day</span>
+                    </div>
+                  )}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 16, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{alert.ticker}</span>
+                        <span style={{ padding: "2px 8px", borderRadius: 10, background: t.surfaceAlt, color: t.text2, fontSize: 11, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>{alert.scannerTag.toUpperCase()}</span>
+                      </div>
+                      <p style={{ margin: "2px 0 0", fontSize: 13, color: t.text3, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{alert.company}</p>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: 12 }}>
+                      <div style={{ textAlign: "right" }}>
+                        <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>${alert.price.toFixed(2)}</p>
+                        <p style={{ margin: "2px 0 0", fontSize: 13, fontWeight: 600, color: isPos ? t.green : t.red, fontFamily: "'DM Sans', sans-serif" }}>
+                          {isPos ? "+" : ""}{typeof alert.changePercent === 'number' ? alert.changePercent.toFixed(2) : alert.changePercent}%
+                        </p>
+                      </div>
+                      <span style={{ fontSize: 16, color: t.text3, transition: "transform .2s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", display: "inline-block" }}>▾</span>
+                    </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 16, background: t.greenBg, color: t.green, fontSize: 12, fontWeight: 600, border: `1px solid ${t.green}40` }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: t.green }}/> {heroAlert.scannerTag.toUpperCase()}</span>
-                    <span style={{ fontSize: 12, color: t.text3 }}>{heroAlert.time} pre-market</span>
+                  {!isExpanded && (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
+                      <span style={{ fontSize: 13, color: t.text2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, fontFamily: "'DM Sans', sans-serif" }}>
+                        {alert.whyAlerting[0]?.text}
+                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: 8 }}>
+                        <ConfidenceRing value={alert.confidence} size={16} t={t} />
+                        <span style={{ fontSize: 13, fontWeight: 700, color: alert.confidence >= 80 ? t.green : t.amber, fontFamily: "'DM Sans', sans-serif" }}>{alert.confidence}%</span>
+                      </div>
+                    </div>
+                  )}
+                  <BigMoneyBadge ticker={alert.ticker} onClick={openFlowForTicker} t={t} />
+                </div>
+                {/* Expanded dropdown panel */}
+                <div style={{
+                  maxHeight: isExpanded ? 400 : 0,
+                  overflow: "hidden",
+                  transition: "max-height .3s ease",
+                }}>
+                  <div style={{ borderTop: `0.5px solid ${t.border}`, padding: "10px 14px", background: t.surfaceAlt + "80" }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6, fontFamily: "'Outfit', sans-serif" }}>Why it's alerting</div>
+                    {alert.whyAlerting.map((w, i) => (
+                      <div key={i} style={{
+                        display: "flex", alignItems: "baseline", gap: 6,
+                        padding: "4px 0",
+                        borderBottom: i < alert.whyAlerting.length - 1 ? `0.5px solid ${t.border}50` : "none",
+                      }}>
+                        <span style={{ fontSize: 13, flexShrink: 0, width: 16 }}>{w.icon}</span>
+                        <span style={{ fontSize: 13, color: t.text1, fontFamily: "'DM Sans', sans-serif" }}>
+                          <span style={{ fontWeight: 600 }}>{w.label}</span>
+                          <span style={{ color: t.text2 }}> — {w.text}</span>
+                        </span>
+                      </div>
+                    ))}
+                    <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
+                      <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: "center" }}>
+                        <div style={{ fontSize: 11, color: t.text3, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Support</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${alert.support.toFixed(2)}</div>
+                      </div>
+                      <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: "center" }}>
+                        <div style={{ fontSize: 11, color: t.text3, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Resistance</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${alert.resistance.toFixed(2)}</div>
+                      </div>
+                      <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: "center" }}>
+                        <div style={{ fontSize: 11, color: t.text3, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>vs SPY</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: alert.vsSpy >= 0 ? t.green : t.red, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>
+                          {alert.vsSpy >= 0 ? "+" : ""}{typeof alert.vsSpy === 'number' ? alert.vsSpy.toFixed(1) : alert.vsSpy}%
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={e => { e.stopPropagation(); }} style={{
+                        flex: 1, padding: "10px 0", borderRadius: 10, fontWeight: 600, fontSize: 14,
+                        background: t.green, color: "#fff", border: "none", cursor: "pointer",
+                        fontFamily: "'Outfit', sans-serif",
+                      }}>Add to Watchlist</button>
+                      <button onClick={e => { e.stopPropagation(); setModalAlert(alert); }} style={{
+                        flex: 1, padding: "10px 0", borderRadius: 10, fontWeight: 600, fontSize: 14,
+                        background: "transparent", color: t.text2, border: `1.5px solid ${t.border}`,
+                        cursor: "pointer", fontFamily: "'Outfit', sans-serif",
+                      }}>View Details</button>
+                    </div>
                   </div>
-                  <BigMoneyBadge ticker={heroAlert.ticker} onClick={openFlowForTicker} t={t} />
                 </div>
-                <div style={{ padding: "0 16px 12px" }}>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: t.text3, textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 10px" }}>Why It's Alerting</p>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{heroAlert.whyAlerting.map((w,i)=>(<div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, background: t.surface, borderRadius: 14, padding: "12px 16px" }}><span style={{ fontSize: 16, marginTop: 2, flexShrink: 0 }}>{w.icon}</span><div><p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: t.text1 }}>{w.label}</p><p style={{ margin: "2px 0 0", fontSize: 13, color: t.text2, lineHeight: 1.4 }}>{w.text}</p></div></div>))}</div>
-                </div>
-                <div className="stats-grid"><div className="stats-cell"><p style={{ fontSize: 10, color: t.text3, textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>Support <Tooltip text="A price level where this stock has historically stopped falling." t={t} /></p><p style={{ fontSize: 15, fontWeight: 700, color: t.text1, margin: "2px 0 0" }}>${heroAlert.support.toFixed(2)}</p></div><div className="stats-cell"><p style={{ fontSize: 10, color: t.text3, textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>Resistance <Tooltip text="A price level where this stock has historically stopped rising." t={t} /></p><p style={{ fontSize: 15, fontWeight: 700, color: t.text1, margin: "2px 0 0" }}>${heroAlert.resistance.toFixed(2)}</p></div><div className="stats-cell"><p style={{ fontSize: 10, color: t.text3, textTransform: "uppercase", margin: 0 }}>Confidence</p><p style={{ fontSize: 15, fontWeight: 700, color: t.green, margin: "2px 0 0" }}>{heroAlert.confidence}%</p></div></div>
-                <div className="btn-row"><button className="btn-primary" onClick={e=>e.stopPropagation()}>Add to Watchlist</button><button className="btn-secondary" onClick={e=>e.stopPropagation()}>Discuss in Chat</button></div>
               </div>
-            </div>
-          )}
-
-          {/* MORE ALERTS */}
-          {otherAlerts.length > 0 && (
-            <div style={{ background: t.card, borderRadius: 16, border: `1px solid ${t.border}`, boxShadow: t.shadow }}>
-              <button onClick={()=>setShowMore(!showMore)} style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontSize: 13, fontWeight: 600, color: t.text1 }}>{filter==="All"?"More Alerts":`${filter} Alerts`}</span><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: t.surfaceAlt, color: t.text2 }}>{otherAlerts.length}</span></div>
-                <span style={{ fontSize: 18, color: t.text3, transition: "transform .2s", transform: showMore?"rotate(180deg)":"rotate(0deg)" }}>▾</span>
-              </button>
-              {showMore && <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 10 }}>{otherAlerts.map(a=>(<AlertCard key={a.id} alert={a} t={t} onClick={()=>setModalAlert(a)} onBigMoneyClick={openFlowForTicker} />))}</div>}
-            </div>
-          )}
+            );
+          })}
 
           {/* INSTITUTIONAL FLOW */}
           <div ref={flowRef} style={{ background: t.card, borderRadius: 16, border: `1px solid ${t.border}`, boxShadow: t.shadow }}>
