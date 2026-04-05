@@ -22,6 +22,17 @@ const COMPANY_TO_TICKER = {
   'doordash': 'DASH', 'airbnb': 'ABNB', 'pinterest': 'PINS',
   'morgan stanley': 'MS', 'bank of america': 'BAC', 'wells fargo': 'WFC',
   'citigroup': 'C',
+  'intuitive surgical': 'ISRG', 'isrg': 'ISRG',
+  'eli lilly': 'LLY', 'lilly': 'LLY', 'novo nordisk': 'NVO',
+  'unitedhealth': 'UNH', 'johnson & johnson': 'JNJ', 'pfizer': 'PFE',
+  'abbvie': 'ABBV', 'merck': 'MRK', 'moderna': 'MRNA',
+  'berkshire': 'BRK.B', 'visa': 'V', 'mastercard': 'MA',
+  'chevron': 'CVX', 'exxon': 'XOM', 'conocophillips': 'COP',
+  'caterpillar': 'CAT', 'deere': 'DE', 'john deere': 'DE',
+  'lockheed': 'LMT', 'raytheon': 'RTX', 'northrop': 'NOC',
+  'target': 'TGT', 'home depot': 'HD', 'lowes': 'LOW', "lowe's": 'LOW',
+  'chipotle': 'CMG', 'mcdonalds': 'MCD', "mcdonald's": 'MCD',
+  'celsius': 'CELH', 'cava': 'CAVA', 'duolingo': 'DUOL',
 };
 
 const IGNORE_TICKERS = new Set(['AI', 'AM', 'PM', 'OK', 'US', 'CEO', 'IPO', 'ETF', 'GDP', 'FBI', 'USA', 'THE', 'FOR', 'AND', 'CAN', 'YOU', 'ARE', 'HOW', 'WHAT', 'WHY', 'IS', 'AT', 'IN', 'ON', 'TO', 'ME', 'MY', 'NO', 'YES', 'HI', 'HEY', 'UP', 'DO', 'IF', 'OR', 'SO', 'IT', 'BE', 'BY', 'OF', 'AN', 'AS', 'GO', 'IM']);
