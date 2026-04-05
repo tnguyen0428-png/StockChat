@@ -14,49 +14,62 @@ function checkForHallucination(response, context, agentType) {
   if (agentType === 'knowledge') return response;
 
   const price = context?.livePrice?.price;
+  const realVolume = context?.livePrice?.volume;
   const hasRealData = price != null && price > 0;
   const hasMarketData = context?.marketData?.spy?.price != null;
   const ticker = context?.ticker || 'that stock';
 
-  // Extract all dollar amounts from the response
   const responsePrices = [...response.matchAll(/\$(\d+\.?\d*)/g)].map(m => parseFloat(m[1]));
+  const volumeMatch = response.match(/(\d+\.?\d*)\s*(million|M)\s*(shares|volume)/i);
+  const responseVolume = volumeMatch ? parseFloat(volumeMatch[1]) * 1e6 : null;
 
-  // Data agent: no data but response has prices = hallucination
+  // No data but response has prices = hallucination
   if (agentType === 'data' && !hasRealData && responsePrices.length > 0) {
     console.warn('[UpTik AI] HALLUCINATION BLOCKED: no price data but response has $amounts');
-    return `I don't have live data for ${ticker} right now. Markets may be closed or the feed is unavailable. Not financial advice.`;
+    return `I don't have live data for ${ticker} right now. Markets may be closed. Not financial advice.`;
   }
 
-  // Data agent: data exists — verify response prices match
-  if (agentType === 'data' && hasRealData && responsePrices.length > 0) {
-    const realPrice = parseFloat(price);
-    const mainResponsePrice = responsePrices[0];
-    const priceDiff = Math.abs(mainResponsePrice - realPrice) / realPrice;
-    if (priceDiff > 0.05) {
-      console.warn('[UpTik AI] HALLUCINATION BLOCKED: price mismatch. Real:', realPrice, 'Response:', mainResponsePrice);
-      return `${ticker} last traded at $${realPrice.toFixed(2)}. Not financial advice.`;
-    }
-  }
-
-  // Data agent: check for fabricated percentages when change data is null
   if (agentType === 'data' && hasRealData) {
+    const realPrice = parseFloat(price);
+
+    // Check price accuracy (>5% off = fabricated)
+    if (responsePrices.length > 0) {
+      const mainResponsePrice = responsePrices[0];
+      const priceDiff = Math.abs(mainResponsePrice - realPrice) / realPrice;
+      if (priceDiff > 0.05) {
+        console.warn('[UpTik AI] HALLUCINATION BLOCKED: price mismatch. Real:', realPrice, 'Response:', mainResponsePrice);
+        return `${ticker} last traded at $${realPrice.toFixed(2)}. Not financial advice.`;
+      }
+    }
+
+    // Check volume accuracy (>20% off = strip it)
+    if (responseVolume && realVolume) {
+      const volDiff = Math.abs(responseVolume - realVolume) / realVolume;
+      if (volDiff > 0.20) {
+        console.warn('[UpTik AI] Volume mismatch stripped. Real:', realVolume, 'Response:', responseVolume);
+        response = response.replace(/\d+\.?\d*\s*(million|M)\s*(shares|volume)[^.]*\./i, '');
+      }
+    } else if (responseVolume && !realVolume) {
+      console.warn('[UpTik AI] Volume claim stripped — no real volume data');
+      response = response.replace(/\d+\.?\d*\s*(million|M)\s*(shares|volume)[^.]*\./i, '');
+    }
+
+    // Check for fabricated percentages when change is null
     const realChange = context?.livePrice?.changePercent;
     const responsePercents = [...response.matchAll(/(\d+\.?\d*)%/g)].map(m => parseFloat(m[1]));
     if (realChange === null && responsePercents.length > 0) {
-      // No change data from Polygon but response mentions percentages
-      console.warn('[UpTik AI] HALLUCINATION BLOCKED: no change data but response has percentages:', responsePercents);
-      const realPrice = parseFloat(price);
+      console.warn('[UpTik AI] HALLUCINATION BLOCKED: no change data but response has percentages');
       return `${ticker} last closed at $${realPrice.toFixed(2)}. Markets are closed so I don't have today's change data. Not financial advice.`;
     }
   }
 
-  // Macro agent: no market data but response has prices
+  // Macro: no market data but response has prices
   if (agentType === 'macro' && !hasMarketData && responsePrices.length > 0) {
     console.warn('[UpTik AI] HALLUCINATION BLOCKED: no market data but response has $amounts');
     return "I don't have live market data right now. Markets may be closed. Check back when they open.";
   }
 
-  return response;
+  return response.trim();
 }
 
 // Strip markdown formatting for clean chat display
