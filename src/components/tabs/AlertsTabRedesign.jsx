@@ -306,6 +306,7 @@ export default function AlertsTab({ session, group }) {
   const [filter, setFilter] = useState("All");
   const [modalAlert, setModalAlert] = useState(null);
   const [selectedChipId, setSelectedChipId] = useState(null);
+  const [expandedHistoryIdx, setExpandedHistoryIdx] = useState(null);
   const [showFlow, setShowFlow] = useState(false);
   const [flowTab, setFlowTab] = useState("bigmoney");
   const [flowSort, setFlowSort] = useState("time");
@@ -535,25 +536,43 @@ export default function AlertsTab({ session, group }) {
             <div style={{ background: t.card, borderRadius: 12, border: `0.5px solid ${t.border}`, overflow: 'hidden' }}>
               {mockTrack.history.map((h, i) => {
                 const isHit = h.type === 'hit' || (h.result != null && h.result > 0);
+                const isOpen = expandedHistoryIdx === i;
                 return (
-                  <div key={i} style={{
-                    padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8,
-                    borderBottom: i < mockTrack.history.length - 1 ? `0.5px solid ${t.border}` : 'none',
-                  }}>
-                    <span style={{ fontSize: 11, color: t.text3, width: 36, flexShrink: 0, fontFamily: "'DM Sans', sans-serif" }}>{h.date}</span>
-                    <div style={{
-                      width: 28, height: 28, borderRadius: '50%',
-                      border: `1.5px solid ${isHit ? t.green : t.red}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  <div key={i} style={{ borderBottom: i < mockTrack.history.length - 1 ? `0.5px solid ${t.border}` : 'none' }}>
+                    <div onClick={() => setExpandedHistoryIdx(isOpen ? null : i)} style={{
+                      padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
                     }}>
-                      <span style={{ fontSize: 8, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{h.ticker}</span>
+                      <span style={{ fontSize: 11, color: t.text3, width: 36, flexShrink: 0, fontFamily: "'DM Sans', sans-serif" }}>{h.date}</span>
+                      <div style={{
+                        width: 28, height: 28, borderRadius: '50%',
+                        border: `1.5px solid ${isHit ? t.green : t.red}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      }}>
+                        <span style={{ fontSize: 8, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{h.ticker}</span>
+                      </div>
+                      <span style={{ fontSize: 13, color: t.text2, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'DM Sans', sans-serif" }}>{h.desc}</span>
+                      <span style={{
+                        fontSize: 12, fontWeight: 700, padding: '2px 8px', borderRadius: 6, flexShrink: 0,
+                        background: isHit ? t.greenBg : t.redBg,
+                        color: isHit ? t.green : t.red,
+                      }}>{isHit ? "+" : ""}{h.result}%</span>
                     </div>
-                    <span style={{ fontSize: 13, color: t.text2, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'DM Sans', sans-serif" }}>{h.desc}</span>
-                    <span style={{
-                      fontSize: 12, fontWeight: 700, padding: '2px 8px', borderRadius: 6, flexShrink: 0,
-                      background: isHit ? t.greenBg : t.redBg,
-                      color: isHit ? t.green : t.red,
-                    }}>{isHit ? "+" : ""}{h.result}%</span>
+                    {isOpen && (
+                      <div style={{ padding: '0 12px 10px', display: 'flex', gap: 6 }}>
+                        <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: 'center' }}>
+                          <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Entry</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${h.from}</div>
+                        </div>
+                        <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: 'center' }}>
+                          <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Next Day</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${h.to}</div>
+                        </div>
+                        <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: 'center' }}>
+                          <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Result</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: isHit ? t.green : t.red, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>{isHit ? "+" : ""}{h.result}%</div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
