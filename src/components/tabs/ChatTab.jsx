@@ -206,18 +206,6 @@ function ListsView({ group, isAdmin, isModerator, isOpenList, onAskAI }) {
     await loadLists();
   };
 
-  const getScoreStyle = (score) => {
-    if (score >= 80) return lv.scoreHi;
-    if (score >= 50) return lv.scoreMid;
-    return lv.scoreLo;
-  };
-
-  const getScoreTrend = (stock) => {
-    if (stock.score >= 70) return { symbol: '▲', style: { fontSize: 9, color: 'var(--green)' } };
-    if (stock.score < 40) return { symbol: '▼', style: { fontSize: 9, color: 'var(--red)' } };
-    return { symbol: '—', style: { fontSize: 9, color: 'var(--text3)' } };
-  };
-
   const formatUpdatedDate = (list) => {
     const stocks = list.curated_stocks || [];
     const dates = stocks.map(s => s.updated_at).filter(Boolean).sort().reverse();
@@ -283,57 +271,51 @@ function ListsView({ group, isAdmin, isModerator, isOpenList, onAskAI }) {
               </div>
             )}
 
-            <div style={lv.colHeaders}>
-              <span style={{ ...lv.colLabel, width: 26 }}>Ranking</span>
-              <span style={{ width: 36 }} />
-              <span style={{ width: 52 }} />
-              <span style={{ ...lv.colLabel, width: 56, textAlign: 'center' }}>Score</span>
-              <span style={{ flex: 1 }} />
-              <span style={lv.colLabel}>Price</span>
-              <span style={{ width: 32 }} />
+            <div style={{ display: 'flex', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+              <span style={{ width: '8%', flexShrink: 0, fontSize: 12, fontWeight: 600, color: 'var(--text1)' }}>Ranking</span>
+              <span style={{ width: '10%', flexShrink: 0 }} />
+              <span style={{ width: '16%', flexShrink: 0 }} />
+              <span style={{ width: '22%', flexShrink: 0, fontSize: 12, fontWeight: 600, color: 'var(--text1)', textAlign: 'center' }}>Score</span>
+              <span style={{ width: '34%', flexShrink: 0, fontSize: 12, fontWeight: 600, color: 'var(--text1)', textAlign: 'right' }}>Price</span>
+              <span style={{ width: '10%', flexShrink: 0 }} />
             </div>
 
             {list.curated_stocks?.sort((a, b) => a.ranking - b.ranking).map(stock => {
               const isExpanded = expanded === stock.id;
               const q = quoteData[stock.ticker];
               const pct = q?.changePercentage;
-              const trend = getScoreTrend(stock);
               const watchers = watcherCounts[stock.ticker] || 0;
 
               return (
                 <div key={stock.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <div style={lv.stockRow} onClick={() => handleExpand(stock)}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                      <span style={lv.rank}>#{stock.ranking}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', padding: '9px 0', cursor: 'pointer' }} onClick={() => handleExpand(stock)}>
+                    <span style={{ width: '8%', flexShrink: 0, fontSize: 12, fontWeight: 600, color: 'var(--text1)' }}>#{stock.ranking}</span>
+                    <div style={{ width: '10%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <img
                         src={`https://images.financialmodelingprep.com/symbol/${stock.ticker}.png`}
                         alt={stock.ticker}
-                        style={lv.logo}
+                        style={{ width: 24, height: 24, borderRadius: 6, objectFit: 'contain', background: 'var(--card2)', border: '0.5px solid var(--border)' }}
                         onError={e => { e.target.style.display = 'none'; }}
                       />
-                      <span style={lv.ticker}>{stock.ticker}</span>
                     </div>
-                    <div style={{ flex: 1 }} />
-                    <div style={lv.scoreCol}>
-                      <span style={getScoreStyle(stock.score)}>{stock.score}</span>
-                      <span style={trend.style}>{trend.symbol}</span>
+                    <span style={{ width: '16%', flexShrink: 0, fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>{stock.ticker}</span>
+                    <div style={{ width: '22%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)', padding: '1px 7px', borderRadius: 10, border: '1px solid rgba(26,173,94,0.3)' }}>{stock.score}</span>
+                      <span style={{ fontSize: 9, color: 'var(--text3)' }}>{isExpanded ? '▼' : '▲'}</span>
                     </div>
-                    <div style={{ flex: 1 }} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={lv.priceCol}>
-                        <div style={lv.price}>{q ? `$${q.price?.toFixed(2)}` : '—'}</div>
-                        {pct != null && (
-                          <div style={{ fontSize: 11, color: pct >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                            {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
-                          </div>
-                        )}
-                      </div>
-                      {isMod && (
-                        <div style={lv.trashBtn} onClick={e => { e.stopPropagation(); handleDeleteStock(stock); }}>
-                          <TrashIcon />
+                    <div style={{ width: '34%', flexShrink: 0, textAlign: 'right' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text1)' }}>{q ? `$${q.price?.toFixed(2)}` : '—'}</div>
+                      {pct != null && (
+                        <div style={{ fontSize: 11, color: pct >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                          {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
                         </div>
                       )}
                     </div>
+                    {isMod && (
+                      <div style={{ width: '10%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { e.stopPropagation(); handleDeleteStock(stock); }}>
+                        <TrashIcon />
+                      </div>
+                    )}
                   </div>
 
                   {isExpanded && (
@@ -404,19 +386,6 @@ const lv = {
   legendDot: { display: 'inline-block', width: 5, height: 5, borderRadius: '50%', background: 'var(--green)', marginRight: 3, flexShrink: 0 },
   legendExpanded: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' },
   legendItem: { fontSize: 11, color: 'var(--text2)', fontWeight: 500 },
-  colHeaders: { display: 'flex', alignItems: 'center', padding: '6px 4px', borderBottom: '1px solid var(--border)' },
-  colLabel: { fontSize: 13, fontWeight: 600, color: 'var(--text1)' },
-  stockRow: { display: 'flex', alignItems: 'center', padding: '10px 0', cursor: 'pointer' },
-  rank: { fontSize: 13, fontWeight: 600, color: 'var(--text1)', width: 26, flexShrink: 0 },
-  logo: { width: 28, height: 28, borderRadius: 6, objectFit: 'contain', background: 'var(--card2)', border: '0.5px solid var(--border)', flexShrink: 0, marginRight: 8 },
-  ticker: { fontSize: 14, fontWeight: 600, color: 'var(--text1)', width: 52, flexShrink: 0 },
-  priceCol: { textAlign: 'right', flexShrink: 0 },
-  price: { fontSize: 13, fontWeight: 600, color: 'var(--text1)' },
-  scoreCol: { width: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, flexShrink: 0 },
-  scoreHi: { fontSize: 11, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)', padding: '2px 8px', borderRadius: 10, border: '1px solid rgba(26,173,94,0.3)' },
-  scoreMid: { fontSize: 11, fontWeight: 600, background: '#FAEEDA', color: '#854F0B', padding: '2px 8px', borderRadius: 10, border: '1px solid #FAC775' },
-  scoreLo: { fontSize: 11, fontWeight: 600, background: 'var(--red-bg)', color: 'var(--red)', padding: '2px 8px', borderRadius: 10, border: '1px solid rgba(224,82,82,0.3)' },
-  trashBtn: { width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', marginLeft: 8 },
   expandedBody: { padding: '10px 4px 14px', background: 'var(--card2)', borderRadius: 0, display: 'flex', flexDirection: 'column', gap: 8 },
   metricsRow: { display: 'flex', flexWrap: 'wrap', gap: 6 },
   metric: { fontSize: 11, color: 'var(--text2)' },
