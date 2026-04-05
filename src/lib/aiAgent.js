@@ -150,14 +150,36 @@ export const stripMarkdown = (text) => {
     .trim();
 };
 
-export async function askUpTikAI({ userText, history = [], lastTicker = null, username, groupName, watchlist }) {
-  const { tickers, newLastTicker } = detectTickers(userText, lastTicker);
-  const stockContext = await fetchStockContext(tickers);
+// ── New pipeline integration ──
+import { runPipeline } from './ai/pipeline';
+import { supabase } from './supabase';
 
-  const messages = [
-    ...history,
-    { role: 'user', content: userText },
-  ];
+export async function askUpTikAI({ userText, history = [], lastTicker = null, username, groupName, watchlist, userId }) {
+  const { tickers, newLastTicker } = detectTickers(userText, lastTicker);
+
+  try {
+    console.log('[askUpTikAI] Using NEW pipeline for:', userText);
+    // Get current user ID from session if not passed
+    let uid = userId;
+    if (!uid) {
+      const { data: { session } } = await supabase.auth.getSession();
+      uid = session?.user?.id;
+    }
+
+    const result = await runPipeline(userText, history, supabase, uid);
+    console.log(`[AI Pipeline] agent=${result.meta.agent} cached=${result.meta.cached} ms=${result.meta.ms}`);
+    return { text: result.reply, newLastTicker: result.meta.ticker || newLastTicker };
+  } catch (err) {
+    console.warn('[AI Pipeline] FAILED — falling back to legacy. Error:', err.message, err);
+    // Fallback to legacy direct call
+    return await legacyAskAI({ userText, history, tickers, newLastTicker, username, groupName, watchlist });
+  }
+}
+
+// Legacy fallback — original Sonnet-only implementation
+async function legacyAskAI({ userText, history, tickers, newLastTicker, username, groupName, watchlist }) {
+  const stockContext = await fetchStockContext(tickers);
+  const messages = [...history, { role: 'user', content: userText }];
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
