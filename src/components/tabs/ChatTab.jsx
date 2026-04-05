@@ -303,32 +303,37 @@ function ListsView({ group, isAdmin, isModerator, isOpenList, onAskAI }) {
               return (
                 <div key={stock.id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <div style={lv.stockRow} onClick={() => handleExpand(stock)}>
-                    <span style={lv.rank}>#{stock.ranking}</span>
-                    <img
-                      src={`https://images.financialmodelingprep.com/symbol/${stock.ticker}.png`}
-                      alt={stock.ticker}
-                      style={lv.logo}
-                      onError={e => { e.target.style.display = 'none'; }}
-                    />
-                    <span style={lv.ticker}>{stock.ticker}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <span style={lv.rank}>#{stock.ranking}</span>
+                      <img
+                        src={`https://images.financialmodelingprep.com/symbol/${stock.ticker}.png`}
+                        alt={stock.ticker}
+                        style={lv.logo}
+                        onError={e => { e.target.style.display = 'none'; }}
+                      />
+                      <span style={lv.ticker}>{stock.ticker}</span>
+                    </div>
+                    <div style={{ flex: 1 }} />
                     <div style={lv.scoreCol}>
                       <span style={getScoreStyle(stock.score)}>{stock.score}</span>
                       <span style={trend.style}>{trend.symbol}</span>
                     </div>
                     <div style={{ flex: 1 }} />
-                    <div style={lv.priceCol}>
-                      <div style={lv.price}>{q ? `$${q.price?.toFixed(2)}` : '—'}</div>
-                      {pct != null && (
-                        <div style={{ fontSize: 11, color: pct >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                          {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={lv.priceCol}>
+                        <div style={lv.price}>{q ? `$${q.price?.toFixed(2)}` : '—'}</div>
+                        {pct != null && (
+                          <div style={{ fontSize: 11, color: pct >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                            {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
+                          </div>
+                        )}
+                      </div>
+                      {isMod && (
+                        <div style={lv.trashBtn} onClick={e => { e.stopPropagation(); handleDeleteStock(stock); }}>
+                          <TrashIcon />
                         </div>
                       )}
                     </div>
-                    {isMod && (
-                      <div style={lv.trashBtn} onClick={e => { e.stopPropagation(); handleDeleteStock(stock); }}>
-                        <TrashIcon />
-                      </div>
-                    )}
                   </div>
 
                   {isExpanded && (
