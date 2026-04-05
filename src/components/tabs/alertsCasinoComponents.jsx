@@ -19,7 +19,7 @@ export function useTheme(darkMode) {
     blueBg: 'rgba(123,140,222,0.1)', pinkBg: 'rgba(244,114,182,0.1)',
     btnActive: '#1a3d6e', shadow: '0 1px 3px rgba(0,0,0,.2)',
   } : {
-    bg: '#ffffff', card: '#ffffff', cardHover: '#f8fafc',
+    bg: '#f8fafc', card: '#ffffff', cardHover: '#f8fafc',
     surface: '#f8fafc', surfaceAlt: '#f1f5f9',
     border: '#e2e8f0', borderLight: '#f1f5f9',
     text1: '#0f172a', text2: '#64748b', text3: '#94a3b8',
