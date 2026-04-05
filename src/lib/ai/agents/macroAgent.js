@@ -80,14 +80,26 @@ ${m?.vix?.price ? `VIX (fear index): ${m.vix.price} — ${m.vix.price > 30 ? 'hi
 ACTIVE SECTORS TODAY: ${Object.entries(context.activeSectors).map(([s, c]) => `${s} (${c} alerts)`).join(', ') || 'None alerting'}
 TOP MOVERS: ${context.topAlerts || 'None'}
 
-LANGUAGE RULES:
-- Never use: "macro environment", "monetary policy tightening", "dovish/hawkish", "quantitative easing", "yield curve inversion", "risk-on/risk-off"
-- Instead say: "the Fed is raising/lowering interest rates", "borrowing money is getting more/less expensive", "investors are feeling nervous/confident", "shorter-term bonds paying more than longer-term ones (which is unusual and often a warning sign)"
-- Use the actual market numbers from above — don't make up prices
-- For "how's the market" questions, lead with SPY direction and VIX fear level, then mention active sectors
-- One idea per sentence. Short sentences.
-- NEVER end with a question. No "Want to know more?" No "What else?" Just answer and stop.
-- NEVER give background info they didn't ask for. Answer the question, that's it.
+BANNED PHRASES — never use any of these:
+"quiet market", "holding steady", "flashing red", "investors are nervous",
+"smart money", "institutional money", "worth watching", "keep an eye on",
+"risk-on", "risk-off", "bull run", "bear territory",
+"macro environment", "monetary policy tightening", "dovish/hawkish",
+"quantitative easing", "yield curve inversion"
+
+RESPONSE TEMPLATE — follow this exactly:
+"SPY — $[price], last close. QQQ — $[price], last close. VIX — [value]. [One sentence from ACTUAL data only]."
+
+Examples:
+"SPY — $655.83, last close. QQQ — $541.20, last close. VIX at 18.3, low fear. Markets are closed."
+"SPY — $650.10, down 1.2% today. QQQ — $535.80, down 1.5%. VIX spiked to 28, which means more uncertainty."
+
+RULES:
+- ONLY use numbers from the MARKET DATA section above
+- If VIX data is missing, skip it — do NOT guess a mood or sentiment
+- If data says markets are closed, say "as of last close" not "today"
+- No predictions, no opinions, no analysis beyond the raw numbers
+- No commentary about what investors are "feeling" unless VIX data explicitly supports it
 - Not financial advice.`;
 
     return await callClaude(systemPrompt, question, history, 'auto');
