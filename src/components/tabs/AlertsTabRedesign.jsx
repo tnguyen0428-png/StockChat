@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from '../../lib/supabase';
 import { run52wHighScan, DEFAULT_THRESHOLD, runVolSurgeScan, DEFAULT_VOL_MULTIPLIER, runGapUpScan, DEFAULT_GAP_THRESHOLD, runMACrossScan, DEFAULT_SHORT_MA, DEFAULT_LONG_MA } from '../../lib/breakoutScanner';
 import { useGroup } from '../../context/GroupContext';
-import { useTheme, ConfidenceRing, AlertArc, BeadPlate, DarkModeToggle } from './alertsCasinoComponents';
+import { useTheme, ChipField, DarkModeToggle } from './alertsCasinoComponents';
 
 // Scanner tag mapping: DB alert_type → UI label
 const SCANNER_TAG_MAP = { '52w_high': 'Yearly High', 'vol_surge': 'Volume Spike', 'gap_up': 'Gap Up', 'ma_cross': 'Trend Change' };
@@ -149,13 +149,6 @@ function Tooltip({ text, t: theme }) {
       {show && <div style={{ position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", marginBottom: 8, width: 220, padding: "8px 12px", fontSize: 12, color: "#fff", background: "#1e293b", borderRadius: 10, boxShadow: "0 4px 12px rgba(0,0,0,.2)", zIndex: 99, lineHeight: 1.5 }}>{text}</div>}
     </span>
   );
-}
-
-function Sparkline() {
-  const pts = [12,18,14,22,20,28,25,32,30,38,36,42];
-  const w=120,h=40,p=2,mn=Math.min(...pts),mx=Math.max(...pts);
-  const d = pts.map((v,i)=>{ const x=p+(i/(pts.length-1))*(w-p*2), y=p+((mx-v)/(mx-mn))*(h-p*2); return `${i===0?"M":"L"}${x},${y}`; }).join(" ");
-  return (<svg viewBox={`0 0 ${w} ${h}`} style={{width:112,height:40}}><defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#22c55e" stopOpacity=".2"/><stop offset="100%" stopColor="#22c55e" stopOpacity="0"/></linearGradient></defs><path d={`${d} L${w-p},${h-p} L${p},${h-p} Z`} fill="url(#sg)"/><path d={d} fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>);
 }
 
 function BigMoneyBadge({ ticker, onClick, t: theme }) {
@@ -312,8 +305,7 @@ export default function AlertsTab({ session, group }) {
   const t = useTheme(darkMode);
   const [filter, setFilter] = useState("All");
   const [modalAlert, setModalAlert] = useState(null);
-  const [expandedAlertId, setExpandedAlertId] = useState(null);
-  const cardRefs = useRef({});
+  const [selectedChipId, setSelectedChipId] = useState(null);
   const [showFlow, setShowFlow] = useState(false);
   const [flowTab, setFlowTab] = useState("bigmoney");
   const [flowSort, setFlowSort] = useState("time");
@@ -393,6 +385,9 @@ export default function AlertsTab({ session, group }) {
     return b.confidence - a.confidence;
   });
 
+  // Auto-select AOTD or first alert on load
+  const selectedAlert = sorted.find(a => a.id === selectedChipId) || sorted[0] || null;
+
   // Flow data
   let flowBM = flowTickerFilter ? mockBigMoney.filter(d => d.ticker === flowTickerFilter) : mockBigMoney;
   let flowSB = flowTickerFilter ? mockSmartBets.filter(s => s.ticker === flowTickerFilter) : mockSmartBets;
@@ -457,124 +452,113 @@ export default function AlertsTab({ session, group }) {
       {view === "empty" && <NoAlerts t={t} />}
       {view === "active" && (
         <>
-          {/* THE ARC — top 5 alerts on blackjack semicircle */}
-          <AlertArc alerts={displayAlerts} onTap={(a) => {
-            setExpandedAlertId(expandedAlertId === a.id ? null : a.id);
-            setTimeout(() => { cardRefs.current[a.id]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 150);
-          }} t={t} darkMode={darkMode} />
+          {/* CHIP FIELD — gauge background + scattered poker chips */}
+          <ChipField
+            alerts={displayAlerts}
+            fearScore={fearScore}
+            history={mockTrack.history}
+            selectedId={selectedChipId}
+            onChipTap={(a) => setSelectedChipId(selectedChipId === a.id ? null : a.id)}
+            t={t}
+            darkMode={darkMode}
+          />
 
-          {/* BEAD PLATE — AOTD track record streak dots */}
-          <BeadPlate history={mockTrack.history} t={t} />
-
-          {/* ALERT CARDS — flat list, each expandable inline */}
-          {sorted.length === 0 && (
-            <div style={{ textAlign: "center", padding: "24px 16px", color: t.text3, fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>
-              No alerts match this filter
-            </div>
-          )}
-          {sorted.map(alert => {
-            const isPos = alert.change >= 0;
-            const isExpanded = expandedAlertId === alert.id;
-            const isAOTD = alert.isAlertOfDay;
-            return (
-              <div key={alert.id} ref={el => cardRefs.current[alert.id] = el} style={{
-                background: t.card, borderRadius: 14,
-                border: `0.5px solid ${isAOTD ? t.gold + '60' : t.border}`,
-                boxShadow: t.shadow, overflow: "hidden",
-              }}>
-                {/* Collapsed header (always visible) */}
-                <div onClick={() => setExpandedAlertId(isExpanded ? null : alert.id)}
-                  style={{ padding: "12px 14px", cursor: "pointer" }}>
-                  {isAOTD && (
-                    <div style={{ marginBottom: 6 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: t.gold, textTransform: "uppercase", letterSpacing: "1px", fontFamily: "'Outfit', sans-serif" }}>⭐ Alert of the Day</span>
-                    </div>
-                  )}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 16, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{alert.ticker}</span>
-                        <span style={{ padding: "2px 8px", borderRadius: 10, background: t.surfaceAlt, color: t.text2, fontSize: 11, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>{alert.scannerTag.toUpperCase()}</span>
-                      </div>
-                      <p style={{ margin: "2px 0 0", fontSize: 13, color: t.text3, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{alert.company}</p>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: 12 }}>
-                      <div style={{ textAlign: "right" }}>
-                        <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>${alert.price.toFixed(2)}</p>
-                        <p style={{ margin: "2px 0 0", fontSize: 13, fontWeight: 600, color: isPos ? t.green : t.red, fontFamily: "'DM Sans', sans-serif" }}>
-                          {isPos ? "+" : ""}{typeof alert.changePercent === 'number' ? alert.changePercent.toFixed(2) : alert.changePercent}%
-                        </p>
-                      </div>
-                      <span style={{ fontSize: 16, color: t.text3, transition: "transform .2s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", display: "inline-block" }}>▾</span>
-                    </div>
+          {/* DETAIL PANEL — shows selected chip's info */}
+          {selectedAlert && (
+            <div style={{ background: t.card, borderRadius: 14, border: `0.5px solid ${t.border}`, boxShadow: t.shadow, overflow: 'hidden' }}>
+              <div style={{ padding: '10px 14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{selectedAlert.ticker}</span>
+                    <span style={{ padding: '2px 8px', borderRadius: 10, background: t.surfaceAlt, color: t.text2, fontSize: 11, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>{selectedAlert.scannerTag.toUpperCase()}</span>
                   </div>
-                  {!isExpanded && (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
-                      <span style={{ fontSize: 13, color: t.text2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, fontFamily: "'DM Sans', sans-serif" }}>
-                        {alert.whyAlerting[0]?.text}
-                      </span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: 8 }}>
-                        <ConfidenceRing value={alert.confidence} size={16} t={t} />
-                        <span style={{ fontSize: 13, fontWeight: 700, color: alert.confidence >= 80 ? t.green : t.amber, fontFamily: "'DM Sans', sans-serif" }}>{alert.confidence}%</span>
-                      </div>
-                    </div>
-                  )}
-                  <BigMoneyBadge ticker={alert.ticker} onClick={openFlowForTicker} t={t} />
+                  <div>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>${selectedAlert.price.toFixed(2)}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: selectedAlert.change >= 0 ? t.green : t.red, marginLeft: 8, fontFamily: "'DM Sans', sans-serif" }}>
+                      {selectedAlert.change >= 0 ? "+" : ""}{typeof selectedAlert.changePercent === 'number' ? selectedAlert.changePercent.toFixed(2) : selectedAlert.changePercent}%
+                    </span>
+                  </div>
                 </div>
-                {/* Expanded dropdown panel */}
-                <div style={{
-                  maxHeight: isExpanded ? 400 : 0,
-                  overflow: "hidden",
-                  transition: "max-height .3s ease",
-                }}>
-                  <div style={{ borderTop: `0.5px solid ${t.border}`, padding: "10px 14px", background: t.surfaceAlt + "80" }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6, fontFamily: "'Outfit', sans-serif" }}>Why it's alerting</div>
-                    {alert.whyAlerting.map((w, i) => (
-                      <div key={i} style={{
-                        display: "flex", alignItems: "baseline", gap: 6,
-                        padding: "4px 0",
-                        borderBottom: i < alert.whyAlerting.length - 1 ? `0.5px solid ${t.border}50` : "none",
-                      }}>
-                        <span style={{ fontSize: 13, flexShrink: 0, width: 16 }}>{w.icon}</span>
-                        <span style={{ fontSize: 13, color: t.text1, fontFamily: "'DM Sans', sans-serif" }}>
-                          <span style={{ fontWeight: 600 }}>{w.label}</span>
-                          <span style={{ color: t.text2 }}> — {w.text}</span>
-                        </span>
-                      </div>
-                    ))}
-                    <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
-                      <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: "center" }}>
-                        <div style={{ fontSize: 11, color: t.text3, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Support</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${alert.support.toFixed(2)}</div>
-                      </div>
-                      <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: "center" }}>
-                        <div style={{ fontSize: 11, color: t.text3, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Resistance</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${alert.resistance.toFixed(2)}</div>
-                      </div>
-                      <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: "center" }}>
-                        <div style={{ fontSize: 11, color: t.text3, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>vs SPY</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: alert.vsSpy >= 0 ? t.green : t.red, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>
-                          {alert.vsSpy >= 0 ? "+" : ""}{typeof alert.vsSpy === 'number' ? alert.vsSpy.toFixed(1) : alert.vsSpy}%
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={e => { e.stopPropagation(); }} style={{
-                        flex: 1, padding: "10px 0", borderRadius: 10, fontWeight: 600, fontSize: 14,
-                        background: t.green, color: "#fff", border: "none", cursor: "pointer",
-                        fontFamily: "'Outfit', sans-serif",
-                      }}>Add to Watchlist</button>
-                      <button onClick={e => { e.stopPropagation(); setModalAlert(alert); }} style={{
-                        flex: 1, padding: "10px 0", borderRadius: 10, fontWeight: 600, fontSize: 14,
-                        background: "transparent", color: t.text2, border: `1.5px solid ${t.border}`,
-                        cursor: "pointer", fontFamily: "'Outfit', sans-serif",
-                      }}>View Details</button>
+                <div style={{ fontSize: 13, color: t.text3, marginBottom: 6, fontFamily: "'DM Sans', sans-serif" }}>{selectedAlert.company}</div>
+                <BigMoneyBadge ticker={selectedAlert.ticker} onClick={openFlowForTicker} t={t} />
+                <div style={{ fontSize: 11, fontWeight: 600, color: t.text3, textTransform: 'uppercase', letterSpacing: '1px', marginTop: 8, marginBottom: 4, fontFamily: "'Outfit', sans-serif" }}>Why it's alerting</div>
+                {selectedAlert.whyAlerting.map((w, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'baseline', gap: 6, padding: '3px 0',
+                    borderBottom: i < selectedAlert.whyAlerting.length - 1 ? `0.5px solid ${t.border}50` : 'none',
+                  }}>
+                    <span style={{ fontSize: 13, flexShrink: 0, width: 16 }}>{w.icon}</span>
+                    <span style={{ fontSize: 13, color: t.text1, fontFamily: "'DM Sans', sans-serif" }}>
+                      <span style={{ fontWeight: 600 }}>{w.label}</span>
+                      <span style={{ color: t.text2 }}> — {w.text}</span>
+                    </span>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: 6, margin: '8px 0' }}>
+                  <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Support</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${selectedAlert.support.toFixed(2)}</div>
+                  </div>
+                  <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Resistance</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${selectedAlert.resistance.toFixed(2)}</div>
+                  </div>
+                  <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>vs SPY</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: selectedAlert.vsSpy >= 0 ? t.green : t.red, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>
+                      {selectedAlert.vsSpy >= 0 ? "+" : ""}{typeof selectedAlert.vsSpy === 'number' ? selectedAlert.vsSpy.toFixed(1) : selectedAlert.vsSpy}%
                     </div>
                   </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={e => e.stopPropagation()} style={{
+                    flex: 1, padding: '9px 0', borderRadius: 10, fontWeight: 600, fontSize: 14,
+                    background: t.green, color: '#fff', border: 'none', cursor: 'pointer',
+                    fontFamily: "'Outfit', sans-serif",
+                  }}>Watchlist</button>
+                  <button onClick={e => { e.stopPropagation(); setModalAlert(selectedAlert); }} style={{
+                    flex: 1, padding: '9px 0', borderRadius: 10, fontWeight: 600, fontSize: 14,
+                    background: 'transparent', color: t.text2, border: `1.5px solid ${t.border}`,
+                    cursor: 'pointer', fontFamily: "'Outfit', sans-serif",
+                  }}>Details</button>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          )}
+
+          {/* ALERT HISTORY */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, padding: '0 4px' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: t.text3, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: "'Outfit', sans-serif" }}>Alert history</span>
+              <span style={{ fontSize: 11, color: t.text3 }}>This week</span>
+            </div>
+            <div style={{ background: t.card, borderRadius: 12, border: `0.5px solid ${t.border}`, overflow: 'hidden' }}>
+              {mockTrack.history.map((h, i) => {
+                const isHit = h.type === 'hit' || (h.result != null && h.result > 0);
+                return (
+                  <div key={i} style={{
+                    padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8,
+                    borderBottom: i < mockTrack.history.length - 1 ? `0.5px solid ${t.border}` : 'none',
+                  }}>
+                    <span style={{ fontSize: 11, color: t.text3, width: 36, flexShrink: 0, fontFamily: "'DM Sans', sans-serif" }}>{h.date}</span>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: '50%',
+                      border: `1.5px solid ${isHit ? t.green : t.red}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <span style={{ fontSize: 8, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{h.ticker}</span>
+                    </div>
+                    <span style={{ fontSize: 13, color: t.text2, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'DM Sans', sans-serif" }}>{h.desc}</span>
+                    <span style={{
+                      fontSize: 12, fontWeight: 700, padding: '2px 8px', borderRadius: 6, flexShrink: 0,
+                      background: isHit ? t.greenBg : t.redBg,
+                      color: isHit ? t.green : t.red,
+                    }}>{isHit ? "+" : ""}{h.result}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           {/* INSTITUTIONAL FLOW */}
           <div ref={flowRef} style={{ background: t.card, borderRadius: 16, border: `1px solid ${t.border}`, boxShadow: t.shadow }}>
@@ -621,17 +605,7 @@ export default function AlertsTab({ session, group }) {
             )}
           </div>
 
-          {/* TRACK RECORD */}
-          <div style={{ background: t.card, borderRadius: 16, border: `1px solid ${t.border}`, boxShadow: t.shadow, overflow: "visible" }}>
-            <div style={{ padding: "16px 16px 12px" }}>
-              <p style={{ fontSize: 11, fontWeight: 600, color: t.text3, textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 16px" }}>Track Record</p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>{[{l:"Hit Rate",v:`${mockTrack.hitRate}%`,c:t.text1},{l:"Avg Return",v:`+${mockTrack.avgReturn}%`,c:t.green},{l:"Streak",v:mockTrack.streak,c:t.text1}].map(x=>(<div key={x.l} style={{ background: t.surface, borderRadius: 14, padding: "12px 8px", textAlign: "center" }}><p style={{ fontSize: 10, color: t.text3, textTransform: "uppercase", letterSpacing: ".04em", margin: 0 }}>{x.l}</p><p style={{ fontSize: 22, fontWeight: 700, color: x.c, margin: "4px 0 0" }}>{x.v}</p></div>))}</div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}><div style={{ display: "flex", gap: 6 }}>{mockTrack.history.map((_,i)=>(<div key={i} style={{ width: 12, height: 12, borderRadius: "50%", background: t.text2, cursor: "pointer" }}/>))}</div><Sparkline /></div>
-              <p style={{ fontSize: 12, color: t.text3, margin: 0 }}>{mockTrack.history.filter(h=>h.type==="hit").length} of {mockTrack.history.length} alerts were profitable</p>
-            </div>
-            <div style={{ borderTop: `1px solid ${t.borderLight}` }}>{mockTrack.history.map((h,i)=>(<div key={i} style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, borderTop: i>0?`1px solid ${t.surface}`:"none" }}><span style={{ fontSize: 10, fontWeight: 600, color: t.text3, background: t.surfaceAlt, padding: "4px 8px", borderRadius: 6, flexShrink: 0 }}>{h.date}</span><div style={{ flex: 1, minWidth: 0 }}><p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: t.text1 }}>{h.ticker}</p><p style={{ margin: "2px 0 0", fontSize: 12, color: t.text2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.desc}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: t.text3 }}>${h.from} → ${h.to} next day</p></div><span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 8, background: h.type==="hit"?t.greenBg:t.redBg, color: h.type==="hit"?t.green:t.red }}>{h.type==="hit"?"Hit":"Miss"} {h.result>0?"+":""}{h.result}%</span></div>))}</div>
-          </div>
-        </>
+</>
       )}
 
       {modalAlert && <Modal alert={modalAlert} onClose={()=>setModalAlert(null)} t={t} />}

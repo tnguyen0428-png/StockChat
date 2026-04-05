@@ -49,93 +49,165 @@ export function ConfidenceRing({ value, size = 16, t }) {
   );
 }
 
-// ── Alert Arc (Blackjack Semicircle) ──
-// Shows top 5 alerts dealt along a curved arc. AOTD at apex.
-export function AlertArc({ alerts, onTap, t, darkMode }) {
-  const top5 = [...alerts].sort((a, b) => b.confidence - a.confidence).slice(0, 5);
-  if (top5.length === 0) return null;
-  const aotd = top5[0];
-  const sides = top5.slice(1);
-  const positions = [
-    { x: 6, y: 38, w: 60, h: 32, rot: -8 },
-    { x: 60, y: 43, w: 58, h: 28, rot: -3 },
-    { x: 155, y: 43, w: 58, h: 28, rot: 3 },
-    { x: 204, y: 38, w: 60, h: 32, rot: 8 },
-  ];
-  const arcBg = darkMode ? 'rgba(212,160,23,0.06)' : 'rgba(26,45,74,0.03)';
-  const arcLine = darkMode ? 'rgba(212,160,23,0.12)' : 'rgba(26,45,74,0.08)';
+// ── Rolex Gauge (subtle background) ──
+export function RolexGauge({ score, t, darkMode }) {
+  const s = score ?? 34;
+  const needleAngle = -90 + (Math.min(Math.max(s, 0), 50) / 50) * 180;
+  const cx = 160, cy = 150, nr = 80;
+  const rad = (needleAngle - 90) * Math.PI / 180;
+  const nx = cx + nr * Math.cos(rad);
+  const ny = cy + nr * Math.sin(rad);
 
   return (
-    <div style={{ padding: '4px 4px 0', textAlign: 'center' }}>
-      <svg viewBox="0 0 270 82" style={{ width: '100%', height: 'auto', maxWidth: 420 }}>
-        <path d="M10 76 Q10 6, 135 6 Q260 6, 260 76" fill="none" stroke={arcBg} strokeWidth="16" />
-        <path d="M10 76 Q10 6, 135 6 Q260 6, 260 76" fill="none" stroke={arcLine} strokeWidth="0.5" strokeDasharray="3 2" />
-        {/* AOTD center */}
-        <g style={{ cursor: 'pointer' }} onClick={() => onTap && onTap(aotd)}>
-          <rect x="98" y="4" width="74" height="42" rx="7" fill={`${t.gold}12`} stroke={`${t.gold}50`} strokeWidth="0.8" />
-          <text x="135" y="14" textAnchor="middle" fontSize="5" fill={t.gold} fontWeight="700" letterSpacing="0.8" style={{ fontFamily: "'Outfit', sans-serif" }}>ALERT OF THE DAY</text>
-          <text x="135" y="28" textAnchor="middle" fontSize="13" fill={t.text1} fontWeight="700" style={{ fontFamily: "'Outfit', sans-serif" }}>{aotd.ticker}</text>
-          <text x="118" y="40" textAnchor="middle" fontSize="7" fill={aotd.change >= 0 ? t.green : t.red} fontWeight="600">{aotd.change >= 0 ? '+' : ''}{typeof aotd.changePercent === 'number' ? aotd.changePercent.toFixed(2) : aotd.changePercent}%</text>
-          <text x="155" y="40" textAnchor="middle" fontSize="7" fill={t.text2} fontWeight="600">{aotd.confidence}%</text>
-        </g>
-        {/* Side cards */}
-        {sides.map((alert, i) => {
-          const p = positions[i];
-          if (!p) return null;
-          const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
-          return (
-            <g key={alert.id || i} transform={`rotate(${p.rot}, ${cx}, ${cy})`} style={{ cursor: 'pointer' }} onClick={() => onTap && onTap(alert)}>
-              <rect x={p.x} y={p.y} width={p.w} height={p.h} rx="5" fill={t.card} stroke={t.border} strokeWidth="0.5" />
-              <text x={cx} y={p.y + (p.h > 30 ? 13 : 12)} textAnchor="middle" fontSize={p.h > 30 ? '9' : '8'} fill={t.text1} fontWeight="700" style={{ fontFamily: "'Outfit', sans-serif" }}>{alert.ticker}</text>
-              <text x={cx} y={p.y + p.h - (p.h > 30 ? 7 : 5)} textAnchor="middle" fontSize="6" fill={alert.change >= 0 ? t.green : t.red} fontWeight="600">{alert.confidence}% {alert.change >= 0 ? '+' : ''}{typeof alert.changePercent === 'number' ? alert.changePercent.toFixed(1) : alert.changePercent}%</text>
-            </g>
-          );
-        })}
-      </svg>
+    <svg viewBox="0 0 320 170" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.25 }}>
+      <defs>
+        <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#22c55e"/>
+          <stop offset="30%" stopColor="#84cc16"/>
+          <stop offset="50%" stopColor="#eab308"/>
+          <stop offset="75%" stopColor="#f97316"/>
+          <stop offset="100%" stopColor="#ef4444"/>
+        </linearGradient>
+      </defs>
+      {/* Outer bezel */}
+      <path d="M60 150 A100 100 0 0 1 260 150" fill="none" stroke={darkMode ? "#2a4a6e" : "#c8d6e5"} strokeWidth="10"/>
+      {/* Fluted bezel ticks */}
+      <path d="M60 150 A100 100 0 0 1 260 150" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" strokeDasharray="1 3.5"/>
+      {/* Color gauge track */}
+      <path d="M68 150 A92 92 0 0 1 252 150" fill="none" stroke="url(#gaugeGrad)" strokeWidth="3" strokeLinecap="round"/>
+      {/* Tick marks */}
+      {[-72,-54,-36,-18,0,18,36,54,72].map(angle => (
+        <line key={angle} x1="72" y1="140" x2="72" y2="148" stroke="rgba(255,255,255,0.4)" strokeWidth="1" transform={`rotate(${angle}, 160, 150)`}/>
+      ))}
+      {/* Labels */}
+      <text x="62" y="165" textAnchor="middle" fontSize="8" fill="#22c55e" fontWeight="600" style={{ fontFamily: "'Outfit', sans-serif" }}>GREED</text>
+      <text x="258" y="165" textAnchor="middle" fontSize="8" fill="#ef4444" fontWeight="600" style={{ fontFamily: "'Outfit', sans-serif" }}>FEAR</text>
+      {/* Needle */}
+      <line x1={cx} y1={cy} x2={nx} y2={ny} stroke={t.text1} strokeWidth="1.5" strokeLinecap="round"/>
+      <circle cx={cx} cy={cy} r="4" fill={darkMode ? "#1e3d62" : "#c8d6e5"} stroke={t.text1} strokeWidth="1"/>
+      <circle cx={cx} cy={cy} r="1.5" fill={t.text1}/>
+    </svg>
+  );
+}
+
+// ── Poker Chip ──
+export function PokerChip({ alert, isSelected, onTap, size, t }) {
+  const isPos = alert.change >= 0;
+  const borderColor = isPos ? t.green : t.red;
+  const isAOTD = alert.isAlertOfDay;
+  const pctText = (isPos ? "+" : "") + (typeof alert.changePercent === 'number' ? alert.changePercent.toFixed(2) : alert.changePercent) + "%";
+
+  const tickerSize = size >= 68 ? 15 : size >= 58 ? 13 : size >= 48 ? 11 : 10;
+  const pctSize = size >= 68 ? 12 : size >= 58 ? 10 : size >= 48 ? 9 : 8;
+  const innerSize = size - 16;
+
+  return (
+    <div onClick={() => onTap(alert)} style={{
+      width: size, height: size, borderRadius: '50%',
+      border: `${isAOTD ? 2.5 : 2}px solid ${isAOTD ? t.gold : borderColor}`,
+      background: `${borderColor}08`,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      cursor: 'pointer', position: 'relative',
+      transform: isSelected ? 'scale(1.1)' : 'scale(1)',
+      transition: 'transform .15s',
+      boxShadow: isSelected ? `0 0 16px ${borderColor}30` : 'none',
+    }}>
+      <div style={{
+        position: 'absolute', width: innerSize, height: innerSize, borderRadius: '50%',
+        border: `0.5px dashed ${borderColor}30`,
+      }}/>
+      {isAOTD && (
+        <div style={{
+          position: 'absolute', top: -5,
+          background: t.gold, color: '#0a1628',
+          fontSize: 6, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
+          fontFamily: "'Outfit', sans-serif", letterSpacing: '0.5px',
+        }}>AOTD</div>
+      )}
+      <span style={{ fontSize: tickerSize, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif", lineHeight: 1, position: 'relative' }}>{alert.ticker}</span>
+      <span style={{ fontSize: pctSize, fontWeight: 700, color: borderColor, lineHeight: 1.2, position: 'relative' }}>{pctText}</span>
     </div>
   );
 }
 
-// ── Bead Plate (Baccarat Streak Dots) ──
-// Shows AOTD track record as streak columns. Green = hit, Red = miss.
-export function BeadPlate({ history, t }) {
-  if (!history || history.length === 0) return null;
-  const reversed = [...history].reverse();
-  const columns = [];
-  let currentCol = [], currentType = null;
-  reversed.forEach(h => {
-    const isHit = h.type === 'hit' || (h.result != null && h.result > 0);
-    if (currentType === null) { currentType = isHit; currentCol.push(isHit); }
-    else if (isHit === currentType) { currentCol.push(isHit); }
-    else { columns.push([...currentCol]); currentCol = [isHit]; currentType = isHit; }
-  });
-  if (currentCol.length > 0) columns.push(currentCol);
+// ── Chip Field (gauge background + scattered poker chips) ──
+export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, t, darkMode }) {
+  const sorted = [...alerts]
+    .sort((a, b) => {
+      if (a.isAlertOfDay && !b.isAlertOfDay) return -1;
+      if (!a.isAlertOfDay && b.isAlertOfDay) return 1;
+      return Math.abs(b.changePercent || 0) - Math.abs(a.changePercent || 0);
+    })
+    .slice(0, 5);
 
-  const hits = history.filter(h => h.type === 'hit' || (h.result != null && h.result > 0)).length;
-  const hitRate = history.length > 0 ? Math.round((hits / history.length) * 100) : 0;
-  const avgReturn = history.length > 0 ? (history.reduce((s, h) => s + (h.result || 0), 0) / history.length).toFixed(1) : '0';
-  let streakCount = 0, streakIsWin = null;
-  for (let i = 0; i < history.length; i++) {
-    const isHit = history[i].type === 'hit' || (history[i].result != null && history[i].result > 0);
-    if (i === 0) { streakIsWin = isHit; streakCount = 1; }
-    else if (isHit === streakIsWin) { streakCount++; }
-    else break;
+  const getChipSize = (pct) => {
+    const abs = Math.abs(pct || 0);
+    if (abs >= 4) return 72;
+    if (abs >= 2) return 62;
+    if (abs >= 1) return 52;
+    return 44;
+  };
+
+  const slots = [
+    { top: '6%', right: '6%' },
+    { top: '10%', left: '5%' },
+    { top: '38%', left: '28%' },
+    { top: '55%', left: '8%' },
+    { top: '42%', right: '12%' },
+  ];
+
+  // Build bead plate dots
+  const dots = [];
+  if (history && history.length > 0) {
+    const reversed = [...history].reverse();
+    let cols = [], col = [], cType = null;
+    reversed.forEach(h => {
+      const hit = h.type === 'hit' || (h.result != null && h.result > 0);
+      if (cType === null) { cType = hit; col.push(hit); }
+      else if (hit === cType) { col.push(hit); }
+      else { cols.push([...col]); col = [hit]; cType = hit; }
+    });
+    if (col.length > 0) cols.push(col);
+    dots.push(...cols);
   }
 
+  const hits = (history || []).filter(h => h.type === 'hit' || (h.result != null && h.result > 0)).length;
+  const hitRate = history && history.length > 0 ? Math.round((hits / history.length) * 100) : 0;
+
   return (
-    <div style={{ padding: '0 12px 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
-      <div style={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-        {columns.map((col, ci) => (
+    <div style={{ position: 'relative', height: 185, marginBottom: 4 }}>
+      <RolexGauge score={fearScore} t={t} darkMode={darkMode} />
+
+      {/* Score label */}
+      <div style={{ position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)', textAlign: 'center', opacity: 0.45 }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: (fearScore ?? 34) > 30 ? '#f97316' : (fearScore ?? 34) > 20 ? '#eab308' : '#22c55e', fontFamily: "'Outfit', sans-serif" }}>{Math.round(fearScore ?? 34)}</div>
+        <div style={{ fontSize: 7, fontWeight: 600, color: (fearScore ?? 34) > 30 ? '#f97316' : (fearScore ?? 34) > 20 ? '#eab308' : '#22c55e', fontFamily: "'Outfit', sans-serif", letterSpacing: 1.5, marginTop: -2 }}>
+          {(fearScore ?? 34) > 30 ? "FEARFUL" : (fearScore ?? 34) > 20 ? "NEUTRAL" : "GREEDY"}
+        </div>
+      </div>
+
+      {/* Bead plate */}
+      <div style={{ position: 'absolute', bottom: 36, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 3, opacity: 0.45 }}>
+        {dots.map((col, ci) => (
           <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {col.map((isHit, di) => (
-              <div key={di} style={{ width: 7, height: 7, borderRadius: '50%', background: isHit ? t.green : t.red }} />
+              <div key={di} style={{ width: 4, height: 4, borderRadius: '50%', background: isHit ? t.green : t.red }} />
             ))}
           </div>
         ))}
+        {dots.length > 0 && <span style={{ fontSize: 8, color: t.text3, marginLeft: 2 }}>{hitRate}%</span>}
       </div>
-      <div style={{ fontSize: 11, color: t.text3, fontFamily: "'DM Sans', sans-serif" }}>
-        {hitRate}% hit · +{avgReturn}% avg · <span style={{ color: streakIsWin ? t.green : t.red, fontWeight: 600 }}>{streakCount}{streakIsWin ? 'W' : 'L'}</span>
-      </div>
+
+      {/* Poker chips */}
+      {sorted.map((alert, i) => {
+        const slot = slots[i];
+        if (!slot) return null;
+        return (
+          <div key={alert.id} style={{ position: 'absolute', ...slot }}>
+            <PokerChip alert={alert} isSelected={selectedId === alert.id} onTap={onChipTap} size={getChipSize(alert.changePercent)} t={t} />
+          </div>
+        );
+      })}
     </div>
   );
 }
