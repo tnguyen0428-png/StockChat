@@ -126,7 +126,7 @@ export async function runPipeline(userMessage, conversationHistory, supabase, us
     const fallback = AGENTS.knowledge;
     const ctx = await fallback.fetchContext(supabase, routing.params);
     const raw = await fallback.respond(userMessage, conversationHistory, ctx, memory);
-    return { reply: stripMarkdown(raw), meta: { agent: 'knowledge', cached: false, ms: Date.now() - start, userLevel: memory.level } };
+    return { reply: stripMarkdown(raw).replace(/\s*•\s*/g, '\n• ').trim(), meta: { agent: 'knowledge', cached: false, ms: Date.now() - start, userLevel: memory.level } };
   }
 
   const context = await agent.fetchContext(supabase, routing.params);
@@ -135,6 +135,9 @@ export async function runPipeline(userMessage, conversationHistory, supabase, us
 
   // Post-response: hallucination check
   response = checkForHallucination(response, context, routing.agent);
+
+  // Format bullets onto separate lines for clean rendering
+  response = response.replace(/\s*•\s*/g, '\n• ').trim();
 
   // Cache it, update memory (non-blocking)
   setCache(userMessage, response);
