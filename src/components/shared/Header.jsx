@@ -397,7 +397,7 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
 
   return (
     <div style={styles.header}>
-      <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }} onClick={() => onHomePress?.()}>
+      <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 0 }} onClick={() => onHomePress?.()}>
         {/* U-arrow icon */}
         <svg width="38" height="38" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round">
           <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3" />
@@ -715,14 +715,14 @@ const styles = {
   logoUp:     { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
   logoTik:    { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
   logoAlerts: {
-    fontSize: 14, fontWeight: 300, color: '#d4e4f2', letterSpacing: 2,
-    fontFamily: "'Avenir Next', 'Avenir', 'Nunito Sans', sans-serif",
-    marginTop: -4, paddingLeft: 18,
+    fontSize: 12, fontWeight: 300, color: '#d4e4f2', letterSpacing: 2.5,
+    fontFamily: "'Outfit', sans-serif",
+    marginTop: 0, paddingLeft: 0,
   },
   slogan: {
-    fontSize: 10, fontWeight: 300, fontStyle: 'italic',
-    color: '#d4e4f2', letterSpacing: 1,
-    fontFamily: "'Avenir Next', 'Avenir', 'Nunito Sans', sans-serif",
+    fontSize: 12, fontWeight: 300, fontStyle: 'italic',
+    color: '#f0ede8', letterSpacing: 1,
+    fontFamily: "'Outfit', sans-serif",
   },
   avatar: {
     width: 28, height: 28, borderRadius: '50%',
