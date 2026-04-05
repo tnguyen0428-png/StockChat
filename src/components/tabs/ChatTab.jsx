@@ -390,8 +390,8 @@ function WatchlistView({ session, onAskAI }) {
         pegRatio: r?.priceToEarningsGrowthRatio || null,
         netMargin: r?.netProfitMargin || null,
         debtEquity: r?.debtToEquityRatio || null,
-        revenueGrowth: g?.growthRevenue || null,
-        epsGrowth: g?.growthEPS || null,
+        revenueGrowth: g?.revenueGrowth || null,
+        epsGrowth: g?.epsgrowth || null,
         nextEarnings,
       };
       setDetailData(prev => {
