@@ -335,6 +335,7 @@ function WatchlistView({ session, onAskAI }) {
         dm[r.value.symbol] = r.value;
       }
     });
+    console.log('DCF results:', Object.keys(dm).length, 'tickers with DCF data');
     setDcfData(prev => {
       const merged = { ...prev, ...dm };
       localStorage.setItem('uptik_wl_dcf', JSON.stringify(merged));
@@ -389,8 +390,8 @@ function WatchlistView({ session, onAskAI }) {
         pegRatio: r?.priceToEarningsGrowthRatio || null,
         netMargin: r?.netProfitMargin || null,
         debtEquity: r?.debtToEquityRatio || null,
-        revenueGrowth: g?.revenueGrowth || g?.growthRevenue || null,
-        epsGrowth: g?.epsgrowth || g?.growthEPS || null,
+        revenueGrowth: g?.growthRevenue || null,
+        epsGrowth: g?.growthEPS || null,
         nextEarnings,
       };
       setDetailData(prev => {
@@ -486,7 +487,6 @@ function WatchlistView({ session, onAskAI }) {
           const sym = item.symbol;
           const q = quoteData[sym] || {};
           const dcf = dcfData[sym];
-          const ratio = ratioData[sym];
           const isExp = expanded === sym;
           const det = detailData[sym];
           const price = q.price || 0;
@@ -496,8 +496,9 @@ function WatchlistView({ session, onAskAI }) {
           const dcfVal = dcf?.dcf;
           const dcfDiff = dcfVal && price ? ((dcfVal - price) / price) * 100 : null;
           const dcfUp = dcfDiff != null ? dcfDiff >= 0 : null;
-          const pe = ratio?.pe;
-          const peColor = pe == null ? '#7a8ea3' : pe < 0 || pe > 50 ? '#E05252' : '#1a2d4a';
+          const peValue = ratioData[sym]?.pe;
+          const peDisplay = (peValue != null && peValue > 0) ? peValue.toFixed(1) : 'N/A';
+          const peColor = !peValue || peValue <= 0 ? '#7a8ea3' : peValue > 50 ? '#E05252' : '#1a2d4a';
           const dotColor = dcfUp === true ? '#1AAD5E' : dcfUp === false ? '#E05252' : null;
 
           return (
@@ -518,14 +519,14 @@ function WatchlistView({ session, onAskAI }) {
                 <div style={{ textAlign: 'right' }}>
                   <div style={ws.price}>{price ? `$${price.toFixed(2)}` : '—'}</div>
                   <div style={{ ...ws.change, color: isUp ? '#1AAD5E' : '#E05252' }}>
-                    {price ? `${isUp ? '+' : ''}$${chg.toFixed(2)} (${isUp ? '+' : ''}${chgPct.toFixed(2)}%)` : ''}
+                    {price ? `${chg >= 0 ? '+' : '-'}$${Math.abs(chg).toFixed(2)} (${chg >= 0 ? '+' : ''}${chgPct.toFixed(2)}%)` : ''}
                   </div>
                 </div>
               </div>
               {/* Bottom row */}
               <div style={ws.cardBottom}>
                 <span style={{ fontSize: 12, color: '#7a8ea3' }}>Fwd P/E</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: peColor }}>{pe != null ? pe.toFixed(1) : '—'}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: peColor }}>{peDisplay}</span>
                 {dotColor && <div style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />}
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={dotColor || '#7a8ea3'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginLeft: 'auto', transform: isExp ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
                   <polyline points="6 9 12 15 18 9" />
