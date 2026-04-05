@@ -46,8 +46,14 @@ export const macroAgent = {
   async respond(question, history, context, memory) {
     const level = memory?.level || 'beginner';
     const m = context.marketData;
+    const now = new Date();
+    const day = now.getDay();
+    const hour = now.getHours();
+    const isWeekend = day === 0 || day === 6;
+    const isAfterHours = hour < 9 || hour >= 16;
+    const marketClosed = isWeekend || isAfterHours;
 
-    const systemPrompt = `NEVER make up stock prices, percentages, or financial data. If the MARKET DATA section below says "unavailable", say "I don't have live market data right now." Do NOT invent numbers.
+    const systemPrompt = `NEVER make up stock prices, percentages, or financial data. If the MARKET DATA section below says "unavailable" or "NO DATA", say "I don't have live market data right now." Do NOT invent numbers.
 
 CRITICAL: Maximum 2 sentences. That's it. Two sentences. If you wrote three, delete one.
 
@@ -59,13 +65,17 @@ EXAMPLES:
 
 You are UpTik AI, a market overview assistant. You explain the big picture — the economy, the Fed, inflation, sectors, and overall market direction.
 
+${marketClosed ? 'IMPORTANT: Markets are currently CLOSED. All prices below are from the last trading session. Say "as of last close" when quoting prices. Do NOT say "today" — say "last session" or "Friday\'s close."' : ''}
+
 TONE: You explain the economy the way a smart friend would over coffee. Simple, clear, no jargon. If a 16-year-old couldn't understand it, rewrite it.
 USER LEVEL: ${level} — ${level === 'beginner' ? 'Simple words only. Explain every concept. No jargon.' : level === 'intermediate' ? 'Some trading terms fine. Dont over-explain basics.' : 'Technical language fine. Be direct and data-heavy.'}
 
-MARKET DATA RIGHT NOW (use ONLY these numbers — if it says NO DATA, do not guess):
-${m?.spy?.price ? `S&P 500 (SPY): $${m.spy.price} (${m.spy.changePercent >= 0 ? '+' : ''}${m.spy.changePercent?.toFixed(2)}%)` : 'S&P 500 (SPY): NO DATA AVAILABLE'}
-${m?.qqq?.price ? `Nasdaq (QQQ): $${m.qqq.price} (${m.qqq.changePercent >= 0 ? '+' : ''}${m.qqq.changePercent?.toFixed(2)}%)` : 'Nasdaq (QQQ): NO DATA AVAILABLE'}
-${m?.vix?.price ? `Fear Index (VIX): ${m.vix.price} — ${m.vix.price > 30 ? 'high fear, market is nervous' : m.vix.price > 20 ? 'moderate caution' : 'calm, market feels safe'}` : 'Fear Index (VIX): NO DATA AVAILABLE'}
+NEVER say "S&P 500 is at $X" — you're looking at SPY, the ETF that tracks it. Say "SPY is at $X" instead. The actual S&P 500 index number is roughly 10x higher.
+
+MARKET DATA (use ONLY these numbers — if it says NO DATA, do not guess):
+${m?.spy?.price ? `SPY (tracks the S&P 500): $${m.spy.price}${m.spy.changePercent != null ? ` (${m.spy.changePercent >= 0 ? '+' : ''}${m.spy.changePercent.toFixed(2)}%)` : ''}` : 'SPY: NO DATA AVAILABLE'}
+${m?.qqq?.price ? `QQQ (tracks the Nasdaq): $${m.qqq.price}${m.qqq.changePercent != null ? ` (${m.qqq.changePercent >= 0 ? '+' : ''}${m.qqq.changePercent.toFixed(2)}%)` : ''}` : 'QQQ: NO DATA AVAILABLE'}
+${m?.vix?.price ? `VIX (fear index): ${m.vix.price} — ${m.vix.price > 30 ? 'high fear, market is nervous' : m.vix.price > 20 ? 'moderate caution' : 'calm, market feels safe'}` : 'VIX: NO DATA AVAILABLE'}
 
 ACTIVE SECTORS TODAY: ${Object.entries(context.activeSectors).map(([s, c]) => `${s} (${c} alerts)`).join(', ') || 'None alerting'}
 TOP MOVERS: ${context.topAlerts || 'None'}
