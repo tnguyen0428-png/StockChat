@@ -61,7 +61,9 @@ export const dataAgent = {
     const aod = context.alertOfDay;
     const aodTicker = aod ? (aod.ticker || aod.tickers?.[0]) : null;
 
-    const systemPrompt = `CRITICAL: Maximum 2 sentences. That's it. Two sentences. If you wrote three, delete one.
+    const systemPrompt = `CRITICAL SAFETY RULE: NEVER make up stock prices, percentages, volume numbers, or any financial data. If the VERIFIED LIVE PRICE DATA section below is empty, says null, or is missing — you MUST say "I don't have live price data right now." You MUST NOT invent numbers. Making up financial data is the worst thing you can do. If you're not 100% sure a number came from the data provided below, do not include it.
+
+CRITICAL: Maximum 2 sentences. That's it. Two sentences. If you wrote three, delete one.
 
 FORMAT: [Fact] + [So what]. That's the formula. First sentence is the fact. Second sentence is why it matters. Done.
 
@@ -89,10 +91,9 @@ RESPONSE FORMAT:
 - For "what should I trade": Today's top pick: [TICKER] at $[price], one sentence why. Not financial advice.
 - Never write paragraphs. Never use bullet points. Never repeat yourself.
 - If you need more than 3 lines, you're saying too much. Cut it.
-- NEVER say "I can't pull data" or "I don't have real-time data." You DO have live price data. Use it.
-- If asked for a chart: "Here's the numbers: [show price data]. For the visual chart, tap the Alerts tab."
-- If price data is unavailable (weekends, after hours, API issues), say: "Markets are closed right now. I'll have live prices when they open Monday at 9:30 AM ET." Do NOT say "couldn't reach the price feed."
-- If you have prevClose data but no live data, use the previous close and mention markets are closed.
+- ONLY use numbers from the VERIFIED LIVE PRICE DATA section below. Never guess prices.
+- If no price data is available, say: "I don't have live price data for that right now. Try checking Yahoo Finance or your broker app."
+- If you have prevClose data but no live data, use the previous close and say "last closing price was $X."
 - NEVER end with a question. No "Want to know more?" No "What else?" Just answer and stop.
 - NEVER give background info they didn't ask for. "Tell me about Ford" = price + one key thing. NOT Ford's history, competition, and strategy.
 
@@ -110,11 +111,14 @@ USER LEVEL: ${level} — ${level === 'beginner' ? 'Simple words only. Explain ev
 
 ${context.ticker ? `USER IS ASKING ABOUT: ${context.ticker}` : 'USER IS ASKING ABOUT THE MARKET / ALERTS IN GENERAL'}
 
-${context.livePrice?.price
-  ? `${context.livePrice.marketOpen ? 'LIVE' : 'LAST CLOSE'} PRICE FOR ${context.ticker}: $${context.livePrice.price}${context.livePrice.changePercent != null ? ` (${context.livePrice.changePercent >= 0 ? '+' : ''}${context.livePrice.changePercent.toFixed(2)}%)` : ''}${context.livePrice.volume ? ` | Vol: ${context.livePrice.volume.toLocaleString()}` : ''}${context.livePrice.dayHigh ? ` | Range: $${context.livePrice.dayLow}-$${context.livePrice.dayHigh}` : ''}${context.livePrice.prevClose ? ` | Prev Close: $${context.livePrice.prevClose}` : ''}${!context.livePrice.marketOpen ? ' (market is closed — this is the last closing price)' : ''}`
-  : context.ticker
-  ? `Could not fetch price for ${context.ticker}. Markets may be closed. Say "Markets are closed right now, last I saw [ticker] was around $X" if you have any context, otherwise say "I'll have live prices when markets open Monday 9:30 AM ET."`
-  : ''}
+${context.livePrice && context.livePrice.price
+  ? `VERIFIED LIVE PRICE DATA (use ONLY these numbers):
+Price: $${context.livePrice.price}
+Change: ${context.livePrice.changePercent !== null ? context.livePrice.changePercent.toFixed(2) + '%' : 'N/A'}
+Volume: ${context.livePrice.volume ? context.livePrice.volume.toLocaleString() : 'N/A'}
+Day Range: $${context.livePrice.dayLow || 'N/A'} - $${context.livePrice.dayHigh || 'N/A'}
+${context.livePrice.note || (context.livePrice.marketOpen ? '' : '(Market is closed — this is the last closing price)')}`
+  : 'LIVE PRICE DATA: NONE AVAILABLE. Do NOT guess or make up any prices. Say "I don\'t have live price data right now" and suggest checking Yahoo Finance or their broker app.'}
 
 ${context.ticker && context.tickerAlerts.length > 0
   ? `${context.ticker} IS ALSO ON OUR SCANNER:\n${context.tickerAlerts.map(a => `$${a.price} type:${a.signal_type || a.alert_type} ${a.notes || a.title || ''}`).join('\n')}`

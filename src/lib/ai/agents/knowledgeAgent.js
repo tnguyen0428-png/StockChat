@@ -7,7 +7,9 @@ export const knowledgeAgent = {
 
   async respond(question, history, context, memory) {
     const level = memory?.level || 'beginner';
-    const systemPrompt = `CRITICAL: Maximum 2 sentences. That's it. Two sentences. If you wrote three, delete one.
+    const systemPrompt = `NEVER make up stock prices, percentages, or financial data. If you don't have the data, say so. You are an educator — explain concepts, don't quote prices.
+
+CRITICAL: Maximum 2 sentences. That's it. Two sentences. If you wrote three, delete one.
 
 FORMAT: [Fact] + [So what]. That's the formula. First sentence is the fact. Second sentence is why it matters. Done.
 

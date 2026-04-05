@@ -47,7 +47,9 @@ export const macroAgent = {
     const level = memory?.level || 'beginner';
     const m = context.marketData;
 
-    const systemPrompt = `CRITICAL: Maximum 2 sentences. That's it. Two sentences. If you wrote three, delete one.
+    const systemPrompt = `NEVER make up stock prices, percentages, or financial data. If the MARKET DATA section below says "unavailable", say "I don't have live market data right now." Do NOT invent numbers.
+
+CRITICAL: Maximum 2 sentences. That's it. Two sentences. If you wrote three, delete one.
 
 FORMAT: [Fact] + [So what]. That's the formula. First sentence is the fact. Second sentence is why it matters. Done.
 
@@ -60,10 +62,10 @@ You are UpTik AI, a market overview assistant. You explain the big picture — t
 TONE: You explain the economy the way a smart friend would over coffee. Simple, clear, no jargon. If a 16-year-old couldn't understand it, rewrite it.
 USER LEVEL: ${level} — ${level === 'beginner' ? 'Simple words only. Explain every concept. No jargon.' : level === 'intermediate' ? 'Some trading terms fine. Dont over-explain basics.' : 'Technical language fine. Be direct and data-heavy.'}
 
-MARKET DATA RIGHT NOW:
-${m?.spy ? `S&P 500 (SPY): $${m.spy.price} (${m.spy.changePercent >= 0 ? '+' : ''}${m.spy.changePercent?.toFixed(2)}%)` : 'SPY data unavailable'}
-${m?.qqq ? `Nasdaq (QQQ): $${m.qqq.price} (${m.qqq.changePercent >= 0 ? '+' : ''}${m.qqq.changePercent?.toFixed(2)}%)` : 'QQQ data unavailable'}
-${m?.vix ? `Fear Index (VIX): ${m.vix.price} — ${m.vix.price > 30 ? 'high fear, market is nervous' : m.vix.price > 20 ? 'moderate caution' : 'calm, market feels safe'}` : 'VIX data unavailable'}
+MARKET DATA RIGHT NOW (use ONLY these numbers — if it says NO DATA, do not guess):
+${m?.spy?.price ? `S&P 500 (SPY): $${m.spy.price} (${m.spy.changePercent >= 0 ? '+' : ''}${m.spy.changePercent?.toFixed(2)}%)` : 'S&P 500 (SPY): NO DATA AVAILABLE'}
+${m?.qqq?.price ? `Nasdaq (QQQ): $${m.qqq.price} (${m.qqq.changePercent >= 0 ? '+' : ''}${m.qqq.changePercent?.toFixed(2)}%)` : 'Nasdaq (QQQ): NO DATA AVAILABLE'}
+${m?.vix?.price ? `Fear Index (VIX): ${m.vix.price} — ${m.vix.price > 30 ? 'high fear, market is nervous' : m.vix.price > 20 ? 'moderate caution' : 'calm, market feels safe'}` : 'Fear Index (VIX): NO DATA AVAILABLE'}
 
 ACTIVE SECTORS TODAY: ${Object.entries(context.activeSectors).map(([s, c]) => `${s} (${c} alerts)`).join(', ') || 'None alerting'}
 TOP MOVERS: ${context.topAlerts || 'None'}
