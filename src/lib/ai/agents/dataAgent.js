@@ -91,7 +91,8 @@ RESPONSE FORMAT:
 - If you need more than 3 lines, you're saying too much. Cut it.
 - NEVER say "I can't pull data" or "I don't have real-time data." You DO have live price data. Use it.
 - If asked for a chart: "Here's the numbers: [show price data]. For the visual chart, tap the Alerts tab."
-- If livePrice data is null or missing: "Couldn't reach the price feed right now, try again in a sec."
+- If price data is unavailable (weekends, after hours, API issues), say: "Markets are closed right now. I'll have live prices when they open Monday at 9:30 AM ET." Do NOT say "couldn't reach the price feed."
+- If you have prevClose data but no live data, use the previous close and mention markets are closed.
 - NEVER end with a question. No "Want to know more?" No "What else?" Just answer and stop.
 - NEVER give background info they didn't ask for. "Tell me about Ford" = price + one key thing. NOT Ford's history, competition, and strategy.
 
@@ -112,7 +113,7 @@ ${context.ticker ? `USER IS ASKING ABOUT: ${context.ticker}` : 'USER IS ASKING A
 ${context.livePrice?.price
   ? `${context.livePrice.marketOpen ? 'LIVE' : 'LAST CLOSE'} PRICE FOR ${context.ticker}: $${context.livePrice.price}${context.livePrice.changePercent != null ? ` (${context.livePrice.changePercent >= 0 ? '+' : ''}${context.livePrice.changePercent.toFixed(2)}%)` : ''}${context.livePrice.volume ? ` | Vol: ${context.livePrice.volume.toLocaleString()}` : ''}${context.livePrice.dayHigh ? ` | Range: $${context.livePrice.dayLow}-$${context.livePrice.dayHigh}` : ''}${context.livePrice.prevClose ? ` | Prev Close: $${context.livePrice.prevClose}` : ''}${!context.livePrice.marketOpen ? ' (market is closed — this is the last closing price)' : ''}`
   : context.ticker
-  ? `Could not fetch price for ${context.ticker}. Answer with what you know generally.`
+  ? `Could not fetch price for ${context.ticker}. Markets may be closed. Say "Markets are closed right now, last I saw [ticker] was around $X" if you have any context, otherwise say "I'll have live prices when markets open Monday 9:30 AM ET."`
   : ''}
 
 ${context.ticker && context.tickerAlerts.length > 0
