@@ -300,7 +300,7 @@ function ListsView({ group, isAdmin, isModerator, isOpenList, onAskAI }) {
                     </div>
                     <span style={{ width: '16%', flexShrink: 0, fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>{stock.ticker}</span>
                     <div style={{ width: '22%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-                      <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)', padding: '1px 7px', borderRadius: 10, border: '1px solid rgba(26,173,94,0.3)' }}>{stock.score}</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--green-bg)', color: '#1a5c10', padding: '1px 7px', borderRadius: 10, border: '1px solid rgba(26,173,94,0.3)' }}>{stock.score}</span>
                       <span style={{ fontSize: 9, color: 'var(--text3)' }}>{isExpanded ? '▼' : '▲'}</span>
                     </div>
                     <div style={{ width: '34%', flexShrink: 0, textAlign: 'right' }}>
