@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
 import { runScreener, SECTOR_MAP } from '../../lib/screener';
+import { run52wHighScan, DEFAULT_THRESHOLD, runVolSurgeScan, DEFAULT_VOL_MULTIPLIER, runGapUpScan, DEFAULT_GAP_THRESHOLD, runMACrossScan, DEFAULT_SHORT_MA, DEFAULT_LONG_MA } from '../../lib/breakoutScanner';
 
 // ── Admin Panel ──
 function AdminPanel({ session, profile }) {
@@ -44,6 +45,45 @@ function AdminPanel({ session, profile }) {
   const [newsLoading, setNewsLoading]   = useState(false);
   const [selectedNews, setSelectedNews] = useState([]);
   const [postingNews, setPostingNews]   = useState(false);
+
+  // Alert Scanner state
+  const [scanning52w, setScanning52w] = useState(false);
+  const [scan52wProgress, setScan52wProgress] = useState(0);
+  const [scan52wStatus, setScan52wStatus] = useState(null);
+  const [scanningVol, setScanningVol] = useState(false);
+  const [scanVolProgress, setScanVolProgress] = useState(0);
+  const [scanVolStatus, setScanVolStatus] = useState(null);
+  const [scanningGap, setScanningGap] = useState(false);
+  const [scanGapProgress, setScanGapProgress] = useState(0);
+  const [scanGapStatus, setScanGapStatus] = useState(null);
+  const [scanningMA, setScanningMA] = useState(false);
+  const [scanMAProgress, setScanMAProgress] = useState(0);
+  const [scanMAStatus, setScanMAStatus] = useState(null);
+
+  const handle52wScan = async () => {
+    setScanning52w(true); setScan52wProgress(0); setScan52wStatus(null);
+    try { const { inserted } = await run52wHighScan(DEFAULT_THRESHOLD, setScan52wProgress); setScan52wStatus({ inserted }); }
+    catch (e) { setScan52wStatus({ error: e.message }); }
+    finally { setScanning52w(false); }
+  };
+  const handleVolScan = async () => {
+    setScanningVol(true); setScanVolProgress(0); setScanVolStatus(null);
+    try { const { inserted } = await runVolSurgeScan(DEFAULT_VOL_MULTIPLIER, setScanVolProgress); setScanVolStatus({ inserted }); }
+    catch (e) { setScanVolStatus({ error: e.message }); }
+    finally { setScanningVol(false); }
+  };
+  const handleGapScan = async () => {
+    setScanningGap(true); setScanGapProgress(0); setScanGapStatus(null);
+    try { const { inserted } = await runGapUpScan(DEFAULT_GAP_THRESHOLD, setScanGapProgress); setScanGapStatus({ inserted }); }
+    catch (e) { setScanGapStatus({ error: e.message }); }
+    finally { setScanningGap(false); }
+  };
+  const handleMAScan = async () => {
+    setScanningMA(true); setScanMAProgress(0); setScanMAStatus(null);
+    try { const { inserted } = await runMACrossScan(DEFAULT_SHORT_MA, DEFAULT_LONG_MA, setScanMAProgress); setScanMAStatus({ inserted }); }
+    catch (e) { setScanMAStatus({ error: e.message }); }
+    finally { setScanningMA(false); }
+  };
 
   useEffect(() => {
     if (activeSection === 'groups')   loadGroups();
@@ -224,6 +264,7 @@ function AdminPanel({ session, profile }) {
 
   const sections = [
     { id: 'news',     label: 'News Scanner'  },
+    { id: 'alertscanner', label: 'Alert Scanner' },
     { id: 'screener', label: 'Run Screener'  },
     { id: 'briefing', label: 'Post Briefing' },
     { id: 'lists',    label: 'Curated Lists' },
@@ -242,7 +283,31 @@ function AdminPanel({ session, profile }) {
           </div>
 
           {activeSection === s.id && (
-            s.id === 'screener' ? (
+            s.id === 'alertscanner' ? (
+              <div style={adminStyles.body}>
+                <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>
+                  Scans S&P 500 + Nasdaq 100 for breakout signals. Results appear in the Alerts tab.
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                  <button style={{ ...adminStyles.btn, opacity: scanning52w ? 0.6 : 1 }} onClick={handle52wScan} disabled={scanning52w}>
+                    {scanning52w ? `52W… ${scan52wProgress}%` : '52W High'}
+                  </button>
+                  <button style={{ ...adminStyles.btn, opacity: scanningVol ? 0.6 : 1 }} onClick={handleVolScan} disabled={scanningVol}>
+                    {scanningVol ? `Vol… ${scanVolProgress}%` : 'Vol Surge'}
+                  </button>
+                  <button style={{ ...adminStyles.btn, opacity: scanningGap ? 0.6 : 1 }} onClick={handleGapScan} disabled={scanningGap}>
+                    {scanningGap ? `Gap… ${scanGapProgress}%` : 'Gap Up'}
+                  </button>
+                  <button style={{ ...adminStyles.btn, opacity: scanningMA ? 0.6 : 1 }} onClick={handleMAScan} disabled={scanningMA}>
+                    {scanningMA ? `MA… ${scanMAProgress}%` : 'MA Cross'}
+                  </button>
+                </div>
+                {scan52wStatus && <div style={{ fontSize: 12, color: scan52wStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scan52wStatus.error ? `Error: ${scan52wStatus.error}` : scan52wStatus.inserted === 0 ? '52W — no new breakouts' : `52W — ${scan52wStatus.inserted} alert${scan52wStatus.inserted > 1 ? 's' : ''} added`}</div>}
+                {scanVolStatus && <div style={{ fontSize: 12, color: scanVolStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scanVolStatus.error ? `Error: ${scanVolStatus.error}` : scanVolStatus.inserted === 0 ? 'Vol — no surges found' : `Vol — ${scanVolStatus.inserted} alert${scanVolStatus.inserted > 1 ? 's' : ''} added`}</div>}
+                {scanGapStatus && <div style={{ fontSize: 12, color: scanGapStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scanGapStatus.error ? `Error: ${scanGapStatus.error}` : scanGapStatus.inserted === 0 ? 'Gap — no gaps found' : `Gap — ${scanGapStatus.inserted} alert${scanGapStatus.inserted > 1 ? 's' : ''} added`}</div>}
+                {scanMAStatus && <div style={{ fontSize: 12, color: scanMAStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scanMAStatus.error ? `Error: ${scanMAStatus.error}` : scanMAStatus.inserted === 0 ? 'MA — no crossovers found' : `MA — ${scanMAStatus.inserted} alert${scanMAStatus.inserted > 1 ? 's' : ''} added`}</div>}
+              </div>
+            ) : s.id === 'screener' ? (
               <div style={adminStyles.body}>
                 <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 10, marginBottom: 10 }}>
                   Scores top stocks from S&P 500 + Nasdaq 100 by sector using FMP data.

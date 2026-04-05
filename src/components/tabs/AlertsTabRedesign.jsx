@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from '../../lib/supabase';
-import { run52wHighScan, DEFAULT_THRESHOLD, runVolSurgeScan, DEFAULT_VOL_MULTIPLIER, runGapUpScan, DEFAULT_GAP_THRESHOLD, runMACrossScan, DEFAULT_SHORT_MA, DEFAULT_LONG_MA } from '../../lib/breakoutScanner';
 import { useGroup } from '../../context/GroupContext';
 import { useTheme, ChipField, DarkModeToggle } from './alertsCasinoComponents';
 
@@ -319,15 +318,6 @@ export default function AlertsTab({ session, group }) {
   const [liveAlerts, setLiveAlerts] = useState([]);
   const [fearScore, setFearScore] = useState(null);
   const [spyData, setSpyData] = useState(null);
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [scanning52w, setScanning52w] = useState(false);
-  const [scan52wProgress, setScan52wProgress] = useState(0);
-  const [scanningVol, setScanningVol] = useState(false);
-  const [scanVolProgress, setScanVolProgress] = useState(0);
-  const [scanningGap, setScanningGap] = useState(false);
-  const [scanGapProgress, setScanGapProgress] = useState(0);
-  const [scanningMA, setScanningMA] = useState(false);
-  const [scanMAProgress, setScanMAProgress] = useState(0);
 
   // ── Fetch breakout_alerts + realtime ──
   useEffect(() => {
@@ -359,12 +349,6 @@ export default function AlertsTab({ session, group }) {
       });
     });
   }, []);
-
-  // ── Scanner handlers ──
-  const handle52wScan = async () => { setScanning52w(true); setScan52wProgress(0); try { await run52wHighScan(DEFAULT_THRESHOLD, setScan52wProgress); } catch {} setScanning52w(false); };
-  const handleVolScan = async () => { setScanningVol(true); setScanVolProgress(0); try { await runVolSurgeScan(DEFAULT_VOL_MULTIPLIER, setScanVolProgress); } catch {} setScanningVol(false); };
-  const handleGapScan = async () => { setScanningGap(true); setScanGapProgress(0); try { await runGapUpScan(DEFAULT_GAP_THRESHOLD, setScanGapProgress); } catch {} setScanningGap(false); };
-  const handleMAScan = async () => { setScanningMA(true); setScanMAProgress(0); try { await runMACrossScan(DEFAULT_SHORT_MA, DEFAULT_LONG_MA, setScanMAProgress); } catch {} setScanningMA(false); };
 
   // ── Build display alerts: live mapped data OR mock fallback ──
   const displayAlerts = useMemo(() => {
@@ -432,21 +416,6 @@ export default function AlertsTab({ session, group }) {
           return (<button key={f} onClick={()=>setFilter(f)} style={{ flexShrink: 0, padding: "8px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, border: filter===f?"none":`1px solid ${t.border}`, background: filter===f?t.btnActive:t.card, color: filter===f?"#fff":t.text2, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "'DM Sans', sans-serif" }}>{f}<span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 10, background: filter===f?"rgba(255,255,255,.2)":t.surfaceAlt, color: filter===f?"#fff":t.text3 }}>{count}</span></button>);
         })}
       </div>
-
-      {/* SCANNER BUTTONS (admin only) */}
-      {isAdmin && (
-        <div>
-          <button onClick={() => setScannerOpen(o => !o)} style={{ fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 16, border: `1px solid ${t.border}`, background: t.card, color: t.text2, cursor: "pointer" }}>{scannerOpen ? "Hide Scanners ▲" : "Run Scanners ▼"}</button>
-          {scannerOpen && (
-            <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-              <button onClick={handle52wScan} disabled={scanning52w} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: `1px solid ${t.green}40`, background: t.greenBg, color: t.green, cursor: scanning52w ? "default" : "pointer", opacity: scanning52w ? 0.6 : 1 }}>{scanning52w ? `52W… ${scan52wProgress}%` : "52W High"}</button>
-              <button onClick={handleVolScan} disabled={scanningVol} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: `1px solid ${t.blue}40`, background: t.blueBg, color: t.blue, cursor: scanningVol ? "default" : "pointer", opacity: scanningVol ? 0.6 : 1 }}>{scanningVol ? `Vol… ${scanVolProgress}%` : "Vol Surge"}</button>
-              <button onClick={handleGapScan} disabled={scanningGap} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: `1px solid ${t.gold}40`, background: t.goldBg, color: t.gold, cursor: scanningGap ? "default" : "pointer", opacity: scanningGap ? 0.6 : 1 }}>{scanningGap ? `Gap… ${scanGapProgress}%` : "Gap Up"}</button>
-              <button onClick={handleMAScan} disabled={scanningMA} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: `1px solid ${t.purple}40`, background: t.purpleBg, color: t.purple, cursor: scanningMA ? "default" : "pointer", opacity: scanningMA ? 0.6 : 1 }}>{scanningMA ? `MA… ${scanMAProgress}%` : "MA Cross"}</button>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* STATES */}
       {view === "loading" && <><SkeletonCard t={t} /><SkeletonCard t={t} /></>}
