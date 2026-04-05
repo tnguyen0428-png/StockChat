@@ -386,7 +386,7 @@ export default function AlertsTab({ session, group }) {
   });
 
   // Auto-select AOTD or first alert on load
-  const selectedAlert = sorted.find(a => a.id === selectedChipId) || sorted[0] || null;
+  const selectedAlert = selectedChipId ? sorted.find(a => a.id === selectedChipId) : null;
 
   // Flow data
   let flowBM = flowTickerFilter ? mockBigMoney.filter(d => d.ticker === flowTickerFilter) : mockBigMoney;
