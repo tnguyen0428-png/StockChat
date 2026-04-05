@@ -104,17 +104,18 @@ export function PokerChip({ alert, isSelected, onTap, size, t }) {
   return (
     <div onClick={() => onTap(alert)} style={{
       width: size, height: size, borderRadius: '50%',
-      border: `${isAOTD ? 2.5 : 2}px solid ${isAOTD ? t.gold : borderColor}`,
-      background: `${borderColor}08`,
+      border: `${isAOTD ? 3 : 2.5}px solid ${isAOTD ? t.gold : borderColor}`,
+      background: `${borderColor}15`,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       cursor: 'pointer', position: 'relative',
       transform: isSelected ? 'scale(1.1)' : 'scale(1)',
       transition: 'transform .15s',
-      boxShadow: isSelected ? `0 0 16px ${borderColor}30` : 'none',
+      animation: isSelected ? 'none' : (isAOTD ? 'chipPulseGold 3s ease-in-out infinite' : isPos ? 'chipPulseGreen 3s ease-in-out infinite' : 'chipPulseRed 2.5s ease-in-out infinite'),
+      boxShadow: isSelected ? `0 0 20px ${borderColor}40` : undefined,
     }}>
       <div style={{
         position: 'absolute', width: innerSize, height: innerSize, borderRadius: '50%',
-        border: `0.5px dashed ${borderColor}30`,
+        border: `1px dashed ${borderColor}45`,
       }}/>
       {isAOTD && (
         <div style={{
@@ -132,7 +133,15 @@ export function PokerChip({ alert, isSelected, onTap, size, t }) {
 
 // ── Chip Field (gauge background + scattered poker chips) ──
 export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, t, darkMode }) {
-  const sorted = [...alerts]
+  // Deduplicate by ticker — keep highest confidence for each
+  const uniqueMap = new Map();
+  alerts.forEach(a => {
+    const existing = uniqueMap.get(a.ticker);
+    if (!existing || a.confidence > existing.confidence) {
+      uniqueMap.set(a.ticker, a);
+    }
+  });
+  const sorted = [...uniqueMap.values()]
     .sort((a, b) => {
       if (a.isAlertOfDay && !b.isAlertOfDay) return -1;
       if (!a.isAlertOfDay && b.isAlertOfDay) return 1;
@@ -142,10 +151,10 @@ export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, t
 
   const getChipSize = (pct) => {
     const abs = Math.abs(pct || 0);
-    if (abs >= 4) return 72;
-    if (abs >= 2) return 62;
-    if (abs >= 1) return 52;
-    return 44;
+    if (abs >= 4) return 82;
+    if (abs >= 2) return 72;
+    if (abs >= 1) return 60;
+    return 52;
   };
 
   const slots = [
@@ -175,7 +184,17 @@ export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, t
   const hitRate = history && history.length > 0 ? Math.round((hits / history.length) * 100) : 0;
 
   return (
-    <div style={{ position: 'relative', height: 185, marginBottom: 4 }}>
+    <div style={{ position: 'relative', height: 210, marginBottom: 4 }}>
+      <style>{`
+        @keyframes chipFloat0 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(3px,-4px); } }
+        @keyframes chipFloat1 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-4px,3px); } }
+        @keyframes chipFloat2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(2px,4px); } }
+        @keyframes chipFloat3 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-3px,-3px); } }
+        @keyframes chipFloat4 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(4px,2px); } }
+        @keyframes chipPulseGreen { 0%,100% { box-shadow: 0 0 6px rgba(93,202,165,0.2), 0 0 20px rgba(93,202,165,0.1); } 50% { box-shadow: 0 0 18px rgba(93,202,165,0.5), 0 0 36px rgba(93,202,165,0.15); } }
+        @keyframes chipPulseRed { 0%,100% { box-shadow: 0 0 6px rgba(240,149,149,0.2), 0 0 20px rgba(240,149,149,0.1); } 50% { box-shadow: 0 0 18px rgba(240,149,149,0.5), 0 0 36px rgba(240,149,149,0.15); } }
+        @keyframes chipPulseGold { 0%,100% { box-shadow: 0 0 6px rgba(212,160,23,0.2), 0 0 20px rgba(212,160,23,0.1); } 50% { box-shadow: 0 0 18px rgba(212,160,23,0.5), 0 0 36px rgba(212,160,23,0.15); } }
+      `}</style>
       <RolexGauge score={fearScore} t={t} darkMode={darkMode} />
 
       {/* Score label */}
@@ -203,7 +222,7 @@ export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, t
         const slot = slots[i];
         if (!slot) return null;
         return (
-          <div key={alert.id} style={{ position: 'absolute', ...slot }}>
+          <div key={alert.id} style={{ position: 'absolute', ...slot, animation: `chipFloat${i} ${6 + i * 1.5}s ease-in-out infinite` }}>
             <PokerChip alert={alert} isSelected={selectedId === alert.id} onTap={onChipTap} size={getChipSize(alert.changePercent)} t={t} />
           </div>
         );
