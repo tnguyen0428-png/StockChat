@@ -47,6 +47,8 @@ export default function PortfolioTab({ session }) {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [loadingData, setLoadingData] = useState(true);
   const [sellTrade, setSellTrade] = useState(null);
+  const [closedTrades, setClosedTrades] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Inline buy state
   const [searchQuery, setSearchQuery] = useState('');
@@ -214,6 +216,20 @@ export default function PortfolioTab({ session }) {
 
   useEffect(() => { loadActivity(); }, [loadActivity]);
 
+  const loadClosedTrades = useCallback(async () => {
+    if (!session?.user?.id) return;
+    const { data } = await supabase
+      .from('paper_trades')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .eq('status', 'closed')
+      .order('sold_at', { ascending: false })
+      .limit(20);
+    if (data) setClosedTrades(data);
+  }, [session?.user?.id]);
+
+  useEffect(() => { loadClosedTrades(); }, [loadClosedTrades]);
+
   useEffect(() => {
     const channel = supabase
       .channel('portfolio_activity')
@@ -319,6 +335,7 @@ export default function PortfolioTab({ session }) {
     loadPortfolio();
     loadLeaderboard();
     loadActivity();
+    loadClosedTrades();
   };
 
   // ── NEW: Hot tickers ──
@@ -534,8 +551,8 @@ export default function PortfolioTab({ session }) {
   };
 
   // Season countdown
-  const seasonEnd = new Date('2025-06-30');
-  const seasonStart = new Date('2025-04-01');
+  const seasonEnd = new Date('2026-06-30');
+  const seasonStart = new Date('2026-04-01');
   const daysLeft = Math.max(0, Math.ceil((seasonEnd - new Date()) / 86400000));
   const seasonProgress = Math.min(100, Math.max(0, ((new Date() - seasonStart) / (seasonEnd - seasonStart)) * 100));
 
@@ -730,11 +747,30 @@ export default function PortfolioTab({ session }) {
                     const pctGain = ((curPrice - entryPrice) / entryPrice) * 100;
                     const isUp = pctGain >= 0;
                     return (
-                      <div key={trade.id} style={s.posRowSm} onClick={() => setSellTrade({ ...trade, currentPrice: curPrice })}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text1)' }}>{trade.ticker}</span>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: isUp ? '#2a7d4b' : '#E24B4A' }}>
-                          {isUp ? '+' : ''}{pctGain.toFixed(1)}%
-                        </span>
+                      <div key={trade.id} style={{ display: 'flex', alignItems: 'center', padding: '8px 6px', background: 'var(--card)', borderRadius: 8, border: '1px solid var(--border)', marginBottom: 4, gap: 6 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text1)' }}>{trade.ticker}</span>
+                            <span style={{ fontSize: 13, color: 'var(--text3)' }}>{Number(trade.shares).toFixed(1)} shares</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+                            <span style={{ fontSize: 13, color: 'var(--text3)' }}>${Number(trade.entry_price).toFixed(2)}</span>
+                            <span style={{ fontSize: 13, color: 'var(--text3)' }}>→</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>${curPrice.toFixed(2)}</span>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right', marginRight: 4 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: isUp ? '#2a7d4b' : '#E24B4A' }}>
+                            {isUp ? '+' : '-'}${Math.abs(Number(trade.shares) * (curPrice - entryPrice)).toFixed(2)}
+                          </div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: isUp ? '#2a7d4b' : '#E24B4A' }}>
+                            {isUp ? '+' : ''}{pctGain.toFixed(1)}%
+                          </div>
+                        </div>
+                        <div
+                          onClick={(e) => { e.stopPropagation(); setSellTrade({ ...trade, currentPrice: curPrice }); }}
+                          style={{ background: 'rgba(224,82,82,0.08)', border: '1px solid rgba(224,82,82,0.2)', color: '#E24B4A', fontSize: 13, fontWeight: 600, padding: '5px 10px', borderRadius: 6, cursor: 'pointer', flexShrink: 0 }}
+                        >Sell</div>
                       </div>
                     );
                   })
@@ -744,6 +780,91 @@ export default function PortfolioTab({ session }) {
               <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>
                 Cash: ${cashBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </div>
+
+              <div
+                onClick={() => setShowHistory(!showHistory)}
+                style={{ fontSize: 13, fontWeight: 600, color: '#4A90D9', cursor: 'pointer', padding: '6px 0', textAlign: 'center', marginTop: 4 }}
+              >
+                {showHistory ? 'Hide History' : `Trade History (${closedTrades.length})`}
+              </div>
+
+              {showHistory && (
+                <div style={{ marginTop: 6 }}>
+                  {closedTrades.length > 0 && (() => {
+                    const wins = closedTrades.filter(t => Number(t.sold_price) > Number(t.entry_price)).length;
+                    const totalPL = closedTrades.reduce((sum, t) => {
+                      return sum + (Number(t.sold_price) - Number(t.entry_price)) * Number(t.shares);
+                    }, 0);
+                    const avgHold = closedTrades.reduce((sum, t) => {
+                      if (!t.sold_at || !t.bought_at) return sum;
+                      return sum + (new Date(t.sold_at) - new Date(t.bought_at)) / 86400000;
+                    }, 0) / closedTrades.length;
+                    const winRate = Math.round((wins / closedTrades.length) * 100);
+                    return (
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                        <div style={{ flex: 1, background: 'var(--card2)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 11, color: 'var(--text3)' }}>Win rate</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: winRate >= 50 ? '#2a7d4b' : '#E24B4A' }}>{winRate}%</div>
+                        </div>
+                        <div style={{ flex: 1, background: 'var(--card2)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 11, color: 'var(--text3)' }}>Avg hold</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text1)' }}>{avgHold.toFixed(1)}d</div>
+                        </div>
+                        <div style={{ flex: 1, background: 'var(--card2)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 11, color: 'var(--text3)' }}>Total P&L</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: totalPL >= 0 ? '#2a7d4b' : '#E24B4A' }}>
+                            {totalPL >= 0 ? '+' : '-'}${Math.abs(totalPL).toFixed(0)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {closedTrades.map(trade => {
+                    const entry = Number(trade.entry_price);
+                    const exit = Number(trade.sold_price);
+                    const shares = Number(trade.shares);
+                    const pl = (exit - entry) * shares;
+                    const pctReturn = ((exit - entry) / entry) * 100;
+                    const isWin = pl >= 0;
+                    const holdMs = trade.sold_at && trade.bought_at ? new Date(trade.sold_at) - new Date(trade.bought_at) : 0;
+                    const holdHours = holdMs / 3600000;
+                    const holdDisplay = holdHours < 24 ? `${Math.round(holdHours)}h hold` : `${Math.round(holdHours / 24)}d hold`;
+                    const isDayTrade = holdHours < 24;
+                    const isPaperHands = !isWin && holdHours < 48;
+                    const isDiamondHands = holdHours >= 720;
+                    const buyDate = trade.bought_at ? new Date(trade.bought_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+
+                    return (
+                      <div key={trade.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text1)' }}>{trade.ticker}</span>
+                          {isDayTrade && <span style={{ fontSize: 11, fontWeight: 600, color: '#791F1F', background: 'rgba(224,82,82,0.1)', padding: '1px 6px', borderRadius: 3 }}>Day traitor</span>}
+                          {isDiamondHands && <span style={{ fontSize: 11, fontWeight: 600, color: '#085041', background: 'rgba(29,158,117,0.1)', padding: '1px 6px', borderRadius: 3 }}>Diamond hands</span>}
+                          {isPaperHands && !isDayTrade && <span style={{ fontSize: 11, fontWeight: 600, color: '#854F0B', background: 'rgba(212,160,23,0.1)', padding: '1px 6px', borderRadius: 3 }}>Paper hands</span>}
+                          <div style={{ flex: 1 }} />
+                          <span style={{ fontSize: 13, fontWeight: 700, color: isWin ? '#2a7d4b' : '#E24B4A' }}>
+                            {isWin ? '+' : '-'}${Math.abs(pl).toFixed(2)}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text3)' }}>
+                          <span>{buyDate}</span>
+                          <span>·</span>
+                          <span>{holdDisplay}</span>
+                          <span>·</span>
+                          <span style={{ color: isWin ? '#2a7d4b' : '#E24B4A', fontWeight: 600 }}>
+                            {isWin ? '+' : ''}{pctReturn.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {closedTrades.length === 0 && (
+                    <div style={{ fontSize: 12, color: 'var(--text3)', textAlign: 'center', padding: '8px 0' }}>No closed trades yet</div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* ── RIGHT COLUMN ── */}
