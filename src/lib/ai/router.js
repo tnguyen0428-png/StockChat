@@ -35,7 +35,7 @@ const COMPANY_TO_TICKER = {
   'celsius': 'CELH', 'cava': 'CAVA', 'duolingo': 'DUOL',
 };
 
-const IGNORE_TICKERS = new Set(['AI', 'AM', 'PM', 'OK', 'US', 'CEO', 'IPO', 'ETF', 'GDP', 'FBI', 'USA', 'THE', 'FOR', 'AND', 'CAN', 'YOU', 'ARE', 'HOW', 'WHAT', 'WHY', 'IS', 'AT', 'IN', 'ON', 'TO', 'ME', 'MY', 'NO', 'YES', 'HI', 'HEY', 'UP', 'DO', 'IF', 'OR', 'SO', 'IT', 'BE', 'BY', 'OF', 'AN', 'AS', 'GO', 'IM']);
+const IGNORE_TICKERS = new Set(['AI', 'AM', 'PM', 'OK', 'US', 'CEO', 'IPO', 'ETF', 'GDP', 'FBI', 'USA', 'THE', 'FOR', 'AND', 'CAN', 'YOU', 'ARE', 'HOW', 'WHAT', 'WHY', 'IS', 'AT', 'IN', 'ON', 'TO', 'ME', 'MY', 'NO', 'YES', 'HI', 'HEY', 'UP', 'DO', 'IF', 'OR', 'SO', 'IT', 'BE', 'BY', 'OF', 'AN', 'AS', 'GO', 'IM', 'TODAY', 'NOW', 'WHEN', 'THEN', 'ANY', 'ALL', 'BUY', 'SELL', 'NOT', 'BUT', 'OUT', 'NEW', 'DAY', 'DID', 'HAS', 'HAD', 'GET', 'GOT', 'WAS', 'HIS', 'HER', 'WHO', 'TOP', 'BIG', 'RED', 'HOT', 'BEEN', 'GOOD', 'BEST', 'LAST', 'NEXT', 'MOST', 'MUCH', 'THAN', 'THEM', 'THEY', 'THIS', 'THAT', 'WILL', 'WITH', 'FROM', 'JUST', 'HAVE', 'BEEN', 'SOME', 'WHAT']);
 
 export async function route(message, history = []) {
   const lower = message.toLowerCase().trim();
@@ -94,6 +94,7 @@ export async function route(message, history = []) {
     'recession', 'gdp', 'unemployment', 'jobs report', 'cpi', 'ppi', 'fomc',
     'treasury', 'bond', 'yield', 'sector', 'sectors', 'oil', 'gold',
     'how is the market', "how's the market", 'market today', 'market doing',
+    "what's moving", 'whats moving', 'moving today', 'movers today', 'top movers',
     'bull market', 'bear market', 'crash', 'correction', 'rally',
     'tariff', 'tariffs', 'trade war', 'debt ceiling', 'stimulus'];
   if (macroKeywords.some(k => lower.includes(k))) {

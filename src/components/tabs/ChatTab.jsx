@@ -17,7 +17,7 @@ const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 const EMOJIS = ['🔥','📈','📉','🚀','💪','🎯','👀','💰','⚠️','✅','❌','😎','🤔','👋','🙌','😂','💎','🐂','🐻','⏰'];
 
 // ── Message Item ──
-const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven }) => {
+const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven, onTickerClick }) => {
   const isAdmin = msg.is_admin;
   const isAI    = msg.user_id === 'user_ai';
 
@@ -29,11 +29,12 @@ const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven }) => 
     return new Date(ts).toLocaleDateString();
   };
 
-  const parseText = (text) => {
+  const parseText = (text, onTickerClick) => {
+    // Match both $TICKER and bare TICKER mentions (only well-known patterns in AI responses)
     const parts = text.split(/(\$[A-Z]{1,5})/g);
     return parts.map((part, i) =>
       /^\$[A-Z]{1,5}$/.test(part)
-        ? <span key={i} style={styles.tickerMention}>{part}</span>
+        ? <span key={i} style={{ ...styles.tickerMention, ...(onTickerClick ? { cursor: 'pointer' } : {}) }} onClick={() => onTickerClick && onTickerClick(part)}>{part}</span>
         : part
     );
   };
@@ -55,7 +56,7 @@ const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven }) => 
           {isAI    && <span style={styles.aiBadge}>AI</span>}
           <span style={styles.msgTime}>{formatTime(msg.created_at)}</span>
         </div>
-        <div style={styles.msgText}>{parseText(msg.text)}</div>
+        <div style={styles.msgText}>{parseText(msg.text, isAI ? onTickerClick : null)}</div>
         {isAI && onFeedback && (
           <div style={styles.feedbackRow}>
             {feedbackGiven ? (
@@ -785,6 +786,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const [aiLastTicker, setAiLastTicker] = useState(null);
   const [aiMode, setAiMode]         = useState(false);
   const [feedbackMap, setFeedbackMap] = useState({});
+  const [aiLoadingTicker, setAiLoadingTicker] = useState(null);
 
   const handleFeedback = useCallback(async (msgId, rating) => {
     setFeedbackMap(prev => ({ ...prev, [msgId]: rating }));
@@ -862,6 +864,9 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
 
   const callAI = useCallback(async (query) => {
     setAiLoading(true);
+    // Extract ticker for loading indicator
+    const tickerMatch = query.match(/\$?([A-Z]{1,5})/i);
+    setAiLoadingTicker(tickerMatch ? tickerMatch[1].toUpperCase() : null);
     try {
       const recentHistory = messages
         .filter(m => m.type === 'user' || m.type === 'ai')
@@ -897,6 +902,29 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
       setAiLoading(false);
     }
   }, [group?.id, activeGroup?.name, profile?.username, watchlist, messages, aiLastTicker]);
+
+  // Generate contextual follow-up chips based on last AI response
+  const COMMON_WORDS = new Set(['TODAY', 'NOW', 'ALL', 'THE', 'HOW', 'WHAT', 'WHY', 'BUY', 'SELL', 'MARKET', 'GOOD', 'BEST', 'TOP']);
+  const getFollowUpChips = useCallback(() => {
+    if (aiLoading) return [];
+    const lastAI = [...messages].reverse().find(m => m.user_id === 'user_ai');
+    if (!lastAI) return [];
+    const ticker = aiLastTicker;
+    if (!ticker || COMMON_WORDS.has(ticker)) return [];
+    const chips = [];
+    if (!/earnings/i.test(lastAI.text)) chips.push(`How did ${ticker}'s last earnings go?`);
+    if (!/compare/i.test(lastAI.text)) chips.push(`Compare ${ticker} to competitors`);
+    chips.push(`Is ${ticker} a good buy right now?`);
+    return chips.slice(0, 2);
+  }, [messages, aiLastTicker, aiLoading]);
+
+  // Handle ticker click from AI responses
+  const handleTickerClick = useCallback((ticker) => {
+    const clean = ticker.replace('$', '');
+    setAiMode(true);
+    setInputText(`Tell me about ${clean}`);
+    inputRef.current?.focus();
+  }, []);
 
   const handleSend = useCallback(async () => {
     if (sendingRef.current) return;
@@ -1006,7 +1034,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
                 if (isAI) {
                   return (
                     <FadingMessage key={msg.id} delay={120000} duration={5000} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
-                      <MessageItem msg={msg} currentUserId={session?.user?.id} onFeedback={handleFeedback} feedbackGiven={feedbackMap[msg.id]} />
+                      <MessageItem msg={msg} currentUserId={session?.user?.id} onFeedback={handleFeedback} feedbackGiven={feedbackMap[msg.id]} onTickerClick={handleTickerClick} />
                     </FadingMessage>
                   );
                 }
@@ -1021,10 +1049,22 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
               })}
               {aiLoading && (
                 <div style={styles.aiLoading}>
-                  <span style={{ color: '#8B5CF6', fontSize: 14 }}>AI is analyzing</span>
+                  <span style={{ color: '#8B5CF6', fontSize: 14 }}>
+                    {aiLoadingTicker ? `Pulling data for ${aiLoadingTicker}...` : 'AI is analyzing...'}
+                  </span>
                   <div style={styles.aiDots}>
                     {[0,1,2].map(i => <div key={i} style={{ ...styles.aiDot, animationDelay: `${i * 0.2}s` }} />)}
                   </div>
+                </div>
+              )}
+              {/* Follow-up suggestion chips after AI response */}
+              {!aiLoading && aiMode && getFollowUpChips().length > 0 && (
+                <div style={styles.chipRow}>
+                  {getFollowUpChips().map((chip, i) => (
+                    <button key={i} onClick={() => { setInputText(chip); inputRef.current?.focus(); }} style={styles.chip}>
+                      {chip}
+                    </button>
+                  ))}
                 </div>
               )}
               <div ref={messagesEndRef} />
@@ -1035,6 +1075,17 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
             <div style={styles.emojiBar}>
               {EMOJIS.map(e => (
                 <button key={e} style={styles.emojiBtn} onClick={() => addEmoji(e)}>{e}</button>
+              ))}
+            </div>
+          )}
+
+          {/* Starter prompt chips when AI mode is active and no AI messages yet */}
+          {aiMode && !aiLoading && !messages.some(m => m.user_id === 'user_ai') && (
+            <div style={styles.starterChipRow}>
+              {["What's moving today?", "Tell me about $NVDA", "How's the market?"].map((chip, i) => (
+                <button key={i} onClick={() => { setInputText(chip.replace('$', '')); inputRef.current?.focus(); }} style={styles.starterChip}>
+                  {chip}
+                </button>
               ))}
             </div>
           )}
@@ -1308,6 +1359,25 @@ const styles = {
   aiDot: {
     width: 5, height: 5, borderRadius: '50%',
     background: '#8B5CF6', animation: 'pulse 1.2s infinite',
+  },
+  chipRow: {
+    display: 'flex', gap: 6, flexWrap: 'wrap', padding: '4px 0 8px',
+  },
+  chip: {
+    fontSize: 12, padding: '5px 12px', borderRadius: 16,
+    background: '#F5F3FF', border: '1px solid rgba(139,92,246,0.25)',
+    color: '#6D28D9', cursor: 'pointer', fontFamily: 'var(--font)',
+    transition: 'all 0.15s', whiteSpace: 'nowrap',
+  },
+  starterChipRow: {
+    display: 'flex', gap: 6, flexWrap: 'wrap', padding: '6px 12px 2px',
+    background: 'var(--card)',
+  },
+  starterChip: {
+    fontSize: 12, padding: '6px 14px', borderRadius: 18,
+    background: 'linear-gradient(135deg, #F5F3FF, #EDE9FE)', border: '1px solid rgba(139,92,246,0.3)',
+    color: '#6D28D9', cursor: 'pointer', fontFamily: 'var(--font)',
+    fontWeight: 500, transition: 'all 0.15s', whiteSpace: 'nowrap',
   },
   modalOverlay: {
     position: 'fixed', inset: 0,
