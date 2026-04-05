@@ -265,7 +265,7 @@ function AdminPanel({ session, profile }) {
   const sections = [
     { id: 'news',     label: 'News Scanner'  },
     { id: 'alertscanner', label: 'Alert Scanner' },
-    { id: 'screener', label: 'Run Screener'  },
+    { id: 'screener', label: 'Stock Scanner'  },
     { id: 'briefing', label: 'Post Briefing' },
     { id: 'lists',    label: 'Curated Lists' },
     { id: 'groups',   label: 'Manage Groups' },
