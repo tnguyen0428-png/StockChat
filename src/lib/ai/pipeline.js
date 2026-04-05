@@ -9,7 +9,6 @@ import { getMemory, updateMemory } from './memory';
 const AGENTS = { data: dataAgent, knowledge: knowledgeAgent, macro: macroAgent };
 
 console.log('[UpTik AI] Pipeline loaded. Agents: data, knowledge, macro. Memory: enabled.');
-clearCache(); // Flush any stale hallucinated responses from previous session
 
 function checkForHallucination(response, context, agentType) {
   if (agentType === 'knowledge') return response;
