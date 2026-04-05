@@ -1083,15 +1083,22 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
           )}
 
           {/* Starter prompt chips when AI mode is active and no AI messages yet */}
-          {aiMode && !aiLoading && !messages.some(m => m.user_id === 'user_ai') && (
-            <div style={styles.starterChipRow}>
-              {["What's moving today?", "Tell me about $NVDA", "How's the market?"].map((chip, i) => (
-                <button key={i} onClick={() => { setInputText(chip.replace('$', '')); inputRef.current?.focus(); }} style={styles.starterChip}>
-                  {chip}
-                </button>
-              ))}
-            </div>
-          )}
+          {aiMode && !aiLoading && !messages.some(m => m.user_id === 'user_ai') && (() => {
+            const wl = (watchlist || []).slice(0, 2);
+            const chips = ["What's moving today?"];
+            if (wl.length >= 1) chips.push(`How's $${wl[0]} doing?`);
+            if (wl.length >= 2) chips.push(`Compare $${wl[0]} vs $${wl[1]}`);
+            if (wl.length === 0) { chips.push("Tell me about $NVDA"); chips.push("How's the market?"); }
+            return (
+              <div style={styles.starterChipRow}>
+                {chips.map((chip, i) => (
+                  <button key={i} onClick={() => { setInputText(chip.replace(/\$/g, '')); inputRef.current?.focus(); }} style={styles.starterChip}>
+                    {chip}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
 
           <div style={styles.inputBar}>
             <div
