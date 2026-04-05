@@ -864,9 +864,12 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
 
   const callAI = useCallback(async (query) => {
     setAiLoading(true);
-    // Extract ticker for loading indicator
-    const tickerMatch = query.match(/\$?([A-Z]{1,5})/i);
-    setAiLoadingTicker(tickerMatch ? tickerMatch[1].toUpperCase() : null);
+    // Extract ticker for loading indicator — only match $TICKER format or standalone uppercase tickers
+    const LOADING_IGNORE = new Set(['WHAT', 'WHATS', 'HOW', 'THE', 'TELL', 'ABOUT', 'TODAY', 'MARKET', 'MOVING', 'COMPARE', 'GOOD', 'BEST', 'LAST', 'WHEN', 'DOES', 'THEIR', 'THIS', 'THAT']);
+    const dollarTicker = query.match(/\$([A-Z]{1,5})\b/);
+    const bareTicker = query.match(/\b([A-Z]{2,5})\b/);
+    const extractedTicker = dollarTicker ? dollarTicker[1] : (bareTicker && !LOADING_IGNORE.has(bareTicker[1]) ? bareTicker[1] : null);
+    setAiLoadingTicker(extractedTicker);
     try {
       const recentHistory = messages
         .filter(m => m.type === 'user' || m.type === 'ai')
