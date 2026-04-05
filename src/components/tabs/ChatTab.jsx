@@ -527,10 +527,13 @@ function WatchlistView({ session, onAskAI }) {
               <div style={ws.cardBottom}>
                 <span style={{ fontSize: 12, color: '#7a8ea3' }}>Fwd P/E</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: peColor }}>{peDisplay}</span>
-                {dotColor && <div style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={dotColor || '#7a8ea3'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginLeft: 'auto', transform: isExp ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
+                <div style={{ flex: 1 }}></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  {dotColor && <div style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={dotColor || '#7a8ea3'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, cursor: 'pointer', transform: isExp ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </div>
               </div>
 
               {/* Expanded detail */}
