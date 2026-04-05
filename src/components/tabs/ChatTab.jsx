@@ -284,8 +284,13 @@ function ListsView({ group, isAdmin, isModerator, isOpenList, onAskAI }) {
             )}
 
             <div style={lv.colHeaders}>
-              <span style={lv.colLabel}>Ranking</span>
-              <span style={{ ...lv.colLabel, marginRight: 40 }}>Score</span>
+              <span style={{ ...lv.colLabel, width: 26 }}>Ranking</span>
+              <span style={{ width: 36 }} />
+              <span style={{ width: 52 }} />
+              <span style={{ ...lv.colLabel, width: 56, textAlign: 'center' }}>Score</span>
+              <span style={{ flex: 1 }} />
+              <span style={lv.colLabel}>Price</span>
+              <span style={{ width: 32 }} />
             </div>
 
             {list.curated_stocks?.sort((a, b) => a.ranking - b.ranking).map(stock => {
@@ -306,6 +311,11 @@ function ListsView({ group, isAdmin, isModerator, isOpenList, onAskAI }) {
                       onError={e => { e.target.style.display = 'none'; }}
                     />
                     <span style={lv.ticker}>{stock.ticker}</span>
+                    <div style={lv.scoreCol}>
+                      <span style={getScoreStyle(stock.score)}>{stock.score}</span>
+                      <span style={trend.style}>{trend.symbol}</span>
+                    </div>
+                    <div style={{ flex: 1 }} />
                     <div style={lv.priceCol}>
                       <div style={lv.price}>{q ? `$${q.price?.toFixed(2)}` : '—'}</div>
                       {pct != null && (
@@ -313,10 +323,6 @@ function ListsView({ group, isAdmin, isModerator, isOpenList, onAskAI }) {
                           {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
                         </div>
                       )}
-                    </div>
-                    <div style={lv.scoreWrap}>
-                      <span style={trend.style}>{trend.symbol}</span>
-                      <span style={getScoreStyle(stock.score)}>{stock.score}</span>
                     </div>
                     {isMod && (
                       <div style={lv.trashBtn} onClick={e => { e.stopPropagation(); handleDeleteStock(stock); }}>
@@ -393,19 +399,19 @@ const lv = {
   legendDot: { display: 'inline-block', width: 5, height: 5, borderRadius: '50%', background: 'var(--green)', marginRight: 3, flexShrink: 0 },
   legendExpanded: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' },
   legendItem: { fontSize: 11, color: 'var(--text2)', fontWeight: 500 },
-  colHeaders: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 4px', borderBottom: '1px solid var(--border)' },
+  colHeaders: { display: 'flex', alignItems: 'center', padding: '6px 4px', borderBottom: '1px solid var(--border)' },
   colLabel: { fontSize: 13, fontWeight: 600, color: 'var(--text1)' },
-  stockRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', cursor: 'pointer' },
-  rank: { fontSize: 13, fontWeight: 600, color: 'var(--text1)', minWidth: 22 },
-  logo: { width: 28, height: 28, borderRadius: 6, objectFit: 'contain', background: 'var(--card2)', border: '0.5px solid var(--border)', flexShrink: 0 },
-  ticker: { fontSize: 14, fontWeight: 600, color: 'var(--text1)', flex: 1 },
+  stockRow: { display: 'flex', alignItems: 'center', padding: '10px 0', cursor: 'pointer' },
+  rank: { fontSize: 13, fontWeight: 600, color: 'var(--text1)', width: 26, flexShrink: 0 },
+  logo: { width: 28, height: 28, borderRadius: 6, objectFit: 'contain', background: 'var(--card2)', border: '0.5px solid var(--border)', flexShrink: 0, marginRight: 8 },
+  ticker: { fontSize: 14, fontWeight: 600, color: 'var(--text1)', width: 52, flexShrink: 0 },
   priceCol: { textAlign: 'right', flexShrink: 0 },
   price: { fontSize: 13, fontWeight: 600, color: 'var(--text1)' },
-  scoreWrap: { display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 },
+  scoreCol: { width: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, flexShrink: 0 },
   scoreHi: { fontSize: 11, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)', padding: '2px 8px', borderRadius: 10, border: '1px solid rgba(26,173,94,0.3)' },
   scoreMid: { fontSize: 11, fontWeight: 600, background: '#FAEEDA', color: '#854F0B', padding: '2px 8px', borderRadius: 10, border: '1px solid #FAC775' },
   scoreLo: { fontSize: 11, fontWeight: 600, background: 'var(--red-bg)', color: 'var(--red)', padding: '2px 8px', borderRadius: 10, border: '1px solid rgba(224,82,82,0.3)' },
-  trashBtn: { width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' },
+  trashBtn: { width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', marginLeft: 8 },
   expandedBody: { padding: '10px 4px 14px', background: 'var(--card2)', borderRadius: 0, display: 'flex', flexDirection: 'column', gap: 8 },
   metricsRow: { display: 'flex', flexWrap: 'wrap', gap: 6 },
   metric: { fontSize: 11, color: 'var(--text2)' },
