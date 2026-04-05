@@ -92,14 +92,17 @@ function broadcastColor(type) {
 }
 
 // ── Lists sub-view ──
-function ListsView({ group, isAdmin, isModerator, isOpenList }) {
+function ListsView({ group, isAdmin, isModerator, isOpenList, onAskAI }) {
   const isMod = isAdmin || isModerator || isOpenList;
-  const [lists, setLists]       = useState([]);
+  const [lists, setLists] = useState([]);
   const [expanded, setExpanded] = useState(null);
   const [notesDraft, setNotesDraft] = useState('');
   const [savingStock, setSavingStock] = useState(false);
-  const [addTickers, setAddTickers]   = useState({});
-  const [loading, setLoading]   = useState(false);
+  const [addTickers, setAddTickers] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [legendOpen, setLegendOpen] = useState(false);
+  const [quoteData, setQuoteData] = useState({});
+  const [watcherCounts, setWatcherCounts] = useState({});
 
   useEffect(() => {
     if (!group?.id) return;
@@ -118,8 +121,40 @@ function ListsView({ group, isAdmin, isModerator, isOpenList }) {
       .select('*, curated_stocks(*)')
       .eq('group_id', group.id)
       .order('created_at', { ascending: true });
-    if (data) setLists(data);
+    if (data) {
+      setLists(data);
+      const allTickers = data.flatMap(l => (l.curated_stocks || []).map(s => s.ticker));
+      if (allTickers.length > 0) fetchQuotes(allTickers);
+      if (allTickers.length > 0) fetchWatcherCounts(allTickers);
+    }
     setLoading(false);
+  };
+
+  const fetchQuotes = async (tickers) => {
+    const unique = [...new Set(tickers)];
+    const promises = unique.map(sym =>
+      fetch(`https://financialmodelingprep.com/stable/quote?symbol=${sym}&apikey=${FMP_KEY}`)
+        .then(r => r.json())
+        .then(json => { const item = Array.isArray(json) ? json[0] : json; return item?.symbol ? item : null; })
+        .catch(() => null)
+    );
+    const results = await Promise.allSettled(promises);
+    const qm = {};
+    results.forEach(r => { if (r.status === 'fulfilled' && r.value) qm[r.value.symbol] = r.value; });
+    setQuoteData(prev => ({ ...prev, ...qm }));
+  };
+
+  const fetchWatcherCounts = async (tickers) => {
+    const unique = [...new Set(tickers)];
+    const counts = {};
+    for (const ticker of unique) {
+      const { count } = await supabase
+        .from('user_watchlist')
+        .select('*', { count: 'exact', head: true })
+        .eq('symbol', ticker);
+      counts[ticker] = count || 0;
+    }
+    setWatcherCounts(counts);
   };
 
   const handleExpand = (stock) => {
@@ -135,7 +170,6 @@ function ListsView({ group, isAdmin, isModerator, isOpenList }) {
     const nextRank = list?.curated_stocks?.length
       ? Math.max(...list.curated_stocks.map(s => s.ranking)) + 1 : 1;
 
-    // Score the ticker automatically
     let score = 0;
     let notes = null;
     let thesis = null;
@@ -149,12 +183,7 @@ function ListsView({ group, isAdmin, isModerator, isOpenList }) {
     } catch {}
 
     const { error } = await supabase.from('curated_stocks').insert({
-      list_id: listId,
-      ticker,
-      ranking: nextRank,
-      score,
-      notes,
-      thesis,
+      list_id: listId, ticker, ranking: nextRank, score, notes, thesis,
     });
     if (!error) {
       setAddTickers(prev => ({ ...prev, [listId]: '' }));
@@ -177,6 +206,34 @@ function ListsView({ group, isAdmin, isModerator, isOpenList }) {
     await loadLists();
   };
 
+  const getScoreStyle = (score) => {
+    if (score >= 80) return lv.scoreHi;
+    if (score >= 50) return lv.scoreMid;
+    return lv.scoreLo;
+  };
+
+  const getScoreTrend = (stock) => {
+    if (stock.score >= 70) return { symbol: '▲', style: { fontSize: 9, color: 'var(--green)' } };
+    if (stock.score < 40) return { symbol: '▼', style: { fontSize: 9, color: 'var(--red)' } };
+    return { symbol: '—', style: { fontSize: 9, color: 'var(--text3)' } };
+  };
+
+  const formatUpdatedDate = (list) => {
+    const stocks = list.curated_stocks || [];
+    const dates = stocks.map(s => s.updated_at).filter(Boolean).sort().reverse();
+    if (dates.length > 0) {
+      return new Date(dates[0]).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    return new Date(list.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const TrashIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2 4h12M5.5 4V2.5a1 1 0 011-1h3a1 1 0 011 1V4M6.5 7v4M9.5 7v4M3.5 4l.75 9a1 1 0 001 .9h5.5a1 1 0 001-.9L12.5 4"
+        stroke="var(--red)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+
   if (loading) return <div style={styles.loadingWrap}><div style={styles.spinner} /></div>;
 
   return (
@@ -186,88 +243,178 @@ function ListsView({ group, isAdmin, isModerator, isOpenList }) {
           <div style={styles.emptyText}>No curated lists yet</div>
         </div>
       )}
-      {lists.map(list => (
-        <div key={list.id} style={{ marginBottom: 20 }}>
-          <div style={styles.secLabel}>{list.name}</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
-            {['Earnings 30%','Fundamentals 25%','Sales Growth 20%','Valuation 10%','Price Trend 10%','Market Cap 5%'].map(item => (
-              <span key={item} style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 500 }}>
-                <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', marginRight: 3, verticalAlign: 'middle' }} />
-                {item}
-              </span>
-            ))}
-          </div>
-          {isMod && (
-            <div style={styles.addRow}>
-              <input
-                style={styles.addInput}
-                value={addTickers[list.id] || ''}
-                onChange={e => setAddTickers(prev => ({ ...prev, [list.id]: e.target.value.toUpperCase().replace(/[^A-Z]/g, '') }))}
-                onKeyDown={e => e.key === 'Enter' && handleAddStock(list.id)}
-                placeholder="ADD TICKER"
-                maxLength={5}
-              />
-              <button style={styles.addBtn} onClick={() => handleAddStock(list.id)}>Add</button>
+      {lists.map(list => {
+        const stockCount = list.curated_stocks?.length || 0;
+        return (
+          <div key={list.id} style={{ marginBottom: 20 }}>
+            <div style={lv.header}>
+              <div style={lv.headerRow}>
+                <span style={lv.headerName}>{list.name}</span>
+                <span style={lv.rankingTag}>Ranking</span>
+              </div>
+              <div style={lv.headerUpdated}>Updated {formatUpdatedDate(list)} · {stockCount} stocks</div>
+              <div style={lv.legendToggle} onClick={() => setLegendOpen(!legendOpen)}>
+                <span style={lv.legendDot} />
+                {legendOpen ? 'Scoring method ▲' : 'Scoring method ▼'}
+              </div>
+              {legendOpen && (
+                <div style={lv.legendExpanded}>
+                  {['Earnings 30%','Fundamentals 25%','Sales Growth 20%','Valuation 10%','Price Trend 10%','Market Cap 5%'].map(item => (
+                    <span key={item} style={lv.legendItem}>
+                      <span style={lv.legendDot} />
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-          {list.curated_stocks?.sort((a, b) => a.ranking - b.ranking).map(stock => {
-            const isExpanded = expanded === stock.id;
-            return (
-              <div key={stock.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                <div style={{ ...styles.listItem, cursor: 'pointer' }} onClick={() => handleExpand(stock)}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', minWidth: 20 }}>#{stock.ranking}</span>
+
+            {isMod && (
+              <div style={styles.addRow}>
+                <input
+                  style={styles.addInput}
+                  value={addTickers[list.id] || ''}
+                  onChange={e => setAddTickers(prev => ({ ...prev, [list.id]: e.target.value.toUpperCase().replace(/[^A-Z]/g, '') }))}
+                  onKeyDown={e => e.key === 'Enter' && handleAddStock(list.id)}
+                  placeholder="ADD TICKER"
+                  maxLength={5}
+                />
+                <button style={styles.addBtn} onClick={() => handleAddStock(list.id)}>Add</button>
+              </div>
+            )}
+
+            <div style={lv.colHeaders}>
+              <span style={lv.colLabel}>Ranking</span>
+              <span style={{ ...lv.colLabel, marginRight: 40 }}>Score</span>
+            </div>
+
+            {list.curated_stocks?.sort((a, b) => a.ranking - b.ranking).map(stock => {
+              const isExpanded = expanded === stock.id;
+              const q = quoteData[stock.ticker];
+              const pct = q?.changePercentage;
+              const trend = getScoreTrend(stock);
+              const watchers = watcherCounts[stock.ticker] || 0;
+
+              return (
+                <div key={stock.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <div style={lv.stockRow} onClick={() => handleExpand(stock)}>
+                    <span style={lv.rank}>#{stock.ranking}</span>
                     <img
                       src={`https://images.financialmodelingprep.com/symbol/${stock.ticker}.png`}
                       alt={stock.ticker}
-                      style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'contain', background: 'var(--card2)', border: '0.5px solid var(--border)', flexShrink: 0 }}
+                      style={lv.logo}
                       onError={e => { e.target.style.display = 'none'; }}
                     />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text1)' }}>{stock.ticker}</div>
+                    <span style={lv.ticker}>{stock.ticker}</span>
+                    <div style={lv.priceCol}>
+                      <div style={lv.price}>{q ? `$${q.price?.toFixed(2)}` : '—'}</div>
+                      {pct != null && (
+                        <div style={{ fontSize: 11, color: pct >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                          {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
+                        </div>
+                      )}
                     </div>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', background: 'var(--card2)', padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)', flexShrink: 0, marginRight: 8 }}>{stock.score}</span>
-                  </div>
-                  {isMod && (
-                    <button style={styles.removeBtn} onClick={e => { e.stopPropagation(); handleDeleteStock(stock); }}>
-                      Remove
-                    </button>
-                  )}
-                </div>
-                {isExpanded && (
-                  <div style={styles.expandedBody}>
-                    {isMod ? (
-                      <>
-                        <textarea
-                          style={styles.notesInput}
-                          value={notesDraft}
-                          onChange={e => setNotesDraft(e.target.value)}
-                          placeholder="Notes, catalysts, targets..."
-                        />
-                        <button
-                          style={{ ...styles.addBtn, width: '100%', opacity: savingStock ? 0.6 : 1 }}
-                          onClick={() => handleSaveStock(stock.id)}
-                          disabled={savingStock}
-                        >
-                          {savingStock ? 'Saving...' : 'Save'}
-                        </button>
-                      </>
-                    ) : (
-                      <div style={styles.notesText}>
-                        {stock.notes || <span style={{ color: 'var(--text3)', fontStyle: 'italic' }}>No notes yet.</span>}
+                    <div style={lv.scoreWrap}>
+                      <span style={trend.style}>{trend.symbol}</span>
+                      <span style={getScoreStyle(stock.score)}>{stock.score}</span>
+                    </div>
+                    {isMod && (
+                      <div style={lv.trashBtn} onClick={e => { e.stopPropagation(); handleDeleteStock(stock); }}>
+                        <TrashIcon />
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      ))}
+
+                  {isExpanded && (
+                    <div style={lv.expandedBody}>
+                      {stock.notes && (
+                        <div style={lv.metricsRow}>
+                          {stock.notes.split(' · ').map((m, i) => (
+                            <span key={i} style={lv.metric}>
+                              {i > 0 && '· '}
+                              {m.split(': ').map((part, j) =>
+                                j === 1 ? <b key={j} style={{ fontWeight: 500, color: 'var(--text1)' }}>{part}</b> : part + ': '
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {stock.thesis && (
+                        <>
+                          <div style={lv.thesisLabel}>Thesis</div>
+                          <div style={lv.thesisText}>{stock.thesis}</div>
+                        </>
+                      )}
+                      {isMod && (
+                        <>
+                          <textarea
+                            style={styles.notesInput}
+                            value={notesDraft}
+                            onChange={e => setNotesDraft(e.target.value)}
+                            placeholder="Notes, catalysts, targets..."
+                          />
+                          <button
+                            style={{ ...styles.addBtn, width: '100%', opacity: savingStock ? 0.6 : 1 }}
+                            onClick={() => handleSaveStock(stock.id)}
+                            disabled={savingStock}
+                          >
+                            {savingStock ? 'Saving...' : 'Save'}
+                          </button>
+                        </>
+                      )}
+                      <div style={lv.expandedFooter}>
+                        <div style={lv.watchers}>
+                          <b style={{ fontWeight: 500, color: 'var(--text2)' }}>{watchers}</b> members watching
+                        </div>
+                        <button style={lv.askAiBtn} onClick={(e) => { e.stopPropagation(); onAskAI && onAskAI(stock.ticker); }}>
+                          Ask AI about {stock.ticker}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
       <div style={{ height: 20 }} />
     </div>
   );
 }
+
+const lv = {
+  header: { padding: '12px 4px 8px', borderBottom: '1px solid var(--border)' },
+  headerRow: { display: 'flex', alignItems: 'center', gap: 8 },
+  headerName: { fontSize: 13, fontWeight: 600, color: 'var(--text1)' },
+  rankingTag: { fontSize: 11, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)', padding: '2px 8px', borderRadius: 10, border: '1px solid rgba(26,173,94,0.3)' },
+  headerUpdated: { fontSize: 11, color: 'var(--text3)', marginTop: 4 },
+  legendToggle: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 11, color: 'var(--text2)', cursor: 'pointer' },
+  legendDot: { display: 'inline-block', width: 5, height: 5, borderRadius: '50%', background: 'var(--green)', marginRight: 3, flexShrink: 0 },
+  legendExpanded: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' },
+  legendItem: { fontSize: 11, color: 'var(--text2)', fontWeight: 500 },
+  colHeaders: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 4px', borderBottom: '1px solid var(--border)' },
+  colLabel: { fontSize: 13, fontWeight: 600, color: 'var(--text1)' },
+  stockRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', cursor: 'pointer' },
+  rank: { fontSize: 13, fontWeight: 600, color: 'var(--text1)', minWidth: 22 },
+  logo: { width: 28, height: 28, borderRadius: 6, objectFit: 'contain', background: 'var(--card2)', border: '0.5px solid var(--border)', flexShrink: 0 },
+  ticker: { fontSize: 14, fontWeight: 600, color: 'var(--text1)', flex: 1 },
+  priceCol: { textAlign: 'right', flexShrink: 0 },
+  price: { fontSize: 13, fontWeight: 600, color: 'var(--text1)' },
+  scoreWrap: { display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 },
+  scoreHi: { fontSize: 11, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)', padding: '2px 8px', borderRadius: 10, border: '1px solid rgba(26,173,94,0.3)' },
+  scoreMid: { fontSize: 11, fontWeight: 600, background: '#FAEEDA', color: '#854F0B', padding: '2px 8px', borderRadius: 10, border: '1px solid #FAC775' },
+  scoreLo: { fontSize: 11, fontWeight: 600, background: 'var(--red-bg)', color: 'var(--red)', padding: '2px 8px', borderRadius: 10, border: '1px solid rgba(224,82,82,0.3)' },
+  trashBtn: { width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' },
+  expandedBody: { padding: '10px 4px 14px', background: 'var(--card2)', borderRadius: 0, display: 'flex', flexDirection: 'column', gap: 8 },
+  metricsRow: { display: 'flex', flexWrap: 'wrap', gap: 6 },
+  metric: { fontSize: 11, color: 'var(--text2)' },
+  thesisLabel: { fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  thesisText: { fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 },
+  expandedFooter: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+  watchers: { fontSize: 11, color: 'var(--text3)' },
+  askAiBtn: { background: '#132d52', color: '#8cd9a0', border: 'none', padding: '5px 12px', borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
+};
 
 // ── Watchlist sub-view (global — no group filter) ──
 function WatchlistView({ session, onAskAI }) {
@@ -851,7 +998,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
 
       {/* Lists view */}
       {subTab === 'lists' && (
-        <ListsView group={group} isAdmin={isAdmin} isModerator={isModerator} isOpenList={group?.name === 'UpTik Public'} />
+        <ListsView group={group} isAdmin={isAdmin} isModerator={isModerator} isOpenList={group?.name === 'UpTik Public'} onAskAI={(sym) => { setSubTab('chat'); setInputText(`@AI Research $${sym}`); }} />
       )}
 
       {/* Watchlist view */}
