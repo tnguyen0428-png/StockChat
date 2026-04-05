@@ -1,5 +1,5 @@
 import { guardrail } from './guardrail';
-import { checkCache, setCache } from './cache';
+import { checkCache, setCache, clearCache } from './cache';
 import { route } from './router';
 import { dataAgent } from './agents/dataAgent';
 import { knowledgeAgent } from './agents/knowledgeAgent';
@@ -9,6 +9,7 @@ import { getMemory, updateMemory } from './memory';
 const AGENTS = { data: dataAgent, knowledge: knowledgeAgent, macro: macroAgent };
 
 console.log('[UpTik AI] Pipeline loaded. Agents: data, knowledge, macro. Memory: enabled.');
+clearCache(); // Flush any stale hallucinated responses from previous session
 
 function checkForHallucination(response, context, agentType) {
   if (agentType === 'knowledge') return response;
@@ -27,7 +28,7 @@ function checkForHallucination(response, context, agentType) {
     return `I don't have live data for ${ticker} right now. Markets may be closed or the feed is unavailable. Not financial advice.`;
   }
 
-  // Data agent: data exists but response price is >5% off = hallucination
+  // Data agent: data exists — verify response prices match
   if (agentType === 'data' && hasRealData && responsePrices.length > 0) {
     const realPrice = parseFloat(price);
     const mainResponsePrice = responsePrices[0];
@@ -35,6 +36,18 @@ function checkForHallucination(response, context, agentType) {
     if (priceDiff > 0.05) {
       console.warn('[UpTik AI] HALLUCINATION BLOCKED: price mismatch. Real:', realPrice, 'Response:', mainResponsePrice);
       return `${ticker} last traded at $${realPrice.toFixed(2)}. Not financial advice.`;
+    }
+  }
+
+  // Data agent: check for fabricated percentages when change data is null
+  if (agentType === 'data' && hasRealData) {
+    const realChange = context?.livePrice?.changePercent;
+    const responsePercents = [...response.matchAll(/(\d+\.?\d*)%/g)].map(m => parseFloat(m[1]));
+    if (realChange === null && responsePercents.length > 0) {
+      // No change data from Polygon but response mentions percentages
+      console.warn('[UpTik AI] HALLUCINATION BLOCKED: no change data but response has percentages:', responsePercents);
+      const realPrice = parseFloat(price);
+      return `${ticker} last closed at $${realPrice.toFixed(2)}. Markets are closed so I don't have today's change data. Not financial advice.`;
     }
   }
 

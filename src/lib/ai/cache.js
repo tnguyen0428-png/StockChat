@@ -29,6 +29,11 @@ export function checkCache(question) {
   return { hit: false };
 }
 
+export function clearCache() {
+  cache.clear();
+  console.log('[Cache] Cleared all entries');
+}
+
 export function setCache(question, response) {
   const norm = normalize(question);
   cache.set(norm, { norm, response, ts: Date.now() });
