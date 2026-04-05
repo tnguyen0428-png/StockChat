@@ -134,16 +134,18 @@ function cardOpacity(ts) { return Math.floor((now - ts) / 60000) > 15 ? 0.75 : 1
 // Flow summary line
 const bmBuying = mockBigMoney.filter(d => d.direction === "buying").length;
 const bmSelling = mockBigMoney.filter(d => d.direction === "selling").length;
-const mostActiveTicker = [...mockBigMoney, ...mockSmartBets].reduce((acc, t) => { acc[t.ticker] = (acc[t.ticker] || 0) + 1; return acc; }, {});
+const mostActiveTicker = [...mockBigMoney, ...mockSmartBets].reduce((acc, x) => { acc[x.ticker] = (acc[x.ticker] || 0) + 1; return acc; }, {});
 const topTicker = Object.entries(mostActiveTicker).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
 
 // ===== SHARED COMPONENTS =====
-function Tooltip({ text }) {
+function Tooltip({ text, t: theme }) {
   const [show, setShow] = useState(false);
+  const bg = theme?.surface || "#e2e8f0";
+  const fg = theme?.text2 || "#64748b";
   return (
     <span style={{ position: "relative", display: "inline-block", marginLeft: 4 }}>
       <button onClick={e => { e.stopPropagation(); setShow(!show); }} onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}
-        style={{ width: 16, height: 16, fontSize: 9, fontWeight: 700, borderRadius: "50%", background: "#e2e8f0", color: "#64748b", border: "none", cursor: "help", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>i</button>
+        style={{ width: 16, height: 16, fontSize: 9, fontWeight: 700, borderRadius: "50%", background: bg, color: fg, border: "none", cursor: "help", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>i</button>
       {show && <div style={{ position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", marginBottom: 8, width: 220, padding: "8px 12px", fontSize: 12, color: "#fff", background: "#1e293b", borderRadius: 10, boxShadow: "0 4px 12px rgba(0,0,0,.2)", zIndex: 99, lineHeight: 1.5 }}>{text}</div>}
     </span>
   );
@@ -156,41 +158,59 @@ function Sparkline() {
   return (<svg viewBox={`0 0 ${w} ${h}`} style={{width:112,height:40}}><defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#22c55e" stopOpacity=".2"/><stop offset="100%" stopColor="#22c55e" stopOpacity="0"/></linearGradient></defs><path d={`${d} L${w-p},${h-p} L${p},${h-p} Z`} fill="url(#sg)"/><path d={d} fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>);
 }
 
-function BigMoneyBadge({ ticker, onClick }) {
+function BigMoneyBadge({ ticker, onClick, t: theme }) {
   if (!hasBigMoneySignal(ticker)) return null;
+  const green = theme?.green || "#15803d";
+  const greenBg = theme?.greenBg || "#f0fdf4";
   return (
-    <div onClick={e => { e.stopPropagation(); onClick(ticker); }} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 8, background: "#f0fdf4", border: "1px solid #bbf7d0", marginTop: 6, cursor: "pointer" }}>
+    <div onClick={e => { e.stopPropagation(); onClick(ticker); }} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 8, background: greenBg, border: `1px solid ${green}40`, marginTop: 6, cursor: "pointer" }}>
       <span style={{ fontSize: 11 }}>🎯</span>
-      <span style={{ fontSize: 11, fontWeight: 600, color: "#15803d" }}>Big money is also buying</span>
+      <span style={{ fontSize: 11, fontWeight: 600, color: green }}>Big money is also buying</span>
     </div>
   );
 }
 
 // ===== SKELETON / EMPTY =====
-function SkeletonCard() {
-  const b = { background: "#e2e8f0", borderRadius: 8 }, sh = { animation: "pulse 1.5s ease-in-out infinite" };
-  return (<div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", padding: 24 }}><style>{`@keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.4 } }`}</style><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}><div><div style={{ ...b, ...sh, width: 80, height: 28, marginBottom: 8 }}/><div style={{ ...b, ...sh, width: 130, height: 16 }}/></div><div style={{ textAlign: "right" }}><div style={{ ...b, ...sh, width: 96, height: 28, marginBottom: 8, marginLeft: "auto" }}/><div style={{ ...b, ...sh, width: 110, height: 16, marginLeft: "auto" }}/></div></div>{[1,2,3].map(i=>(<div key={i} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10, background: "#f8fafc", borderRadius: 12, padding: "12px 16px" }}><div style={{ ...b, ...sh, width: 36, height: 36, borderRadius: 10 }}/><div style={{ flex: 1 }}><div style={{ ...b, ...sh, width: 96, height: 16, marginBottom: 6 }}/><div style={{ ...b, ...sh, width: 200, height: 12 }}/></div></div>))}<div style={{ display: "flex", gap: 12, marginTop: 16 }}><div style={{ ...b, ...sh, flex: 1, height: 44, borderRadius: 12 }}/><div style={{ ...b, ...sh, flex: 1, height: 44, borderRadius: 12 }}/></div></div>);
+function SkeletonCard({ t: theme }) {
+  const border = theme?.border || "#e2e8f0";
+  const cardBg = theme?.card || "#fff";
+  const surface = theme?.surface || "#f8fafc";
+  const b = { background: border, borderRadius: 8 }, sh = { animation: "pulse 1.5s ease-in-out infinite" };
+  return (<div style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: 24 }}><style>{`@keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.4 } }`}</style><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}><div><div style={{ ...b, ...sh, width: 80, height: 28, marginBottom: 8 }}/><div style={{ ...b, ...sh, width: 130, height: 16 }}/></div><div style={{ textAlign: "right" }}><div style={{ ...b, ...sh, width: 96, height: 28, marginBottom: 8, marginLeft: "auto" }}/><div style={{ ...b, ...sh, width: 110, height: 16, marginLeft: "auto" }}/></div></div>{[1,2,3].map(i=>(<div key={i} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10, background: surface, borderRadius: 12, padding: "12px 16px" }}><div style={{ ...b, ...sh, width: 36, height: 36, borderRadius: 10 }}/><div style={{ flex: 1 }}><div style={{ ...b, ...sh, width: 96, height: 16, marginBottom: 6 }}/><div style={{ ...b, ...sh, width: 200, height: 12 }}/></div></div>))}<div style={{ display: "flex", gap: 12, marginTop: 16 }}><div style={{ ...b, ...sh, flex: 1, height: 44, borderRadius: 12 }}/><div style={{ ...b, ...sh, flex: 1, height: 44, borderRadius: 12 }}/></div></div>);
 }
 
-function NoAlerts() {
-  return (<div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", padding: "48px 24px", textAlign: "center" }}><div style={{ fontSize: 48, marginBottom: 16 }}>🔭</div><h3 style={{ fontSize: 18, fontWeight: 600, color: "#1e293b", margin: "0 0 8px" }}>No High-Confidence Alerts Right Now</h3><p style={{ fontSize: 14, color: "#94a3b8", maxWidth: 280, margin: "0 auto", lineHeight: 1.6 }}>Our scanners are still running — we'll notify you when something stands out.</p></div>);
+function NoAlerts({ t: theme }) {
+  const cardBg = theme?.card || "#fff";
+  const border = theme?.border || "#e2e8f0";
+  const text1 = theme?.text1 || "#1e293b";
+  const text3 = theme?.text3 || "#94a3b8";
+  return (<div style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, padding: "48px 24px", textAlign: "center" }}><div style={{ fontSize: 48, marginBottom: 16 }}>🔭</div><h3 style={{ fontSize: 18, fontWeight: 600, color: text1, margin: "0 0 8px" }}>No High-Confidence Alerts Right Now</h3><p style={{ fontSize: 14, color: text3, maxWidth: 280, margin: "0 auto", lineHeight: 1.6 }}>Our scanners are still running — we'll notify you when something stands out.</p></div>);
 }
 
 // ===== MODAL =====
-function Modal({ alert, onClose }) {
+function Modal({ alert, onClose, t: theme }) {
+  const tt = theme || {};
+  const cardBg = tt.card || "#fff";
+  const surface = tt.surface || "#f8fafc";
+  const border = tt.borderLight || "#f1f5f9";
+  const text1 = tt.text1 || "#0f172a";
+  const text2 = tt.text2 || "#64748b";
+  const text3 = tt.text3 || "#94a3b8";
+  const green = tt.green || "#16a34a";
+  const red = tt.red || "#dc2626";
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", backdropFilter: "blur(4px)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={e=>e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 420, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 25px 50px rgba(0,0,0,.15)" }}>
-        <div style={{ position: "sticky", top: 0, background: "#fff", borderRadius: "20px 20px 0 0", borderBottom: "1px solid #f1f5f9", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#0f172a" }}>{alert.ticker}</h2><p style={{ margin: "2px 0 0", fontSize: 14, color: "#64748b" }}>{alert.company}</p></div>
-          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f1f5f9", border: "none", cursor: "pointer", fontSize: 18, color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", backdropFilter: "blur(4px)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background: cardBg, borderRadius: 20, width: "100%", maxWidth: 420, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 25px 50px rgba(0,0,0,.25)" }}>
+        <div style={{ position: "sticky", top: 0, background: cardBg, borderRadius: "20px 20px 0 0", borderBottom: `1px solid ${border}`, padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div><h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: text1 }}>{alert.ticker}</h2><p style={{ margin: "2px 0 0", fontSize: 14, color: text2 }}>{alert.company}</p></div>
+          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", background: surface, border: "none", cursor: "pointer", fontSize: 18, color: text2, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
         </div>
         <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 24 }}>
-          <div><span style={{ fontSize: 30, fontWeight: 700, color: "#0f172a" }}>${alert.price.toFixed(2)}</span><span style={{ marginLeft: 12, color: alert.change >= 0 ? "#16a34a" : "#dc2626", fontWeight: 600 }}>{alert.change >= 0 ? "▲" : "▼"} ${Math.abs(alert.change).toFixed(2)} ({alert.change >= 0 ? "+" : ""}{alert.changePercent}%)</span></div>
-          <div style={{ background: "#f8fafc", borderRadius: 16, height: 160, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #f1f5f9" }}><span style={{ fontSize: 14, color: "#94a3b8" }}>Chart — connects to live data later</span></div>
-          <div><h4 style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px" }}>Key Stats</h4><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>{[{l:"Volume",v:alert.volume,s:`Avg: ${alert.avgVolume}`},{l:"Market Cap",v:alert.marketCap,s:alert.sector},{l:"vs S&P 500",v:`${alert.vsSpy>=0?"+":""}${alert.vsSpy}%`,s:alert.vsSpy>=0?"Outperforming":"Underperforming"},{l:"Confidence",v:`${alert.confidence}%`,s:alert.confidence>=90?"Very High":alert.confidence>=80?"High":"Moderate"}].map(x=>(<div key={x.l} style={{ background: "#f8fafc", borderRadius: 14, padding: "12px 16px" }}><p style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>{x.l}</p><p style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", margin: "4px 0 2px" }}>{x.v}</p><p style={{ fontSize: 12, color: "#64748b", margin: 0 }}>{x.s}</p></div>))}</div></div>
-          <div><h4 style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px" }}>Why It's Alerting</h4><div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{alert.whyAlerting.map((w,i)=>(<div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, background: "#f8fafc", borderRadius: 14, padding: "12px 16px" }}><span style={{ fontSize: 18, marginTop: 2 }}>{w.icon}</span><div><p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#1e293b" }}>{w.label}</p><p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748b", lineHeight: 1.4 }}>{w.text}</p></div></div>))}</div></div>
-          <div style={{ display: "flex", gap: 12 }}><div style={{ flex: 1, background: "#f8fafc", borderRadius: 14, padding: "12px 16px" }}><p style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center" }}>Support <Tooltip text="A price level where this stock has historically stopped falling." /></p><p style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", margin: "4px 0 0" }}>${alert.support.toFixed(2)}</p></div><div style={{ flex: 1, background: "#f8fafc", borderRadius: 14, padding: "12px 16px" }}><p style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center" }}>Resistance <Tooltip text="A price level where this stock has historically stopped rising." /></p><p style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", margin: "4px 0 0" }}>${alert.resistance.toFixed(2)}</p></div></div>
+          <div><span style={{ fontSize: 30, fontWeight: 700, color: text1 }}>${alert.price.toFixed(2)}</span><span style={{ marginLeft: 12, color: alert.change >= 0 ? green : red, fontWeight: 600 }}>{alert.change >= 0 ? "▲" : "▼"} ${Math.abs(alert.change).toFixed(2)} ({alert.change >= 0 ? "+" : ""}{alert.changePercent}%)</span></div>
+          <div style={{ background: surface, borderRadius: 16, height: 160, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${border}` }}><span style={{ fontSize: 14, color: text3 }}>Chart — connects to live data later</span></div>
+          <div><h4 style={{ fontSize: 11, fontWeight: 600, color: text3, textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px" }}>Key Stats</h4><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>{[{l:"Volume",v:alert.volume,s:`Avg: ${alert.avgVolume}`},{l:"Market Cap",v:alert.marketCap,s:alert.sector},{l:"vs S&P 500",v:`${alert.vsSpy>=0?"+":""}${alert.vsSpy}%`,s:alert.vsSpy>=0?"Outperforming":"Underperforming"},{l:"Confidence",v:`${alert.confidence}%`,s:alert.confidence>=90?"Very High":alert.confidence>=80?"High":"Moderate"}].map(x=>(<div key={x.l} style={{ background: surface, borderRadius: 14, padding: "12px 16px" }}><p style={{ fontSize: 11, color: text3, textTransform: "uppercase", margin: 0 }}>{x.l}</p><p style={{ fontSize: 18, fontWeight: 700, color: text1, margin: "4px 0 2px" }}>{x.v}</p><p style={{ fontSize: 12, color: text2, margin: 0 }}>{x.s}</p></div>))}</div></div>
+          <div><h4 style={{ fontSize: 11, fontWeight: 600, color: text3, textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px" }}>Why It's Alerting</h4><div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{alert.whyAlerting.map((w,i)=>(<div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, background: surface, borderRadius: 14, padding: "12px 16px" }}><span style={{ fontSize: 18, marginTop: 2 }}>{w.icon}</span><div><p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: text1 }}>{w.label}</p><p style={{ margin: "2px 0 0", fontSize: 13, color: text2, lineHeight: 1.4 }}>{w.text}</p></div></div>))}</div></div>
+          <div style={{ display: "flex", gap: 12 }}><div style={{ flex: 1, background: surface, borderRadius: 14, padding: "12px 16px" }}><p style={{ fontSize: 11, color: text3, textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center" }}>Support <Tooltip text="A price level where this stock has historically stopped falling." t={theme} /></p><p style={{ fontSize: 18, fontWeight: 700, color: text1, margin: "4px 0 0" }}>${alert.support.toFixed(2)}</p></div><div style={{ flex: 1, background: surface, borderRadius: 14, padding: "12px 16px" }}><p style={{ fontSize: 11, color: text3, textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center" }}>Resistance <Tooltip text="A price level where this stock has historically stopped rising." t={theme} /></p><p style={{ fontSize: 18, fontWeight: 700, color: text1, margin: "4px 0 0" }}>${alert.resistance.toFixed(2)}</p></div></div>
           <div className="btn-row" style={{ padding: 0 }}><button className="btn-primary">Add to Watchlist</button><button className="btn-secondary">Discuss in Chat</button></div>
         </div>
       </div>
@@ -199,20 +219,31 @@ function Modal({ alert, onClose }) {
 }
 
 // ===== ALERT CARD =====
-function AlertCard({ alert, onClick, onBigMoneyClick }) {
+function AlertCard({ alert, onClick, onBigMoneyClick, t: theme }) {
   const isPos = alert.change >= 0;
+  const tt = theme || {};
+  const cardBg = tt.card || "#fff";
+  const border = tt.border || "#e2e8f0";
+  const surface = tt.surface || "#f8fafc";
+  const surfaceAlt = tt.surfaceAlt || "#f1f5f9";
+  const text1 = tt.text1 || "#0f172a";
+  const text2 = tt.text2 || "#64748b";
+  const text3 = tt.text3 || "#94a3b8";
+  const green = tt.green || "#16a34a";
+  const red = tt.red || "#dc2626";
+  const shadow = tt.shadow || "0 1px 3px rgba(0,0,0,.06)";
   return (
-    <div onClick={onClick} style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: "16px 20px", cursor: "pointer", transition: "box-shadow .2s" }} onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 12px rgba(0,0,0,.1)"} onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,.06)"}>
+    <div onClick={onClick} style={{ background: cardBg, borderRadius: 16, border: `1px solid ${border}`, boxShadow: shadow, padding: "16px 20px", cursor: "pointer", transition: "box-shadow .2s" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{alert.ticker}</h4><span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 12, background: "#f1f5f9", color: "#475569", fontSize: 10, fontWeight: 600 }}>{alert.scannerTag.toUpperCase()}</span></div>
-          <p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{alert.company}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: text1 }}>{alert.ticker}</h4><span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 12, background: surfaceAlt, color: text2, fontSize: 10, fontWeight: 600 }}>{alert.scannerTag.toUpperCase()}</span></div>
+          <p style={{ margin: "2px 0 0", fontSize: 13, color: text2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{alert.company}</p>
         </div>
-        <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}><p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>${alert.price.toFixed(2)}</p><p style={{ margin: "2px 0 0", fontSize: 13, fontWeight: 600, color: isPos ? "#16a34a" : "#dc2626" }}>{isPos?"+":""}${Math.abs(alert.change).toFixed(2)} ({isPos?"+":""}{alert.changePercent}%)</p></div>
+        <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}><p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: text1 }}>${alert.price.toFixed(2)}</p><p style={{ margin: "2px 0 0", fontSize: 13, fontWeight: 600, color: isPos ? green : red }}>{isPos?"+":""}${Math.abs(alert.change).toFixed(2)} ({isPos?"+":""}{alert.changePercent}%)</p></div>
       </div>
-      <BigMoneyBadge ticker={alert.ticker} onClick={onBigMoneyClick} />
-      <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", borderRadius: 10, padding: "8px 12px", marginTop: 8 }}><span style={{ fontSize: 14 }}>{alert.whyAlerting[0].icon}</span><span style={{ fontSize: 13, color: "#475569" }}><strong style={{ color: "#1e293b" }}>{alert.whyAlerting[0].label}</strong><br/><span style={{ fontSize: 12 }}>{alert.whyAlerting[0].text}</span></span></div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}><span style={{ fontSize: 11, color: "#94a3b8" }}>{alert.time} · Confidence <strong style={{ color: alert.confidence >= 90 ? "#16a34a" : alert.confidence >= 80 ? "#0f172a" : "#f59e0b" }}>{alert.confidence}%</strong></span><span style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>View details →</span></div>
+      <BigMoneyBadge ticker={alert.ticker} onClick={onBigMoneyClick} t={theme} />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, background: surface, borderRadius: 10, padding: "8px 12px", marginTop: 8 }}><span style={{ fontSize: 14 }}>{alert.whyAlerting[0].icon}</span><span style={{ fontSize: 13, color: text2 }}><strong style={{ color: text1 }}>{alert.whyAlerting[0].label}</strong><br/><span style={{ fontSize: 12 }}>{alert.whyAlerting[0].text}</span></span></div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}><span style={{ fontSize: 11, color: text3 }}>{alert.time} · Confidence <strong style={{ color: alert.confidence >= 80 ? green : (tt.amber || "#f59e0b") }}>{alert.confidence}%</strong></span><span style={{ fontSize: 12, color: text2, fontWeight: 500 }}>View details →</span></div>
     </div>
   );
 }
@@ -229,62 +260,74 @@ function MoodBar({ score, t: theme }) {
 }
 
 // ===== FLOW CARDS =====
-function BigMoneyCard({ trade, isExpanded, onToggle }) {
+function BigMoneyCard({ trade, isExpanded, onToggle, t: theme }) {
   const dc = { buying: { bg: "#f0fdf4", border: "#22c55e", icon: "↑", label: "Buying", color: "#15803d" }, selling: { bg: "#fef2f2", border: "#ef4444", icon: "↓", label: "Selling", color: "#dc2626" }, neutral: { bg: "#fffbeb", border: "#f59e0b", icon: "→", label: "Unclear", color: "#d97706" } }[trade.direction];
+  const cardBg = theme?.card || "#fff";
+  const border = theme?.border || "#e2e8f0";
+  const text1 = theme?.text1 || "#0f172a";
+  const text3 = theme?.text3 || "#94a3b8";
+  const text2 = theme?.text2 || "#475569";
+  const borderLight = theme?.borderLight || "#f1f5f9";
   return (
-    <div onClick={onToggle} style={{ background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", borderLeft: `${trade.multiplier >= 8 ? 4 : 3}px solid ${dc.border}`, padding: "12px 14px", cursor: "pointer", opacity: cardOpacity(trade.time) }}>
+    <div onClick={onToggle} style={{ background: cardBg, borderRadius: 14, border: `1px solid ${border}`, borderLeft: `${trade.multiplier >= 8 ? 4 : 3}px solid ${dc.border}`, padding: "12px 14px", cursor: "pointer", opacity: cardOpacity(trade.time) }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <div style={{ width: 24, height: 24, borderRadius: 6, background: dc.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: dc.color }}>{dc.icon}</div>
-          <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{trade.ticker}</h4>
+          <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: text1 }}>{trade.ticker}</h4>
           <span style={{ fontSize: 10, fontWeight: 600, color: dc.color, textTransform: "uppercase" }}>{dc.label}</span>
         </div>
-        <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{trade.dollarValue}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: text1 }}>{trade.dollarValue}</span>
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94a3b8" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: text3 }}>
         <span>{trade.shares} shares · {trade.multiplier}x normal</span>
         <div style={{ display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: freshDotColor(trade.time), display: "inline-block" }}/>{relTime(trade.time)}</div>
       </div>
       {isExpanded && (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #f1f5f9" }}>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${borderLight}` }}>
           <div style={{ background: dc.bg, borderRadius: 10, padding: "8px 12px" }}>
-            <p style={{ margin: 0, fontSize: 12, color: "#475569", lineHeight: 1.5 }}>💡 {trade.note}</p>
+            <p style={{ margin: 0, fontSize: 12, color: text2, lineHeight: 1.5 }}>💡 {trade.note}</p>
           </div>
         </div>
       )}
-      <div style={{ textAlign: "right", marginTop: 4 }}><span style={{ fontSize: 10, color: "#94a3b8" }}>{isExpanded ? "Less ▴" : "More ▾"}</span></div>
+      <div style={{ textAlign: "right", marginTop: 4 }}><span style={{ fontSize: 10, color: text3 }}>{isExpanded ? "Less ▴" : "More ▾"}</span></div>
     </div>
   );
 }
 
-function SmartBetCard({ bet, isExpanded, onToggle }) {
+function SmartBetCard({ bet, isExpanded, onToggle, t: theme }) {
   const isUp = bet.direction === "up";
   const dc = isUp ? { bg: "#f0fdf4", border: "#22c55e", color: "#15803d" } : { bg: "#fef2f2", border: "#ef4444", color: "#dc2626" };
+  const cardBg = theme?.card || "#fff";
+  const border = theme?.border || "#e2e8f0";
+  const text1 = theme?.text1 || "#0f172a";
+  const text3 = theme?.text3 || "#94a3b8";
+  const text2 = theme?.text2 || "#475569";
+  const borderLight = theme?.borderLight || "#f1f5f9";
   return (
-    <div onClick={onToggle} style={{ background: "#fff", borderRadius: 14, border: `1px solid ${isUp ? "#d1fae5" : "#fecaca"}`, borderLeft: `3px solid ${dc.border}`, padding: "12px 14px", cursor: "pointer", opacity: cardOpacity(bet.time) }}>
+    <div onClick={onToggle} style={{ background: cardBg, borderRadius: 14, border: `1px solid ${border}`, borderLeft: `3px solid ${dc.border}`, padding: "12px 14px", cursor: "pointer", opacity: cardOpacity(bet.time) }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 16 }}>{isUp ? "📈" : "📉"}</span>
-          <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{bet.ticker}</h4>
+          <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: text1 }}>{bet.ticker}</h4>
           {bet.unusual && <span style={{ padding: "1px 5px", borderRadius: 6, background: "#fef3c7", color: "#92400e", fontSize: 9, fontWeight: 700 }}>🔥 UNUSUAL</span>}
         </div>
-        <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{bet.amount}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: text1 }}>{bet.amount}</span>
       </div>
       <div style={{ background: dc.bg, borderRadius: 6, padding: "4px 8px", marginBottom: 4 }}>
         <p style={{ margin: 0, fontSize: 12, color: dc.color, fontWeight: 600 }}>{isUp ? "Betting UP" : "Betting DOWN"}: {bet.bet}</p>
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94a3b8" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: text3 }}>
         <span>{bet.odds}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: freshDotColor(bet.time), display: "inline-block" }}/>{relTime(bet.time)}</div>
       </div>
       {isExpanded && (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #f1f5f9" }}>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${borderLight}` }}>
           <div style={{ background: dc.bg, borderRadius: 10, padding: "8px 12px" }}>
-            <p style={{ margin: 0, fontSize: 12, color: "#475569", lineHeight: 1.5 }}>💡 {bet.detail}</p>
+            <p style={{ margin: 0, fontSize: 12, color: text2, lineHeight: 1.5 }}>💡 {bet.detail}</p>
           </div>
         </div>
       )}
-      <div style={{ textAlign: "right", marginTop: 4 }}><span style={{ fontSize: 10, color: "#94a3b8" }}>{isExpanded ? "Less ▴" : "More ▾"}</span></div>
+      <div style={{ textAlign: "right", marginTop: 4 }}><span style={{ fontSize: 10, color: text3 }}>{isExpanded ? "Less ▴" : "More ▾"}</span></div>
     </div>
   );
 }
@@ -363,7 +406,6 @@ export default function AlertsTab({ session, group }) {
   const displayAlerts = useMemo(() => {
     if (liveAlerts.length > 0) {
       const mapped = liveAlerts.map(a => mapDbAlert(a, spyData));
-      // Mark highest confidence as alert of day
       if (mapped.length > 0) {
         const best = mapped.reduce((b, a) => a.confidence > b.confidence ? a : b);
         best.isAlertOfDay = true;
@@ -376,7 +418,7 @@ export default function AlertsTab({ session, group }) {
   const filtered = filter === "All" ? displayAlerts : displayAlerts.filter(a => a.scannerTag === filterMap[filter]);
   const heroAlert = filtered.find(a => a.isAlertOfDay) || filtered[0];
   const otherAlerts = filtered.filter(a => a !== heroAlert);
-  const card = { background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,.06)", overflow: "visible" };
+  const card = { background: t.card, borderRadius: 16, border: `1px solid ${t.border}`, boxShadow: t.shadow, overflow: "visible" };
 
   // Flow data
   let flowBM = flowTickerFilter ? mockBigMoney.filter(d => d.ticker === flowTickerFilter) : mockBigMoney;
@@ -446,18 +488,18 @@ export default function AlertsTab({ session, group }) {
           <button onClick={() => setScannerOpen(o => !o)} style={{ fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 16, border: `1px solid ${t.border}`, background: t.card, color: t.text2, cursor: "pointer" }}>{scannerOpen ? "Hide Scanners ▲" : "Run Scanners ▼"}</button>
           {scannerOpen && (
             <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-              <button onClick={handle52wScan} disabled={scanning52w} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#15803d", cursor: scanning52w ? "default" : "pointer", opacity: scanning52w ? 0.6 : 1 }}>{scanning52w ? `52W… ${scan52wProgress}%` : "52W High"}</button>
-              <button onClick={handleVolScan} disabled={scanningVol} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: "1px solid #bfdbfe", background: "#eff6ff", color: "#2563eb", cursor: scanningVol ? "default" : "pointer", opacity: scanningVol ? 0.6 : 1 }}>{scanningVol ? `Vol… ${scanVolProgress}%` : "Vol Surge"}</button>
-              <button onClick={handleGapScan} disabled={scanningGap} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: "1px solid #fde68a", background: "#fffbeb", color: "#d97706", cursor: scanningGap ? "default" : "pointer", opacity: scanningGap ? 0.6 : 1 }}>{scanningGap ? `Gap… ${scanGapProgress}%` : "Gap Up"}</button>
-              <button onClick={handleMAScan} disabled={scanningMA} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: "1px solid #c4b5fd", background: "#f5f3ff", color: "#7c3aed", cursor: scanningMA ? "default" : "pointer", opacity: scanningMA ? 0.6 : 1 }}>{scanningMA ? `MA… ${scanMAProgress}%` : "MA Cross"}</button>
+              <button onClick={handle52wScan} disabled={scanning52w} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: `1px solid ${t.green}40`, background: t.greenBg, color: t.green, cursor: scanning52w ? "default" : "pointer", opacity: scanning52w ? 0.6 : 1 }}>{scanning52w ? `52W… ${scan52wProgress}%` : "52W High"}</button>
+              <button onClick={handleVolScan} disabled={scanningVol} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: `1px solid ${t.blue}40`, background: t.blueBg, color: t.blue, cursor: scanningVol ? "default" : "pointer", opacity: scanningVol ? 0.6 : 1 }}>{scanningVol ? `Vol… ${scanVolProgress}%` : "Vol Surge"}</button>
+              <button onClick={handleGapScan} disabled={scanningGap} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: `1px solid ${t.gold}40`, background: t.goldBg, color: t.gold, cursor: scanningGap ? "default" : "pointer", opacity: scanningGap ? 0.6 : 1 }}>{scanningGap ? `Gap… ${scanGapProgress}%` : "Gap Up"}</button>
+              <button onClick={handleMAScan} disabled={scanningMA} style={{ padding: "5px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: `1px solid ${t.purple}40`, background: t.purpleBg, color: t.purple, cursor: scanningMA ? "default" : "pointer", opacity: scanningMA ? 0.6 : 1 }}>{scanningMA ? `MA… ${scanMAProgress}%` : "MA Cross"}</button>
             </div>
           )}
         </div>
       )}
 
       {/* STATES */}
-      {view === "loading" && <><SkeletonCard /><SkeletonCard /></>}
-      {view === "empty" && <NoAlerts />}
+      {view === "loading" && <><SkeletonCard t={t} /><SkeletonCard t={t} /></>}
+      {view === "empty" && <NoAlerts t={t} />}
       {view === "active" && (
         <>
           {/* THE ARC — top 5 alerts on blackjack semicircle */}
@@ -469,24 +511,24 @@ export default function AlertsTab({ session, group }) {
           {/* HERO */}
           {heroAlert && (
             <div>
-              {heroAlert.isAlertOfDay && <p style={{ fontSize: 12, fontWeight: 700, color: "#16a34a", textTransform: "uppercase", letterSpacing: "1.5px", margin: "0 0 8px", display: "flex", alignItems: "center", gap: 6 }}>⭐ Alert of the Day</p>}
+              {heroAlert.isAlertOfDay && <p style={{ fontSize: 12, fontWeight: 700, color: t.green, textTransform: "uppercase", letterSpacing: "1.5px", margin: "0 0 8px", display: "flex", alignItems: "center", gap: 6 }}>⭐ Alert of the Day</p>}
               <div style={{ ...card, cursor: "pointer" }} onClick={()=>setModalAlert(heroAlert)}>
                 <div style={{ padding: "16px 16px 12px" }}>
                   <div className="hero-header">
                     <div><h3 className="hero-ticker">{heroAlert.ticker}</h3><p className="hero-company">{heroAlert.company}</p></div>
-                    <div style={{ textAlign: "right" }}><p className="hero-price">${heroAlert.price.toFixed(2)}</p><p className="hero-change" style={{ color: heroAlert.change>=0?"#16a34a":"#dc2626" }}>{heroAlert.change>=0?"+":""}${Math.abs(heroAlert.change).toFixed(2)} ({heroAlert.change>=0?"+":""}{heroAlert.changePercent}%)</p></div>
+                    <div style={{ textAlign: "right" }}><p className="hero-price">${heroAlert.price.toFixed(2)}</p><p className="hero-change" style={{ color: heroAlert.change>=0?t.green:t.red }}>{heroAlert.change>=0?"+":""}${Math.abs(heroAlert.change).toFixed(2)} ({heroAlert.change>=0?"+":""}{heroAlert.changePercent}%)</p></div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 16, background: "#f0fdf4", color: "#15803d", fontSize: 12, fontWeight: 600, border: "1px solid #bbf7d0" }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }}/> {heroAlert.scannerTag.toUpperCase()}</span>
-                    <span style={{ fontSize: 12, color: "#94a3b8" }}>{heroAlert.time} pre-market</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 16, background: t.greenBg, color: t.green, fontSize: 12, fontWeight: 600, border: `1px solid ${t.green}40` }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: t.green }}/> {heroAlert.scannerTag.toUpperCase()}</span>
+                    <span style={{ fontSize: 12, color: t.text3 }}>{heroAlert.time} pre-market</span>
                   </div>
-                  <BigMoneyBadge ticker={heroAlert.ticker} onClick={openFlowForTicker} />
+                  <BigMoneyBadge ticker={heroAlert.ticker} onClick={openFlowForTicker} t={t} />
                 </div>
                 <div style={{ padding: "0 16px 12px" }}>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 10px" }}>Why It's Alerting</p>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{heroAlert.whyAlerting.map((w,i)=>(<div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, background: "#f8fafc", borderRadius: 14, padding: "12px 16px" }}><span style={{ fontSize: 16, marginTop: 2, flexShrink: 0 }}>{w.icon}</span><div><p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#1e293b" }}>{w.label}</p><p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748b", lineHeight: 1.4 }}>{w.text}</p></div></div>))}</div>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: t.text3, textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 10px" }}>Why It's Alerting</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{heroAlert.whyAlerting.map((w,i)=>(<div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, background: t.surface, borderRadius: 14, padding: "12px 16px" }}><span style={{ fontSize: 16, marginTop: 2, flexShrink: 0 }}>{w.icon}</span><div><p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: t.text1 }}>{w.label}</p><p style={{ margin: "2px 0 0", fontSize: 13, color: t.text2, lineHeight: 1.4 }}>{w.text}</p></div></div>))}</div>
                 </div>
-                <div className="stats-grid"><div className="stats-cell"><p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>Support <Tooltip text="A price level where this stock has historically stopped falling." /></p><p style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", margin: "2px 0 0" }}>${heroAlert.support.toFixed(2)}</p></div><div className="stats-cell"><p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>Resistance <Tooltip text="A price level where this stock has historically stopped rising." /></p><p style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", margin: "2px 0 0" }}>${heroAlert.resistance.toFixed(2)}</p></div><div className="stats-cell"><p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", margin: 0 }}>Confidence</p><p style={{ fontSize: 15, fontWeight: 700, color: "#16a34a", margin: "2px 0 0" }}>{heroAlert.confidence}%</p></div></div>
+                <div className="stats-grid"><div className="stats-cell"><p style={{ fontSize: 10, color: t.text3, textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>Support <Tooltip text="A price level where this stock has historically stopped falling." t={t} /></p><p style={{ fontSize: 15, fontWeight: 700, color: t.text1, margin: "2px 0 0" }}>${heroAlert.support.toFixed(2)}</p></div><div className="stats-cell"><p style={{ fontSize: 10, color: t.text3, textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>Resistance <Tooltip text="A price level where this stock has historically stopped rising." t={t} /></p><p style={{ fontSize: 15, fontWeight: 700, color: t.text1, margin: "2px 0 0" }}>${heroAlert.resistance.toFixed(2)}</p></div><div className="stats-cell"><p style={{ fontSize: 10, color: t.text3, textTransform: "uppercase", margin: 0 }}>Confidence</p><p style={{ fontSize: 15, fontWeight: 700, color: t.green, margin: "2px 0 0" }}>{heroAlert.confidence}%</p></div></div>
                 <div className="btn-row"><button className="btn-primary" onClick={e=>e.stopPropagation()}>Add to Watchlist</button><button className="btn-secondary" onClick={e=>e.stopPropagation()}>Discuss in Chat</button></div>
               </div>
             </div>
@@ -494,60 +536,56 @@ export default function AlertsTab({ session, group }) {
 
           {/* MORE ALERTS */}
           {otherAlerts.length > 0 && (
-            <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,.06)" }}>
+            <div style={{ background: t.card, borderRadius: 16, border: `1px solid ${t.border}`, boxShadow: t.shadow }}>
               <button onClick={()=>setShowMore(!showMore)} style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>{filter==="All"?"More Alerts":`${filter} Alerts`}</span><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: "#f1f5f9", color: "#64748b" }}>{otherAlerts.length}</span></div>
-                <span style={{ fontSize: 18, color: "#94a3b8", transition: "transform .2s", transform: showMore?"rotate(180deg)":"rotate(0deg)" }}>▾</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontSize: 13, fontWeight: 600, color: t.text1 }}>{filter==="All"?"More Alerts":`${filter} Alerts`}</span><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: t.surfaceAlt, color: t.text2 }}>{otherAlerts.length}</span></div>
+                <span style={{ fontSize: 18, color: t.text3, transition: "transform .2s", transform: showMore?"rotate(180deg)":"rotate(0deg)" }}>▾</span>
               </button>
-              {showMore && <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 10 }}>{otherAlerts.map(a=>(<AlertCard key={a.id} alert={a} onClick={()=>setModalAlert(a)} onBigMoneyClick={openFlowForTicker} />))}</div>}
+              {showMore && <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 10 }}>{otherAlerts.map(a=>(<AlertCard key={a.id} alert={a} t={t} onClick={()=>setModalAlert(a)} onBigMoneyClick={openFlowForTicker} />))}</div>}
             </div>
           )}
 
           {/* INSTITUTIONAL FLOW */}
-          <div ref={flowRef} style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,.06)" }}>
+          <div ref={flowRef} style={{ background: t.card, borderRadius: 16, border: `1px solid ${t.border}`, boxShadow: t.shadow }}>
             <button onClick={()=>setShowFlow(!showFlow)} style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>🏦 Institutional Flow</span>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: "#f1f5f9", color: "#64748b" }}>{mockBigMoney.length + mockSmartBets.length}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: t.text1 }}>🏦 Institutional Flow</span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: t.surfaceAlt, color: t.text2 }}>{mockBigMoney.length + mockSmartBets.length}</span>
               </div>
-              <span style={{ fontSize: 18, color: "#94a3b8", transition: "transform .2s", transform: showFlow?"rotate(180deg)":"rotate(0deg)" }}>▾</span>
+              <span style={{ fontSize: 18, color: t.text3, transition: "transform .2s", transform: showFlow?"rotate(180deg)":"rotate(0deg)" }}>▾</span>
             </button>
-            {!showFlow && <p style={{ margin: 0, padding: "0 16px 12px", fontSize: 11, color: "#94a3b8" }}>{bmBuying} buying · {bmSelling} selling · {topTicker} most active</p>}
+            {!showFlow && <p style={{ margin: 0, padding: "0 16px 12px", fontSize: 11, color: t.text3 }}>{bmBuying} buying · {bmSelling} selling · {topTicker} most active</p>}
             {showFlow && (
               <div style={{ padding: "0 12px 12px" }}>
-                {/* Ticker filter pill */}
                 {flowTickerFilter && (
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                    <span style={{ fontSize: 12, color: "#64748b" }}>Showing:</span>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 10, background: "#1e293b", color: "#fff", fontSize: 12, fontWeight: 600 }}>
+                    <span style={{ fontSize: 12, color: t.text2 }}>Showing:</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 10, background: t.btnActive, color: "#fff", fontSize: 12, fontWeight: 600 }}>
                       {flowTickerFilter}
-                      <button onClick={()=>setFlowTickerFilter(null)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 14, padding: 0, marginLeft: 2 }}>✕</button>
+                      <button onClick={()=>setFlowTickerFilter(null)} style={{ background: "none", border: "none", color: t.text3, cursor: "pointer", fontSize: 14, padding: 0, marginLeft: 2 }}>✕</button>
                     </span>
                   </div>
                 )}
-                {/* Inner tabs */}
                 <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-                  {[{k:"bigmoney",l:"Big Money Trades"},{k:"smartbets",l:"Smart Bets"}].map(t=>(
-                    <button key={t.k} onClick={()=>{setFlowTab(t.k);setFlowExpandedId(null);setFlowShowAll(false);}} style={{ flex: 1, padding: "8px 0", borderRadius: 10, fontSize: 12, fontWeight: 600, border: flowTab===t.k?"none":"1px solid #e2e8f0", background: flowTab===t.k?"#1e293b":"#fff", color: flowTab===t.k?"#fff":"#64748b", cursor: "pointer" }}>{t.l}</button>
+                  {[{k:"bigmoney",l:"Big Money Trades"},{k:"smartbets",l:"Smart Bets"}].map(tab=>(
+                    <button key={tab.k} onClick={()=>{setFlowTab(tab.k);setFlowExpandedId(null);setFlowShowAll(false);}} style={{ flex: 1, padding: "8px 0", borderRadius: 10, fontSize: 12, fontWeight: 600, border: flowTab===tab.k?"none":`1px solid ${t.border}`, background: flowTab===tab.k?t.btnActive:t.card, color: flowTab===tab.k?"#fff":t.text2, cursor: "pointer" }}>{tab.l}</button>
                   ))}
                 </div>
-                {/* Sort */}
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: 4, marginBottom: 10 }}>
                   {[{k:"time",l:"Newest"},{k:"size",l:"Largest"}].map(s=>(
-                    <button key={s.k} onClick={()=>setFlowSort(s.k)} style={{ padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 600, border: flowSort===s.k?"none":"1px solid #e2e8f0", background: flowSort===s.k?"#1e293b":"#fff", color: flowSort===s.k?"#fff":"#64748b", cursor: "pointer" }}>{s.l}</button>
+                    <button key={s.k} onClick={()=>setFlowSort(s.k)} style={{ padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 600, border: flowSort===s.k?"none":`1px solid ${t.border}`, background: flowSort===s.k?t.btnActive:t.card, color: flowSort===s.k?"#fff":t.text2, cursor: "pointer" }}>{s.l}</button>
                   ))}
                 </div>
-                {/* Cards */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {flowTab === "bigmoney"
-                    ? flowVisible.map(t=><BigMoneyCard key={t.id} trade={t} isExpanded={flowExpandedId===t.id} onToggle={()=>setFlowExpandedId(flowExpandedId===t.id?null:t.id)} />)
-                    : flowVisible.map(b=><SmartBetCard key={b.id} bet={b} isExpanded={flowExpandedId===b.id} onToggle={()=>setFlowExpandedId(flowExpandedId===b.id?null:b.id)} />)
+                    ? flowVisible.map(tr=><BigMoneyCard key={tr.id} trade={tr} t={t} isExpanded={flowExpandedId===tr.id} onToggle={()=>setFlowExpandedId(flowExpandedId===tr.id?null:tr.id)} />)
+                    : flowVisible.map(b=><SmartBetCard key={b.id} bet={b} t={t} isExpanded={flowExpandedId===b.id} onToggle={()=>setFlowExpandedId(flowExpandedId===b.id?null:b.id)} />)
                   }
                 </div>
                 {flowList.length > 3 && !flowShowAll && (
-                  <button onClick={()=>setFlowShowAll(true)} style={{ width: "100%", marginTop: 8, padding: "8px 0", borderRadius: 10, fontSize: 12, fontWeight: 600, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer" }}>Show all {flowList.length} {flowTab==="bigmoney"?"trades":"bets"} ▾</button>
+                  <button onClick={()=>setFlowShowAll(true)} style={{ width: "100%", marginTop: 8, padding: "8px 0", borderRadius: 10, fontSize: 12, fontWeight: 600, border: `1px solid ${t.border}`, background: t.card, color: t.text2, cursor: "pointer" }}>Show all {flowList.length} {flowTab==="bigmoney"?"trades":"bets"} ▾</button>
                 )}
-                {flowList.length === 0 && <p style={{ textAlign: "center", fontSize: 13, color: "#94a3b8", padding: "16px 0" }}>No {flowTickerFilter||""} flow data</p>}
+                {flowList.length === 0 && <p style={{ textAlign: "center", fontSize: 13, color: t.text3, padding: "16px 0" }}>No {flowTickerFilter||""} flow data</p>}
               </div>
             )}
           </div>
@@ -555,17 +593,17 @@ export default function AlertsTab({ session, group }) {
           {/* TRACK RECORD */}
           <div style={card}>
             <div style={{ padding: "16px 16px 12px" }}>
-              <p style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 16px" }}>Track Record</p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>{[{l:"Hit Rate",v:`${mockTrack.hitRate}%`,c:"#1e293b"},{l:"Avg Return",v:`+${mockTrack.avgReturn}%`,c:"#16a34a"},{l:"Streak",v:mockTrack.streak,c:"#1e293b"}].map(x=>(<div key={x.l} style={{ background: "#f8fafc", borderRadius: 14, padding: "12px 8px", textAlign: "center" }}><p style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".04em", margin: 0 }}>{x.l}</p><p style={{ fontSize: 22, fontWeight: 700, color: x.c, margin: "4px 0 0" }}>{x.v}</p></div>))}</div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}><div style={{ display: "flex", gap: 6 }}>{mockTrack.history.map((_,i)=>(<div key={i} style={{ width: 12, height: 12, borderRadius: "50%", background: "#334155", cursor: "pointer" }}/>))}</div><Sparkline /></div>
-              <p style={{ fontSize: 12, color: "#94a3b8", margin: 0 }}>{mockTrack.history.filter(h=>h.type==="hit").length} of {mockTrack.history.length} alerts were profitable</p>
+              <p style={{ fontSize: 11, fontWeight: 600, color: t.text3, textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 16px" }}>Track Record</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>{[{l:"Hit Rate",v:`${mockTrack.hitRate}%`,c:t.text1},{l:"Avg Return",v:`+${mockTrack.avgReturn}%`,c:t.green},{l:"Streak",v:mockTrack.streak,c:t.text1}].map(x=>(<div key={x.l} style={{ background: t.surface, borderRadius: 14, padding: "12px 8px", textAlign: "center" }}><p style={{ fontSize: 10, color: t.text3, textTransform: "uppercase", letterSpacing: ".04em", margin: 0 }}>{x.l}</p><p style={{ fontSize: 22, fontWeight: 700, color: x.c, margin: "4px 0 0" }}>{x.v}</p></div>))}</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}><div style={{ display: "flex", gap: 6 }}>{mockTrack.history.map((_,i)=>(<div key={i} style={{ width: 12, height: 12, borderRadius: "50%", background: t.text2, cursor: "pointer" }}/>))}</div><Sparkline /></div>
+              <p style={{ fontSize: 12, color: t.text3, margin: 0 }}>{mockTrack.history.filter(h=>h.type==="hit").length} of {mockTrack.history.length} alerts were profitable</p>
             </div>
-            <div style={{ borderTop: "1px solid #f1f5f9" }}>{mockTrack.history.map((h,i)=>(<div key={i} style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, borderTop: i>0?"1px solid #f8fafc":"none" }}><span style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8", background: "#f1f5f9", padding: "4px 8px", borderRadius: 6, flexShrink: 0 }}>{h.date}</span><div style={{ flex: 1, minWidth: 0 }}><p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#1e293b" }}>{h.ticker}</p><p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.desc}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: "#94a3b8" }}>${h.from} → ${h.to} next day</p></div><span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 8, background: h.type==="hit"?"#f0fdf4":"#fef2f2", color: h.type==="hit"?"#15803d":"#dc2626" }}>{h.type==="hit"?"Hit":"Miss"} {h.result>0?"+":""}{h.result}%</span></div>))}</div>
+            <div style={{ borderTop: `1px solid ${t.borderLight}` }}>{mockTrack.history.map((h,i)=>(<div key={i} style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, borderTop: i>0?`1px solid ${t.surface}`:"none" }}><span style={{ fontSize: 10, fontWeight: 600, color: t.text3, background: t.surfaceAlt, padding: "4px 8px", borderRadius: 6, flexShrink: 0 }}>{h.date}</span><div style={{ flex: 1, minWidth: 0 }}><p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: t.text1 }}>{h.ticker}</p><p style={{ margin: "2px 0 0", fontSize: 12, color: t.text2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.desc}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: t.text3 }}>${h.from} → ${h.to} next day</p></div><span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 8, background: h.type==="hit"?t.greenBg:t.redBg, color: h.type==="hit"?t.green:t.red }}>{h.type==="hit"?"Hit":"Miss"} {h.result>0?"+":""}{h.result}%</span></div>))}</div>
           </div>
         </>
       )}
 
-      {modalAlert && <Modal alert={modalAlert} onClose={()=>setModalAlert(null)} />}
+      {modalAlert && <Modal alert={modalAlert} onClose={()=>setModalAlert(null)} t={t} />}
     </div>
   );
 }
