@@ -131,6 +131,12 @@ Day Range: $${context.livePrice.dayLow || 'N/A'} - $${context.livePrice.dayHigh 
 ${context.livePrice.note || (context.livePrice.marketOpen ? '' : '(Market is closed — this is the last closing price)')}`
   : 'LIVE PRICE DATA: NONE AVAILABLE. Do NOT guess or make up any prices. Say "I don\'t have live price data right now" and suggest checking Yahoo Finance or their broker app.'}
 
+YOUR RESPONSE CAN ONLY CONTAIN THESE NUMBERS:
+- The price shown above
+- The change percentage shown above (if available)
+- The volume shown above (if available)
+NOTHING ELSE. No 52-week highs. No support levels. No resistance levels. No price targets. No "breaks above $X." No "trading near $X." If a number is not listed in the VERIFIED LIVE PRICE DATA section, it does not exist to you.
+
 ${context.ticker && context.tickerAlerts.length > 0
   ? `${context.ticker} IS ALSO ON OUR SCANNER:\n${context.tickerAlerts.map(a => `$${a.price} type:${a.signal_type || a.alert_type} ${a.notes || a.title || ''}`).join('\n')}`
   : context.ticker

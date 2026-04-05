@@ -54,6 +54,17 @@ function checkForHallucination(response, context, agentType) {
       response = response.replace(/\d+\.?\d*\s*(million|M)\s*(shares|volume)[^.]*\./i, '');
     }
 
+    // Strip any price targets or levels not from Polygon data
+    for (const rp of responsePrices) {
+      const diff = Math.abs(rp - realPrice) / realPrice;
+      if (diff > 0.01 && diff <= 1.0) {
+        console.warn('[UpTik AI] Stripping fabricated price level: $' + rp, '(real: $' + realPrice + ')');
+        const escaped = rp.toString().replace('.', '\\.');
+        const regex = new RegExp(`[^.]*\\$${escaped}[^.]*\\.?`, 'g');
+        response = response.replace(regex, '');
+      }
+    }
+
     // Check for fabricated percentages when change is null
     const realChange = context?.livePrice?.changePercent;
     const responsePercents = [...response.matchAll(/(\d+\.?\d*)%/g)].map(m => parseFloat(m[1]));
