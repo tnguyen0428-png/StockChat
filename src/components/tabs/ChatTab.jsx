@@ -882,14 +882,14 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
       setAiLastTicker(newLastTicker);
       await supabase.from('chat_messages').insert({
         group_id: group.id, user_id: 'user_ai',
-        username: 'UpTik AI', user_color: '#8B5CF6',
+        username: 'UpTik', user_color: '#8B5CF6',
         text, type: 'ai', is_admin: false,
       });
     } catch(err) {
       console.error('UpTik AI error:', err.message, err);
       await supabase.from('chat_messages').insert({
         group_id: group.id, user_id: 'user_ai',
-        username: 'UpTik AI', user_color: '#8B5CF6',
+        username: 'UpTik', user_color: '#8B5CF6',
         text: `Error: ${err.message}`,
         type: 'ai', is_admin: false,
       });
