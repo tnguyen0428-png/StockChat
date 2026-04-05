@@ -37,8 +37,28 @@ const COMPANY_TO_TICKER = {
 
 const IGNORE_TICKERS = new Set(['AI', 'AM', 'PM', 'OK', 'US', 'CEO', 'IPO', 'ETF', 'GDP', 'FBI', 'USA', 'THE', 'FOR', 'AND', 'CAN', 'YOU', 'ARE', 'HOW', 'WHAT', 'WHY', 'IS', 'AT', 'IN', 'ON', 'TO', 'ME', 'MY', 'NO', 'YES', 'HI', 'HEY', 'UP', 'DO', 'IF', 'OR', 'SO', 'IT', 'BE', 'BY', 'OF', 'AN', 'AS', 'GO', 'IM']);
 
-export async function route(message) {
+export async function route(message, history = []) {
   const lower = message.toLowerCase().trim();
+
+  // Check for pronoun references ("it", "that stock", "the same one", "this one")
+  const pronouns = /\b(it|its|that stock|this stock|that one|this one|the same|same stock|same ticker)\b/i;
+  if (pronouns.test(message)) {
+    // Look backwards through history for the last mentioned ticker
+    for (let i = history.length - 1; i >= 0; i--) {
+      const h = history[i]?.content || '';
+      // Check for $SYMBOL
+      const tickerInHistory = h.match(/\$([A-Z]{1,5})\b/);
+      if (tickerInHistory) return { agent: 'data', params: { ticker: tickerInHistory[1] } };
+      // Check company names
+      const hLower = h.toLowerCase();
+      for (const [name, ticker] of Object.entries(COMPANY_TO_TICKER)) {
+        if (hLower.includes(name)) return { agent: 'data', params: { ticker } };
+      }
+      // Check bare tickers
+      const bare = h.match(/\b([A-Z]{2,5})\b/);
+      if (bare && !IGNORE_TICKERS.has(bare[1])) return { agent: 'data', params: { ticker: bare[1] } };
+    }
+  }
 
   // === TICKER CHECKS FIRST (always take priority) ===
 

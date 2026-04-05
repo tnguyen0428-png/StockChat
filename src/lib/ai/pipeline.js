@@ -44,7 +44,7 @@ export async function runPipeline(userMessage, conversationHistory, supabase, us
   const memory = await getMemory(supabase, userId);
 
   // Step 4: Route to the right agent (rule-based first, Haiku fallback)
-  const routing = await route(userMessage);
+  const routing = await route(userMessage, conversationHistory);
   console.log('[UpTik AI] Route:', routing.agent, routing.params?.ticker || '');
 
   // Step 5: Run the agent — fetch context + generate response
