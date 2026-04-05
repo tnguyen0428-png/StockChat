@@ -11,23 +11,36 @@ const AGENTS = { data: dataAgent, knowledge: knowledgeAgent, macro: macroAgent }
 console.log('[UpTik AI] Pipeline loaded. Agents: data, knowledge, macro. Memory: enabled.');
 
 function checkForHallucination(response, context, agentType) {
-  if (agentType === 'knowledge') return response; // education doesn't need price data
+  if (agentType === 'knowledge') return response;
 
-  const hasPriceData = context?.livePrice?.price != null;
+  const price = context?.livePrice?.price;
+  const hasRealData = price != null && price > 0;
   const hasMarketData = context?.marketData?.spy?.price != null;
-  const hasAlertData = context?.compressedAlerts && context.compressedAlerts !== 'No alerts today.';
-  const mentionsPrices = /\$\d+\.\d{2}/.test(response);
-  const mentionsPercent = /\d+\.\d+%/.test(response);
+  const ticker = context?.ticker || 'that stock';
 
-  // If data agent has no price data but response contains specific dollar amounts
-  if (agentType === 'data' && !hasPriceData && mentionsPrices) {
-    console.warn('[UpTik AI] HALLUCINATION BLOCKED: response had prices but no price data available');
-    return "I don't have live price data for that ticker right now. Markets may be closed or the price feed is unavailable. Check Yahoo Finance or your broker app for the current price.";
+  // Extract all dollar amounts from the response
+  const responsePrices = [...response.matchAll(/\$(\d+\.?\d*)/g)].map(m => parseFloat(m[1]));
+
+  // Data agent: no data but response has prices = hallucination
+  if (agentType === 'data' && !hasRealData && responsePrices.length > 0) {
+    console.warn('[UpTik AI] HALLUCINATION BLOCKED: no price data but response has $amounts');
+    return `I don't have live data for ${ticker} right now. Markets may be closed or the feed is unavailable. Not financial advice.`;
   }
 
-  // If macro agent has no market data but response contains specific numbers
-  if (agentType === 'macro' && !hasMarketData && mentionsPrices) {
-    console.warn('[UpTik AI] HALLUCINATION BLOCKED: macro response had prices but no market data');
+  // Data agent: data exists but response price is >5% off = hallucination
+  if (agentType === 'data' && hasRealData && responsePrices.length > 0) {
+    const realPrice = parseFloat(price);
+    const mainResponsePrice = responsePrices[0];
+    const priceDiff = Math.abs(mainResponsePrice - realPrice) / realPrice;
+    if (priceDiff > 0.05) {
+      console.warn('[UpTik AI] HALLUCINATION BLOCKED: price mismatch. Real:', realPrice, 'Response:', mainResponsePrice);
+      return `${ticker} last traded at $${realPrice.toFixed(2)}. Not financial advice.`;
+    }
+  }
+
+  // Macro agent: no market data but response has prices
+  if (agentType === 'macro' && !hasMarketData && responsePrices.length > 0) {
+    console.warn('[UpTik AI] HALLUCINATION BLOCKED: no market data but response has $amounts');
     return "I don't have live market data right now. Markets may be closed. Check back when they open.";
   }
 

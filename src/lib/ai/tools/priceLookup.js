@@ -28,7 +28,7 @@ export async function lookupPrice(ticker) {
       return null;
     }
 
-    console.log('[PriceLookup]', upper, ': $' + data.price, data.marketOpen ? '(live)' : '(prev close)');
+    console.log('[PriceLookup] RAW response for', upper, JSON.stringify(data));
     priceCache.set(upper, { data, ts: Date.now() });
     return data;
   } catch (err) {
