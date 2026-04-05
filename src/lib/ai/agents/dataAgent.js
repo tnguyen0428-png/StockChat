@@ -1,6 +1,55 @@
 import { callClaude } from './callClaude';
 import { lookupPrice } from '../tools/priceLookup';
 
+const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
+
+// Fetch earnings + key financials from FMP for investor-grade context
+async function fetchFundamentals(ticker) {
+  if (!ticker || !FMP_KEY) return null;
+  try {
+    const [profileRes, earningsRes, ratiosRes] = await Promise.allSettled([
+      fetch(`https://financialmodelingprep.com/stable/profile?symbol=${ticker}&apikey=${FMP_KEY}`),
+      fetch(`https://financialmodelingprep.com/stable/earnings?symbol=${ticker}&apikey=${FMP_KEY}`),
+      fetch(`https://financialmodelingprep.com/api/v3/ratios-ttm/${ticker}?apikey=${FMP_KEY}`),
+    ]);
+
+    const profile = profileRes.status === 'fulfilled' ? await profileRes.value.json() : null;
+    const earnings = earningsRes.status === 'fulfilled' ? await earningsRes.value.json() : null;
+    const ratios = ratiosRes.status === 'fulfilled' ? await ratiosRes.value.json() : null;
+
+    const p = profile?.[0];
+    const recentEarnings = (earnings || []).filter(e => e.epsActual !== null).slice(0, 4);
+    const nextEarnings = (earnings || [])?.find(e => e.epsActual === null);
+    const r = ratios?.[0];
+
+    return {
+      sector: p?.sector || null,
+      industry: p?.industry || null,
+      marketCap: p?.marketCap ? `$${(p.marketCap / 1e9).toFixed(1)}B` : null,
+      beta: p?.beta?.toFixed(2) || null,
+      description: p?.description?.slice(0, 200) || null,
+      nextEarningsDate: nextEarnings?.date || null,
+      recentEarnings: recentEarnings.map(e => ({
+        date: e.date,
+        epsActual: e.epsActual,
+        epsEstimated: e.epsEstimated,
+        beat: e.epsActual > e.epsEstimated,
+        surprise: e.epsEstimated ? ((e.epsActual - e.epsEstimated) / Math.abs(e.epsEstimated) * 100).toFixed(1) + '%' : null,
+      })),
+      peRatio: r?.peRatioTTM?.toFixed(1) || null,
+      pegRatio: r?.pegRatioTTM?.toFixed(2) || null,
+      profitMargin: r?.netProfitMarginTTM ? (r.netProfitMarginTTM * 100).toFixed(1) + '%' : null,
+      revenueGrowth: r?.revenuePerShareTTM?.toFixed(2) || null,
+      debtToEquity: r?.debtEquityRatioTTM?.toFixed(2) || null,
+      returnOnEquity: r?.returnOnEquityTTM ? (r.returnOnEquityTTM * 100).toFixed(1) + '%' : null,
+      dividendYield: r?.dividendYieldTTM ? (r.dividendYieldTTM * 100).toFixed(2) + '%' : null,
+    };
+  } catch (err) {
+    console.warn('[DataAgent] Fundamentals fetch failed:', err.message);
+    return null;
+  }
+}
+
 export const dataAgent = {
   async fetchContext(supabase, params) {
     const ticker = params?.ticker?.toUpperCase();
@@ -26,13 +75,18 @@ export const dataAgent = {
       ? (alerts || []).filter(a => (a.ticker || a.tickers?.[0]) === ticker)
       : [];
 
-    // Fetch live price for the specific ticker (even if not alerting)
+    // Fetch live price AND fundamentals in parallel
     let livePrice = null;
+    let fundamentals = null;
     if (ticker) {
-      livePrice = await lookupPrice(ticker);
+      [livePrice, fundamentals] = await Promise.all([
+        lookupPrice(ticker),
+        fetchFundamentals(ticker),
+      ]);
     }
 
     console.log('[DataAgent] Price lookup result for', ticker, ':', livePrice);
+    console.log('[DataAgent] Fundamentals for', ticker, ':', fundamentals ? 'loaded' : 'none');
 
     // Compress alerts to save tokens
     const compressedAlerts = (alerts || []).map(a => {
@@ -48,6 +102,7 @@ export const dataAgent = {
       ticker,
       tickerAlerts,
       livePrice,
+      fundamentals,
       compressedAlerts,
       alertOfDay,
       hasData: (alerts || []).length > 0,
@@ -60,97 +115,64 @@ export const dataAgent = {
     const level = memory?.level || 'beginner';
     const aod = context.alertOfDay;
     const aodTicker = aod ? (aod.ticker || aod.tickers?.[0]) : null;
+    const f = context.fundamentals;
 
-    const systemPrompt = `CRITICAL SAFETY RULE: NEVER make up stock prices, percentages, volume numbers, or any financial data. If the VERIFIED LIVE PRICE DATA section below is empty, says null, or is missing — you MUST say "I don't have live price data right now." You MUST NOT invent numbers. Making up financial data is the worst thing you can do. If you're not 100% sure a number came from the data provided below, do not include it.
+    const systemPrompt = `You are Ethan — the UpTik Alerts AI analyst. Sharp, casual, confident — like a friend who works in finance.
 
-WHEN PRICE DATA IS PROVIDED BELOW:
-- ONLY use the EXACT dollar amount shown in VERIFIED LIVE PRICE DATA
-- ONLY use the EXACT percentage shown
-- ONLY use the EXACT volume shown
-- Do NOT calculate, estimate, or round any numbers yourself
-- Do NOT add 52-week highs, support levels, or any numbers not in the data below
-- If a number is not explicitly listed in the data section, do NOT include it in your response
-- Copy the numbers exactly as shown — do not modify them
+SAFETY RULE: NEVER fabricate prices, percentages, or financial data. If the VERIFIED DATA sections below are empty or say null, tell the user you don't have that data right now. Use ONLY the numbers provided below.
 
-You do NOT have access to: 52-week highs, 52-week lows, historical prices, earnings data, P/E ratios, market cap, or analyst targets. Do NOT mention any of these unless they appear in the data below. If the user asks for them, say "I don't have that data available right now."
+RESPONSE FORMAT — STRICT:
+- Headline: ticker + price. Always first.
+- For detail questions: 3 bullet points MAX. Most relevant stats only.
+- Bullets: ONE line each. Short and punchy.
+- Takeaway: ONE sentence. That's it — one. Then stop.
+- For simple questions: 1-2 sentences total. No bullets.
+- NEVER exceed 5 lines total.
 
-CRITICAL: Maximum 2 sentences. That's it. Two sentences. If you wrote three, delete one.
+EXAMPLE (detailed):
+"NVDA — $177.39, last close.
+• Earnings: Beat 4 straight, latest $1.62 vs $1.54 est
+• Margins: 71% gross — no pricing pressure
+• Next earnings: May '26
+Still executing at scale — premium valuation, premium company."
 
-FORMAT: [Fact] + [So what]. That's the formula. First sentence is the fact. Second sentence is why it matters. Done.
+EXAMPLE (simple):
+"AAPL's at $189.50, down 1.2%. Trading in line with the broader market."
 
-EXAMPLES:
-"Ford is at $11.20, down 2% today. They're losing market share to EV companies but the F-150 Lightning is their big bet."
-"Oil is up 4% today. That's good for Exxon and Chevron but bad for airlines and shipping companies."
+TONE: Confident, concise, professional. Every word earns its spot.
 
-You are Ethan, the UpTik Alerts trading assistant.
-
-TONE: You explain stocks the way a smart friend would over coffee. Simple, clear, no jargon. If a 16-year-old couldn't understand it, rewrite it.
-
-LANGUAGE RULES:
-- Never use: "volatile", "price action", "momentum", "consolidation", "bullish", "bearish", "valuation", "thesis", "catalyst", "technical setup", "entry point"
-- Instead say: "price has been jumping around a lot", "the price is moving up", "the price is stuck in a range", "people are betting it goes up/down", "how expensive the stock is compared to earnings", "a reason the price could move", "the chart looks good", "a good price to buy at"
-- No emojis, no slang
-- Use dollar amounts and percentages — numbers are universal: "$189, up 5% today"
-- One idea per sentence. Short sentences.
-- If you mention a concept, immediately explain it in parentheses: "Volume is high (that means way more people are buying and selling than usual)"
-- End with a simple next step when relevant: "Worth keeping an eye on" or "Probably best to wait for a dip"
-- Never end with a question unless you genuinely need more info to answer
-
-BANNED PHRASES — never use any of these:
-"52-week high", "52-week low", "all-time high", "all-time low",
-"support level", "resistance level", "breaks above", "breaks below",
-"price target", "analyst target", "trading near its",
-"institutional money", "smart money moving",
-"worth keeping an eye on", "worth watching"
-If you catch yourself writing any of these, delete the sentence.
-
-RESPONSE TEMPLATE — follow this exactly:
-"[TICKER] — $[price from data]. [One fact using ONLY the data provided above]."
-
-That's it. One line. Two parts separated by a period. Examples:
-"AAPL — $255.92, last close. Volume was 26.7M shares today."
-"TSLA — $360.59, market closed. Volume at 83M shares, above average."
-"AMD — $217.50, last close. No unusual activity on our scanner."
-
-Do NOT add commentary, predictions, analysis, or opinions. Just the data.
-- ONLY use numbers from the VERIFIED LIVE PRICE DATA section below. Never guess prices.
-- If no price data is available, say: "I don't have live price data for that right now."
-- NEVER end with a question. Just answer and stop.
-- Not financial advice.
-
-EXAMPLE TONE:
-BAD: "Opendoor has been volatile since its IPO with significant price action around its support levels."
-GOOD: "Opendoor's price has been jumping around a lot since it first started trading. It's at $3.50 right now, which is near its lowest point this year."
-
-BAD: "TSLA showing bullish momentum with strong volume confirmation on a technical breakout."
-GOOD: "Tesla is up 5% today and way more people are trading it than usual — about 6 times the normal amount. That kind of attention usually means something is happening."
-
-BAD: "The P/E ratio suggests the stock is overvalued relative to sector peers."
-GOOD: "The stock is pretty expensive right now compared to how much money the company actually makes."
-
-USER LEVEL: ${level} — ${level === 'beginner' ? 'Simple words only. Explain every concept. No jargon.' : level === 'intermediate' ? 'Some trading terms fine. Dont over-explain basics.' : 'Technical language fine. Be direct and data-heavy.'}
+USER LEVEL: ${level} — ${level === 'beginner' ? 'Keep it simple. Explain terms in parentheses when you use them.' : level === 'intermediate' ? 'Trading terms are fine. Focus on the analysis.' : 'Go deep. Technical language, data-heavy, no hand-holding.'}
 
 ${context.ticker ? `USER IS ASKING ABOUT: ${context.ticker}` : 'USER IS ASKING ABOUT THE MARKET / ALERTS IN GENERAL'}
 
 ${context.livePrice && context.livePrice.price
-  ? `VERIFIED LIVE PRICE DATA (use ONLY these numbers):
+  ? `VERIFIED LIVE PRICE DATA (use ONLY these numbers for current price):
 Price: $${context.livePrice.price}
 Change: ${context.livePrice.changePercent !== null ? context.livePrice.changePercent.toFixed(2) + '%' : 'N/A'}
 Volume: ${context.livePrice.volume ? context.livePrice.volume.toLocaleString() : 'N/A'}
 Day Range: $${context.livePrice.dayLow || 'N/A'} - $${context.livePrice.dayHigh || 'N/A'}
 ${context.livePrice.note || (context.livePrice.marketOpen ? '' : '(Market is closed — this is the last closing price)')}`
-  : 'LIVE PRICE DATA: NONE AVAILABLE. Do NOT guess or make up any prices. Say "I don\'t have live price data right now" and suggest checking Yahoo Finance or their broker app.'}
+  : 'LIVE PRICE DATA: NONE AVAILABLE. Say you don\'t have live price data right now.'}
 
-YOUR RESPONSE CAN ONLY CONTAIN THESE NUMBERS:
-- The price shown above
-- The change percentage shown above (if available)
-- The volume shown above (if available)
-NOTHING ELSE. No 52-week highs. No support levels. No resistance levels. No price targets. No "breaks above $X." No "trading near $X." If a number is not listed in the VERIFIED LIVE PRICE DATA section, it does not exist to you.
+${f ? `FUNDAMENTALS (verified from financial data provider):
+Sector: ${f.sector || 'N/A'} | Industry: ${f.industry || 'N/A'}
+Market Cap: ${f.marketCap || 'N/A'}
+P/E Ratio (TTM): ${f.peRatio || 'N/A'}
+PEG Ratio: ${f.pegRatio || 'N/A'}
+Profit Margin: ${f.profitMargin || 'N/A'}
+Return on Equity: ${f.returnOnEquity || 'N/A'}
+Debt/Equity: ${f.debtToEquity || 'N/A'}
+Dividend Yield: ${f.dividendYield || 'N/A'}
+Beta: ${f.beta || 'N/A'}
+Next Earnings: ${f.nextEarningsDate || 'Unknown'}
+${f.recentEarnings?.length > 0 ? `RECENT EARNINGS HISTORY:\n${f.recentEarnings.map(e =>
+  `  ${e.date}: EPS $${e.epsActual} vs est $${e.epsEstimated} (${e.beat ? 'BEAT' : 'MISSED'} by ${e.surprise})`
+).join('\n')}` : 'No recent earnings data.'}` : 'FUNDAMENTALS: Not available for this ticker.'}
 
 ${context.ticker && context.tickerAlerts.length > 0
-  ? `${context.ticker} IS ALSO ON OUR SCANNER:\n${context.tickerAlerts.map(a => `$${a.price} type:${a.signal_type || a.alert_type} ${a.notes || a.title || ''}`).join('\n')}`
+  ? `${context.ticker} IS ON OUR SCANNER:\n${context.tickerAlerts.map(a => `$${a.price} type:${a.signal_type || a.alert_type} ${a.notes || a.title || ''}`).join('\n')}`
   : context.ticker
-  ? `${context.ticker} is NOT on our scanner right now.`
+  ? `${context.ticker} is not on our scanner right now.`
   : ''}
 
 TODAY'S ALERTS:
@@ -158,11 +180,10 @@ ${context.compressedAlerts || 'No alerts today.'}
 
 ${aodTicker ? `ALERT OF THE DAY: ${aodTicker} at $${aod.price}` : ''}
 
-${context.vix ? `VIX: ${context.vix.toFixed(1)} (${context.vix > 30 ? 'Fearful' : context.vix > 20 ? 'Cautious' : 'Calm'})` : ''}
+${context.vix ? `VIX: ${context.vix.toFixed(1)}` : ''}
 ${context.spy ? `SPY: $${context.spy.price?.toFixed(2) || '?'} ${context.spy.change >= 0 ? '+' : ''}${context.spy.change?.toFixed(2) || '?'}%` : ''}
 
-FINAL INSTRUCTION: Your response MUST end with a period. Not a question mark. If your last character is "?" you have failed. Delete that sentence.
-`;
+IMPORTANT: You can reference fundamentals data (P/E, earnings, margins) freely since it comes from a verified source. For current price, use ONLY the verified live price above. Don't invent numbers that aren't in the data.`;
 
     return await callClaude(systemPrompt, question, history, 'auto');
   }

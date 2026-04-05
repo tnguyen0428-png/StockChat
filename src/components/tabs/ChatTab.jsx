@@ -1122,7 +1122,7 @@ const styles = {
   },
   msgText: {
     fontSize: 16, color: 'var(--text1)',
-    lineHeight: 1.6, wordBreak: 'break-word',
+    lineHeight: 1.6, wordBreak: 'break-word', whiteSpace: 'pre-wrap',
   },
   tickerMention: {
     background: '#FFFBEB', color: '#D4A017',

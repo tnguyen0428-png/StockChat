@@ -6,7 +6,7 @@ const MODELS = {
 };
 
 export async function callClaude(systemPrompt, userMessage, history = [], tier = 'auto') {
-  const recent = (history || []).slice(-8).map(msg => ({
+  const recent = (history || []).slice(-20).map(msg => ({
     role: msg.role === 'assistant' ? 'assistant' : 'user',
     content: msg.content
   }));
@@ -26,7 +26,7 @@ export async function callClaude(systemPrompt, userMessage, history = [], tier =
     },
     body: JSON.stringify({
       model,
-      max_tokens: 100,
+      max_tokens: 150,
       system: systemPrompt,
       messages: [...recent, { role: 'user', content: userMessage }]
     })
@@ -49,7 +49,7 @@ export async function callClaude(systemPrompt, userMessage, history = [], tier =
       },
       body: JSON.stringify({
         model: MODELS.smart,
-        max_tokens: 100,
+        max_tokens: 150,
         system: systemPrompt,
         messages: [...recent, { role: 'user', content: userMessage }]
       })
@@ -65,10 +65,14 @@ export async function callClaude(systemPrompt, userMessage, history = [], tier =
 function needsSonnet(msg) {
   let score = 0;
   if ((msg.match(/\?/g) || []).length > 1) score += 0.3;
-  if (/compare|versus|vs|better|which|should i|analyze/i.test(msg)) score += 0.3;
-  if ((msg.match(/\$[A-Z]{1,5}/g) || []).length > 1) score += 0.2;
-  if (msg.length > 200) score += 0.2;
-  return score > 0.5;
+  if (/compare|versus|vs|better|which|should i|analyze/i.test(msg)) score += 0.4;
+  if ((msg.match(/\$[A-Z]{1,5}/g) || []).length > 1) score += 0.3;
+  if (msg.length > 150) score += 0.2;
+  // Investor-grade questions need depth
+  if (/earnings|revenue|margin|p\/e|valuation|financials|fundamentals|balance sheet|cash flow|guidance|forecast/i.test(msg)) score += 0.4;
+  // Opinion/analysis questions
+  if (/what do you think|is it a buy|worth buying|good investment|overvalued|undervalued|bull case|bear case/i.test(msg)) score += 0.4;
+  return score > 0.3;
 }
 
 function isWeakAnswer(text) {

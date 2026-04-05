@@ -17,28 +17,34 @@ function checkForHallucination(response, context, agentType) {
   const realVolume = context?.livePrice?.volume;
   const hasRealData = price != null && price > 0;
   const hasMarketData = context?.marketData?.spy?.price != null;
+  const hasFundamentals = context?.fundamentals != null;
   const ticker = context?.ticker || 'that stock';
 
-  const responsePrices = [...response.matchAll(/\$(\d+\.?\d*)/g)].map(m => parseFloat(m[1]));
+  // Extract dollar amounts that look like stock prices (not market cap like $2.7T or $4.3B)
+  const responsePrices = [...response.matchAll(/\$(\d+\.?\d*)(?!\s*[BTM])/g)].map(m => parseFloat(m[1]));
   const volumeMatch = response.match(/(\d+\.?\d*)\s*(million|M)\s*(shares|volume)/i);
   const responseVolume = volumeMatch ? parseFloat(volumeMatch[1]) * 1e6 : null;
 
-  // No data but response has prices = hallucination
-  if (agentType === 'data' && !hasRealData && responsePrices.length > 0) {
+  // No live price data AND no fundamentals, but response has $ amounts = hallucination
+  if (agentType === 'data' && !hasRealData && !hasFundamentals && responsePrices.length > 0) {
     console.warn('[UpTik AI] HALLUCINATION BLOCKED: no price data but response has $amounts');
-    return `I don't have live data for ${ticker} right now. Markets may be closed. Not financial advice.`;
+    return `I don't have live data for ${ticker} right now. Markets may be closed.`;
   }
 
   if (agentType === 'data' && hasRealData) {
     const realPrice = parseFloat(price);
 
-    // Check price accuracy (>5% off = fabricated)
+    // Check if the FIRST dollar amount in the response is close to the real price
+    // Only flag if it looks like it's trying to be the stock price (within plausible range)
     if (responsePrices.length > 0) {
       const mainResponsePrice = responsePrices[0];
-      const priceDiff = Math.abs(mainResponsePrice - realPrice) / realPrice;
-      if (priceDiff > 0.05) {
-        console.warn('[UpTik AI] HALLUCINATION BLOCKED: price mismatch. Real:', realPrice, 'Response:', mainResponsePrice);
-        return `${ticker} last traded at $${realPrice.toFixed(2)}. Not financial advice.`;
+      // Only check prices in the same order of magnitude as the real price (likely stock prices, not EPS/ratios)
+      if (mainResponsePrice > realPrice * 0.5 && mainResponsePrice < realPrice * 2) {
+        const priceDiff = Math.abs(mainResponsePrice - realPrice) / realPrice;
+        if (priceDiff > 0.05) {
+          console.warn('[UpTik AI] HALLUCINATION BLOCKED: price mismatch. Real:', realPrice, 'Response:', mainResponsePrice);
+          return `${ticker} last traded at $${realPrice.toFixed(2)}.`;
+        }
       }
     }
 
@@ -54,23 +60,16 @@ function checkForHallucination(response, context, agentType) {
       response = response.replace(/\d+\.?\d*\s*(million|M)\s*(shares|volume)[^.]*\./i, '');
     }
 
-    // Strip any price targets or levels not from Polygon data
-    for (const rp of responsePrices) {
-      const diff = Math.abs(rp - realPrice) / realPrice;
-      if (diff > 0.01 && diff <= 1.0) {
-        console.warn('[UpTik AI] Stripping fabricated price level: $' + rp, '(real: $' + realPrice + ')');
-        const escaped = rp.toString().replace('.', '\\.');
-        const regex = new RegExp(`[^.]*\\$${escaped}[^.]*\\.?`, 'g');
-        response = response.replace(regex, '');
-      }
-    }
-
-    // Check for fabricated percentages when change is null
+    // Only check for fabricated daily change percentages — NOT fundamentals percentages
+    // Fundamentals like P/E, margins, ROE are legitimate data from our provider
     const realChange = context?.livePrice?.changePercent;
-    const responsePercents = [...response.matchAll(/(\d+\.?\d*)%/g)].map(m => parseFloat(m[1]));
-    if (realChange === null && responsePercents.length > 0) {
-      console.warn('[UpTik AI] HALLUCINATION BLOCKED: no change data but response has percentages');
-      return `${ticker} last closed at $${realPrice.toFixed(2)}. Markets are closed so I don't have today's change data. Not financial advice.`;
+    if (realChange === null && !hasFundamentals) {
+      // Only block if response mentions "today" or "up/down X%" in a way that implies daily change
+      const dailyChangePattern = /(?:up|down|gained|lost|fell|rose|dropped|jumped)\s+\d+\.?\d*%/i;
+      if (dailyChangePattern.test(response)) {
+        console.warn('[UpTik AI] HALLUCINATION BLOCKED: fabricated daily change percentage');
+        return `${ticker} last closed at $${realPrice.toFixed(2)}. Markets are closed so I don't have today's change data.`;
+      }
     }
   }
 
@@ -79,10 +78,6 @@ function checkForHallucination(response, context, agentType) {
     console.warn('[UpTik AI] HALLUCINATION BLOCKED: no market data but response has $amounts');
     return "I don't have live market data right now. Markets may be closed. Check back when they open.";
   }
-
-  // Hard strip: remove any trailing sentence that ends with ?
-  response = response.replace(/\s*[^.!]*\?\s*$/, '').trim();
-  if (response && !response.endsWith('.') && !response.endsWith('!')) response += '.';
 
   return response.trim();
 }

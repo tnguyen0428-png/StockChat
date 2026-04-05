@@ -157,7 +157,7 @@ export default function AITab({ session }) {
                   background: msg.role === 'user' ? '#7C3AED' : 'var(--card)',
                   border: isAssistant ? '1px solid var(--border)' : 'none',
                   color: msg.role === 'user' ? '#fff' : 'var(--text1)',
-                  fontSize: 14, lineHeight: 1.6,
+                  fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap',
                 }}>
                   {msg.text}
                 </div>
