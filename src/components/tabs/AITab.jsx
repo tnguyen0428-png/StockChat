@@ -24,13 +24,39 @@ export default function AITab({ session }) {
   const [watchlist, setWatchlist] = useState([]);
   const [lastTicker, setLastTicker] = useState(null);
   const [listening, setListening] = useState(false);
+  const [feedbackMap, setFeedbackMap] = useState({});
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
+  const msgIdCounter = useRef(0);
+
+  const nextMsgId = () => `ai-msg-${++msgIdCounter.current}`;
+
+  const handleFeedback = async (msgId, rating) => {
+    setFeedbackMap(prev => ({ ...prev, [msgId]: rating }));
+    const msg = messages.find(m => m.id === msgId);
+    let question = '';
+    const idx = messages.findIndex(m => m.id === msgId);
+    for (let i = idx - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') { question = messages[i].text; break; }
+    }
+    try {
+      await supabase.from('ai_feedback').insert({
+        user_id: session.user.id,
+        message_id: null,
+        question,
+        response: msg?.text || '',
+        rating,
+      });
+    } catch (err) {
+      console.warn('[Feedback] Save failed:', err.message);
+    }
+  };
 
   useEffect(() => {
     loadWatchlist();
     setMessages([{
+      id: nextMsgId(),
       role: 'assistant',
       text: `Hey ${profile?.username || 'there'} — what are we researching today?`
     }]);
@@ -76,7 +102,7 @@ export default function AITab({ session }) {
     if (!userText || loading) return;
     setInput('');
     inputRef.current?.focus();
-    const userMsg = { role: 'user', text: userText };
+    const userMsg = { id: nextMsgId(), role: 'user', text: userText };
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
     try {
@@ -94,9 +120,9 @@ export default function AITab({ session }) {
       });
 
       setLastTicker(newLastTicker);
-      setMessages(prev => [...prev, { role: 'assistant', text: aiText }]);
+      setMessages(prev => [...prev, { id: nextMsgId(), role: 'assistant', text: aiText }]);
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', text: 'Unable to respond right now. Try again shortly.' }]);
+      setMessages(prev => [...prev, { id: nextMsgId(), role: 'assistant', text: 'Unable to respond right now. Try again shortly.' }]);
     } finally {
       setLoading(false);
     }
@@ -118,27 +144,43 @@ export default function AITab({ session }) {
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10, WebkitOverflowScrolling: 'touch' }}>
         {messages.map((msg, i) => {
+          const isAssistant = msg.role === 'assistant';
+          const rated = feedbackMap[msg.id];
           const bubble = (
             <div style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', gap: 8, alignItems: 'flex-start' }}>
-              {msg.role === 'assistant' && (
+              {isAssistant && (
                 <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0, marginTop: 2 }}>AI</div>
               )}
-              <div style={{
-                maxWidth: '80%', padding: '10px 13px', borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '2px 12px 12px 12px',
-                background: msg.role === 'user' ? '#7C3AED' : 'var(--card)',
-                border: msg.role === 'assistant' ? '1px solid var(--border)' : 'none',
-                color: msg.role === 'user' ? '#fff' : 'var(--text1)',
-                fontSize: 14, lineHeight: 1.6,
-              }}>
-                {msg.text}
+              <div style={{ maxWidth: '80%' }}>
+                <div style={{
+                  padding: '10px 13px', borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '2px 12px 12px 12px',
+                  background: msg.role === 'user' ? '#7C3AED' : 'var(--card)',
+                  border: isAssistant ? '1px solid var(--border)' : 'none',
+                  color: msg.role === 'user' ? '#fff' : 'var(--text1)',
+                  fontSize: 14, lineHeight: 1.6,
+                }}>
+                  {msg.text}
+                </div>
+                {isAssistant && i > 0 && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 4, alignItems: 'center' }}>
+                    {rated ? (
+                      <span style={{ fontSize: 12, color: '#94a3b8' }}>{rated === 'up' ? '👍' : '👎'} Thanks!</span>
+                    ) : (
+                      <>
+                        <button onClick={() => handleFeedback(msg.id, 'up')} style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>👍</button>
+                        <button onClick={() => handleFeedback(msg.id, 'down')} style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>👎</button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );
-          if (i === 0 && msg.role === 'assistant') {
-            return <div key={i}>{bubble}</div>;
+          if (i === 0 && isAssistant) {
+            return <div key={msg.id}>{bubble}</div>;
           }
           return (
-            <FadingMessage key={i} onRemove={() => setMessages(prev => prev.filter((_, idx) => idx !== i))}>
+            <FadingMessage key={msg.id} delay={120000} duration={5000} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
               {bubble}
             </FadingMessage>
           );
