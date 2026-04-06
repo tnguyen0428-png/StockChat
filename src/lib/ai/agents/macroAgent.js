@@ -1,4 +1,5 @@
 import { callClaude } from './callClaude';
+import { lookupPrice } from '../tools/priceLookup';
 
 export const macroAgent = {
   async fetchContext(supabase) {
@@ -13,7 +14,6 @@ export const macroAgent = {
     // Try to get SPY and QQQ prices for market overview
     let marketData = null;
     try {
-      const { lookupPrice } = await import('../tools/priceLookup.js');
       const [spy, qqq, vix] = await Promise.allSettled([
         lookupPrice('SPY'),
         lookupPrice('QQQ'),

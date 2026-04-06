@@ -17,23 +17,65 @@ const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 const EMOJIS = ['🔥','📈','📉','🚀','💪','🎯','👀','💰','⚠️','✅','❌','😎','🤔','👋','🙌','😂','💎','🐂','🐻','⏰'];
 
 // ── Earnings card parser ──
-// Detects AI replies that mention an earnings beat/miss and extracts structured fields.
+// Handles both single-quarter and multi-quarter bullet-list earnings replies.
 function parseEarningsCard(text) {
-  if (!text || !/EPS/i.test(text) || !/(beat|miss)/i.test(text)) return null;
+  if (!text || !/(beat|miss)/i.test(text)) return null;
   const tickerM = text.match(/\b([A-Z]{1,5})\b\s*[—–-]\s*\$?([\d.,]+)/);
-  const dateM   = text.match(/([A-Z][a-z]{2,9}\s+\d{1,2},\s*\d{4})/);
-  const epsM    = text.match(/\$?([\d.]+)\s*EPS\s*(?:vs|versus)\s*\$?([\d.]+)/i);
-  const pctM    = text.match(/(beat|miss(?:ed)?)\s*by\s*([\d.]+)%/i);
-  if (!tickerM || !epsM) return null;
-  const actual = parseFloat(epsM[1]);
-  const est = parseFloat(epsM[2]);
-  const beat = pctM ? (pctM[1].toLowerCase().startsWith('beat') ? 1 : -1) * parseFloat(pctM[2]) : ((actual - est) / est) * 100;
+  if (!tickerM) return null;
+  // Extract all quarters mentioned: "Feb '26: Beat by 1.8% ($0.74 vs $0.727 est)"
+  const quarters = [];
+  // Pattern A: "[Label]: Beat by X% ($A vs $E est)"
+  const reA = /(?:([A-Z][a-z]{2,9}\s*['’]?\d{2,4}|[A-Z][a-z]{2,9}\s+\d{1,2},?\s*\d{4})[^:]*:?\s*)?(Beat|Miss(?:ed)?)\s*by\s*([\d.]+)\s*%(?:\s*\(?\$?([\d.]+)\s*(?:vs|versus)\s*\$?([\d.]+)\s*(?:est(?:imate)?)?\)?)?/gi;
+  // Pattern B: "[Label] beat/miss $A vs $E est (+/-X%)"
+  const reB = /(?:([A-Z][a-z]{2,9}\s*['’]?\d{2,4}|[A-Z][a-z]{2,9}\s+\d{1,2},?\s*\d{4})[^$]*?)?(beat|miss(?:ed)?)\s*\$?([\d.]+)\s*(?:vs|versus)\s*\$?([\d.]+)\s*(?:est(?:imate)?)?\s*\(?\s*([+-]?[\d.]+)\s*%\)?/gi;
+  let m;
+  while ((m = reA.exec(text)) !== null) {
+    quarters.push({
+      label: m[1] || null,
+      sign: /^beat/i.test(m[2]) ? 1 : -1,
+      pct: parseFloat(m[3]),
+      actual: m[4] ? parseFloat(m[4]) : null,
+      est: m[5] ? parseFloat(m[5]) : null,
+    });
+  }
+  if (quarters.length === 0) {
+    while ((m = reB.exec(text)) !== null) {
+      const pct = parseFloat(m[5]);
+      quarters.push({
+        label: m[1] || null,
+        sign: /^beat/i.test(m[2]) ? 1 : -1,
+        pct: Math.abs(pct),
+        actual: parseFloat(m[3]),
+        est: parseFloat(m[4]),
+      });
+    }
+  }
+  // Pattern C: "$A vs $E est (X% beat/miss)"
+  if (quarters.length === 0) {
+    const reC = /\$?([\d.]+)\s*(?:vs|versus)\s*\$?([\d.]+)\s*est(?:imate)?\s*\(?\s*([\d.]+)\s*%\s*(beat|miss(?:ed)?)\)?/gi;
+    while ((m = reC.exec(text)) !== null) {
+      quarters.push({
+        label: null,
+        sign: /^beat/i.test(m[4]) ? 1 : -1,
+        pct: parseFloat(m[3]),
+        actual: parseFloat(m[1]),
+        est: parseFloat(m[2]),
+      });
+    }
+  }
+  if (quarters.length === 0) return null;
+  const latest = quarters[0];
+  // Everything after the price line is context/narrative.
+  const noteText = text.slice(tickerM.index + tickerM[0].length).replace(/^[,\s.]*(?:last\s+close\.?)?/i, '').trim() || null;
   return {
     ticker: tickerM[1],
     price: parseFloat(tickerM[2].replace(/,/g, '')),
-    date: dateM ? dateM[1] : null,
-    actual, est, beatPct: beat,
-    note: text.replace(/.*?%\s*\.?\s*/s, '').trim() || null,
+    date: latest.label,
+    actual: latest.actual,
+    est: latest.est,
+    beatPct: latest.sign * latest.pct,
+    quarters, // array for multi-quarter history strip
+    note: noteText,
   };
 }
 
@@ -64,23 +106,220 @@ function EarningsCard({ data, onTickerClick }) {
           <span style={val}>{data.date}</span>
         </div>
       )}
-      <div style={row}>
-        <span style={lbl}>EPS Actual</span>
-        <span style={{ ...val, color: accent }}>${data.actual.toFixed(3)}</span>
-      </div>
-      <div style={row}>
-        <span style={lbl}>EPS Estimate</span>
-        <span style={val}>${data.est.toFixed(3)}</span>
-      </div>
-      <div style={{ ...row, borderBottom: 'none' }}>
+      {data.actual != null && (
+        <div style={row}>
+          <span style={lbl}>EPS Actual</span>
+          <span style={{ ...val, color: accent }}>${data.actual.toFixed(3)}</span>
+        </div>
+      )}
+      {data.est != null && (
+        <div style={row}>
+          <span style={lbl}>EPS Estimate</span>
+          <span style={val}>${data.est.toFixed(3)}</span>
+        </div>
+      )}
+      <div style={{ ...row, borderBottom: ((data.quarters && data.quarters.length > 1) || data.note) ? '1px solid var(--border)' : 'none' }}>
         <span style={lbl}>Surprise</span>
         <span style={{ ...val, color: accent }}>{positive ? '+' : ''}{data.beatPct.toFixed(1)}%</span>
       </div>
-      {data.note && (
-        <div style={{ padding: '8px 12px', fontSize: 13, color: 'var(--text2)', lineHeight: 1.5, borderTop: '1px solid var(--border)', background: 'var(--card)' }}>
-          {data.note}
+      {data.quarters && data.quarters.length > 1 && (
+        <div style={{ padding: '10px 12px', background: 'var(--card)' }}>
+          <div style={{ ...lbl, marginBottom: 6 }}>History</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {data.quarters.map((q, i) => {
+              const qPos = q.sign >= 0;
+              const qAccent = qPos ? '#1AAD5E' : '#E05252';
+              const qBg = qPos ? 'rgba(26,173,94,0.08)' : 'rgba(224,82,82,0.08)';
+              return (
+                <div key={i} style={{ padding: '6px 10px', borderRadius: 8, background: qBg, border: `1px solid ${qAccent}33`, fontSize: 12, fontWeight: 600, color: qAccent, fontVariantNumeric: 'tabular-nums' }}>
+                  {q.label || 'Q' + (data.quarters.length - i)} · {qPos ? '▲' : '▼'} {q.pct.toFixed(1)}%
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
+      {data.note && (
+        <div style={{ padding: '10px 12px', fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, borderTop: data.quarters && data.quarters.length > 1 ? '1px solid var(--border)' : 'none', background: 'var(--card)' }}>
+          {renderBulletedNote(data.note)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Price quote card parser ──
+// Matches "AAPL — $187.43, up 1.2%", "AAPL — $187.43, last close", "$AAPL at $187.43"
+function parsePriceQuoteCard(text) {
+  if (!text) return null;
+  // Skip if earnings parser will handle it
+  if (/(beat|miss(?:ed)?)\s*by\s*[\d.]+\s*%/i.test(text)) return null;
+  // Skip if valuation parser will handle it (numeric P/E present)
+  if (/P\/E[:\s]+[\d.]+/i.test(text)) return null;
+  const m = text.match(/\$?\b([A-Z]{1,5})\b\s*(?:—|–|-|at|:)\s*\$?([\d,]+\.?\d*)/);
+  if (!m) return null;
+  const price = parseFloat(m[2].replace(/,/g, ''));
+  if (!price || price > 100000) return null;
+  const pctM = text.match(/(up|down|\+|-)\s*([\d.]+)\s*%/i);
+  let pct = pctM ? parseFloat(pctM[2]) : null;
+  if (pct != null && (/^down$/i.test(pctM[1]) || pctM[1] === '-')) pct = -pct;
+  const volM = text.match(/([\d.]+)\s*([KMB])\s*shares/i);
+  const isClose = /last close|closing price|market(?:'s)?\s*closed/i.test(text);
+  // Build context note from rest of text (everything after first period)
+  const parts = text.split(/[.!?]\s/);
+  const note = parts.slice(1).filter(p => p.trim()).join('. ').trim() || null;
+  return {
+    ticker: m[1], price, pct, note,
+    volume: volM ? `${volM[1]}${volM[2].toUpperCase()}` : null,
+    isClose,
+  };
+}
+
+function PriceQuoteCard({ data, onTickerClick }) {
+  const hasPct = data.pct != null;
+  const up = hasPct ? data.pct >= 0 : true;
+  const accent = hasPct ? (up ? '#1AAD5E' : '#E05252') : '#6D28D9';
+  const bg = hasPct ? (up ? 'rgba(26,173,94,0.08)' : 'rgba(224,82,82,0.08)') : 'rgba(139,92,246,0.08)';
+  return (
+    <div style={{ marginTop: 6, border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--card2)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: bg, borderBottom: `1px solid ${accent}33`, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            onClick={() => onTickerClick && onTickerClick('$' + data.ticker)}
+            style={{ fontSize: 16, fontWeight: 800, color: '#D4A017', background: '#FFFBEB', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(212,160,23,0.3)', cursor: onTickerClick ? 'pointer' : 'default' }}
+          >${data.ticker}</span>
+          <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--text1)', fontVariantNumeric: 'tabular-nums' }}>${data.price.toFixed(2)}</span>
+          {data.isClose && (
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', padding: '2px 6px', border: '1px solid var(--border)', borderRadius: 4 }}>Last close</span>
+          )}
+        </div>
+        {hasPct && (
+          <span style={{ fontSize: 14, fontWeight: 700, color: accent, fontVariantNumeric: 'tabular-nums' }}>
+            {up ? '▲' : '▼'} {up ? '+' : ''}{data.pct.toFixed(2)}%
+          </span>
+        )}
+      </div>
+      {data.volume && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 14px', borderBottom: data.note ? '1px solid var(--border)' : 'none' }}>
+          <span style={{ fontSize: 12, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Volume</span>
+          <span style={{ fontSize: 14, color: 'var(--text1)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{data.volume} shares</span>
+        </div>
+      )}
+      {data.note && (
+        <div style={{ padding: '10px 14px', fontSize: 13, color: 'var(--text2)', lineHeight: 1.6 }}>
+          {renderBulletedNote(data.note)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Split inline "• a • b • c" into separated rows; paragraphs without bullets render as-is.
+function renderBulletedNote(text) {
+  if (!text) return null;
+  // Normalize: ensure a bullet at the start of each bullet chunk
+  const hasBullets = /[•●]/.test(text);
+  if (!hasBullets) {
+    return text.split(/\n+/).map((line, i) => <div key={i} style={{ marginBottom: 4 }}>{line}</div>);
+  }
+  // Split on bullets, keeping the delimiter off
+  const parts = text.split(/\s*[•●]\s*/).map(s => s.trim()).filter(Boolean);
+  // If the first part is prose (no bullet prefix in original), keep it as an intro paragraph
+  const startsWithBullet = /^\s*[•●]/.test(text);
+  const intro = !startsWithBullet ? parts.shift() : null;
+  return (
+    <>
+      {intro && <div style={{ marginBottom: 8 }}>{intro}</div>}
+      {parts.map((p, i) => (
+        <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'flex-start' }}>
+          <span style={{ color: '#8B5CF6', fontWeight: 700, lineHeight: 1.6 }}>•</span>
+          <span style={{ flex: 1 }}>{p}</span>
+        </div>
+      ))}
+    </>
+  );
+}
+
+// ── Valuation card parser ──
+// Matches replies like "AAPL — P/E: 32, PEG: 2.1, Net Margin: 25%, Sales Growth: 8%"
+function parseValuationCard(text) {
+  if (!text) return null;
+  if (!/P\/E/i.test(text)) return null;
+  const tickerM = text.match(/\b([A-Z]{1,5})\b/);
+  const pe = text.match(/P\/E[:\s]+([\d.]+)/i);
+  const peg = text.match(/PEG[:\s]+([\d.]+)/i);
+  const netM = text.match(/Net Margin[:\s]+([\d.]+)\s*%/i);
+  const sales = text.match(/Sales Growth[:\s]+([-\d.]+)\s*%/i);
+  const epsG = text.match(/EPS Growth[:\s]+([-\d.]+)\s*%/i);
+  if (!tickerM || !pe) return null;
+  return {
+    ticker: tickerM[1],
+    pe: parseFloat(pe[1]),
+    peg: peg ? parseFloat(peg[1]) : null,
+    netMargin: netM ? parseFloat(netM[1]) : null,
+    salesGrowth: sales ? parseFloat(sales[1]) : null,
+    epsGrowth: epsG ? parseFloat(epsG[1]) : null,
+  };
+}
+
+function ValuationCard({ data, onTickerClick }) {
+  const row = { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '8px 12px', borderBottom: '1px solid var(--border)' };
+  const lbl = { fontSize: 12, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 };
+  const val = { fontSize: 15, color: 'var(--text1)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' };
+  const signColor = (v) => v == null ? 'var(--text1)' : (v >= 0 ? '#1AAD5E' : '#E05252');
+  const fmtPct = (v) => v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+  return (
+    <div style={{ marginTop: 6, border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--card2)' }}>
+      <div style={{ padding: '10px 12px', background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span
+          onClick={() => onTickerClick && onTickerClick('$' + data.ticker)}
+          style={{ fontSize: 16, fontWeight: 800, color: '#D4A017', background: '#FFFBEB', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(212,160,23,0.3)', cursor: onTickerClick ? 'pointer' : 'default' }}
+        >${data.ticker}</span>
+        <span style={{ fontSize: 12, color: '#6D28D9', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Valuation</span>
+      </div>
+      <div style={row}><span style={lbl}>P/E</span><span style={val}>{data.pe.toFixed(1)}</span></div>
+      {data.peg != null && <div style={row}><span style={lbl}>PEG</span><span style={val}>{data.peg.toFixed(2)}</span></div>}
+      {data.netMargin != null && <div style={row}><span style={lbl}>Net Margin</span><span style={val}>{data.netMargin.toFixed(1)}%</span></div>}
+      {data.salesGrowth != null && <div style={row}><span style={lbl}>Sales Growth</span><span style={{ ...val, color: signColor(data.salesGrowth) }}>{fmtPct(data.salesGrowth)}</span></div>}
+      {data.epsGrowth != null && <div style={{ ...row, borderBottom: 'none' }}><span style={lbl}>EPS Growth</span><span style={{ ...val, color: signColor(data.epsGrowth) }}>{fmtPct(data.epsGrowth)}</span></div>}
+    </div>
+  );
+}
+
+// ── Options flow card parser ──
+// Matches "$AAPL 200C 4/18 — $2.1M premium, bullish"
+function parseOptionsFlowCard(text) {
+  if (!text) return null;
+  const m = text.match(/\$?\b([A-Z]{1,5})\b\s+(\d+(?:\.\d+)?)\s*([CP])\s+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s*[—–-]\s*\$?([\d.]+)\s*([KMB])\s*(?:premium)?/i);
+  if (!m) return null;
+  const sent = /bullish/i.test(text) ? 'bullish' : /bearish/i.test(text) ? 'bearish' : null;
+  return {
+    ticker: m[1], strike: parseFloat(m[2]), side: m[3].toUpperCase(),
+    expiry: m[4], premium: parseFloat(m[5]), unit: m[6].toUpperCase(), sentiment: sent,
+  };
+}
+
+function OptionsFlowCard({ data, onTickerClick }) {
+  const bull = data.sentiment === 'bullish' || (data.side === 'C' && data.sentiment !== 'bearish');
+  const accent = bull ? '#1AAD5E' : '#E05252';
+  const bg = bull ? 'rgba(26,173,94,0.08)' : 'rgba(224,82,82,0.08)';
+  const row = { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '8px 12px', borderBottom: '1px solid var(--border)' };
+  const lbl = { fontSize: 12, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 };
+  const val = { fontSize: 15, color: 'var(--text1)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' };
+  return (
+    <div style={{ marginTop: 6, border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--card2)' }}>
+      <div style={{ padding: '10px 12px', background: bg, borderBottom: `1px solid ${accent}33`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span
+          onClick={() => onTickerClick && onTickerClick('$' + data.ticker)}
+          style={{ fontSize: 16, fontWeight: 800, color: '#D4A017', background: '#FFFBEB', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(212,160,23,0.3)', cursor: onTickerClick ? 'pointer' : 'default' }}
+        >${data.ticker}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          {bull ? '▲ Bullish Flow' : '▼ Bearish Flow'}
+        </span>
+      </div>
+      <div style={row}><span style={lbl}>Contract</span><span style={val}>{data.strike} {data.side === 'C' ? 'Call' : 'Put'}</span></div>
+      <div style={row}><span style={lbl}>Expiry</span><span style={val}>{data.expiry}</span></div>
+      <div style={{ ...row, borderBottom: 'none' }}><span style={lbl}>Premium</span><span style={{ ...val, color: accent }}>${data.premium}{data.unit}</span></div>
     </div>
   );
 }
@@ -126,9 +365,15 @@ const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven, onTic
           <span style={styles.msgTime}>{formatTime(msg.created_at)}</span>
         </div>
         {(() => {
-          const earnings = isAI ? parseEarningsCard(msg.text) : null;
-          if (earnings) {
-            return <EarningsCard data={earnings} onTickerClick={onTickerClick} />;
+          if (isAI) {
+            const earnings = parseEarningsCard(msg.text);
+            if (earnings) return <EarningsCard data={earnings} onTickerClick={onTickerClick} />;
+            const valuation = parseValuationCard(msg.text);
+            if (valuation) return <ValuationCard data={valuation} onTickerClick={onTickerClick} />;
+            const flow = parseOptionsFlowCard(msg.text);
+            if (flow) return <OptionsFlowCard data={flow} onTickerClick={onTickerClick} />;
+            const quote = parsePriceQuoteCard(msg.text);
+            if (quote) return <PriceQuoteCard data={quote} onTickerClick={onTickerClick} />;
           }
           return <div style={styles.msgText}>{parseText(msg.text, isAI ? onTickerClick : null)}</div>;
         })()}
@@ -1002,11 +1247,31 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     if (!lastAI) return [];
     const ticker = aiLastTicker;
     if (!ticker || COMMON_WORDS.has(ticker)) return [];
+    const text = lastAI.text;
     const chips = [];
-    if (!/earnings/i.test(lastAI.text)) chips.push(`How did ${ticker}'s last earnings go?`);
-    if (!/compare/i.test(lastAI.text)) chips.push(`Compare ${ticker} to competitors`);
-    chips.push(`Is ${ticker} a good buy right now?`);
-    return chips.slice(0, 2);
+    // Context-aware branching off the last answer's content
+    if (/EPS|earnings|beat|miss/i.test(text)) {
+      chips.push(`What's ${ticker}'s next catalyst?`);
+      chips.push(`How did ${ticker} guide forward?`);
+    } else if (/P\/E|PEG|margin|valuation/i.test(text)) {
+      chips.push(`Is ${ticker} overvalued vs peers?`);
+      chips.push(`Compare ${ticker} to its sector`);
+    } else if (/call|put|premium|flow|options/i.test(text)) {
+      chips.push(`Show more ${ticker} unusual flow`);
+      chips.push(`What does the dark pool say on ${ticker}?`);
+    } else if (/support|resistance|breakout|chart/i.test(text)) {
+      chips.push(`What's ${ticker}'s next key level?`);
+      chips.push(`Is ${ticker} in a trend?`);
+    } else if (/last close|closing price|volume|shares/i.test(text)) {
+      chips.push(`How did ${ticker}'s last earnings go?`);
+      chips.push(`What's ${ticker}'s next catalyst?`);
+      chips.push(`Any unusual flow on ${ticker}?`);
+    } else {
+      if (!/earnings/i.test(text)) chips.push(`How did ${ticker}'s last earnings go?`);
+      if (!/compare/i.test(text)) chips.push(`Compare ${ticker} to competitors`);
+      chips.push(`Is ${ticker} a good buy right now?`);
+    }
+    return chips.slice(0, 3);
   }, [messages, aiLastTicker, aiLoading]);
 
   // Handle ticker click from AI responses
