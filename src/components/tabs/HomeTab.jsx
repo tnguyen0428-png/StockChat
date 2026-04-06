@@ -10,12 +10,30 @@ import { isWeekend, isMarketHoliday, isMarketOpen, isAfterHours } from '../../ut
 import { askUpTikAI } from '../../lib/aiAgent';
 import CreateGroupModal from '../shared/CreateGroupModal';
 import InviteModal from '../shared/InviteModal';
+import FadingMessage from '../shared/FadingMessage';
 
 const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
 const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 
 // ── Popular tickers for new user onboarding ──
 const POPULAR_TICKERS = ['NVDA', 'AAPL', 'TSLA', 'AMD', 'SPY', 'META'];
+
+// ── Onboarding sector picks ──
+const ONBOARD_TRENDING = [
+  { symbol: 'NVDA', name: 'Nvidia' },
+  { symbol: 'TSLA', name: 'Tesla' },
+  { symbol: 'AAPL', name: 'Apple' },
+  { symbol: 'AMD', name: 'AMD' },
+  { symbol: 'SPY', name: 'S&P 500 ETF' },
+  { symbol: 'META', name: 'Meta' },
+];
+const ONBOARD_SECTORS = [
+  { name: 'Technology', color: '#4CAF50', tickers: ['MSFT', 'GOOG', 'AMZN', 'CRM', 'INTC'] },
+  { name: 'Energy', color: '#FF9800', tickers: ['XOM', 'CVX', 'OXY', 'SLB'] },
+  { name: 'Healthcare', color: '#E91E63', tickers: ['JNJ', 'UNH', 'PFE', 'ABBV'] },
+  { name: 'Finance', color: '#2196F3', tickers: ['JPM', 'BAC', 'GS', 'V'] },
+  { name: 'Consumer', color: '#9C27B0', tickers: ['DIS', 'NKE', 'SBUX', 'MCD'] },
+];
 
 export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePress, onTabChange, scrollToChatRef }) {
   const { publicGroups, privateGroup, activeGroup, profile, customGroups } = useGroup();
@@ -48,11 +66,26 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   const [showInviteGroup, setShowInviteGroup]   = useState(null);
 
   // ── Research / Curated Lists state ──
-  const [researchSector, setResearchSector]     = useState(null);
+  const savedSector = localStorage.getItem('uptik_last_sector');
+  const [researchSector, setResearchSectorRaw]  = useState(savedSector || null);
+  const setResearchSector = (val) => {
+    setResearchSectorRaw(val);
+    if (val) localStorage.setItem('uptik_last_sector', val);
+    else localStorage.removeItem('uptik_last_sector');
+  };
   const [researchStocks, setResearchStocks]     = useState([]);
   const [researchLoading, setResearchLoading]   = useState(false);
   const [researchExpanded, setResearchExpanded] = useState(null);
   const [researchPrices, setResearchPrices]     = useState({});
+
+  // ── Onboarding state (first-login flow) ──
+  const [showOnboarding, setShowOnboarding]     = useState(false);
+  const [onboardSelected, setOnboardSelected]   = useState(new Set());
+  const [onboardPrices, setOnboardPrices]       = useState({});
+  const [onboardSearch, setOnboardSearch]        = useState('');
+  const [onboardSearchResults, setOnboardSearchResults] = useState([]);
+  const [onboardSearchLoading, setOnboardSearchLoading] = useState(false);
+  const onboardSearchTimeout = useRef(null);
 
   // ── Chat input state (sends from Home page) ──
   const [chatInput, setChatInput]               = useState('');
@@ -102,8 +135,114 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   useEffect(() => {
     loadBriefing();
     loadMarketIndicators();
-    loadWatchlist();
+    loadWatchlist().then(() => {
+      // Restore saved sector on mount
+      const saved = localStorage.getItem('uptik_last_sector');
+      if (saved && saved !== '__mylist__') {
+        loadResearch(saved);
+      }
+    });
   }, []);
+
+  // ── First-login detection: show onboarding if watchlist is empty & never dismissed ──
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      const dismissed = localStorage.getItem('uptik_onboarding_done');
+      if (dismissed) return;
+      // Check if user has any watchlist items
+      const { data, count } = await supabase
+        .from('user_watchlist')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', session.user.id);
+      if (count === 0) {
+        setShowOnboarding(true);
+        // Fetch trending prices for onboarding display
+        fetchOnboardPrices();
+      }
+    };
+    checkOnboarding();
+  }, []);
+
+  const fetchOnboardPrices = async () => {
+    if (!FMP_KEY) return;
+    const allTickers = [
+      ...ONBOARD_TRENDING.map(t => t.symbol),
+      ...ONBOARD_SECTORS.flatMap(s => s.tickers),
+    ];
+    const unique = [...new Set(allTickers)];
+    try {
+      const results = await Promise.allSettled(
+        unique.map(t =>
+          fetch(`https://financialmodelingprep.com/stable/quote?symbol=${t}&apikey=${FMP_KEY}`)
+            .then(r => r.json())
+        )
+      );
+      const prices = {};
+      results.forEach(r => {
+        if (r.status === 'fulfilled' && Array.isArray(r.value) && r.value[0]) {
+          const q = r.value[0];
+          if (q.symbol && q.price) prices[q.symbol] = { price: q.price, change: q.changePercentage };
+        }
+      });
+      setOnboardPrices(prices);
+    } catch (err) {
+      console.error('[Onboard] Price fetch error:', err.message);
+    }
+  };
+
+  const toggleOnboardTicker = (symbol) => {
+    setOnboardSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(symbol)) next.delete(symbol);
+      else next.add(symbol);
+      return next;
+    });
+  };
+
+  const handleOnboardSearch = (val) => {
+    setOnboardSearch(val);
+    if (onboardSearchTimeout.current) clearTimeout(onboardSearchTimeout.current);
+    if (val.length < 1) { setOnboardSearchResults([]); return; }
+    setOnboardSearchLoading(true);
+    onboardSearchTimeout.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://api.polygon.io/v3/reference/tickers?search=${val}&active=true&limit=6&apiKey=${POLYGON_KEY}`
+        );
+        const data = await res.json();
+        setOnboardSearchResults((data.results || []).map(t => ({
+          symbol: t.ticker, name: t.name,
+        })));
+      } catch { setOnboardSearchResults([]); }
+      setOnboardSearchLoading(false);
+    }, 300);
+  };
+
+  const finishOnboarding = async () => {
+    const tickers = [...onboardSelected];
+    localStorage.setItem('uptik_onboarding_done', '1');
+    setShowOnboarding(false);
+    // Batch add all selected tickers to watchlist
+    if (tickers.length > 0) {
+      const groupId = activeGroup?.id || publicGroups[0]?.id;
+      const inserts = tickers.map(symbol => ({
+        user_id: session.user.id,
+        group_id: groupId,
+        symbol,
+      }));
+      const { data } = await supabase.from('user_watchlist').insert(inserts).select();
+      if (data) {
+        setWatchlist(data);
+        fetchResearchPrices(tickers);
+        showToast(`${tickers.length} stock${tickers.length > 1 ? 's' : ''} added to My List!`);
+      }
+    }
+  };
+
+  const skipOnboarding = () => {
+    localStorage.setItem('uptik_onboarding_done', '1');
+    setShowOnboarding(false);
+  };
 
   useEffect(() => {
     if (publicGroups.length > 0) {
@@ -438,6 +577,16 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
       .order('created_at', { ascending: true });
     if (data) {
       setWatchlist(data);
+      // Restore My List view if it was the last-opened pill
+      const saved = localStorage.getItem('uptik_last_sector');
+      if (saved === '__mylist__' && data.length > 0) {
+        setResearchSectorRaw('__mylist__');
+        setResearchStocks(data.map((w, i) => ({
+          id: w.id, ticker: w.symbol, ranking: i + 1,
+          score: null, thesis: null, notes: null, _isWatchlist: true,
+        })));
+        fetchResearchPrices(data.map(w => w.symbol));
+      }
     }
   };
 
@@ -564,6 +713,136 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
         </div>
       )}
 
+      {/* ═══ ONBOARDING OVERLAY (first login only) ═══ */}
+      {showOnboarding && (
+        <div style={OB.overlay}>
+          {/* Welcome */}
+          <div style={OB.header}>
+            <div style={OB.wave}>👋</div>
+            <div style={OB.title}>Welcome to UpTik!</div>
+            <div style={OB.sub}>Pick some stocks to watch. You'll get live prices, alerts, and see what the community says about them.</div>
+          </div>
+
+          {/* Progress */}
+          <div style={OB.progress}>
+            <span style={OB.count}><span style={{ color: '#2a7d4b' }}>{onboardSelected.size}</span> selected</span>
+            <div style={OB.barTrack}>
+              <div style={{ ...OB.barFill, width: `${Math.min((onboardSelected.size / 5) * 100, 100)}%` }} />
+            </div>
+            <span style={{ fontSize: 11, color: '#7a8ea3' }}>min 1</span>
+          </div>
+
+          {/* Search */}
+          <div style={OB.search}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7a8ea3" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input
+              style={OB.searchInput}
+              placeholder="Search any ticker or company..."
+              value={onboardSearch}
+              onChange={e => handleOnboardSearch(e.target.value)}
+            />
+            {onboardSearch && (
+              <span style={{ color: '#7a8ea3', cursor: 'pointer', fontSize: 16 }} onClick={() => { setOnboardSearch(''); setOnboardSearchResults([]); }}>×</span>
+            )}
+          </div>
+
+          {/* Search results */}
+          {onboardSearchResults.length > 0 && (
+            <div style={OB.searchResults}>
+              {onboardSearchResults.map(r => (
+                <div key={r.symbol} style={OB.searchItem}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2d4a' }}>{r.symbol}</div>
+                    <div style={{ fontSize: 10, color: '#7a8ea3' }}>{r.name}</div>
+                  </div>
+                  {onboardSelected.has(r.symbol) ? (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#2a7d4b', padding: '4px 12px' }}>Added ✓</span>
+                  ) : (
+                    <button style={OB.searchAddBtn} onClick={() => toggleOnboardTicker(r.symbol)}>+ Add</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {onboardSearchLoading && <div style={{ padding: '8px 20px', fontSize: 11, color: '#7a8ea3' }}>Searching...</div>}
+
+          {/* Scrollable picks area */}
+          <div style={OB.scrollArea}>
+            {/* Trending */}
+            <div style={OB.section}>
+              <div style={OB.sectionTitle}>
+                <span style={{ fontSize: 14 }}>🔥</span> Trending Now
+              </div>
+              <div style={OB.trendingGrid}>
+                {ONBOARD_TRENDING.map(t => {
+                  const sel = onboardSelected.has(t.symbol);
+                  const p = onboardPrices[t.symbol];
+                  const chg = p?.change;
+                  return (
+                    <div
+                      key={t.symbol}
+                      style={{ ...OB.trendingChip, ...(sel ? OB.trendingChipSel : {}) }}
+                      onClick={() => toggleOnboardTicker(t.symbol)}
+                    >
+                      <span style={OB.tcTicker}>{t.symbol}</span>
+                      {chg != null && (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: chg >= 0 ? '#2a7d4b' : '#e05252' }}>
+                          {chg >= 0 ? '+' : ''}{chg.toFixed(2)}%
+                        </span>
+                      )}
+                      <span style={{ fontSize: sel ? 13 : 16, color: sel ? '#2a7d4b' : '#b0bec5' }}>
+                        {sel ? '✓' : '+'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Sectors */}
+            <div style={OB.section}>
+              <div style={OB.sectionTitle}>
+                <span style={{ fontSize: 14 }}>📊</span> Browse by Sector
+              </div>
+              {ONBOARD_SECTORS.map(sector => (
+                <div key={sector.name} style={OB.sectorGroup}>
+                  <div style={OB.sectorLabel}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: sector.color, display: 'inline-block' }} />
+                    {sector.name}
+                  </div>
+                  <div style={OB.sectorStocks}>
+                    {sector.tickers.map(t => {
+                      const sel = onboardSelected.has(t);
+                      return (
+                        <div
+                          key={t}
+                          style={{ ...OB.sectorStock, ...(sel ? OB.sectorStockSel : {}) }}
+                          onClick={() => toggleOnboardTicker(t)}
+                        >
+                          {t} <span style={{ fontSize: 13, color: sel ? '#2a7d4b' : '#c0c8d0' }}>{sel ? '✓' : '+'}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer CTA */}
+          <div style={OB.footer}>
+            <button
+              style={{ ...OB.cta, ...(onboardSelected.size === 0 ? { opacity: 0.5 } : {}) }}
+              onClick={finishOnboarding}
+              disabled={onboardSelected.size === 0}
+            >
+              Build My Watchlist{onboardSelected.size > 0 ? ` (${onboardSelected.size})` : ''} →
+            </button>
+            <div style={OB.skip} onClick={skipOnboarding}>Skip for now</div>
+          </div>
+        </div>
+      )}
+
       {/* ═══ SLIM HEADER ═══ */}
       <div style={S.header}>
         <div style={S.hLeft}>
@@ -622,55 +901,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
       {/* ═══ SCROLLABLE CONTENT ═══ */}
       <div style={S.content}>
 
-        {/* ── WATCHLIST SEARCH (appears when adding tickers) ── */}
-        {showSearch && (
-          <div style={S.searchOverlay}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#132d52' }}>Add to My List</span>
-              <span style={{ fontSize: 12, color: '#2a7d4b', fontWeight: 500, cursor: 'pointer' }} onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults([]); }}>Done</span>
-            </div>
-            <div style={S.searchBarLight}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a8ea3" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-              <input
-                ref={searchRef}
-                style={S.searchInputLight}
-                placeholder="Search ticker or company..."
-                value={searchQuery}
-                onChange={e => handleSearchChange(e.target.value)}
-                autoFocus
-              />
-              {searchQuery && (
-                <span style={{ color: '#7a8ea3', cursor: 'pointer', fontSize: 16 }} onClick={() => { setSearchQuery(''); setSearchResults([]); }}>×</span>
-              )}
-            </div>
-            {!searchQuery && (
-              <div style={{ ...S.wlPopRow, marginTop: 8 }}>
-                <span style={S.wlPopLabel}>Popular:</span>
-                {POPULAR_TICKERS.map(t => (
-                  <span key={t} style={{ ...S.wlPopChip, ...(addingTicker === t ? { opacity: 0.5 } : {}), ...(watchlist.some(w => w.symbol === t) ? { opacity: 0.4 } : {}) }} onClick={() => addToWatchlist(t)}>{t}</span>
-                ))}
-              </div>
-            )}
-            {searchResults.length > 0 && (
-              <div style={S.searchResultsLight}>
-                {searchResults.map(r => (
-                  <div key={r.symbol} style={S.searchItemLight}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2d4a' }}>{r.symbol}</div>
-                      <div style={{ fontSize: 10, color: '#7a8ea3' }}>{r.name}</div>
-                    </div>
-                    {r.alreadyAdded ? (
-                      <span style={{ fontSize: 11, fontWeight: 600, color: '#7a8ea3', padding: '4px 12px' }}>Added ✓</span>
-                    ) : (
-                      <button style={S.siAddBtnLight} onClick={() => { addToWatchlist(r.symbol); setSearchResults(prev => prev.map(s => s.symbol === r.symbol ? { ...s, alreadyAdded: true } : s)); }}>+ Add</button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            {searchLoading && <div style={{ padding: '8px 0', fontSize: 11, color: '#7a8ea3', textAlign: 'center' }}>Searching...</div>}
-          </div>
-        )}
+        {/* Search overlay moved inline into My List card below */}
 
         {/* ── DAILY BRIEFING (collapsible) ── */}
         <div style={S.briefSection}>
@@ -767,7 +998,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
 
           {/* Results */}
           {researchSector && (
-            <div style={S.resCard}>
+            <div style={{ ...S.resCard, ...(researchSector === '__mylist__' ? { borderRadius: '12px 12px 0 0' } : {}) }}>
               {researchLoading ? (
                 <div style={{ padding: 16, textAlign: 'center', color: '#7a8ea3', fontSize: 13 }}>Loading...</div>
               ) : researchStocks.length === 0 ? (
@@ -793,9 +1024,9 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                   <div style={S.resHeaderRow}>
                     {researchSector === '__mylist__' ? (
                       <>
-                        <span style={{ ...S.resColTicker, flex: 'none', minWidth: 60 }}>Ticker</span>
-                        <span style={{ ...S.resColScore, flex: 1, textAlign: 'center' }}>CHG%</span>
-                        <span style={S.resColPrice}>Price</span>
+                        <span style={{ ...S.resColTicker, flex: 1 }}>Ticker</span>
+                        <span style={{ ...S.resColPrice, flex: 'none', minWidth: 70, textAlign: 'right' }}>Price</span>
+                        <span style={{ ...S.resColScore, flex: 'none', minWidth: 80, textAlign: 'right' }}>CHG%</span>
                         <span style={{ minWidth: 28 }}></span>
                       </>
                     ) : (
@@ -818,27 +1049,31 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                         <div style={S.resRowTop} onClick={() => !isMyList && setResearchExpanded(isOpen ? null : stock.id)}>
                           {isMyList ? (
                             <>
-                              <span style={{ ...S.resTicker, flex: 'none', minWidth: 60 }}>{stock.ticker}</span>
-                              <span style={{ flex: 1, textAlign: 'center' }}>
+                              <span style={{ ...S.resTicker, flex: 1 }}>{stock.ticker}</span>
+                              <span style={{ ...S.resPrice, flex: 'none', minWidth: 70 }}>
+                                {priceData ? `$${priceData.price.toFixed(2)}` : '—'}
+                              </span>
+                              <span style={{ flex: 'none', minWidth: 80, textAlign: 'right' }}>
                                 {priceData ? (
                                   <span style={{
                                     fontSize: 12, fontWeight: 600,
                                     color: isUp ? '#2a7d4b' : chg < 0 ? '#e05252' : '#5a7080',
                                   }}>
-                                    {isUp ? '▲' : chg < 0 ? '▼' : ''} {chg != null ? `${isUp ? '+' : ''}${chg.toFixed(2)}%` : '—'}
+                                    {isUp ? '▲' : chg < 0 ? '▼' : ''}{chg != null ? `${isUp ? '+' : ''}${chg.toFixed(2)}%` : '—'}
                                   </span>
                                 ) : (
                                   <span style={{ fontSize: 12, color: '#7a8ea3' }}>—</span>
                                 )}
                               </span>
-                              <span style={S.resPrice}>
-                                {priceData ? `$${priceData.price.toFixed(2)}` : '—'}
-                              </span>
                               <span
                                 style={S.wlRemoveBtn}
                                 onClick={(e) => { e.stopPropagation(); removeFromWatchlist(stock.id, stock.ticker); }}
                                 title="Remove"
-                              >×</span>
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2a7d4b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
+                                </svg>
+                              </span>
                             </>
                           ) : (
                             <>
@@ -876,17 +1111,63 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                       </div>
                     );
                   })}
-                  {/* + Add Ticker button for My List */}
-                  {researchSector === '__mylist__' && (
-                    <div
-                      style={S.wlAddTicker}
-                      onClick={() => setShowSearch(true)}
-                    >
-                      <span style={{ fontSize: 14, fontWeight: 700 }}>+</span> Add Ticker
-                    </div>
-                  )}
                 </>
               )}
+            </div>
+          )}
+
+          {/* Add ticker search — below the card, always visible when My List is active */}
+          {researchSector === '__mylist__' && (
+            <div style={S.wlAddSection}>
+              <div style={S.wlAddSearchBar} onClick={() => { if (!showSearch) setShowSearch(true); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a8ea3" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                {showSearch ? (
+                  <input
+                    ref={searchRef}
+                    style={S.searchInputLight}
+                    placeholder="Search ticker or company..."
+                    value={searchQuery}
+                    onChange={e => handleSearchChange(e.target.value)}
+                    autoFocus
+                  />
+                ) : (
+                  <span style={{ fontSize: 12, color: '#7a8ea3' }}>+ Add ticker...</span>
+                )}
+                {showSearch && searchQuery && (
+                  <span style={{ color: '#7a8ea3', cursor: 'pointer', fontSize: 16 }} onClick={(e) => { e.stopPropagation(); setSearchQuery(''); setSearchResults([]); }}>×</span>
+                )}
+                <span
+                  style={S.wlAddBtn}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (showSearch) {
+                      setShowSearch(false); setSearchQuery(''); setSearchResults([]);
+                    } else {
+                      setShowSearch(true);
+                    }
+                  }}
+                >
+                  {showSearch ? 'Done' : '+ Add'}
+                </span>
+              </div>
+              {showSearch && searchResults.length > 0 && (
+                <div style={{ marginTop: 6 }}>
+                  {searchResults.map(r => (
+                    <div key={r.symbol} style={S.searchItemLight}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2d4a' }}>{r.symbol}</div>
+                        <div style={{ fontSize: 10, color: '#7a8ea3' }}>{r.name}</div>
+                      </div>
+                      {r.alreadyAdded ? (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#7a8ea3', padding: '4px 12px' }}>Added ✓</span>
+                      ) : (
+                        <button style={S.siAddBtnLight} onClick={() => { addToWatchlist(r.symbol); setSearchResults(prev => prev.map(s => s.symbol === r.symbol ? { ...s, alreadyAdded: true } : s)); }}>+ Add</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {showSearch && searchLoading && <div style={{ padding: '6px 0', fontSize: 11, color: '#7a8ea3', textAlign: 'center' }}>Searching...</div>}
             </div>
           )}
         </div>
@@ -919,9 +1200,18 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
           <div style={S.chatCard}>
             <div ref={chatStripRef} style={{ ...S.ccMsgs, ...(chatExpanded ? { maxHeight: 400, overflow: 'hidden auto' } : {}) }}>
               {chatMessages.length > 0 ? (
-                chatMessages.map((msg, i) => (
-                  <ChatBubble key={msg.id || i} msg={msg} />
-                ))
+                chatMessages.map((msg, i) => {
+                  const isAI = msg.user_id === 'user_ai' || msg.type === 'ai';
+                  const isAIQuestion = msg.type === 'user' && /@AI\b/i.test(msg.text);
+                  if (isAI || isAIQuestion) {
+                    return (
+                      <FadingMessage key={msg.id || i} delay={60000} duration={5000} onRemove={() => setChatMessages(prev => prev.filter(m => m.id !== msg.id))}>
+                        <ChatBubble msg={msg} />
+                      </FadingMessage>
+                    );
+                  }
+                  return <ChatBubble key={msg.id || i} msg={msg} />;
+                })
               ) : (
                 <div style={{ padding: 16, textAlign: 'center', color: '#7a8ea3', fontSize: 13 }}>
                   No recent messages
@@ -1093,7 +1383,7 @@ const S = {
   // ── Toast ──
   toast: {
     position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)',
-    background: '#2a7d4b', color: '#fff', fontSize: 12, fontWeight: 600,
+    background: '#2a7d4b', color: '#fff', fontSize: 13, fontWeight: 600,
     padding: '8px 16px', borderRadius: 20, boxShadow: '0 4px 12px rgba(42,125,75,0.3)',
     display: 'flex', alignItems: 'center', gap: 6, zIndex: 10000,
   },
@@ -1114,7 +1404,7 @@ const S = {
     background: 'rgba(255,255,255,0.1)', padding: '2px 7px', borderRadius: 8,
   },
   statusDot: { width: 5, height: 5, borderRadius: '50%' },
-  statusText: { fontSize: 9, fontWeight: 600, letterSpacing: '0.04em' },
+  statusText: { fontSize: 10, fontWeight: 600, letterSpacing: '0.04em' },
   avatar: {
     width: 26, height: 26, borderRadius: '50%', background: 'rgba(255,255,255,0.12)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1123,18 +1413,18 @@ const S = {
   profileMenu: {
     position: 'absolute', top: 'calc(100% + 8px)', right: -4, width: 130,
     background: '#132d52', border: '1px solid rgba(255,255,255,0.15)',
-    borderRadius: 10, boxShadow: '0 6px 24px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden',
+    borderRadius: 12, boxShadow: '0 6px 24px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden',
   },
-  pmName: { fontSize: 12, fontWeight: 600, color: '#e0e0e0', padding: '9px 12px 8px', borderBottom: '1px solid rgba(255,255,255,0.1)' },
-  pmItem: { fontSize: 12, fontWeight: 500, color: '#ccc', padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)' },
+  pmName: { fontSize: 13, fontWeight: 600, color: '#e0e0e0', padding: '9px 12px 8px', borderBottom: '1px solid rgba(255,255,255,0.1)' },
+  pmItem: { fontSize: 13, fontWeight: 500, color: '#2a7d4b', padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)' },
 
   // ── Market Ticker Bar ──
   combinedBar: { background: '#1a3a5e', flexShrink: 0 },
   barContent: { padding: '6px 0', minHeight: 30 },
   barScroll: { overflow: 'hidden', display: 'flex', alignItems: 'center' },
   pulseItem: { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 12px' },
-  pulseName: { fontSize: 11, fontWeight: 500, color: '#4a6178' },
-  pulseVal: { fontSize: 11, fontWeight: 700 },
+  pulseName: { fontSize: 12, fontWeight: 500, color: '#4a6178' },
+  pulseVal: { fontSize: 12, fontWeight: 700 },
 
   // ── Content ──
   content: { flex: 1, overflowY: 'auto', paddingBottom: 56, background: '#eef2f7' },
@@ -1150,38 +1440,38 @@ const S = {
 
   // ── Watchlist / My List helpers ──
   wlPopRow: { display: 'flex', gap: 5, justifyContent: 'center', flexWrap: 'wrap' },
-  wlPopLabel: { fontSize: 10, color: '#3e5568', marginRight: 2, alignSelf: 'center' },
+  wlPopLabel: { fontSize: 11, color: '#3e5568', marginRight: 2, alignSelf: 'center' },
   wlPopChip: {
-    fontSize: 11, fontWeight: 600, color: '#8cd9a0',
-    background: 'rgba(140,217,160,0.1)', border: '1px solid rgba(140,217,160,0.2)',
+    fontSize: 12, fontWeight: 600, color: '#2a7d4b',
+    background: 'rgba(42,125,75,0.08)', border: '1px solid rgba(42,125,75,0.2)',
     borderRadius: 8, padding: '4px 10px', cursor: 'pointer',
   },
 
 
   // ── Briefing ──
-  briefSection: { padding: '10px 14px 8px' },
+  briefSection: { padding: '12px 14px 8px' },
   briefHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  briefTitle: { fontSize: 13, fontWeight: 700, color: '#1a2d4a', letterSpacing: '-0.01em' },
-  briefTime: { fontSize: 10, color: '#7a8ea3' },
-  briefToggle: { fontSize: 11, color: '#2a7d4b', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' },
+  briefTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', letterSpacing: '-0.01em' },
+  briefTime: { fontSize: 11, color: '#7a8ea3' },
+  briefToggle: { fontSize: 12, color: '#2a7d4b', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' },
   briefCard: {
-    background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
+    background: '#fff', border: '1px solid #d8e2ed', borderRadius: 12,
     padding: '10px 12px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10,
   },
-  bfTickers: { fontSize: 10, fontWeight: 700, color: '#2a7d4b', marginBottom: 2 },
-  bfTitle: { fontSize: 12, color: '#1a2d4a', fontWeight: 500, lineHeight: 1.3 },
-  bfLink: { color: '#2a7d4b', fontSize: 11, fontWeight: 600, textDecoration: 'none', flexShrink: 0 },
-  briefEmpty: { background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 10, padding: 16, textAlign: 'center', fontSize: 13, color: '#7a8ea3' },
+  bfTickers: { fontSize: 11, fontWeight: 700, color: '#2a7d4b', marginBottom: 2 },
+  bfTitle: { fontSize: 13, color: '#1a2d4a', fontWeight: 500, lineHeight: 1.3 },
+  bfLink: { color: '#2a7d4b', fontSize: 12, fontWeight: 600, textDecoration: 'none', flexShrink: 0 },
+  briefEmpty: { background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 12, padding: 16, textAlign: 'center', fontSize: 13, color: '#7a8ea3' },
 
   // ── Research section ──
-  resSection: { padding: '10px 14px 8px' },
+  resSection: { padding: '12px 14px 8px' },
   resHeader: { display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 },
-  resTitle: { fontSize: 13, fontWeight: 700, color: '#1a2d4a', letterSpacing: '-0.01em' },
-  resSub: { fontSize: 10, color: '#7a8ea3', fontWeight: 500 },
+  resTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', letterSpacing: '-0.01em' },
+  resSub: { fontSize: 11, color: '#7a8ea3', fontWeight: 500 },
   resPills: { display: 'flex', gap: 6, marginBottom: 8, overflowX: 'auto', scrollbarWidth: 'none' },
   resPill: {
-    flexShrink: 0, padding: '5px 14px', borderRadius: 14, fontSize: 12, fontWeight: 500,
-    cursor: 'pointer', border: '1px solid #d8e2ed', background: '#fff', color: '#4a6178',
+    flexShrink: 0, padding: '5px 14px', borderRadius: 14, fontSize: 13, fontWeight: 500,
+    cursor: 'pointer', border: '1px solid #d8e2ed', background: '#fff', color: '#2a7d4b',
   },
   resPillActive: { background: '#132d52', color: '#fff', borderColor: '#132d52' },
   resCard: {
@@ -1194,54 +1484,54 @@ const S = {
   resRowTop: {
     display: 'flex', alignItems: 'center', gap: 8,
   },
-  resRank: { fontSize: 11, fontWeight: 700, color: '#7a8ea3', minWidth: 24 },
+  resRank: { fontSize: 12, fontWeight: 700, color: '#7a8ea3', minWidth: 24 },
   resTicker: { fontSize: 13, fontWeight: 700, color: '#1a2d4a', flex: 1 },
   resScoreWrap: { flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4 },
   resScoreBadge: {
-    fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 8, textAlign: 'center',
+    fontSize: 12, fontWeight: 700, padding: '2px 10px', borderRadius: 8, textAlign: 'center',
   },
-  resPrice: { fontSize: 12, fontWeight: 600, color: '#3a5068', minWidth: 70, textAlign: 'right' },
+  resPrice: { fontSize: 13, fontWeight: 600, color: '#3a5068', minWidth: 70, textAlign: 'right' },
   resHeaderRow: {
     display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',
-    borderBottom: '1.5px solid #e2e8f0', background: '#f8fafc',
+    borderBottom: '1.5px solid #d8e2ed', background: '#f8fafc',
   },
-  resColRank: { fontSize: 10, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 24 },
-  resColTicker: { fontSize: 10, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: '0.05em', flex: 1 },
-  resColScore: { fontSize: 10, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 36, textAlign: 'center', flex: 1 },
-  resColPrice: { fontSize: 10, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 70, textAlign: 'right' },
-  resChev: { fontSize: 9, color: '#7a8ea3' },
+  resColRank: { fontSize: 11, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 24 },
+  resColTicker: { fontSize: 11, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: '0.05em', flex: 1 },
+  resColScore: { fontSize: 11, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 36, textAlign: 'center', flex: 1 },
+  resColPrice: { fontSize: 11, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 70, textAlign: 'right' },
+  resChev: { fontSize: 10, color: '#2a7d4b' },
   resExpandedBody: {
     padding: '6px 12px 8px 36px', background: '#f8fafc', borderTop: '1px solid #eef2f7',
   },
   resMetrics: {
-    fontSize: 11, color: '#2a7d4b', fontWeight: 600, lineHeight: 1.5, marginBottom: 4,
+    fontSize: 12, color: '#2a7d4b', fontWeight: 600, lineHeight: 1.5, marginBottom: 4,
   },
   resThesis: {
-    fontSize: 12, color: '#4a6178', lineHeight: 1.4,
+    fontSize: 13, color: '#4a6178', lineHeight: 1.4,
   },
 
   // ── Chat section ──
   chatSection: { padding: '12px 14px 8px' },
   csHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  csTitle: { fontSize: 13, fontWeight: 700, color: '#1a2d4a', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 6 },
-  csLive: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#2a7d4b', fontWeight: 500 },
+  csTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 6 },
+  csLive: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#2a7d4b', fontWeight: 500 },
   csLiveDot: { width: 5, height: 5, borderRadius: '50%', background: '#2a7d4b', animation: 'pulse 1.5s ease-in-out infinite' },
-  csViewAll: { fontSize: 12, color: '#2a7d4b', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' },
+  csViewAll: { fontSize: 13, color: '#2a7d4b', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' },
 
   // ── My Groups section ──
-  groupSection: { padding: '0 14px 16px' },
+  groupSection: { padding: '12px 14px 16px' },
   groupSectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   groupSectionTitle: { fontSize: 15, fontWeight: 700, color: '#132d52', letterSpacing: '-0.01em' },
   groupCreateBtn: {
-    fontSize: 12, fontWeight: 600, color: '#2a7d4b', background: 'none', border: 'none',
+    fontSize: 13, fontWeight: 600, color: '#2a7d4b', background: 'none', border: 'none',
     cursor: 'pointer', padding: '4px 0',
   },
   myGroupsPills: { display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2, justifyContent: 'center', flexWrap: 'wrap' },
   myGroupPill: {
     flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
-    borderRadius: 10, border: '1px solid #d8e2ed', background: '#fff', cursor: 'pointer',
+    borderRadius: 12, border: '1px solid #d8e2ed', background: '#fff', cursor: 'pointer',
   },
-  myGroupName: { fontSize: 13, fontWeight: 600, color: '#1a2d4a' },
+  myGroupName: { fontSize: 14, fontWeight: 600, color: '#1a2d4a' },
   groupCta: {
     display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
     background: 'linear-gradient(135deg, #f0f7f3 0%, #e8f4ec 100%)', borderRadius: 12,
@@ -1253,8 +1543,8 @@ const S = {
     border: '1px solid #c8e6d0',
   },
   groupCtaText: { flex: 1 },
-  groupCtaTitle: { fontSize: 14, fontWeight: 700, color: '#132d52', marginBottom: 2 },
-  groupCtaSub: { fontSize: 11, color: '#5a8a6a', lineHeight: 1.3 },
+  groupCtaTitle: { fontSize: 15, fontWeight: 700, color: '#132d52', marginBottom: 2 },
+  groupCtaSub: { fontSize: 12, color: '#5a8a6a', lineHeight: 1.3 },
 
   chatCard: {
     background: '#fff', border: '1px solid #d8e2ed', borderRadius: 12, overflow: 'hidden',
@@ -1274,8 +1564,8 @@ const S = {
     justifyContent: 'center', fontSize: 11, fontWeight: 600, color: '#fff', flexShrink: 0,
   },
   ccTop: { display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 1 },
-  ccName: { fontSize: 12, fontWeight: 600 },
-  ccTime: { fontSize: 10, color: '#7a8ea3', marginLeft: 'auto' },
+  ccName: { fontSize: 13, fontWeight: 600 },
+  ccTime: { fontSize: 11, color: '#7a8ea3', marginLeft: 'auto' },
   ccText: { fontSize: 13, color: '#4a6178', lineHeight: 1.4 },
   ccTk: { color: '#2a7d4b', fontWeight: 600 },
   // ccFooter replaced by fixedChatBar
@@ -1306,14 +1596,25 @@ const S = {
   // ── My List styles ──
   wlRemoveBtn: {
     minWidth: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 18, color: '#c0c8d0', cursor: 'pointer', borderRadius: '50%',
-    transition: 'color 0.15s',
+    cursor: 'pointer', borderRadius: '50%',
+    transition: 'opacity 0.15s', opacity: 0.7,
   },
-  wlAddTicker: {
-    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-    padding: '10px 12px', fontSize: 13, fontWeight: 600,
-    color: '#2a7d4b', cursor: 'pointer', borderTop: '1.5px dashed #d8e2ed',
-    background: '#f8fafc',
+  wlAddSection: {
+    padding: '8px 12px',
+    background: '#fff', border: '1px solid #d8e2ed', borderTop: 'none',
+    borderRadius: '0 0 12px 12px', marginTop: -1,
+  },
+  wlAddSearchBar: {
+    display: 'flex', alignItems: 'center', gap: 8,
+    background: '#fff', border: '1.5px solid #d8e2ed', borderRadius: 12,
+    padding: '8px 12px', cursor: 'text',
+  },
+  wlAddBtn: {
+    flexShrink: 0, marginLeft: 'auto',
+    fontSize: 12, fontWeight: 700, color: '#fff',
+    background: '#2a7d4b', border: 'none',
+    borderRadius: 12, padding: '5px 12px', cursor: 'pointer',
+    boxShadow: '0 2px 6px rgba(42,125,75,0.3)',
   },
 
   // ── Search overlay (light theme) ──
@@ -1324,23 +1625,109 @@ const S = {
   searchBarLight: {
     display: 'flex', alignItems: 'center', gap: 8,
     background: '#f5f7fa', border: '1px solid #d8e2ed',
-    borderRadius: 10, padding: '7px 12px',
+    borderRadius: 12, padding: '7px 12px',
   },
   searchInputLight: {
     flex: 1, background: 'none', border: 'none', outline: 'none',
-    fontFamily: 'inherit', fontSize: 12, color: '#1a2d4a',
+    fontFamily: 'inherit', fontSize: 13, color: '#1a2d4a',
   },
   searchResultsLight: {
     marginTop: 6, background: '#f8fafc',
-    border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden',
+    border: '1px solid #d8e2ed', borderRadius: 12, overflow: 'hidden',
   },
   searchItemLight: {
     padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     borderBottom: '1px solid #f0f3f6', cursor: 'pointer',
   },
   siAddBtnLight: {
-    fontSize: 11, fontWeight: 600, color: '#2a7d4b', background: 'rgba(42,125,75,0.08)',
-    border: '1px solid rgba(42,125,75,0.2)', borderRadius: 8, padding: '4px 12px', cursor: 'pointer',
+    fontSize: 12, fontWeight: 600, color: '#2a7d4b', background: 'rgba(42,125,75,0.08)',
+    border: '1px solid rgba(42,125,75,0.2)', borderRadius: 12, padding: '4px 12px', cursor: 'pointer',
     fontFamily: 'inherit',
+  },
+};
+
+// ═══════════════════════════════════════
+// ONBOARDING STYLES
+// ═══════════════════════════════════════
+const OB = {
+  overlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(238,242,247,0.98)', zIndex: 100,
+    display: 'flex', flexDirection: 'column', overflowY: 'auto',
+  },
+  header: { textAlign: 'center', padding: '28px 20px 4px' },
+  wave: { fontSize: 32, marginBottom: 4 },
+  title: { fontSize: 22, fontWeight: 700, color: '#132d52', marginBottom: 4, letterSpacing: '-0.02em' },
+  sub: { fontSize: 13, color: '#5a7080', lineHeight: 1.5, maxWidth: 320, margin: '0 auto' },
+
+  progress: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    padding: '10px 20px 4px',
+  },
+  count: { fontSize: 12, fontWeight: 600, color: '#132d52' },
+  barTrack: { flex: 1, maxWidth: 180, height: 4, background: '#d8e2ed', borderRadius: 4, overflow: 'hidden' },
+  barFill: { height: '100%', background: '#2a7d4b', borderRadius: 4, transition: 'width 0.4s ease' },
+
+  search: {
+    margin: '8px 20px 0', display: 'flex', alignItems: 'center', gap: 8,
+    background: '#fff', border: '1.5px solid #d8e2ed', borderRadius: 12, padding: '10px 14px',
+  },
+  searchInput: {
+    flex: 1, background: 'none', border: 'none', outline: 'none',
+    fontFamily: 'inherit', fontSize: 13, color: '#1a2d4a',
+  },
+  searchResults: {
+    margin: '6px 20px 0', background: '#fff', border: '1px solid #d8e2ed',
+    borderRadius: 10, overflow: 'hidden',
+  },
+  searchItem: {
+    padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    borderBottom: '1px solid #f0f3f6',
+  },
+  searchAddBtn: {
+    fontSize: 11, fontWeight: 600, color: '#2a7d4b', background: 'rgba(42,125,75,0.08)',
+    border: '1px solid rgba(42,125,75,0.2)', borderRadius: 8, padding: '4px 12px',
+    cursor: 'pointer', fontFamily: 'inherit',
+  },
+
+  scrollArea: { flex: 1, overflowY: 'auto', paddingBottom: 8 },
+
+  section: { padding: '12px 20px 4px' },
+  sectionTitle: {
+    fontSize: 12, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase',
+    letterSpacing: '0.08em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6,
+  },
+
+  trendingGrid: { display: 'flex', gap: 8, flexWrap: 'wrap' },
+  trendingChip: {
+    display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 12,
+    background: '#fff', border: '1.5px solid #d8e2ed', cursor: 'pointer', transition: 'all 0.2s',
+  },
+  trendingChipSel: { borderColor: '#2a7d4b', background: 'rgba(42,125,75,0.06)' },
+  tcTicker: { fontSize: 13, fontWeight: 700, color: '#132d52' },
+
+  sectorGroup: { marginBottom: 14 },
+  sectorLabel: {
+    fontSize: 11, fontWeight: 600, color: '#5a7080', marginBottom: 6, paddingLeft: 2,
+    display: 'flex', alignItems: 'center', gap: 5,
+  },
+  sectorStocks: { display: 'flex', gap: 6, flexWrap: 'wrap' },
+  sectorStock: {
+    padding: '6px 12px', borderRadius: 12, background: '#fff', border: '1px solid #d8e2ed',
+    fontSize: 12, fontWeight: 600, color: '#1a2d4a', cursor: 'pointer', transition: 'all 0.2s',
+    display: 'flex', alignItems: 'center', gap: 5,
+  },
+  sectorStockSel: { borderColor: '#2a7d4b', background: 'rgba(42,125,75,0.08)', color: '#2a7d4b' },
+
+  footer: { padding: '12px 20px 20px', display: 'flex', flexDirection: 'column', gap: 8 },
+  cta: {
+    width: '100%', padding: 14, border: 'none', borderRadius: 14,
+    fontFamily: 'inherit', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+    background: '#2a7d4b', color: '#fff', boxShadow: '0 4px 16px rgba(42,125,75,0.25)',
+    transition: 'all 0.2s',
+  },
+  skip: {
+    textAlign: 'center', fontSize: 13, color: '#7a8ea3', cursor: 'pointer',
+    padding: 4, fontWeight: 500,
   },
 };
