@@ -340,6 +340,41 @@ function OptionsFlowCard({ data, onTickerClick }) {
   );
 }
 
+// ── Comparison card (peers vs anchor ticker) ──
+function ComparisonCard({ data, onTickerClick }) {
+  const peers = Array.isArray(data.peers) ? data.peers : [];
+  return (
+    <div style={{ marginTop: 6, border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--card2)' }}>
+      <div style={{ padding: '10px 12px', background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            onClick={() => onTickerClick && onTickerClick('$' + data.ticker)}
+            style={{ fontSize: 16, fontWeight: 800, color: '#D4A017', background: '#FFFBEB', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(212,160,23,0.3)', cursor: onTickerClick ? 'pointer' : 'default' }}
+          >${data.ticker}</span>
+          {data.price != null && (
+            <span style={{ fontSize: 14, color: 'var(--text2)', fontVariantNumeric: 'tabular-nums' }}>${Number(data.price).toFixed(2)}</span>
+          )}
+        </div>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#6D28D9', textTransform: 'uppercase', letterSpacing: '0.5px' }}>vs peers</span>
+      </div>
+      {data.headline && (
+        <div style={{ padding: '10px 12px', fontSize: 13, color: 'var(--text1)', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>
+          {data.headline}
+        </div>
+      )}
+      {peers.map((p, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderBottom: i < peers.length - 1 ? '1px solid var(--border)' : 'none' }}>
+          <span
+            onClick={() => onTickerClick && onTickerClick('$' + p.ticker)}
+            style={{ fontSize: 12, fontWeight: 800, color: '#D4A017', background: '#FFFBEB', padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(212,160,23,0.3)', cursor: onTickerClick ? 'pointer' : 'default', flexShrink: 0, lineHeight: 1.4 }}
+          >${p.ticker}</span>
+          <span style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5, flex: 1 }}>{p.note}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Message Item ──
 const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven, onTickerClick }) => {
   const isAdmin = msg.is_admin;
@@ -405,6 +440,8 @@ const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven, onTic
                   isClose: !!cardData.isClose,
                   note,
                 }} onTickerClick={onTickerClick} />;
+              } else if (cardData.type === 'comparison') {
+                card = <ComparisonCard data={cardData} onTickerClick={onTickerClick} />;
               } else if (cardData.type === 'valuation') {
                 card = <ValuationCard data={{
                   ticker: cardData.ticker,
@@ -1313,7 +1350,12 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     const isChartProse     = /\b(support|resistance|breakout)\b.*\$[\d.]+/i.test(proseText);
     const isPriceProse     = /last close|closing price|\d+\s*[KMB]\s*shares/i.test(proseText);
 
-    if (cardType === 'earnings' || isEarningsProse) {
+    const isComparisonProse = /\b(?:vs|versus)\b.*\$?[A-Z]{1,5}/.test(proseText) || (proseText.match(/\b[A-Z]{2,5}\b/g) || []).length >= 3;
+    if (cardType === 'comparison' || (isComparisonProse && cardType !== 'earnings' && cardType !== 'valuation')) {
+      chips.push(`Which has the best margins?`);
+      chips.push(`Which is the safer bet right now?`);
+      chips.push(`Who's winning on growth?`);
+    } else if (cardType === 'earnings' || isEarningsProse) {
       chips.push(`What's ${ticker}'s next catalyst?`);
       chips.push(`How did ${ticker} guide forward?`);
     } else if (cardType === 'valuation' || isValuationProse) {

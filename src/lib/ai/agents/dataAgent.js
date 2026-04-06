@@ -200,13 +200,18 @@ When you have verified data for a ticker, START your reply with a fenced JSON bl
 {"type":"valuation","ticker":"AAPL","price":189.50,"pe":32.1,"peg":2.1,"netMargin":25.3,"salesGrowth":8.2,"epsGrowth":12.4}
 \`\`\`
 
+\`\`\`uptik
+{"type":"comparison","ticker":"KR","price":72.35,"peers":[{"ticker":"COST","note":"Premium membership moat"},{"ticker":"WMT","note":"Scale + omnichannel edge"}],"headline":"Kroger vs. the competition"}
+\`\`\`
+
 Rules for the JSON block:
 - Emit it ONLY when you have the verified numbers above. If you don't have data, skip the block entirely and just write prose.
 - "earnings" type: use when the question is about earnings/EPS/beats.
 - "price" type: use when the question is about current price/quote/volume.
 - "valuation" type: use when the question is about P/E, margins, growth.
+- "comparison" type: use when the question is about peers/competitors/versus. Include 2-4 peers with a 4-8 word note each. Use this instead of "price" for comparison questions.
 - Omit any field you don't have (don't invent). \`quarters\` can have 1-4 entries.
-- AFTER the block, write your normal 3-bullet prose analysis below.
+- AFTER the block, write your normal 3-bullet prose analysis below. KEEP BULLETS SHORT — one line each. Never leave a bullet unfinished.
 - Never emit the JSON block if you're refusing to answer or saying "I don't have data".`;
 
     return await callClaude(systemPrompt, question, history, 'auto');
