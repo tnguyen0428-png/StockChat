@@ -207,7 +207,7 @@ When you have verified data for a ticker, START your reply with a fenced JSON bl
 Rules for the JSON block:
 - ALWAYS use THREE backticks to open AND close the fence (\`\`\`uptik ... \`\`\`). Never use single backticks. Never omit the closing fence.
 - Put the JSON on its own line(s) between the fences. Valid JSON only — no trailing commas, no comments.
-- Emit it ONLY when you have the verified numbers above. If you don't have data, skip the block entirely and just write prose.
+- MANDATORY: You MUST emit the JSON block whenever your reply mentions ANY of: a price, an EPS number, a beat/miss %, a P/E, margins, growth rates, quarterly results, or peer tickers. No exceptions. If you write "$AMN — $18.20" or "beat by 5%" in prose, you must have already emitted the \`\`\`uptik block above it. Only skip the block if you genuinely have no data and are saying so.
 - "earnings" type: use when the question is about earnings/EPS/beats.
 - "price" type: use when the question is about current price/quote/volume.
 - "valuation" type: use when the question is about P/E, margins, growth.
