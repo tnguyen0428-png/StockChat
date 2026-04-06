@@ -11,6 +11,12 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.error('Missing Supabase environment variables. Check your .env file.');
 }
 
+// Admin client for scanner inserts (bypasses RLS)
+const SERVICE_ROLE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+export const supabaseAdmin = SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+  : null;
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
 import { useTheme, ChipField, DarkModeToggle } from './alertsCasinoComponents';
+import { getSmartBets, getBigMoney } from '../../lib/unusualWhales';
 
 // Scanner tag mapping: DB alert_type → UI label
 const SCANNER_TAG_MAP = { '52w_high': 'Yearly High', 'vol_surge': 'Volume Spike', 'gap_up': 'Gap Up', 'ma_cross': 'Trend Change' };
@@ -107,14 +108,19 @@ const mockSmartBets = [
   { id: "sb5", ticker: "META", company: "Meta Platforms", direction: "up", bet: "Above $560 by May 16", amount: "$34.2M", rawSize: 34.2e6, odds: "Moderate risk", unusual: true, time: mins(18), detail: "A longer-term bet of $34.2M that Meta rises above $560.", premium: "$22.50", volume: "15.2K", openInterest: "3.1K", uncertainty: "Moderate" },
 ];
 
-// Cross-reference lookups
-const bmByTicker = new Map(mockBigMoney.map(d => [d.ticker, d]));
-const sbByTicker = new Map();
-mockSmartBets.forEach(s => { if (!sbByTicker.has(s.ticker)) sbByTicker.set(s.ticker, s); });
-
-function hasBigMoneySignal(ticker) {
-  return (bmByTicker.has(ticker) && bmByTicker.get(ticker).direction === "buying") ||
-         (sbByTicker.has(ticker) && sbByTicker.get(ticker).direction === "up");
+// Cross-reference lookups — now computed dynamically inside component via useMemo
+function buildFlowLookups(bigMoney, smartBets) {
+  const bmByTicker = new Map(bigMoney.map(d => [d.ticker, d]));
+  const sbByTicker = new Map();
+  smartBets.forEach(s => { if (!sbByTicker.has(s.ticker)) sbByTicker.set(s.ticker, s); });
+  const hasBigMoneySignal = (ticker) =>
+    (bmByTicker.has(ticker) && bmByTicker.get(ticker).direction === "buying") ||
+    (sbByTicker.has(ticker) && sbByTicker.get(ticker).direction === "up");
+  const bmBuying = bigMoney.filter(d => d.direction === "buying").length;
+  const bmSelling = bigMoney.filter(d => d.direction === "selling").length;
+  const mostActive = [...bigMoney, ...smartBets].reduce((acc, x) => { acc[x.ticker] = (acc[x.ticker] || 0) + 1; return acc; }, {});
+  const topTicker = Object.entries(mostActive).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+  return { bmByTicker, sbByTicker, hasBigMoneySignal, bmBuying, bmSelling, topTicker };
 }
 
 function relTime(ts) {
@@ -130,11 +136,7 @@ function freshDotColor(ts) {
 }
 function cardOpacity(ts) { return Math.floor((now - ts) / 60000) > 15 ? 0.75 : 1; }
 
-// Flow summary line
-const bmBuying = mockBigMoney.filter(d => d.direction === "buying").length;
-const bmSelling = mockBigMoney.filter(d => d.direction === "selling").length;
-const mostActiveTicker = [...mockBigMoney, ...mockSmartBets].reduce((acc, x) => { acc[x.ticker] = (acc[x.ticker] || 0) + 1; return acc; }, {});
-const topTicker = Object.entries(mostActiveTicker).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+// Flow summary line — computed inside component now
 
 // ===== SHARED COMPONENTS =====
 function Tooltip({ text, t: theme }) {
@@ -150,8 +152,8 @@ function Tooltip({ text, t: theme }) {
   );
 }
 
-function BigMoneyBadge({ ticker, onClick, t: theme }) {
-  if (!hasBigMoneySignal(ticker)) return null;
+function BigMoneyBadge({ ticker, onClick, t: theme, checkFn }) {
+  if (!(checkFn || (() => false))(ticker)) return null;
   const green = theme?.green || "#15803d";
   const greenBg = theme?.greenBg || "#f0fdf4";
   return (
@@ -241,7 +243,7 @@ function BigMoneyCard({ trade, isExpanded, onToggle, t: theme }) {
         <span style={{ fontSize: 14, fontWeight: 700, color: text1 }}>{trade.dollarValue}</span>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: text3 }}>
-        <span>{trade.shares} shares · {trade.multiplier}x normal</span>
+        <span>{trade.shares} shares{trade.multiplier ? ` · ${trade.multiplier}x normal` : ''}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: freshDotColor(trade.time), display: "inline-block" }}/>{relTime(trade.time)}</div>
       </div>
       {isExpanded && (
@@ -319,6 +321,11 @@ export default function AlertsTab({ session, group }) {
   const [fearScore, setFearScore] = useState(null);
   const [spyData, setSpyData] = useState(null);
 
+  // ── Unusual Whales flow data ──
+  const [uwBigMoney, setUwBigMoney] = useState(null);
+  const [uwSmartBets, setUwSmartBets] = useState(null);
+  const [uwLoading, setUwLoading] = useState(true);
+
   // ── Fetch breakout_alerts + realtime ──
   useEffect(() => {
     const load = async () => {
@@ -350,6 +357,33 @@ export default function AlertsTab({ session, group }) {
     });
   }, []);
 
+  // ── Fetch Unusual Whales flow data ──
+  useEffect(() => {
+    let cancelled = false;
+    async function loadUW() {
+      setUwLoading(true);
+      try {
+        const [bm, sb] = await Promise.all([getBigMoney({ limit: 15 }), getSmartBets({ limit: 15 })]);
+        if (cancelled) return;
+        if (bm) setUwBigMoney(bm);
+        if (sb) setUwSmartBets(sb);
+      } catch (err) {
+        console.error('[UW] Failed to load flow data:', err);
+      } finally {
+        if (!cancelled) setUwLoading(false);
+      }
+    }
+    loadUW();
+    // Refresh every 2 minutes
+    const interval = setInterval(loadUW, 120_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
+  // ── Active flow data: UW real data → mock fallback ──
+  const bigMoney = uwBigMoney || mockBigMoney;
+  const smartBets = uwSmartBets || mockSmartBets;
+  const flowLookups = useMemo(() => buildFlowLookups(bigMoney, smartBets), [bigMoney, smartBets]);
+
   // ── Build display alerts: live mapped data OR mock fallback ──
   const displayAlerts = useMemo(() => {
     if (liveAlerts.length > 0) {
@@ -374,8 +408,8 @@ export default function AlertsTab({ session, group }) {
   const selectedAlert = selectedChipId ? sorted.find(a => a.id === selectedChipId) : null;
 
   // Flow data
-  let flowBM = flowTickerFilter ? mockBigMoney.filter(d => d.ticker === flowTickerFilter) : mockBigMoney;
-  let flowSB = flowTickerFilter ? mockSmartBets.filter(s => s.ticker === flowTickerFilter) : mockSmartBets;
+  let flowBM = flowTickerFilter ? bigMoney.filter(d => d.ticker === flowTickerFilter) : bigMoney;
+  let flowSB = flowTickerFilter ? smartBets.filter(s => s.ticker === flowTickerFilter) : smartBets;
   if (flowSort === "size") { flowBM = [...flowBM].sort((a,b) => b.rawDollar - a.rawDollar); flowSB = [...flowSB].sort((a,b) => b.rawSize - a.rawSize); }
   else { flowBM = [...flowBM].sort((a,b) => b.time - a.time); flowSB = [...flowSB].sort((a,b) => b.time - a.time); }
   const flowList = flowTab === "bigmoney" ? flowBM : flowSB;
@@ -450,7 +484,7 @@ export default function AlertsTab({ session, group }) {
                   </div>
                 </div>
                 <div style={{ fontSize: 13, color: t.text3, marginBottom: 6, fontFamily: "'DM Sans', sans-serif" }}>{selectedAlert.company}</div>
-                <BigMoneyBadge ticker={selectedAlert.ticker} onClick={openFlowForTicker} t={t} />
+                <BigMoneyBadge ticker={selectedAlert.ticker} onClick={openFlowForTicker} t={t} checkFn={flowLookups.hasBigMoneySignal} />
                 <div style={{ fontSize: 11, fontWeight: 600, color: t.text3, textTransform: 'uppercase', letterSpacing: '1px', marginTop: 8, marginBottom: 4, fontFamily: "'Outfit', sans-serif" }}>Why it's alerting</div>
                 {selectedAlert.whyAlerting.map((w, i) => (
                   <div key={i} style={{
@@ -553,11 +587,11 @@ export default function AlertsTab({ session, group }) {
             <button onClick={()=>setShowFlow(!showFlow)} style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: t.text1 }}>🏦 Institutional Flow</span>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: t.surfaceAlt, color: t.text2 }}>{mockBigMoney.length + mockSmartBets.length}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: t.surfaceAlt, color: t.text2 }}>{bigMoney.length + smartBets.length}{uwBigMoney ? '' : ' ⚡'}</span>
               </div>
               <span style={{ fontSize: 18, color: t.text3, transition: "transform .2s", transform: showFlow?"rotate(180deg)":"rotate(0deg)" }}>▾</span>
             </button>
-            {!showFlow && <p style={{ margin: 0, padding: "0 16px 12px", fontSize: 11, color: t.text3 }}>{bmBuying} buying · {bmSelling} selling · {topTicker} most active</p>}
+            {!showFlow && <p style={{ margin: 0, padding: "0 16px 12px", fontSize: 11, color: t.text3 }}>{flowLookups.bmBuying} buying · {flowLookups.bmSelling} selling · {flowLookups.topTicker} most active{!uwBigMoney ? ' (sample data)' : ''}</p>}
             {showFlow && (
               <div style={{ padding: "0 12px 12px" }}>
                 {flowTickerFilter && (
