@@ -3,11 +3,34 @@ import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
 import { useTheme, ChipField, DarkModeToggle } from './alertsCasinoComponents';
 
-// Scanner tag mapping: DB alert_type → UI label
-const SCANNER_TAG_MAP = { '52w_high': 'Yearly High', 'vol_surge': 'Volume Spike', 'gap_up': 'Gap Up', 'ma_cross': 'Trend Change' };
+// Default scanner tag mapping (used as fallback before DB alert_types load)
+const DEFAULT_TAG_MAP = { '52w_high': 'Yearly High', 'vol_surge': 'Volume Spike', 'gap_up': 'Gap Up', 'ma_cross': 'Trend Change', 'vcp': 'VCP Pattern', 'flow_signal': 'Flow Signal' };
+
+// Sector display labels
+const SECTOR_LABELS = {
+  'AI_INFRA_COOLING': 'AI Cooling', 'AI_INFRA_COMPUTE': 'AI Compute', 'AI_INFRA_POWER': 'AI Power',
+  'NUCLEAR_ENERGY': 'Nuclear', 'GRID_POWER': 'Grid/Power', 'SEMICONDUCTORS_HBM': 'Memory/HBM',
+  'PHOTONICS_OPTICAL': 'Photonics', 'AGENTIC_AI': 'Agentic AI', 'DEFENSE_AI': 'Defense AI',
+  'QUANTUM': 'Quantum', 'ROBOTICS': 'Robotics', 'SPACE_SAT': 'Space/Sat',
+  'BIOTECH_AI': 'Biotech AI', 'ENERGY_STORAGE': 'Energy Storage',
+};
+
+const SECTOR_COLORS = {
+  'AI_INFRA_COOLING': '#06B6D4', 'AI_INFRA_COMPUTE': '#8B5CF6', 'AI_INFRA_POWER': '#F59E0B',
+  'NUCLEAR_ENERGY': '#10B981', 'GRID_POWER': '#EF4444', 'SEMICONDUCTORS_HBM': '#3B82F6',
+  'PHOTONICS_OPTICAL': '#EC4899', 'AGENTIC_AI': '#6366F1', 'DEFENSE_AI': '#78716C',
+  'QUANTUM': '#A855F7', 'ROBOTICS': '#F97316', 'SPACE_SAT': '#0EA5E9',
+  'BIOTECH_AI': '#84CC16', 'ENERGY_STORAGE': '#FBBF24',
+};
+
+const CONVICTION_CONFIG = {
+  'very_high': { label: 'Very High', emoji: '🔥🔥', color: '#DC2626', bg: '#FEF2F2' },
+  'high':      { label: 'High',      emoji: '🔥',   color: '#F59E0B', bg: '#FFFBEB' },
+  'standard':  { label: 'Standard',  emoji: '',      color: '#64748B', bg: '#F8FAFC' },
+};
 
 // Map a raw Supabase breakout_alerts row to the redesign card format
-function mapDbAlert(a, spyData) {
+function mapDbAlert(a, spyData, tagMap) {
   const ticker = a.ticker ?? a.tickers?.[0] ?? '—';
   const type = a.signal_type ?? a.alert_type ?? 'vol_surge';
   const rawVol = a.volume ?? a.current_volume;
@@ -43,98 +66,69 @@ function mapDbAlert(a, spyData) {
 
   const vsSpy = a.rsVsSpy ?? (change != null && spyData?.change ? Number(change) - Number(spyData.change) : null);
 
+  // Use dynamic tag map for label
+  const scannerTag = tagMap[type] || type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
   // Generate whyAlerting bullets
   const whyAlerting = [];
-  if (signal) whyAlerting.push({ icon: "📊", label: SCANNER_TAG_MAP[type] || type, text: signal });
+  if (signal) whyAlerting.push({ icon: "📊", label: scannerTag, text: signal });
   if (volume) whyAlerting.push({ icon: "🔥", label: "Volume", text: `${volume} shares traded${avgVolume ? ` (avg: ${avgVolume})` : ''}` });
   if (confidence >= 80) whyAlerting.push({ icon: "✅", label: "Strong Setup", text: "Technical indicators look positive" });
   else whyAlerting.push({ icon: "🔍", label: "Watch Closely", text: "Moderate signal — monitor for confirmation" });
 
+  // Conviction badge
+  const conviction = a.conviction || 'standard';
+  const convInfo = CONVICTION_CONFIG[conviction] || CONVICTION_CONFIG.standard;
+
+  // Sector label
+  const sectorKey = a.sector || null;
+  const sectorLabel = sectorKey ? (SECTOR_LABELS[sectorKey] || sectorKey.replace(/_/g, ' ')) : '—';
+  const sectorColor = sectorKey ? (SECTOR_COLORS[sectorKey] || '#64748B') : null;
+
   return {
     ...a, id: a.id, ticker, company: a.name ?? ticker, price: a.price != null ? Number(a.price) : 0,
     change: change != null ? Number(change) : 0, changePercent: change != null ? Number(change) : 0,
-    time, scannerTag: SCANNER_TAG_MAP[type] || 'Alert', volume: volume ?? '—', avgVolume: avgVolume ?? '—',
+    time, scannerTag, volume: volume ?? '—', avgVolume: avgVolume ?? '—',
     vsSpy: vsSpy ?? 0, confidence, support: support != null ? Number(support) : 0, resistance: resistance != null ? Number(resistance) : 0,
-    sector: a.sector ?? '—', marketCap: '—', description: a.context ?? '',
+    sector: sectorLabel, sectorKey, sectorColor, sectorTier: a.sector_tier ?? null,
+    conviction, convictionLabel: convInfo.label, convictionEmoji: convInfo.emoji,
+    convictionColor: convInfo.color, convictionBg: convInfo.bg,
+    marketCap: '—', description: a.context ?? '',
     whyAlerting: whyAlerting.length > 0 ? whyAlerting : [{ icon: "📊", label: "Alert", text: "Breakout signal detected" }],
     isAlertOfDay: false, _isLive: true,
   };
 }
 
-// ===== MOCK ALERTS (fallback — Thursday Apr 3 closing prices) =====
-const mockAlerts = [
-  { id: 1, ticker: "TSLA", company: "Tesla Inc", price: 360.59, change: -20.67, changePercent: -5.42, time: "4:00 PM", scannerTag: "Volume Spike", volume: "82.5M", avgVolume: "58.3M", vsSpy: -5.51, confidence: 85, support: 340.00, resistance: 381.26, sector: "Electric Vehicles", marketCap: "$1.35T", description: "Manufactures electric vehicles and energy storage systems.", whyAlerting: [{ icon: "🔥", label: "Volume Surge", text: "82.5M shares traded — well above average" }, { icon: "⚠️", label: "Sharp Move", text: "Dropped $20.67 (-5.42%) on heavy volume" }, { icon: "🔍", label: "Watch Closely", text: "Big volume on a down day — potential reversal setup" }], isAlertOfDay: true },
-  { id: 2, ticker: "NVDA", company: "NVIDIA Corp", price: 177.39, change: 1.64, changePercent: 0.93, time: "4:00 PM", scannerTag: "Yearly High", volume: "141.4M", avgVolume: "85.2M", vsSpy: 0.84, confidence: 88, support: 165.00, resistance: 195.95, sector: "Semiconductors", marketCap: "$4.3T", description: "Designs GPUs and AI computing platforms.", whyAlerting: [{ icon: "🏔️", label: "Near Peak", text: "Within 9.5% of its 52-week high of $195.95" }, { icon: "📊", label: "Strong Volume", text: "141.4M shares — 1.7x normal volume" }, { icon: "✅", label: "Momentum", text: "Holding above key moving averages" }], isAlertOfDay: false },
-  { id: 3, ticker: "SMCI", company: "Super Micro Computer", price: 23.22, change: 0.71, changePercent: 3.15, time: "4:00 PM", scannerTag: "Gap Up", volume: "29.8M", avgVolume: "18.5M", vsSpy: 3.06, confidence: 78, support: 20.00, resistance: 28.00, sector: "IT Hardware", marketCap: "$13.7B", description: "Provides high-performance server and storage solutions for AI.", whyAlerting: [{ icon: "📈", label: "Price Jumped", text: "Up 3.15% — outperforming the market" }, { icon: "📊", label: "Above Average Volume", text: "29.8M shares vs 18.5M average" }, { icon: "💡", label: "AI Demand", text: "Continued interest in AI server infrastructure" }], isAlertOfDay: false },
-  { id: 4, ticker: "AAPL", company: "Apple Inc", price: 255.92, change: 0.28, changePercent: 0.11, time: "4:00 PM", scannerTag: "Yearly High", volume: "26.7M", avgVolume: "42.1M", vsSpy: 0.02, confidence: 82, support: 245.00, resistance: 260.10, sector: "Consumer Electronics", marketCap: "$3.9T", description: "Designs and sells smartphones, computers, and digital services.", whyAlerting: [{ icon: "🏔️", label: "Near Peak", text: "Within 1.6% of 52-week high of $260.10" }, { icon: "✅", label: "Steady Climb", text: "Holding near all-time highs" }, { icon: "📊", label: "Quiet Strength", text: "Low volume suggests consolidation, not weakness" }], isAlertOfDay: false },
-  { id: 5, ticker: "AMZN", company: "Amazon.com Inc", price: 209.77, change: -0.80, changePercent: -0.38, time: "4:00 PM", scannerTag: "Volume Spike", volume: "30.1M", avgVolume: "22.7M", vsSpy: -0.47, confidence: 76, support: 195.00, resistance: 242.52, sector: "E-Commerce / Cloud", marketCap: "$2.2T", description: "Operates online retail marketplace and Amazon Web Services cloud platform.", whyAlerting: [{ icon: "📊", label: "Volume Up", text: "30.1M shares — 1.3x above average" }, { icon: "🔍", label: "Pullback", text: "Slight dip — watching for support at $195" }, { icon: "💡", label: "Cloud Growth", text: "AWS continues strong revenue momentum" }], isAlertOfDay: false },
-  { id: 6, ticker: "META", company: "Meta Platforms", price: 574.46, change: -4.73, changePercent: -0.82, time: "4:00 PM", scannerTag: "Trend Change", volume: "13.2M", avgVolume: "16.8M", vsSpy: -0.91, confidence: 74, support: 550.00, resistance: 600.00, sector: "Social Media / AI", marketCap: "$1.46T", description: "Operates Facebook, Instagram, WhatsApp and invests heavily in AI and metaverse.", whyAlerting: [{ icon: "🔄", label: "Trend Shift", text: "Pulling back from recent highs" }, { icon: "📊", label: "Lower Volume", text: "13.2M shares — below average" }, { icon: "💡", label: "AI Focus", text: "Heavy investment in AI infrastructure continues" }], isAlertOfDay: false },
-  { id: 7, ticker: "AMD", company: "Advanced Micro Devices", price: 217.50, change: 7.29, changePercent: 3.47, time: "4:00 PM", scannerTag: "Gap Up", volume: "38.1M", avgVolume: "28.4M", vsSpy: 3.38, confidence: 86, support: 200.00, resistance: 227.30, sector: "Semiconductors", marketCap: "$352B", description: "Designs CPUs and GPUs for gaming, data centers, and AI applications.", whyAlerting: [{ icon: "📈", label: "Strong Rally", text: "Up $7.29 (+3.47%) — leading the chip sector" }, { icon: "🔥", label: "Volume Surge", text: "38.1M shares — 1.3x above average" }, { icon: "✅", label: "Approaching High", text: "Within 4.3% of 52-week high of $227.30" }], isAlertOfDay: false },
-  { id: 8, ticker: "PLTR", company: "Palantir Technologies", price: 148.46, change: 1.96, changePercent: 1.34, time: "4:00 PM", scannerTag: "Volume Spike", volume: "29.8M", avgVolume: "22.1M", vsSpy: 1.25, confidence: 83, support: 140.00, resistance: 167.57, sector: "AI / Data Analytics", marketCap: "$347B", description: "Provides AI-driven data analytics platforms to governments and enterprises.", whyAlerting: [{ icon: "📊", label: "Volume Up", text: "29.8M shares — 1.35x above average" }, { icon: "📈", label: "Steady Gains", text: "Up 1.34% on continued AI sector strength" }, { icon: "✅", label: "Positive Trend", text: "Holding above key support levels" }], isAlertOfDay: false },
-];
-
-const filterMap = { "All": null, "Yearly High": "Yearly High", "Volume Spike": "Volume Spike", "Trend Change": "Trend Change", "Gap Up": "Gap Up", "Catalyst News": "Catalyst News" };
-const filterKeys = Object.keys(filterMap);
-
-const mockTrack = {
-  hitRate: 67, avgReturn: 1.0, streak: "2W",
-  history: [
-    { ticker: "TSLA", date: "Apr 2", desc: "Pre-market gap on 6x volume", from: 189.3, to: 195.36, result: 3.2, type: "hit" },
-    { ticker: "NVDA", date: "Apr 1", desc: "Within 1.8% of yearly high", from: 875.4, to: 891.15, result: 1.8, type: "hit" },
-    { ticker: "PLTR", date: "Mar 31", desc: "Gap above consolidation zone", from: 24.88, to: 24.78, result: -0.4, type: "miss" },
-    { ticker: "SMCI", date: "Mar 28", desc: "Volume 4.2x average", from: 92.17, to: 94.66, result: 2.7, type: "hit" },
-    { ticker: "AMD", date: "Mar 26", desc: "Trend reversal signal", from: 164.2, to: 162.39, result: -1.1, type: "miss" },
-  ],
-};
-
-// ===== INSTITUTIONAL FLOW MOCK DATA =====
-const now = new Date();
-const mins = (m) => new Date(now.getTime() - m * 60000);
-
-const mockBigMoney = [
-  { id: "bm1", ticker: "TSLA", company: "Tesla Inc", price: 189.30, shares: "2.4M", dollarValue: "$454M", rawDollar: 454e6, direction: "buying", time: mins(2), multiplier: 13.3, note: "This is 13x the normal trade size — a major institution is loading up." },
-  { id: "bm2", ticker: "NVDA", company: "NVIDIA Corp", price: 891.15, shares: "850K", dollarValue: "$758M", rawDollar: 758e6, direction: "buying", time: mins(9), multiplier: 8.9, note: "Largest dark pool trade today. 9x normal size — likely a hedge fund." },
-  { id: "bm3", ticker: "AAPL", company: "Apple Inc", price: 218.45, shares: "1.8M", dollarValue: "$393M", rawDollar: 393e6, direction: "neutral", time: mins(6), multiplier: 8.2, note: "Big trade but direction unclear — could be a portfolio rebalance." },
-  { id: "bm4", ticker: "META", company: "Meta Platforms", price: 542.18, shares: "620K", dollarValue: "$336M", rawDollar: 336e6, direction: "selling", time: mins(13), multiplier: 5.6, note: "An institution appears to be reducing their META position." },
-  { id: "bm5", ticker: "AMZN", company: "Amazon.com", price: 198.72, shares: "1.2M", dollarValue: "$238M", rawDollar: 238e6, direction: "buying", time: mins(16), multiplier: 4.0, note: "Moderate-sized institutional buy. 4x normal trade size." },
-];
-
-const mockSmartBets = [
-  { id: "sb1", ticker: "TSLA", company: "Tesla Inc", direction: "up", bet: "Above $200 by Apr 11", amount: "$20.5M", rawSize: 20.5e6, odds: "High risk", unusual: true, time: mins(1), detail: "Someone just bet $20.5M that Tesla will rise above $200 in the next week.", premium: "$4.85", volume: "42.3K", openInterest: "18.2K", uncertainty: "High" },
-  { id: "sb2", ticker: "NVDA", company: "NVIDIA Corp", direction: "up", bet: "Above $920 by Apr 18", amount: "$51.2M", rawSize: 51.2e6, odds: "Moderate risk", unusual: true, time: mins(4), detail: "The largest options bet today. $51.2M that NVIDIA goes above $920.", premium: "$18.20", volume: "28.1K", openInterest: "5.4K", uncertainty: "Moderate" },
-  { id: "sb3", ticker: "SPY", company: "S&P 500 ETF", direction: "down", bet: "Below $510 by Apr 11", amount: "$29.1M", rawSize: 29.1e6, odds: "Lower risk", unusual: false, time: mins(7), detail: "A large bet the overall market will dip below $510.", premium: "$3.40", volume: "85.6K", openInterest: "42.1K", uncertainty: "Low" },
-  { id: "sb4", ticker: "AAPL", company: "Apple Inc", direction: "up", bet: "Above $225 by Apr 25", amount: "$10.6M", rawSize: 10.6e6, odds: "Moderate risk", unusual: true, time: mins(10), detail: "Unusual activity — $10.6M bet that Apple crosses $225.", premium: "$2.95", volume: "35.8K", openInterest: "12.7K", uncertainty: "Moderate" },
-  { id: "sb5", ticker: "META", company: "Meta Platforms", direction: "up", bet: "Above $560 by May 16", amount: "$34.2M", rawSize: 34.2e6, odds: "Moderate risk", unusual: true, time: mins(18), detail: "A longer-term bet of $34.2M that Meta rises above $560.", premium: "$22.50", volume: "15.2K", openInterest: "3.1K", uncertainty: "Moderate" },
-];
-
-// Cross-reference lookups
-const bmByTicker = new Map(mockBigMoney.map(d => [d.ticker, d]));
-const sbByTicker = new Map();
-mockSmartBets.forEach(s => { if (!sbByTicker.has(s.ticker)) sbByTicker.set(s.ticker, s); });
-
-function hasBigMoneySignal(ticker) {
-  return (bmByTicker.has(ticker) && bmByTicker.get(ticker).direction === "buying") ||
-         (sbByTicker.has(ticker) && sbByTicker.get(ticker).direction === "up");
-}
-
+// ===== HELPERS =====
+const nowTs = () => new Date();
 function relTime(ts) {
-  const d = Math.floor((now - ts) / 60000);
+  const d = Math.floor((nowTs() - new Date(ts)) / 60000);
   if (d < 1) return "Just now";
   if (d === 1) return "1 min ago";
   if (d < 60) return `${d} min ago`;
-  return `${Math.floor(d / 60)}h ago`;
+  if (d < 1440) return `${Math.floor(d / 60)}h ago`;
+  return `${Math.floor(d / 1440)}d ago`;
 }
 function freshDotColor(ts) {
-  const d = Math.floor((now - ts) / 60000);
+  const d = Math.floor((nowTs() - new Date(ts)) / 60000);
   if (d <= 5) return "#22c55e"; if (d <= 15) return "#f59e0b"; return "#cbd5e1";
 }
-function cardOpacity(ts) { return Math.floor((now - ts) / 60000) > 15 ? 0.75 : 1; }
+function cardOpacity(ts) { return Math.floor((nowTs() - new Date(ts)) / 60000) > 15 ? 0.75 : 1; }
 
-// Flow summary line
-const bmBuying = mockBigMoney.filter(d => d.direction === "buying").length;
-const bmSelling = mockBigMoney.filter(d => d.direction === "selling").length;
-const mostActiveTicker = [...mockBigMoney, ...mockSmartBets].reduce((acc, x) => { acc[x.ticker] = (acc[x.ticker] || 0) + 1; return acc; }, {});
-const topTicker = Object.entries(mostActiveTicker).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+function formatDollar(n) {
+  if (!n && n !== 0) return '—';
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
+  return `$${n.toFixed(0)}`;
+}
+
+function formatShares(n) {
+  if (!n && n !== 0) return '—';
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`;
+  return String(n);
+}
 
 // ===== SHARED COMPONENTS =====
 function Tooltip({ text, t: theme }) {
@@ -150,8 +144,11 @@ function Tooltip({ text, t: theme }) {
   );
 }
 
-function BigMoneyBadge({ ticker, onClick, t: theme }) {
-  if (!hasBigMoneySignal(ticker)) return null;
+function BigMoneyBadge({ ticker, flowData, onClick, t: theme }) {
+  // Check live dark pool + options data for bullish signal
+  const hasBullish = flowData.darkpool.some(d => d.ticker === ticker && d.direction === 'buying') ||
+                     flowData.options.some(o => o.ticker === ticker && o.direction === 'bullish');
+  if (!hasBullish) return null;
   const green = theme?.green || "#15803d";
   const greenBg = theme?.greenBg || "#f0fdf4";
   return (
@@ -221,33 +218,35 @@ function MoodBar({ score, t: theme }) {
   return (<div style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontSize: 11, color: t3 }}>MOOD:</span><span style={{ fontSize: 12, fontWeight: 700, color }}>{label}</span><div style={{ width: 48, height: 6, borderRadius: 3, background: bg, overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", borderRadius: 3, background: `linear-gradient(90deg, #ef4444, ${color})` }}/></div><span style={{ fontSize: 12, fontWeight: 600, color: t2 }}>{Math.round(s)}</span></div>);
 }
 
-// ===== FLOW CARDS =====
+// ===== FLOW CARDS (now driven by live data) =====
 function BigMoneyCard({ trade, isExpanded, onToggle, t: theme }) {
-  const dc = { buying: { bg: "#f0fdf4", border: "#22c55e", icon: "↑", label: "Buying", color: "#15803d" }, selling: { bg: "#fef2f2", border: "#ef4444", icon: "↓", label: "Selling", color: "#dc2626" }, neutral: { bg: "#fffbeb", border: "#f59e0b", icon: "→", label: "Unclear", color: "#d97706" } }[trade.direction];
+  const dir = (trade.direction || 'neutral').toLowerCase();
+  const dc = { buying: { bg: "#f0fdf4", border: "#22c55e", icon: "↑", label: "Buying", color: "#15803d" }, selling: { bg: "#fef2f2", border: "#ef4444", icon: "↓", label: "Selling", color: "#dc2626" }, neutral: { bg: "#fffbeb", border: "#f59e0b", icon: "→", label: "Unclear", color: "#d97706" } }[dir] || { bg: "#fffbeb", border: "#f59e0b", icon: "→", label: "Unclear", color: "#d97706" };
   const cardBg = theme?.card || "#fff";
   const border = theme?.border || "#e2e8f0";
   const text1 = theme?.text1 || "#0f172a";
   const text3 = theme?.text3 || "#94a3b8";
   const text2 = theme?.text2 || "#475569";
   const borderLight = theme?.borderLight || "#f1f5f9";
+  const mult = trade.multiplier || 1;
   return (
-    <div onClick={onToggle} style={{ background: cardBg, borderRadius: 14, border: `1px solid ${border}`, borderLeft: `${trade.multiplier >= 8 ? 4 : 3}px solid ${dc.border}`, padding: "12px 14px", cursor: "pointer", opacity: cardOpacity(trade.time) }}>
+    <div onClick={onToggle} style={{ background: cardBg, borderRadius: 14, border: `1px solid ${border}`, borderLeft: `${mult >= 8 ? 4 : 3}px solid ${dc.border}`, padding: "12px 14px", cursor: "pointer", opacity: cardOpacity(trade.executed_at || trade.fetched_at) }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <div style={{ width: 24, height: 24, borderRadius: 6, background: dc.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: dc.color }}>{dc.icon}</div>
           <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: text1 }}>{trade.ticker}</h4>
           <span style={{ fontSize: 10, fontWeight: 600, color: dc.color, textTransform: "uppercase" }}>{dc.label}</span>
         </div>
-        <span style={{ fontSize: 14, fontWeight: 700, color: text1 }}>{trade.dollarValue}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: text1 }}>{formatDollar(trade.dollar_value)}</span>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: text3 }}>
-        <span>{trade.shares} shares · {trade.multiplier}x normal</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: freshDotColor(trade.time), display: "inline-block" }}/>{relTime(trade.time)}</div>
+        <span>{formatShares(trade.shares)} shares{mult > 1 ? ` · ${mult.toFixed(1)}x normal` : ''}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: freshDotColor(trade.executed_at || trade.fetched_at), display: "inline-block" }}/>{relTime(trade.executed_at || trade.fetched_at)}</div>
       </div>
       {isExpanded && (
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${borderLight}` }}>
           <div style={{ background: dc.bg, borderRadius: 10, padding: "8px 12px" }}>
-            <p style={{ margin: 0, fontSize: 12, color: text2, lineHeight: 1.5 }}>💡 {trade.note}</p>
+            <p style={{ margin: 0, fontSize: 12, color: text2, lineHeight: 1.5 }}>💡 {trade.note || `${formatDollar(trade.dollar_value)} dark pool print on ${trade.ticker}${trade.venue ? ` via ${trade.venue}` : ''}`}</p>
           </div>
         </div>
       )}
@@ -257,7 +256,7 @@ function BigMoneyCard({ trade, isExpanded, onToggle, t: theme }) {
 }
 
 function SmartBetCard({ bet, isExpanded, onToggle, t: theme }) {
-  const isUp = bet.direction === "up";
+  const isUp = bet.direction === "bullish";
   const dc = isUp ? { bg: "#f0fdf4", border: "#22c55e", color: "#15803d" } : { bg: "#fef2f2", border: "#ef4444", color: "#dc2626" };
   const cardBg = theme?.card || "#fff";
   const border = theme?.border || "#e2e8f0";
@@ -266,26 +265,32 @@ function SmartBetCard({ bet, isExpanded, onToggle, t: theme }) {
   const text2 = theme?.text2 || "#475569";
   const borderLight = theme?.borderLight || "#f1f5f9";
   return (
-    <div onClick={onToggle} style={{ background: cardBg, borderRadius: 14, border: `1px solid ${border}`, borderLeft: `3px solid ${dc.border}`, padding: "12px 14px", cursor: "pointer", opacity: cardOpacity(bet.time) }}>
+    <div onClick={onToggle} style={{ background: cardBg, borderRadius: 14, border: `1px solid ${border}`, borderLeft: `3px solid ${dc.border}`, padding: "12px 14px", cursor: "pointer", opacity: cardOpacity(bet.executed_at || bet.fetched_at) }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 16 }}>{isUp ? "📈" : "📉"}</span>
           <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: text1 }}>{bet.ticker}</h4>
-          {bet.unusual && <span style={{ padding: "1px 5px", borderRadius: 6, background: "#fef3c7", color: "#92400e", fontSize: 9, fontWeight: 700 }}>🔥 UNUSUAL</span>}
+          {bet.is_unusual && <span style={{ padding: "1px 5px", borderRadius: 6, background: "#fef3c7", color: "#92400e", fontSize: 9, fontWeight: 700 }}>🔥 UNUSUAL</span>}
         </div>
-        <span style={{ fontSize: 14, fontWeight: 700, color: text1 }}>{bet.amount}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: text1 }}>{formatDollar(bet.premium)}</span>
       </div>
       <div style={{ background: dc.bg, borderRadius: 6, padding: "4px 8px", marginBottom: 4 }}>
-        <p style={{ margin: 0, fontSize: 12, color: dc.color, fontWeight: 600 }}>{isUp ? "Betting UP" : "Betting DOWN"}: {bet.bet}</p>
+        <p style={{ margin: 0, fontSize: 12, color: dc.color, fontWeight: 600 }}>
+          {isUp ? "Betting UP" : "Betting DOWN"}: {bet.bet_desc || `${bet.option_type?.toUpperCase() || 'OPTION'} $${bet.strike || '?'}`}
+        </p>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: text3 }}>
-        <span>{bet.odds}</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: freshDotColor(bet.time), display: "inline-block" }}/>{relTime(bet.time)}</div>
+        <span>{bet.trade_type || 'option'}{bet.is_otm ? ' · OTM' : ''}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: freshDotColor(bet.executed_at || bet.fetched_at), display: "inline-block" }}/>{relTime(bet.executed_at || bet.fetched_at)}</div>
       </div>
       {isExpanded && (
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${borderLight}` }}>
           <div style={{ background: dc.bg, borderRadius: 10, padding: "8px 12px" }}>
-            <p style={{ margin: 0, fontSize: 12, color: text2, lineHeight: 1.5 }}>💡 {bet.detail}</p>
+            <p style={{ margin: 0, fontSize: 12, color: text2, lineHeight: 1.5 }}>
+              💡 {formatDollar(bet.premium)} bet that {bet.ticker} goes {isUp ? 'above' : 'below'} ${bet.strike || '?'}{bet.expiry ? ` by ${new Date(bet.expiry).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}.
+              {bet.size ? ` ${bet.size.toLocaleString()} contracts.` : ''}
+              {bet.volume && bet.open_interest ? ` Vol/OI: ${bet.volume.toLocaleString()}/${bet.open_interest.toLocaleString()}` : ''}
+            </p>
           </div>
         </div>
       )}
@@ -319,6 +324,36 @@ export default function AlertsTab({ session, group }) {
   const [fearScore, setFearScore] = useState(null);
   const [spyData, setSpyData] = useState(null);
 
+  // ── Dynamic filter types from DB ──
+  const [alertTypes, setAlertTypes] = useState([]);
+  const tagMap = useMemo(() => {
+    const map = { ...DEFAULT_TAG_MAP };
+    alertTypes.forEach(at => { map[at.type_key] = at.label; });
+    return map;
+  }, [alertTypes]);
+
+  // ── Live alert performance history ──
+  const [perfHistory, setPerfHistory] = useState([]);
+
+  // ── Performance snapshots (multi-interval 1d/3d/7d/14d/30d) ──
+  const [perfSnapshots, setPerfSnapshots] = useState([]);
+
+  // ── Sector filter state ──
+  const [sectorFilter, setSectorFilter] = useState(null);
+  const [convictionFilter, setConvictionFilter] = useState(null);
+
+  // ── Live institutional flow ──
+  const [darkpoolTrades, setDarkpoolTrades] = useState([]);
+  const [optionsFlow, setOptionsFlow] = useState([]);
+
+  // ── Fetch alert_types (dynamic filters) ──
+  useEffect(() => {
+    supabase.from('alert_types').select('*').eq('is_active', true).order('position')
+      .then(({ data, error }) => {
+        if (data && data.length > 0) setAlertTypes(data);
+      });
+  }, []);
+
   // ── Fetch breakout_alerts + realtime ──
   useEffect(() => {
     const load = async () => {
@@ -330,6 +365,81 @@ export default function AlertsTab({ session, group }) {
     const channel = supabase.channel('alerts_feed_redesign')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'breakout_alerts' }, (payload) => {
         setLiveAlerts(prev => [payload.new, ...prev]);
+      }).subscribe();
+    return () => supabase.removeChannel(channel);
+  }, []);
+
+  // ── Fetch alert_performance (history) + realtime ──
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('alert_performance').select('*')
+        .not('outcome', 'is', null)
+        .order('alert_time', { ascending: false })
+        .limit(20);
+      if (data) setPerfHistory(data);
+    };
+    load();
+    const channel = supabase.channel('perf_feed')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'alert_performance' }, (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          setPerfHistory(prev => {
+            const filtered = prev.filter(p => p.id !== payload.new.id);
+            if (payload.new.outcome || payload.new.admin_outcome) {
+              return [payload.new, ...filtered].slice(0, 20);
+            }
+            return filtered;
+          });
+        }
+      }).subscribe();
+    return () => supabase.removeChannel(channel);
+  }, []);
+
+  // ── Fetch performance snapshots (multi-interval) + realtime ──
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('alert_performance_snapshots').select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (data) setPerfSnapshots(data);
+    };
+    load();
+    const channel = supabase.channel('perf_snapshots_feed')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'alert_performance_snapshots' }, (payload) => {
+        if (payload.eventType === 'UPDATE') {
+          setPerfSnapshots(prev => prev.map(s => s.id === payload.new.id ? payload.new : s));
+        } else if (payload.eventType === 'INSERT') {
+          setPerfSnapshots(prev => [payload.new, ...prev].slice(0, 200));
+        }
+      }).subscribe();
+    return () => supabase.removeChannel(channel);
+  }, []);
+
+  // ── Fetch darkpool_trades + realtime ──
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('darkpool_trades').select('*')
+        .order('executed_at', { ascending: false }).limit(30);
+      if (data) setDarkpoolTrades(data);
+    };
+    load();
+    const channel = supabase.channel('darkpool_feed')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'darkpool_trades' }, (payload) => {
+        setDarkpoolTrades(prev => [payload.new, ...prev].slice(0, 50));
+      }).subscribe();
+    return () => supabase.removeChannel(channel);
+  }, []);
+
+  // ── Fetch options_flow + realtime ──
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('options_flow').select('*')
+        .order('executed_at', { ascending: false }).limit(30);
+      if (data) setOptionsFlow(data);
+    };
+    load();
+    const channel = supabase.channel('options_feed')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'options_flow' }, (payload) => {
+        setOptionsFlow(prev => [payload.new, ...prev].slice(0, 50));
       }).subscribe();
     return () => supabase.removeChannel(channel);
   }, []);
@@ -350,20 +460,61 @@ export default function AlertsTab({ session, group }) {
     });
   }, []);
 
-  // ── Build display alerts: live mapped data OR mock fallback ──
+  // ── Build dynamic filter keys from alert_types ──
+  const filterConfig = useMemo(() => {
+    const config = [{ key: 'All', label: 'All', match: null }];
+    if (alertTypes.length > 0) {
+      alertTypes.forEach(at => {
+        config.push({ key: at.type_key, label: at.label, match: at.label });
+      });
+    } else {
+      // Fallback to defaults if DB hasn't loaded yet
+      Object.entries(DEFAULT_TAG_MAP).forEach(([key, label]) => {
+        config.push({ key, label, match: label });
+      });
+    }
+    return config;
+  }, [alertTypes]);
+
+  // ── Build display alerts: live mapped data ──
   const displayAlerts = useMemo(() => {
     if (liveAlerts.length > 0) {
-      const mapped = liveAlerts.map(a => mapDbAlert(a, spyData));
+      const mapped = liveAlerts.map(a => mapDbAlert(a, spyData, tagMap));
       if (mapped.length > 0) {
         const best = mapped.reduce((b, a) => a.confidence > b.confidence ? a : b);
         best.isAlertOfDay = true;
       }
       return mapped;
     }
-    return mockAlerts;
-  }, [liveAlerts, spyData]);
+    return [];
+  }, [liveAlerts, spyData, tagMap]);
 
-  const filtered = filter === "All" ? displayAlerts : displayAlerts.filter(a => a.scannerTag === filterMap[filter]);
+  // ── Build per-alert snapshot map: alertId → { '1d': +2.5, '3d': -1.2, ... } ──
+  const snapshotMap = useMemo(() => {
+    const map = {};
+    for (const s of perfSnapshots) {
+      if (!map[s.alert_id]) map[s.alert_id] = {};
+      map[s.alert_id][s.interval_key] = {
+        returnPct: s.return_pct,
+        outcome: s.outcome,
+        tracked: !!s.tracked_at,
+        price: s.snapshot_price,
+      };
+    }
+    return map;
+  }, [perfSnapshots]);
+
+  // Apply all filters: scanner type + sector + conviction
+  let filtered = filter === "All" ? displayAlerts : displayAlerts.filter(a => {
+    const fc = filterConfig.find(f => f.key === filter);
+    return fc?.match ? a.scannerTag === fc.match : true;
+  });
+  if (sectorFilter) {
+    filtered = filtered.filter(a => a.sectorKey === sectorFilter);
+  }
+  if (convictionFilter) {
+    filtered = filtered.filter(a => a.conviction === convictionFilter);
+  }
   const sorted = [...filtered].sort((a, b) => {
     if (a.isAlertOfDay && !b.isAlertOfDay) return -1;
     if (!a.isAlertOfDay && b.isAlertOfDay) return 1;
@@ -373,11 +524,138 @@ export default function AlertsTab({ session, group }) {
   // Auto-select AOTD or first alert on load
   const selectedAlert = selectedChipId ? sorted.find(a => a.id === selectedChipId) : null;
 
-  // Flow data
-  let flowBM = flowTickerFilter ? mockBigMoney.filter(d => d.ticker === flowTickerFilter) : mockBigMoney;
-  let flowSB = flowTickerFilter ? mockSmartBets.filter(s => s.ticker === flowTickerFilter) : mockSmartBets;
-  if (flowSort === "size") { flowBM = [...flowBM].sort((a,b) => b.rawDollar - a.rawDollar); flowSB = [...flowSB].sort((a,b) => b.rawSize - a.rawSize); }
-  else { flowBM = [...flowBM].sort((a,b) => b.time - a.time); flowSB = [...flowSB].sort((a,b) => b.time - a.time); }
+  // ── Compute performance stats from live data ──
+  const perfStats = useMemo(() => {
+    if (perfHistory.length === 0) return { hitRate: 0, avgReturn: 0, streak: '—' };
+    const outcomes = perfHistory.map(p => {
+      const eff = p.admin_outcome || p.outcome;
+      return { ...p, effectiveOutcome: eff, effectiveReturn: p.return_pct ?? 0 };
+    });
+    const hits = outcomes.filter(o => o.effectiveOutcome === 'hit').length;
+    const hitRate = Math.round((hits / outcomes.length) * 100);
+    const avgReturn = outcomes.length > 0 ? (outcomes.reduce((s, o) => s + o.effectiveReturn, 0) / outcomes.length) : 0;
+
+    // Calculate streak
+    let streak = 0;
+    let streakType = outcomes[0]?.effectiveOutcome === 'hit' ? 'W' : 'L';
+    for (const o of outcomes) {
+      if ((streakType === 'W' && o.effectiveOutcome === 'hit') || (streakType === 'L' && o.effectiveOutcome !== 'hit')) {
+        streak++;
+      } else break;
+    }
+
+    return { hitRate, avgReturn: avgReturn.toFixed(1), streak: `${streak}${streakType}` };
+  }, [perfHistory]);
+
+  // ── Build history display from live performance data + snapshots ──
+  const historyDisplay = useMemo(() => {
+    return perfHistory.map(p => {
+      const effOutcome = p.admin_outcome || p.outcome;
+      const effReturn = p.return_pct ?? 0;
+      const alertDate = new Date(p.alert_time);
+      const dateStr = alertDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      // Get multi-interval snapshots for this alert
+      const snapshots = snapshotMap[p.alert_id] || {};
+      return {
+        ticker: p.ticker,
+        date: dateStr,
+        desc: p.signal_desc || p.signal_type || 'Alert',
+        from: p.alert_price,
+        to: p.price_24h,
+        result: effReturn,
+        type: effOutcome,
+        adminOverride: !!p.admin_outcome,
+        adminNotes: p.admin_notes,
+        snapshots,
+        alertId: p.alert_id,
+      };
+    });
+  }, [perfHistory, snapshotMap]);
+
+  // ── Flow data: live from DB ──
+  const flowData = useMemo(() => ({ darkpool: darkpoolTrades, options: optionsFlow }), [darkpoolTrades, optionsFlow]);
+
+  // ── Score & rank flow tickers to find top 4 (exclude ETFs/indexes) ──
+  const ETF_EXCLUDE = new Set([
+    'SPY','QQQ','IWM','DIA','VTI','VOO','SPX','SPXW','NDX',
+    'XLF','XLE','XLK','XLV','XLI','XLU','XLP','XLY','XLB','XLRE',
+    'GLD','SLV','USO','TLT','HYG','LQD','EEM','EFA','VXX',
+    'SOXL','SOXS','TQQQ','SQQQ','UVXY','SVXY','ARKK',
+    'SMH','KWEB','FXI','BITO','IBIT','GDX','GDXJ',
+    'VIX','RUT','OEX','XSP',
+  ]);
+  const MEGA_CAP_PENALTY = new Set([
+    'AAPL','MSFT','GOOGL','GOOG','AMZN','NVDA','META','TSLA',
+    'BRK.A','BRK.B','BRKB','JPM','V','MA','JNJ','WMT','PG',
+    'XOM','UNH','HD','BAC','KO','PEP','COST','MRK','ABBV',
+    'CVX','CRM','AVGO','LLY','NFLX','AMD','ADBE','ORCL',
+    'CSCO','ACN','INTC','CMCSA','T','VZ','DIS','NKE',
+    'MCD','IBM','GE','CAT','BA','GS','MS','C',
+    'PYPL','UBER','SQ','SHOP','SNOW','PLTR','COIN',
+  ]);
+  const flowRanked = useMemo(() => {
+    const tickerScores = {};
+    // Score options flow
+    for (const o of optionsFlow) {
+      if (ETF_EXCLUDE.has(o.ticker)) continue;
+      if (!tickerScores[o.ticker]) tickerScores[o.ticker] = { ticker: o.ticker, score: 0, premium: 0, dpValue: 0, sweeps: 0, count: 0, optionsCount: 0 };
+      const ts = tickerScores[o.ticker];
+      ts.count++;
+      ts.optionsCount++;
+      if (o.premium) ts.premium += o.premium;
+      const isSweep = (o.trade_type || '').includes('sweep');
+      const isCall = o.option_type === 'call';
+      const isBullish = o.direction === 'bullish';
+      if (isBullish && isCall && isSweep) { ts.sweeps++; ts.score += 25; }
+      else if (isBullish && isCall) ts.score += 15;
+      else if (isBullish) ts.score += 8;
+      if (o.is_unusual) ts.score += 10;
+      if (o.premium >= 1000000) ts.score += 20;
+      else if (o.premium >= 500000) ts.score += 12;
+      else if (o.premium >= 100000) ts.score += 5;
+    }
+    // Score dark pool
+    for (const d of darkpoolTrades) {
+      if (ETF_EXCLUDE.has(d.ticker)) continue;
+      if (!tickerScores[d.ticker]) tickerScores[d.ticker] = { ticker: d.ticker, score: 0, premium: 0, dpValue: 0, sweeps: 0, count: 0, optionsCount: 0 };
+      const ts = tickerScores[d.ticker];
+      ts.count++;
+      if (d.dollar_value) { ts.dpValue += d.dollar_value; ts.score += d.dollar_value >= 10000000 ? 20 : d.dollar_value >= 1000000 ? 10 : 5; }
+      if (d.direction === 'buying') ts.score += 8;
+      if (d.multiplier >= 5) ts.score += 15;
+      else if (d.multiplier >= 2) ts.score += 8;
+    }
+    // Apply mega-cap penalty
+    for (const ts of Object.values(tickerScores)) {
+      if (MEGA_CAP_PENALTY.has(ts.ticker)) ts.score = Math.round(ts.score * 0.3);
+    }
+    return Object.values(tickerScores)
+      .filter(t => !ETF_EXCLUDE.has(t.ticker) && t.optionsCount >= 1 && t.score > 0)
+      .sort((a, b) => b.score - a.score);
+  }, [optionsFlow, darkpoolTrades]);
+
+  const topFlowTickers = useMemo(() => new Set(flowRanked.slice(0, 4).map(t => t.ticker)), [flowRanked]);
+
+  // Flow summary
+  const bmBuying = darkpoolTrades.filter(d => d.direction === 'buying').length;
+  const bmSelling = darkpoolTrades.filter(d => d.direction === 'selling').length;
+  const topTicker = flowRanked[0]?.ticker || "";
+
+  // Flow filtering & sorting — default to top 4 tickers unless user picks a specific one
+  const activeFlowFilter = flowTickerFilter || null;
+  let flowBM = activeFlowFilter
+    ? darkpoolTrades.filter(d => d.ticker === activeFlowFilter)
+    : darkpoolTrades.filter(d => topFlowTickers.has(d.ticker));
+  let flowSB = activeFlowFilter
+    ? optionsFlow.filter(s => s.ticker === activeFlowFilter)
+    : optionsFlow.filter(s => topFlowTickers.has(s.ticker));
+  if (flowSort === "size") {
+    flowBM = [...flowBM].sort((a, b) => (b.dollar_value || 0) - (a.dollar_value || 0));
+    flowSB = [...flowSB].sort((a, b) => (b.premium || 0) - (a.premium || 0));
+  } else {
+    flowBM = [...flowBM].sort((a, b) => new Date(b.executed_at || b.fetched_at) - new Date(a.executed_at || a.fetched_at));
+    flowSB = [...flowSB].sort((a, b) => new Date(b.executed_at || b.fetched_at) - new Date(a.executed_at || a.fetched_at));
+  }
   const flowList = flowTab === "bigmoney" ? flowBM : flowSB;
   const flowVisible = flowShowAll ? flowList : flowList.slice(0, 3);
 
@@ -409,38 +687,64 @@ export default function AlertsTab({ session, group }) {
         </div>
       </div>
 
-      {/* FILTERS */}
+      {/* SCANNER TYPE FILTERS */}
       <div className="filter-row">
-        {filterKeys.map(f=>{
-          const count = f==="All"?displayAlerts.length:displayAlerts.filter(a=>a.scannerTag===filterMap[f]).length;
-          return (<button key={f} onClick={()=>setFilter(f)} style={{ flexShrink: 0, padding: "8px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, border: filter===f?"none":`1px solid ${t.border}`, background: filter===f?t.btnActive:t.card, color: filter===f?"#fff":t.text2, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "'DM Sans', sans-serif" }}>{f}<span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 10, background: filter===f?"rgba(255,255,255,.2)":t.surfaceAlt, color: filter===f?"#fff":t.text3 }}>{count}</span></button>);
+        {filterConfig.map(f => {
+          const count = f.key === "All" ? displayAlerts.length : displayAlerts.filter(a => a.scannerTag === f.match).length;
+          return (<button key={f.key} onClick={() => setFilter(f.key)} style={{ flexShrink: 0, padding: "8px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, border: filter === f.key ? "none" : `1px solid ${t.border}`, background: filter === f.key ? t.btnActive : t.card, color: filter === f.key ? "#fff" : t.text2, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "'DM Sans', sans-serif" }}>{f.label}<span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 10, background: filter === f.key ? "rgba(255,255,255,.2)" : t.surfaceAlt, color: filter === f.key ? "#fff" : t.text3 }}>{count}</span></button>);
+        })}
+      </div>
+
+      {/* SECTOR + CONVICTION FILTERS */}
+      <div className="filter-row">
+        {/* Conviction filters */}
+        {['high', 'very_high'].map(cv => {
+          const cvConf = CONVICTION_CONFIG[cv];
+          const count = displayAlerts.filter(a => a.conviction === cv).length;
+          if (count === 0) return null;
+          const active = convictionFilter === cv;
+          return (<button key={cv} onClick={() => setConvictionFilter(active ? null : cv)} style={{ flexShrink: 0, padding: "6px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: active ? 'none' : `1px solid ${cvConf.color}40`, background: active ? cvConf.color : cvConf.bg, color: active ? '#fff' : cvConf.color, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontFamily: "'DM Sans', sans-serif" }}>{cvConf.emoji} {cvConf.label}<span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 8, background: active ? "rgba(255,255,255,.2)" : `${cvConf.color}15`, color: active ? '#fff' : cvConf.color }}>{count}</span></button>);
+        })}
+        {/* Sector filters — only show sectors that have alerts */}
+        {Object.entries(SECTOR_LABELS).map(([key, label]) => {
+          const count = displayAlerts.filter(a => a.sectorKey === key).length;
+          if (count === 0) return null;
+          const color = SECTOR_COLORS[key] || '#64748B';
+          const active = sectorFilter === key;
+          return (<button key={key} onClick={() => setSectorFilter(active ? null : key)} style={{ flexShrink: 0, padding: "6px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: active ? 'none' : `1px solid ${color}40`, background: active ? color : `${color}10`, color: active ? '#fff' : color, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontFamily: "'DM Sans', sans-serif" }}>{label}<span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 8, background: active ? "rgba(255,255,255,.2)" : `${color}15`, color: active ? '#fff' : color }}>{count}</span></button>);
         })}
       </div>
 
       {/* STATES */}
       {view === "loading" && <><SkeletonCard t={t} /><SkeletonCard t={t} /></>}
-      {view === "empty" && <NoAlerts t={t} />}
-      {view === "active" && (
+      {view === "active" && displayAlerts.length === 0 && <NoAlerts t={t} />}
+      {view === "active" && displayAlerts.length > 0 && (
         <>
-          {/* CHIP FIELD — gauge background + scattered poker chips */}
+          {/* CHIP FIELD */}
           <ChipField
             alerts={displayAlerts}
             fearScore={fearScore}
-            history={mockTrack.history}
+            history={historyDisplay}
             selectedId={selectedChipId}
             onChipTap={(a) => setSelectedChipId(selectedChipId === a.id ? null : a.id)}
             t={t}
             darkMode={darkMode}
           />
 
-          {/* DETAIL PANEL — shows selected chip's info */}
+          {/* DETAIL PANEL */}
           {selectedAlert && (
             <div style={{ background: t.card, borderRadius: 14, border: `0.5px solid ${t.border}`, boxShadow: t.shadow, overflow: 'hidden' }}>
               <div style={{ padding: '10px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 16, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{selectedAlert.ticker}</span>
                     <span style={{ padding: '2px 8px', borderRadius: 10, background: t.surfaceAlt, color: t.text2, fontSize: 11, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>{selectedAlert.scannerTag.toUpperCase()}</span>
+                    {selectedAlert.sectorKey && (
+                      <span style={{ padding: '2px 8px', borderRadius: 10, background: `${selectedAlert.sectorColor}15`, color: selectedAlert.sectorColor, fontSize: 10, fontWeight: 700, fontFamily: "'Outfit', sans-serif" }}>{selectedAlert.sector}</span>
+                    )}
+                    {selectedAlert.conviction !== 'standard' && (
+                      <span style={{ padding: '2px 8px', borderRadius: 10, background: selectedAlert.convictionBg, color: selectedAlert.convictionColor, fontSize: 10, fontWeight: 700, fontFamily: "'Outfit', sans-serif" }}>{selectedAlert.convictionEmoji} {selectedAlert.convictionLabel}</span>
+                    )}
                   </div>
                   <div>
                     <span style={{ fontSize: 16, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>${selectedAlert.price.toFixed(2)}</span>
@@ -450,7 +754,34 @@ export default function AlertsTab({ session, group }) {
                   </div>
                 </div>
                 <div style={{ fontSize: 13, color: t.text3, marginBottom: 6, fontFamily: "'DM Sans', sans-serif" }}>{selectedAlert.company}</div>
-                <BigMoneyBadge ticker={selectedAlert.ticker} onClick={openFlowForTicker} t={t} />
+                <BigMoneyBadge ticker={selectedAlert.ticker} flowData={flowData} onClick={openFlowForTicker} t={t} />
+                {/* Performance trail: 1d→3d→7d→14d→30d */}
+                {snapshotMap[selectedAlert.id] && (() => {
+                  const snaps = snapshotMap[selectedAlert.id];
+                  const intervals = ['1d','3d','7d','14d','30d'];
+                  const hasAnyData = intervals.some(k => snaps[k]?.tracked);
+                  if (!hasAnyData) return null;
+                  return (
+                    <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                      {intervals.map(k => {
+                        const s = snaps[k];
+                        const tracked = s?.tracked;
+                        const ret = s?.returnPct;
+                        const isHit = tracked && ret != null && ret >= 0;
+                        const bg = !tracked ? t.surface : isHit ? (t.greenBg || '#f0fdf4') : (t.redBg || '#fef2f2');
+                        const color = !tracked ? t.text3 : isHit ? t.green : t.red;
+                        return (
+                          <div key={k} style={{ flex: 1, background: bg, borderRadius: 6, padding: '3px 2px', textAlign: 'center' }}>
+                            <div style={{ fontSize: 9, color: t.text3, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>{k}</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color, fontFamily: "'DM Sans', sans-serif" }}>
+                              {tracked && ret != null ? `${ret >= 0 ? '+' : ''}${ret.toFixed(1)}%` : '—'}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
                 <div style={{ fontSize: 11, fontWeight: 600, color: t.text3, textTransform: 'uppercase', letterSpacing: '1px', marginTop: 8, marginBottom: 4, fontFamily: "'Outfit', sans-serif" }}>Why it's alerting</div>
                 {selectedAlert.whyAlerting.map((w, i) => (
                   <div key={i} style={{
@@ -496,22 +827,30 @@ export default function AlertsTab({ session, group }) {
             </div>
           )}
 
-          {/* ALERT HISTORY */}
+          {/* ALERT HISTORY — live from alert_performance */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, padding: '0 4px' }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: t.text3, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: "'Outfit', sans-serif" }}>Alert history</span>
-              <span style={{ fontSize: 11, color: t.text3 }}>This week</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: t.text3, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: "'Outfit', sans-serif" }}>
+                Alert history
+                {perfStats.hitRate > 0 && <span style={{ marginLeft: 8, color: t.text2, fontWeight: 600, textTransform: 'none' }}>{perfStats.hitRate}% hit rate · avg {perfStats.avgReturn}% · {perfStats.streak}</span>}
+              </span>
+              <span style={{ fontSize: 11, color: t.text3 }}>{historyDisplay.length} tracked</span>
             </div>
             <div style={{ background: t.card, borderRadius: 12, border: `0.5px solid ${t.border}`, overflow: 'hidden' }}>
-              {mockTrack.history.map((h, i) => {
+              {historyDisplay.length === 0 && (
+                <div style={{ padding: '20px 12px', textAlign: 'center' }}>
+                  <p style={{ fontSize: 13, color: t.text3, margin: 0 }}>No tracked results yet — performance auto-tracks after 24h</p>
+                </div>
+              )}
+              {historyDisplay.map((h, i) => {
                 const isHit = h.type === 'hit' || (h.result != null && h.result > 0);
                 const isOpen = expandedHistoryIdx === i;
                 return (
-                  <div key={i} style={{ borderBottom: i < mockTrack.history.length - 1 ? `0.5px solid ${t.border}` : 'none' }}>
+                  <div key={i} style={{ borderBottom: i < historyDisplay.length - 1 ? `0.5px solid ${t.border}` : 'none' }}>
                     <div onClick={() => setExpandedHistoryIdx(isOpen ? null : i)} style={{
                       padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
                     }}>
-                      <span style={{ fontSize: 11, color: t.text3, width: 36, flexShrink: 0, fontFamily: "'DM Sans', sans-serif" }}>{h.date}</span>
+                      <span style={{ fontSize: 11, color: t.text3, width: 42, flexShrink: 0, fontFamily: "'DM Sans', sans-serif" }}>{h.date}</span>
                       <div style={{
                         width: 28, height: 28, borderRadius: '50%',
                         border: `1.5px solid ${isHit ? t.green : t.red}`,
@@ -520,26 +859,56 @@ export default function AlertsTab({ session, group }) {
                         <span style={{ fontSize: 8, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{h.ticker}</span>
                       </div>
                       <span style={{ fontSize: 13, color: t.text2, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'DM Sans', sans-serif" }}>{h.desc}</span>
-                      <span style={{
-                        fontSize: 12, fontWeight: 700, padding: '2px 8px', borderRadius: 6, flexShrink: 0,
-                        background: isHit ? t.greenBg : t.redBg,
-                        color: isHit ? t.green : t.red,
-                      }}>{isHit ? "+" : ""}{h.result}%</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                        {h.adminOverride && <span title="Admin override" style={{ fontSize: 10 }}>👑</span>}
+                        <span style={{
+                          fontSize: 12, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
+                          background: isHit ? t.greenBg : t.redBg,
+                          color: isHit ? t.green : t.red,
+                        }}>{h.result != null ? `${isHit ? "+" : ""}${h.result.toFixed(1)}%` : '—'}</span>
+                      </div>
                     </div>
                     {isOpen && (
-                      <div style={{ padding: '0 12px 10px', display: 'flex', gap: 6 }}>
-                        <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: 'center' }}>
-                          <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Entry</div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${h.from}</div>
+                      <div style={{ padding: '0 12px 10px' }}>
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                          <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: 'center' }}>
+                            <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Entry</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${h.from != null ? Number(h.from).toFixed(2) : '—'}</div>
+                          </div>
+                          <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: 'center' }}>
+                            <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>24h Later</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${h.to != null ? Number(h.to).toFixed(2) : '—'}</div>
+                          </div>
+                          <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: 'center' }}>
+                            <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Result</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: isHit ? t.green : t.red, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>{h.result != null ? `${isHit ? "+" : ""}${h.result.toFixed(1)}%` : '—'}</div>
+                          </div>
                         </div>
-                        <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: 'center' }}>
-                          <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Next Day</div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${h.to}</div>
-                        </div>
-                        <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 6, textAlign: 'center' }}>
-                          <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Result</div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: isHit ? t.green : t.red, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>{isHit ? "+" : ""}{h.result}%</div>
-                        </div>
+                        {/* Multi-interval performance trail */}
+                        {h.snapshots && Object.keys(h.snapshots).length > 0 && (
+                          <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                            {['1d','3d','7d','14d','30d'].map(k => {
+                              const s = h.snapshots[k];
+                              const tracked = s?.tracked;
+                              const ret = s?.returnPct;
+                              const hit = tracked && ret != null && ret >= 0;
+                              const bg = !tracked ? t.surface : hit ? (t.greenBg || '#f0fdf4') : (t.redBg || '#fef2f2');
+                              const color = !tracked ? t.text3 : hit ? t.green : t.red;
+                              return (
+                                <div key={k} style={{ flex: 1, background: bg, borderRadius: 6, padding: '3px 2px', textAlign: 'center' }}>
+                                  <div style={{ fontSize: 9, color: t.text3, fontWeight: 600 }}>{k}</div>
+                                  <div style={{ fontSize: 11, fontWeight: 700, color }}>{tracked && ret != null ? `${ret >= 0 ? '+' : ''}${ret.toFixed(1)}%` : '—'}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {h.adminNotes && (
+                          <div style={{ background: t.surface, borderRadius: 8, padding: 6 }}>
+                            <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>👑 Admin Note</div>
+                            <div style={{ fontSize: 12, color: t.text2, marginTop: 2 }}>{h.adminNotes}</div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -548,16 +917,22 @@ export default function AlertsTab({ session, group }) {
             </div>
           </div>
 
-          {/* INSTITUTIONAL FLOW */}
+          {/* INSTITUTIONAL FLOW — live from options_flow + darkpool_trades */}
           <div ref={flowRef} style={{ background: t.card, borderRadius: 16, border: `1px solid ${t.border}`, boxShadow: t.shadow }}>
-            <button onClick={()=>setShowFlow(!showFlow)} style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer" }}>
+            <button onClick={() => setShowFlow(!showFlow)} style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: t.text1 }}>🏦 Institutional Flow</span>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: t.surfaceAlt, color: t.text2 }}>{mockBigMoney.length + mockSmartBets.length}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: t.surfaceAlt, color: t.text2 }}>{darkpoolTrades.length + optionsFlow.length}</span>
               </div>
-              <span style={{ fontSize: 18, color: t.text3, transition: "transform .2s", transform: showFlow?"rotate(180deg)":"rotate(0deg)" }}>▾</span>
+              <span style={{ fontSize: 18, color: t.text3, transition: "transform .2s", transform: showFlow ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
             </button>
-            {!showFlow && <p style={{ margin: 0, padding: "0 16px 12px", fontSize: 11, color: t.text3 }}>{bmBuying} buying · {bmSelling} selling · {topTicker} most active</p>}
+            {!showFlow && (
+              <p style={{ margin: 0, padding: "0 16px 12px", fontSize: 11, color: t.text3 }}>
+                {darkpoolTrades.length + optionsFlow.length > 0
+                  ? `Top: ${flowRanked.slice(0, 4).map(t => t.ticker).join(', ')}${bmBuying ? ` · ${bmBuying} buying` : ''}${bmSelling ? ` · ${bmSelling} selling` : ''}`
+                  : 'No flow data yet — updates every 30 min during market hours'}
+              </p>
+            )}
             {showFlow && (
               <div style={{ padding: "0 12px 12px" }}>
                 {flowTickerFilter && (
@@ -565,38 +940,37 @@ export default function AlertsTab({ session, group }) {
                     <span style={{ fontSize: 12, color: t.text2 }}>Showing:</span>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 10, background: t.btnActive, color: "#fff", fontSize: 12, fontWeight: 600 }}>
                       {flowTickerFilter}
-                      <button onClick={()=>setFlowTickerFilter(null)} style={{ background: "none", border: "none", color: t.text3, cursor: "pointer", fontSize: 14, padding: 0, marginLeft: 2 }}>✕</button>
+                      <button onClick={() => setFlowTickerFilter(null)} style={{ background: "none", border: "none", color: t.text3, cursor: "pointer", fontSize: 14, padding: 0, marginLeft: 2 }}>✕</button>
                     </span>
                   </div>
                 )}
                 <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-                  {[{k:"bigmoney",l:"Big Money Trades"},{k:"smartbets",l:"Smart Bets"}].map(tab=>(
-                    <button key={tab.k} onClick={()=>{setFlowTab(tab.k);setFlowExpandedId(null);setFlowShowAll(false);}} style={{ flex: 1, padding: "8px 0", borderRadius: 10, fontSize: 12, fontWeight: 600, border: flowTab===tab.k?"none":`1px solid ${t.border}`, background: flowTab===tab.k?t.btnActive:t.card, color: flowTab===tab.k?"#fff":t.text2, cursor: "pointer" }}>{tab.l}</button>
+                  {[{ k: "bigmoney", l: "Dark Pool" }, { k: "smartbets", l: "Options Flow" }].map(tab => (
+                    <button key={tab.k} onClick={() => { setFlowTab(tab.k); setFlowExpandedId(null); setFlowShowAll(false); }} style={{ flex: 1, padding: "8px 0", borderRadius: 10, fontSize: 12, fontWeight: 600, border: flowTab === tab.k ? "none" : `1px solid ${t.border}`, background: flowTab === tab.k ? t.btnActive : t.card, color: flowTab === tab.k ? "#fff" : t.text2, cursor: "pointer" }}>{tab.l}</button>
                   ))}
                 </div>
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: 4, marginBottom: 10 }}>
-                  {[{k:"time",l:"Newest"},{k:"size",l:"Largest"}].map(s=>(
-                    <button key={s.k} onClick={()=>setFlowSort(s.k)} style={{ padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 600, border: flowSort===s.k?"none":`1px solid ${t.border}`, background: flowSort===s.k?t.btnActive:t.card, color: flowSort===s.k?"#fff":t.text2, cursor: "pointer" }}>{s.l}</button>
+                  {[{ k: "time", l: "Newest" }, { k: "size", l: "Largest" }].map(s => (
+                    <button key={s.k} onClick={() => setFlowSort(s.k)} style={{ padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 600, border: flowSort === s.k ? "none" : `1px solid ${t.border}`, background: flowSort === s.k ? t.btnActive : t.card, color: flowSort === s.k ? "#fff" : t.text2, cursor: "pointer" }}>{s.l}</button>
                   ))}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {flowTab === "bigmoney"
-                    ? flowVisible.map(tr=><BigMoneyCard key={tr.id} trade={tr} t={t} isExpanded={flowExpandedId===tr.id} onToggle={()=>setFlowExpandedId(flowExpandedId===tr.id?null:tr.id)} />)
-                    : flowVisible.map(b=><SmartBetCard key={b.id} bet={b} t={t} isExpanded={flowExpandedId===b.id} onToggle={()=>setFlowExpandedId(flowExpandedId===b.id?null:b.id)} />)
+                    ? flowVisible.map(tr => <BigMoneyCard key={tr.id} trade={tr} t={t} isExpanded={flowExpandedId === tr.id} onToggle={() => setFlowExpandedId(flowExpandedId === tr.id ? null : tr.id)} />)
+                    : flowVisible.map(b => <SmartBetCard key={b.id} bet={b} t={t} isExpanded={flowExpandedId === b.id} onToggle={() => setFlowExpandedId(flowExpandedId === b.id ? null : b.id)} />)
                   }
                 </div>
                 {flowList.length > 3 && !flowShowAll && (
-                  <button onClick={()=>setFlowShowAll(true)} style={{ width: "100%", marginTop: 8, padding: "8px 0", borderRadius: 10, fontSize: 12, fontWeight: 600, border: `1px solid ${t.border}`, background: t.card, color: t.text2, cursor: "pointer" }}>Show all {flowList.length} {flowTab==="bigmoney"?"trades":"bets"} ▾</button>
+                  <button onClick={() => setFlowShowAll(true)} style={{ width: "100%", marginTop: 8, padding: "8px 0", borderRadius: 10, fontSize: 12, fontWeight: 600, border: `1px solid ${t.border}`, background: t.card, color: t.text2, cursor: "pointer" }}>Show all {flowList.length} {flowTab === "bigmoney" ? "trades" : "bets"} ▾</button>
                 )}
-                {flowList.length === 0 && <p style={{ textAlign: "center", fontSize: 13, color: t.text3, padding: "16px 0" }}>No {flowTickerFilter||""} flow data</p>}
+                {flowList.length === 0 && <p style={{ textAlign: "center", fontSize: 13, color: t.text3, padding: "16px 0" }}>No {flowTickerFilter || ""} flow data yet</p>}
               </div>
             )}
           </div>
-
-</>
+        </>
       )}
 
-      {modalAlert && <Modal alert={modalAlert} onClose={()=>setModalAlert(null)} t={t} />}
+      {modalAlert && <Modal alert={modalAlert} onClose={() => setModalAlert(null)} t={t} />}
     </div>
   );
 }

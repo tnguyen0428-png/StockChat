@@ -122,6 +122,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
     const day = est.getDay();
     const timeInMinutes = est.getHours() * 60 + est.getMinutes();
     if (day === 0 || day === 6) return 'closed';
+    if (isMarketHoliday()) return 'closed';
     if (timeInMinutes < 570) return 'premarket';
     if (timeInMinutes >= 570 && timeInMinutes < 960) return 'open';
     return 'afterhours';
@@ -490,11 +491,86 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
         } catch { return null; }
       }));
       const valid = results.filter(Boolean);
+      if (valid.length > 0) {
+        const pulse = {};
+        valid.forEach(r => { pulse[r.symbol] = { price: r.price, change: r.change, label: 'FUT' }; });
+        setFuturesData(pulse);
+        setFuturesLabels(valid.map(r => ({ key: r.symbol, label: r.label })));
+      } else {
+        // Yahoo proxy failed — fall back to FMP as futures-style display
+        await loadFuturesFMPFallback();
+      }
+    } catch {
+      // Full failure — fall back to FMP as futures-style display
+      await loadFuturesFMPFallback();
+    }
+  };
+
+  // ── FMP fallback specifically for the futures/off-hours ticker bar ──
+  const loadFuturesFMPFallback = async () => {
+    if (!FMP_KEY) return;
+    const tickers = ['SPY', 'QQQ', 'DIA', 'IWM', 'AAPL'];
+    const labels = { SPY: 'S&P 500', QQQ: 'Nasdaq', DIA: 'Dow', IWM: 'Russell', AAPL: 'Apple' };
+    try {
+      const results = await Promise.allSettled(
+        tickers.map(t =>
+          fetch(`https://financialmodelingprep.com/stable/quote?symbol=${t}&apikey=${FMP_KEY}`)
+            .then(r => r.json())
+        )
+      );
       const pulse = {};
-      valid.forEach(r => { pulse[r.symbol] = { price: r.price, change: r.change, label: 'FUT' }; });
-      setFuturesData(pulse);
-      setFuturesLabels(valid.map(r => ({ key: r.symbol, label: r.label })));
-    } catch {}
+      const futLabels = [];
+      results.forEach((r, idx) => {
+        if (r.status === 'fulfilled' && Array.isArray(r.value) && r.value[0]) {
+          const q = r.value[0];
+          const ticker = tickers[idx];
+          if (q.price) {
+            pulse[ticker] = { price: q.price, change: q.changesPercentage ?? q.changePercentage ?? 0, label: '' };
+            futLabels.push({ key: ticker, label: labels[ticker] || ticker });
+          }
+        }
+      });
+      if (futLabels.length > 0) {
+        setFuturesData(pulse);
+        setFuturesLabels(futLabels);
+      }
+    } catch (err) {
+      console.error('[Futures FMP Fallback] Error:', err.message);
+    }
+  };
+
+  // ── FMP Fallback: always-available ticker data ──
+  // Writes to marketPulse + marketIndicators (not futures) so it works during any market status
+  const loadFMPFallback = async () => {
+    if (!FMP_KEY) return;
+    const fallbackTickers = ['SPY', 'QQQ', 'DIA', 'IWM', 'AAPL'];
+    const fallbackLabels = { SPY: 'S&P 500', QQQ: 'Nasdaq', DIA: 'Dow', IWM: 'Russell', AAPL: 'Apple' };
+    try {
+      const results = await Promise.allSettled(
+        fallbackTickers.map(t =>
+          fetch(`https://financialmodelingprep.com/stable/quote?symbol=${t}&apikey=${FMP_KEY}`)
+            .then(r => r.json())
+        )
+      );
+      const pulse = {};
+      const indicators = [];
+      results.forEach((r, idx) => {
+        if (r.status === 'fulfilled' && Array.isArray(r.value) && r.value[0]) {
+          const q = r.value[0];
+          const ticker = fallbackTickers[idx];
+          if (q.price) {
+            pulse[ticker] = { price: q.price, change: q.changesPercentage ?? q.changePercentage ?? 0, label: '' };
+            indicators.push({ ticker, label: fallbackLabels[ticker] || ticker, position: idx });
+          }
+        }
+      });
+      if (Object.keys(pulse).length > 0) {
+        setMarketPulse(prev => ({ ...prev, ...pulse }));
+        setMarketIndicators(prev => prev.length > 0 ? prev : indicators);
+      }
+    } catch (err) {
+      console.error('[FMP Fallback] Error:', err.message);
+    }
   };
 
   const loadMarketIndicators = async () => {
@@ -502,11 +578,14 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
       .from('market_indicators')
       .select('*')
       .order('position', { ascending: true });
-    if (data) {
+    if (data && data.length > 0) {
       setMarketIndicators(data);
       await loadMarketPulse(data);
       const status = getMarketStatus();
       if (status !== 'open') await loadFutures();
+    } else {
+      // No indicators in DB — go straight to FMP fallback
+      await loadFMPFallback();
     }
   };
 
@@ -514,54 +593,87 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
     try {
       const tickers = indicators.map(m => m.ticker);
       if (tickers.length === 0) return;
-      if (isWeekend() || isMarketHoliday()) return;
 
+      // Try Polygon first (works during market hours + extended hours)
       const fetchTickers = isAfterHours()
         ? tickers.filter(t => ['SPY', 'QQQ', 'DIA'].includes(t))
         : tickers;
-      if (fetchTickers.length === 0) return;
 
-      const res = await fetch(
-        `https://api.polygon.io/v3/snapshot?ticker.any_of=${fetchTickers.join(',')}&apiKey=${POLYGON_KEY}`
-      );
-      const data = await res.json();
-      const pulse = {};
+      let pulse = {};
+      let polygonWorked = false;
 
-      (data.results || []).forEach(t => {
-        const s = t.session;
-        const ms = t.market_status;
-        let change = s.regular_trading_change_percent;
-        let price = s.close || s.price;
-        let label = '';
-        if (ms !== 'open') {
-          if (s.late_trading_change_percent) {
-            change = s.late_trading_change_percent;
-            price = s.close + (s.late_trading_change || 0);
-            label = 'AH';
-          } else if (s.early_trading_change_percent) {
-            change = s.early_trading_change_percent;
-            label = 'PM';
+      if (fetchTickers.length > 0 && !isWeekend() && !isMarketHoliday()) {
+        try {
+          const res = await fetch(
+            `https://api.polygon.io/v3/snapshot?ticker.any_of=${fetchTickers.join(',')}&apiKey=${POLYGON_KEY}`
+          );
+          const data = await res.json();
+
+          (data.results || []).forEach(t => {
+            const s = t.session;
+            const ms = t.market_status;
+            let change = s.regular_trading_change_percent;
+            let price = s.close || s.price;
+            let label = '';
+            if (ms !== 'open') {
+              if (s.late_trading_change_percent) {
+                change = s.late_trading_change_percent;
+                price = s.close + (s.late_trading_change || 0);
+                label = 'AH';
+              } else if (s.early_trading_change_percent) {
+                change = s.early_trading_change_percent;
+                label = 'PM';
+              }
+            }
+            pulse[t.ticker] = { price, change, label };
+          });
+
+          if (isMarketOpen()) {
+            const missing = tickers.filter(t => !pulse[t]);
+            for (let i = 0; i < missing.length; i += 20) {
+              if (i > 0) await new Promise(r => setTimeout(r, 1000));
+              try {
+                const batch = missing.slice(i, i + 20);
+                const r = await fetch(`https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${batch.join(',')}&apiKey=${POLYGON_KEY}`);
+                const d = await r.json();
+                (d.tickers || []).forEach(t => {
+                  const price = t.day?.c || t.prevDay?.c || 0;
+                  const prev = t.prevDay?.c || t.day?.o || price;
+                  pulse[t.ticker] = { price, change: prev ? ((price - prev) / prev) * 100 : 0, label: '' };
+                });
+              } catch {}
+            }
           }
-        }
-        pulse[t.ticker] = { price, change, label };
-      });
-
-      if (isMarketOpen()) {
-        const missing = tickers.filter(t => !pulse[t]);
-        for (let i = 0; i < missing.length; i += 20) {
-          if (i > 0) await new Promise(r => setTimeout(r, 1000));
-          try {
-            const batch = missing.slice(i, i + 20);
-            const r = await fetch(`https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${batch.join(',')}&apiKey=${POLYGON_KEY}`);
-            const d = await r.json();
-            (d.tickers || []).forEach(t => {
-              const price = t.day?.c || t.prevDay?.c || 0;
-              const prev = t.prevDay?.c || t.day?.o || price;
-              pulse[t.ticker] = { price, change: prev ? ((price - prev) / prev) * 100 : 0, label: '' };
-            });
-          } catch {}
+          polygonWorked = Object.keys(pulse).length > 0;
+        } catch {
+          polygonWorked = false;
         }
       }
+
+      // FMP fallback — if Polygon returned nothing (weekend, holiday, API issue)
+      if (!polygonWorked && FMP_KEY) {
+        const fmpTickers = tickers.length > 0 ? tickers : ['SPY', 'QQQ', 'DIA'];
+        try {
+          const results = await Promise.allSettled(
+            fmpTickers.map(t =>
+              fetch(`https://financialmodelingprep.com/stable/quote?symbol=${t}&apikey=${FMP_KEY}`)
+                .then(r => r.json())
+            )
+          );
+          results.forEach((r, idx) => {
+            if (r.status === 'fulfilled' && Array.isArray(r.value) && r.value[0]) {
+              const q = r.value[0];
+              const ticker = fmpTickers[idx];
+              if (q.price) {
+                pulse[ticker] = { price: q.price, change: q.changesPercentage ?? q.changePercentage ?? 0, label: '' };
+              }
+            }
+          });
+        } catch (err) {
+          console.error('[MarketPulse FMP fallback] Error:', err.message);
+        }
+      }
+
       setMarketPulse(pulse);
     } catch {}
   };
@@ -672,14 +784,35 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   // ═══════════════════════════════════════
   // DERIVED DATA
   // ═══════════════════════════════════════
-  const pulseItems = marketStatus === 'open'
-    ? (marketIndicators.length > 0
-        ? marketIndicators.map(m => ({ label: m.label, key: m.ticker }))
-        : [{ label: 'S&P', key: 'SPY' }, { label: 'Nasdaq', key: 'QQQ' }, { label: 'Dow', key: 'DIA' }])
-    : futuresLabels.length > 0
-      ? futuresLabels
-      : marketIndicators.map(m => ({ label: m.label, key: m.ticker }));
+  const DEFAULT_ITEMS = [{ label: 'S&P 500', key: 'SPY' }, { label: 'Nasdaq', key: 'QQQ' }, { label: 'Dow', key: 'DIA' }];
 
+  // Keywords that identify futures/commodities indicators — hide these during market hours
+  const FUTURES_KEYWORDS = ['futures', 'fut', 'gold', 'silver', 'oil', 'vix', 'gc=f', 'cl=f', 'si=f', 'es=f', 'nq=f', 'ym=f'];
+  const isFuturesItem = (item) => {
+    const label = (item.label || '').toLowerCase();
+    const key = (item.key || item.ticker || '').toLowerCase();
+    return FUTURES_KEYWORDS.some(kw => label.includes(kw) || key.includes(kw));
+  };
+
+  const pulseItems = (() => {
+    if (marketStatus === 'open') {
+      // Filter out futures/commodities from DB indicators during market hours
+      if (marketIndicators.length > 0) {
+        const stockOnly = marketIndicators
+          .filter(m => !isFuturesItem({ label: m.label, key: m.ticker }))
+          .map(m => ({ label: m.label, key: m.ticker }));
+        return stockOnly.length > 0 ? stockOnly : DEFAULT_ITEMS;
+      }
+      return DEFAULT_ITEMS;
+    }
+    // Outside market hours: show everything (futures + commodities welcome)
+    if (futuresLabels.length > 0) return futuresLabels;
+    if (marketIndicators.length > 0) return marketIndicators.map(m => ({ label: m.label, key: m.ticker }));
+    return DEFAULT_ITEMS;
+  })();
+
+  // During market hours: only show market data (no futures)
+  // Outside market hours: merge in futures/fallback data
   const activePulse = marketStatus === 'open' ? marketPulse : { ...marketPulse, ...futuresData };
 
   const uptikPublic = publicGroups.find(g => g.name === 'UpTik Public');
@@ -882,13 +1015,17 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               {[...pulseItems, ...pulseItems].map((item, i) => {
                 const d = activePulse[item.key];
                 const chg = d?.change;
-                const arrow = chg > 0 ? '▲' : '▼';
-                const color = chg > 0 ? '#8cd9a0' : chg < 0 ? '#e05252' : '#5a7080';
+                const price = d?.price;
+                const arrow = chg > 0 ? '▲' : chg < 0 ? '▼' : '';
+                const color = chg > 0 ? '#5eed8a' : chg < 0 ? '#ff6b6b' : '#8a9bb0';
                 return (
                   <span key={i} style={S.pulseItem}>
                     <span style={S.pulseName}>{item.label}</span>
+                    <span style={{ ...S.pulsePrice, color: '#dbe6f0' }}>
+                      {price ? price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}
+                    </span>
                     <span style={{ ...S.pulseVal, color }}>
-                      {d ? `${arrow}${Math.abs(chg).toFixed(2)}%` : '--'}
+                      {d ? `${arrow}${Math.abs(chg).toFixed(2)}%` : ''}
                     </span>
                   </span>
                 );
@@ -1368,11 +1505,12 @@ const S = {
 
   // ── Market Ticker Bar ──
   combinedBar: { background: '#1a3a5e', flexShrink: 0 },
-  barContent: { padding: '6px 0', minHeight: 30 },
+  barContent: { padding: '8px 0', minHeight: 34 },
   barScroll: { overflow: 'hidden', display: 'flex', alignItems: 'center' },
-  pulseItem: { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 12px' },
-  pulseName: { fontSize: 12, fontWeight: 500, color: '#4a6178' },
-  pulseVal: { fontSize: 12, fontWeight: 700 },
+  pulseItem: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 14px' },
+  pulseName: { fontSize: 13, fontWeight: 600, color: '#b8cde0', letterSpacing: 0.3 },
+  pulsePrice: { fontSize: 13, fontWeight: 700 },
+  pulseVal: { fontSize: 12, fontWeight: 600 },
 
   // ── Content ──
   content: { flex: 1, overflowY: 'auto', paddingBottom: 56, background: '#eef2f7' },
