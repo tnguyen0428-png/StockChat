@@ -43,7 +43,7 @@ function extractUptikCard(text) {
     // Swallow trailing backticks after the JSON block
     let tail = end + 1;
     while (text[tail] === '`') tail++;
-    const prose = (text.slice(0, marker.index) + text.slice(tail)).trim();
+    const prose = (text.slice(0, marker.index) + text.slice(tail)).replace(/^[`\s]+|[`\s]+$/g, '').trim();
     return { data, prose };
   } catch {
     return { data: null, prose: text };
