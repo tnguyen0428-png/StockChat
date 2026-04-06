@@ -16,6 +16,75 @@ const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 
 const EMOJIS = ['🔥','📈','📉','🚀','💪','🎯','👀','💰','⚠️','✅','❌','😎','🤔','👋','🙌','😂','💎','🐂','🐻','⏰'];
 
+// ── Earnings card parser ──
+// Detects AI replies that mention an earnings beat/miss and extracts structured fields.
+function parseEarningsCard(text) {
+  if (!text || !/EPS/i.test(text) || !/(beat|miss)/i.test(text)) return null;
+  const tickerM = text.match(/\b([A-Z]{1,5})\b\s*[—–-]\s*\$?([\d.,]+)/);
+  const dateM   = text.match(/([A-Z][a-z]{2,9}\s+\d{1,2},\s*\d{4})/);
+  const epsM    = text.match(/\$?([\d.]+)\s*EPS\s*(?:vs|versus)\s*\$?([\d.]+)/i);
+  const pctM    = text.match(/(beat|miss(?:ed)?)\s*by\s*([\d.]+)%/i);
+  if (!tickerM || !epsM) return null;
+  const actual = parseFloat(epsM[1]);
+  const est = parseFloat(epsM[2]);
+  const beat = pctM ? (pctM[1].toLowerCase().startsWith('beat') ? 1 : -1) * parseFloat(pctM[2]) : ((actual - est) / est) * 100;
+  return {
+    ticker: tickerM[1],
+    price: parseFloat(tickerM[2].replace(/,/g, '')),
+    date: dateM ? dateM[1] : null,
+    actual, est, beatPct: beat,
+    note: text.replace(/.*?%\s*\.?\s*/s, '').trim() || null,
+  };
+}
+
+function EarningsCard({ data, onTickerClick }) {
+  const positive = data.beatPct >= 0;
+  const accent = positive ? '#1AAD5E' : '#E05252';
+  const bg     = positive ? 'rgba(26,173,94,0.08)' : 'rgba(224,82,82,0.08)';
+  const row = { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '8px 12px', borderBottom: '1px solid var(--border)' };
+  const lbl = { fontSize: 12, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 };
+  const val = { fontSize: 15, color: 'var(--text1)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' };
+  return (
+    <div style={{ marginTop: 6, border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--card2)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: bg, borderBottom: `1px solid ${accent}33` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            onClick={() => onTickerClick && onTickerClick('$' + data.ticker)}
+            style={{ fontSize: 16, fontWeight: 800, color: '#D4A017', background: '#FFFBEB', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(212,160,23,0.3)', cursor: onTickerClick ? 'pointer' : 'default' }}
+          >${data.ticker}</span>
+          <span style={{ fontSize: 14, color: 'var(--text2)', fontVariantNumeric: 'tabular-nums' }}>${data.price.toFixed(2)}</span>
+        </div>
+        <span style={{ fontSize: 13, fontWeight: 700, color: accent }}>
+          {positive ? '▲' : '▼'} {positive ? 'BEAT' : 'MISS'} {Math.abs(data.beatPct).toFixed(1)}%
+        </span>
+      </div>
+      {data.date && (
+        <div style={row}>
+          <span style={lbl}>Report Date</span>
+          <span style={val}>{data.date}</span>
+        </div>
+      )}
+      <div style={row}>
+        <span style={lbl}>EPS Actual</span>
+        <span style={{ ...val, color: accent }}>${data.actual.toFixed(3)}</span>
+      </div>
+      <div style={row}>
+        <span style={lbl}>EPS Estimate</span>
+        <span style={val}>${data.est.toFixed(3)}</span>
+      </div>
+      <div style={{ ...row, borderBottom: 'none' }}>
+        <span style={lbl}>Surprise</span>
+        <span style={{ ...val, color: accent }}>{positive ? '+' : ''}{data.beatPct.toFixed(1)}%</span>
+      </div>
+      {data.note && (
+        <div style={{ padding: '8px 12px', fontSize: 13, color: 'var(--text2)', lineHeight: 1.5, borderTop: '1px solid var(--border)', background: 'var(--card)' }}>
+          {data.note}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Message Item ──
 const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven, onTickerClick }) => {
   const isAdmin = msg.is_admin;
@@ -56,7 +125,13 @@ const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven, onTic
           {isAI    && <span style={styles.aiBadge}>AI</span>}
           <span style={styles.msgTime}>{formatTime(msg.created_at)}</span>
         </div>
-        <div style={styles.msgText}>{parseText(msg.text, isAI ? onTickerClick : null)}</div>
+        {(() => {
+          const earnings = isAI ? parseEarningsCard(msg.text) : null;
+          if (earnings) {
+            return <EarningsCard data={earnings} onTickerClick={onTickerClick} />;
+          }
+          return <div style={styles.msgText}>{parseText(msg.text, isAI ? onTickerClick : null)}</div>;
+        })()}
         {isAI && onFeedback && (
           <div style={styles.feedbackRow}>
             {feedbackGiven ? (
