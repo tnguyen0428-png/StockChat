@@ -699,9 +699,14 @@ Deno.serve(async (req) => {
           ticker: ts.ticker,
           notes: `${dirEmoji}${convictionEmoji} ${ts.ticker} Flow Signal · ${signalText}`,
           price: ts.underlyingPrice || 0,
-          volume: ts.tradeCount,
-          change_pct: 0,          // Don't store confidence here — it was displayed as price change
-          rel_volume: ts.score,   // Frontend derives confidence from score: min(95, 60 + score/3)
+          volume: ts.tradeCount,           // Number of flow trades detected
+          change_pct: 0,                   // Not a price change — flow signals don't have this
+          rel_volume: ts.score,            // Signal score (frontend derives confidence from this)
+          avg_volume: ts.totalPremium,     // Total options premium ($)
+          volume_ratio: ts.bullishCallSweeps, // Number of bullish call sweeps
+          gap_pct: ts.totalDarkpoolValue,  // Total dark pool dollar value
+          pct_from_high: ts.optionsCount,  // Number of options flow trades
+          high_52w: ts.darkpoolCount,      // Number of dark pool prints
           // New columns from migration
           sector: ts.sector || null,
           conviction: ts.conviction,

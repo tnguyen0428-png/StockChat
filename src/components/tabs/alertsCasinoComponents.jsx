@@ -92,10 +92,13 @@ export function RolexGauge({ score, t, darkMode }) {
 
 // ── Poker Chip ──
 export function PokerChip({ alert, isSelected, onTap, size, t }) {
-  const isPos = alert.change >= 0;
+  const isFlow = alert.isFlowSignal;
+  const isPos = isFlow ? (alert.confidence >= 70) : (alert.change >= 0);
   const borderColor = isPos ? t.green : t.red;
   const isAOTD = alert.isAlertOfDay;
-  const pctText = (isPos ? "+" : "") + (typeof alert.changePercent === 'number' ? alert.changePercent.toFixed(2) : alert.changePercent) + "%";
+  const pctText = isFlow
+    ? `${alert.confidence}%`
+    : (isPos ? "+" : "") + (typeof alert.changePercent === 'number' ? alert.changePercent.toFixed(2) : alert.changePercent) + "%";
 
   const tickerSize = size >= 68 ? 15 : size >= 58 ? 13 : size >= 48 ? 11 : 10;
   const pctSize = size >= 68 ? 12 : size >= 58 ? 10 : size >= 48 ? 9 : 8;
@@ -141,15 +144,25 @@ export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, t
       uniqueMap.set(a.ticker, a);
     }
   });
+  const getSortValue = (a) => a.isFlowSignal ? (a.confidence || 0) : Math.abs(a.changePercent || 0);
   const sorted = [...uniqueMap.values()]
     .sort((a, b) => {
       if (a.isAlertOfDay && !b.isAlertOfDay) return -1;
       if (!a.isAlertOfDay && b.isAlertOfDay) return 1;
-      return Math.abs(b.changePercent || 0) - Math.abs(a.changePercent || 0);
+      return getSortValue(b) - getSortValue(a);
     })
     .slice(0, 5);
 
-  const getChipSize = (pct) => {
+  const getChipSize = (pct, alert) => {
+    // Flow signals: size by confidence level
+    if (alert?.isFlowSignal) {
+      const conf = alert.confidence || 0;
+      if (conf >= 85) return 82;
+      if (conf >= 75) return 72;
+      if (conf >= 65) return 60;
+      return 52;
+    }
+    // Scanner alerts: size by price change
     const abs = Math.abs(pct || 0);
     if (abs >= 4) return 82;
     if (abs >= 2) return 72;
@@ -223,7 +236,7 @@ export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, t
         if (!slot) return null;
         return (
           <div key={alert.id} style={{ position: 'absolute', ...slot, animation: `chipFloat${i} ${6 + i * 1.5}s ease-in-out infinite` }}>
-            <PokerChip alert={alert} isSelected={selectedId === alert.id} onTap={onChipTap} size={getChipSize(alert.changePercent)} t={t} />
+            <PokerChip alert={alert} isSelected={selectedId === alert.id} onTap={onChipTap} size={getChipSize(alert.changePercent, alert)} t={t} />
           </div>
         );
       })}

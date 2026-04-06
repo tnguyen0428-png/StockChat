@@ -75,12 +75,37 @@ function mapDbAlert(a, spyData, tagMap) {
   // Use dynamic tag map for label
   const scannerTag = tagMap[type] || type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
+  // ── Flow signal enrichment: decode packed fields ──
+  let flowPremium = null, flowSweeps = 0, flowDpValue = null, flowOptCount = 0, flowDpCount = 0, flowScore = 0;
+  if (isFlowSignal) {
+    flowPremium = a.avg_volume ? Number(a.avg_volume) : null;    // total options premium ($)
+    flowSweeps = a.volume_ratio ? Number(a.volume_ratio) : 0;    // bullish call sweeps
+    flowDpValue = a.gap_pct ? Number(a.gap_pct) : null;          // dark pool dollar value
+    flowOptCount = a.pct_from_high ? Number(a.pct_from_high) : 0; // options trade count
+    flowDpCount = a.high_52w ? Number(a.high_52w) : 0;           // dark pool print count
+    flowScore = a.rel_volume ? Number(a.rel_volume) : 0;         // signal score
+  }
+
   // Generate whyAlerting bullets
   const whyAlerting = [];
-  if (signal) whyAlerting.push({ icon: "📊", label: scannerTag, text: signal });
-  if (volume) whyAlerting.push({ icon: "🔥", label: "Volume", text: `${volume} shares traded${avgVolume ? ` (avg: ${avgVolume})` : ''}` });
-  if (confidence >= 80) whyAlerting.push({ icon: "✅", label: "Strong Setup", text: "Technical indicators look positive" });
-  else whyAlerting.push({ icon: "🔍", label: "Watch Closely", text: "Moderate signal — monitor for confirmation" });
+  if (isFlowSignal) {
+    // Flow-specific bullets with real data
+    const premiumStr = flowPremium ? (flowPremium >= 1e6 ? `$${(flowPremium / 1e6).toFixed(1)}M` : `$${(flowPremium / 1e3).toFixed(0)}K`) : null;
+    const dpStr = flowDpValue ? (flowDpValue >= 1e6 ? `$${(flowDpValue / 1e6).toFixed(1)}M` : `$${(flowDpValue / 1e3).toFixed(0)}K`) : null;
+
+    if (premiumStr) whyAlerting.push({ icon: "💰", label: "Options Premium", text: `${premiumStr} total premium across ${flowOptCount} trade${flowOptCount !== 1 ? 's' : ''}` });
+    if (flowSweeps > 0) whyAlerting.push({ icon: "🔥", label: "Bullish Sweeps", text: `${flowSweeps} aggressive call sweep${flowSweeps !== 1 ? 's' : ''} detected` });
+    if (dpStr) whyAlerting.push({ icon: "🏦", label: "Dark Pool", text: `${dpStr} in dark pool prints (${flowDpCount} block${flowDpCount !== 1 ? 's' : ''})` });
+    if (flowScore >= 80) whyAlerting.push({ icon: "✅", label: "Strong Signal", text: `Score ${flowScore} — multiple converging indicators` });
+    else if (flowScore >= 40) whyAlerting.push({ icon: "📊", label: "Moderate Signal", text: `Score ${flowScore} — notable institutional interest` });
+    else whyAlerting.push({ icon: "🔍", label: "Early Signal", text: `Score ${flowScore} — monitor for confirmation` });
+  } else {
+    // Scanner alert bullets (original logic)
+    if (signal) whyAlerting.push({ icon: "📊", label: scannerTag, text: signal });
+    if (volume) whyAlerting.push({ icon: "🔥", label: "Volume", text: `${volume} shares traded${avgVolume ? ` (avg: ${avgVolume})` : ''}` });
+    if (confidence >= 80) whyAlerting.push({ icon: "✅", label: "Strong Setup", text: "Technical indicators look positive" });
+    else whyAlerting.push({ icon: "🔍", label: "Watch Closely", text: "Moderate signal — monitor for confirmation" });
+  }
 
   // Conviction badge
   const conviction = a.conviction || 'standard';
@@ -102,6 +127,8 @@ function mapDbAlert(a, spyData, tagMap) {
     marketCap: '—', description: a.context ?? '',
     whyAlerting: whyAlerting.length > 0 ? whyAlerting : [{ icon: "📊", label: "Alert", text: "Breakout signal detected" }],
     isAlertOfDay: false, _isLive: true,
+    // Flow signal enrichment
+    isFlowSignal, flowPremium, flowSweeps, flowDpValue, flowOptCount, flowDpCount, flowScore,
   };
 }
 
@@ -201,9 +228,25 @@ function Modal({ alert, onClose, t: theme }) {
           <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", background: surface, border: "none", cursor: "pointer", fontSize: 18, color: text2, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
         </div>
         <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 24 }}>
-          <div><span style={{ fontSize: 30, fontWeight: 700, color: text1 }}>${alert.price.toFixed(2)}</span><span style={{ marginLeft: 12, color: alert.change >= 0 ? green : red, fontWeight: 600 }}>{alert.change >= 0 ? "▲" : "▼"} ${Math.abs(alert.change).toFixed(2)} ({alert.change >= 0 ? "+" : ""}{alert.changePercent}%)</span></div>
+          <div><span style={{ fontSize: 30, fontWeight: 700, color: text1 }}>${alert.price.toFixed(2)}</span>
+            {alert.isFlowSignal ? (
+              <span style={{ marginLeft: 12, padding: '3px 10px', borderRadius: 10, fontWeight: 700, fontSize: 16, background: alert.confidence >= 80 ? '#f0fdf4' : '#f8fafc', color: alert.confidence >= 80 ? green : text2 }}>{alert.confidence}% confidence</span>
+            ) : (
+              <span style={{ marginLeft: 12, color: alert.change >= 0 ? green : red, fontWeight: 600 }}>{alert.change >= 0 ? "▲" : "▼"} ${Math.abs(alert.change).toFixed(2)} ({alert.change >= 0 ? "+" : ""}{alert.changePercent}%)</span>
+            )}
+          </div>
           <div style={{ background: surface, borderRadius: 16, height: 160, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${border}` }}><span style={{ fontSize: 14, color: text3 }}>Chart — connects to live data later</span></div>
-          <div><h4 style={{ fontSize: 11, fontWeight: 600, color: text3, textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px" }}>Key Stats</h4><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>{[{l:"Volume",v:alert.volume,s:`Avg: ${alert.avgVolume}`},{l:"Market Cap",v:alert.marketCap,s:alert.sector},{l:"vs S&P 500",v:`${alert.vsSpy>=0?"+":""}${alert.vsSpy}%`,s:alert.vsSpy>=0?"Outperforming":"Underperforming"},{l:"Confidence",v:`${alert.confidence}%`,s:alert.confidence>=90?"Very High":alert.confidence>=80?"High":"Moderate"}].map(x=>(<div key={x.l} style={{ background: surface, borderRadius: 14, padding: "12px 16px" }}><p style={{ fontSize: 11, color: text3, textTransform: "uppercase", margin: 0 }}>{x.l}</p><p style={{ fontSize: 18, fontWeight: 700, color: text1, margin: "4px 0 2px" }}>{x.v}</p><p style={{ fontSize: 12, color: text2, margin: 0 }}>{x.s}</p></div>))}</div></div>
+          <div><h4 style={{ fontSize: 11, fontWeight: 600, color: text3, textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px" }}>Key Stats</h4><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>{(alert.isFlowSignal ? [
+            {l:"Signal Score",v:alert.flowScore,s:alert.flowScore>=80?"Very Strong":alert.flowScore>=40?"Strong":"Moderate"},
+            {l:"Confidence",v:`${alert.confidence}%`,s:alert.confidence>=90?"Very High":alert.confidence>=80?"High":"Moderate"},
+            {l:"Options Premium",v:alert.flowPremium?(alert.flowPremium>=1e6?`$${(alert.flowPremium/1e6).toFixed(1)}M`:`$${(alert.flowPremium/1e3).toFixed(0)}K`):'—',s:`${alert.flowOptCount} option trade${alert.flowOptCount!==1?'s':''}`},
+            {l:"Dark Pool",v:alert.flowDpValue?(alert.flowDpValue>=1e6?`$${(alert.flowDpValue/1e6).toFixed(1)}M`:`$${(alert.flowDpValue/1e3).toFixed(0)}K`):'—',s:`${alert.flowDpCount} block print${alert.flowDpCount!==1?'s':''}`},
+          ] : [
+            {l:"Volume",v:alert.volume,s:`Avg: ${alert.avgVolume}`},
+            {l:"Market Cap",v:alert.marketCap,s:alert.sector},
+            {l:"vs S&P 500",v:`${alert.vsSpy>=0?"+":""}${alert.vsSpy}%`,s:alert.vsSpy>=0?"Outperforming":"Underperforming"},
+            {l:"Confidence",v:`${alert.confidence}%`,s:alert.confidence>=90?"Very High":alert.confidence>=80?"High":"Moderate"},
+          ]).map(x=>(<div key={x.l} style={{ background: surface, borderRadius: 14, padding: "12px 16px" }}><p style={{ fontSize: 11, color: text3, textTransform: "uppercase", margin: 0 }}>{x.l}</p><p style={{ fontSize: 18, fontWeight: 700, color: text1, margin: "4px 0 2px" }}>{x.v}</p><p style={{ fontSize: 12, color: text2, margin: 0 }}>{x.s}</p></div>))}</div></div>
           <div><h4 style={{ fontSize: 11, fontWeight: 600, color: text3, textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px" }}>Why It's Alerting</h4><div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{alert.whyAlerting.map((w,i)=>(<div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, background: surface, borderRadius: 14, padding: "12px 16px" }}><span style={{ fontSize: 18, marginTop: 2 }}>{w.icon}</span><div><p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: text1 }}>{w.label}</p><p style={{ margin: "2px 0 0", fontSize: 13, color: text2, lineHeight: 1.4 }}>{w.text}</p></div></div>))}</div></div>
           <div style={{ display: "flex", gap: 12 }}><div style={{ flex: 1, background: surface, borderRadius: 14, padding: "12px 16px" }}><p style={{ fontSize: 11, color: text3, textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center" }}>Support <Tooltip text="A price level where this stock has historically stopped falling." t={theme} /></p><p style={{ fontSize: 18, fontWeight: 700, color: text1, margin: "4px 0 0" }}>${alert.support.toFixed(2)}</p></div><div style={{ flex: 1, background: surface, borderRadius: 14, padding: "12px 16px" }}><p style={{ fontSize: 11, color: text3, textTransform: "uppercase", margin: 0, display: "flex", alignItems: "center" }}>Resistance <Tooltip text="A price level where this stock has historically stopped rising." t={theme} /></p><p style={{ fontSize: 18, fontWeight: 700, color: text1, margin: "4px 0 0" }}>${alert.resistance.toFixed(2)}</p></div></div>
           <div style={{ display: "flex", gap: 12, padding: 0 }}><button style={{ flex: 1, padding: "12px 0", borderRadius: 14, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "'Outfit', sans-serif", background: green, color: "#fff", border: "none" }}>Add to Watchlist</button><button style={{ flex: 1, padding: "12px 0", borderRadius: 14, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "'Outfit', sans-serif", background: "transparent", color: text2, border: `2px solid ${border}` }}>Discuss in Chat</button></div>
@@ -760,9 +803,16 @@ export default function AlertsTab({ session, group }) {
                   </div>
                   <div>
                     <span style={{ fontSize: 16, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>${selectedAlert.price.toFixed(2)}</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: selectedAlert.change >= 0 ? t.green : t.red, marginLeft: 8, fontFamily: "'DM Sans', sans-serif" }}>
-                      {selectedAlert.change >= 0 ? "+" : ""}{typeof selectedAlert.changePercent === 'number' ? selectedAlert.changePercent.toFixed(2) : selectedAlert.changePercent}%
-                    </span>
+                    {selectedAlert.isFlowSignal ? (
+                      <span style={{ fontSize: 12, fontWeight: 700, marginLeft: 8, padding: '2px 8px', borderRadius: 8, fontFamily: "'DM Sans', sans-serif",
+                        background: selectedAlert.confidence >= 80 ? (t.greenBg || '#f0fdf4') : (t.surfaceAlt || '#f1f5f9'),
+                        color: selectedAlert.confidence >= 80 ? t.green : t.text2
+                      }}>{selectedAlert.confidence}% conf</span>
+                    ) : (
+                      <span style={{ fontSize: 13, fontWeight: 600, color: selectedAlert.change >= 0 ? t.green : t.red, marginLeft: 8, fontFamily: "'DM Sans', sans-serif" }}>
+                        {selectedAlert.change >= 0 ? "+" : ""}{typeof selectedAlert.changePercent === 'number' ? selectedAlert.changePercent.toFixed(2) : selectedAlert.changePercent}%
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div style={{ fontSize: 13, color: t.text3, marginBottom: 6, fontFamily: "'DM Sans', sans-serif" }}>{selectedAlert.company}</div>
@@ -807,22 +857,40 @@ export default function AlertsTab({ session, group }) {
                     </span>
                   </div>
                 ))}
-                <div style={{ display: 'flex', gap: 6, margin: '8px 0' }}>
-                  <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
-                    <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Support</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${selectedAlert.support.toFixed(2)}</div>
-                  </div>
-                  <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
-                    <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Resistance</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${selectedAlert.resistance.toFixed(2)}</div>
-                  </div>
-                  <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
-                    <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>vs SPY</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: selectedAlert.vsSpy >= 0 ? t.green : t.red, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>
-                      {selectedAlert.vsSpy >= 0 ? "+" : ""}{typeof selectedAlert.vsSpy === 'number' ? selectedAlert.vsSpy.toFixed(1) : selectedAlert.vsSpy}%
+                {/* Stats row — flow-specific or scanner-specific */}
+                {selectedAlert.isFlowSignal ? (
+                  <div style={{ display: 'flex', gap: 6, margin: '8px 0' }}>
+                    <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Score</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: selectedAlert.flowScore >= 60 ? t.green : t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>{selectedAlert.flowScore}</div>
+                    </div>
+                    <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Confidence</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: selectedAlert.confidence >= 80 ? t.green : t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>{selectedAlert.confidence}%</div>
+                    </div>
+                    <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Trades</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>{selectedAlert.flowOptCount + selectedAlert.flowDpCount}</div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 6, margin: '8px 0' }}>
+                    <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Support</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${selectedAlert.support.toFixed(2)}</div>
+                    </div>
+                    <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Resistance</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${selectedAlert.resistance.toFixed(2)}</div>
+                    </div>
+                    <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>vs SPY</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: selectedAlert.vsSpy >= 0 ? t.green : t.red, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>
+                        {selectedAlert.vsSpy >= 0 ? "+" : ""}{typeof selectedAlert.vsSpy === 'number' ? selectedAlert.vsSpy.toFixed(1) : selectedAlert.vsSpy}%
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={e => e.stopPropagation()} style={{
                     flex: 1, padding: '9px 0', borderRadius: 10, fontWeight: 600, fontSize: 14,
