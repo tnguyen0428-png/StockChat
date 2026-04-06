@@ -60,7 +60,25 @@ function isMarketHours(): boolean {
   const now = new Date();
   const dow = now.getUTCDay();
   if (dow === 0 || dow === 6) return false;
-  const etMinutes = (now.getUTCHours() - 4) * 60 + now.getUTCMinutes();
+  // Determine EST (-5) vs EDT (-4) using US DST rules:
+  // DST starts 2nd Sunday of March, ends 1st Sunday of November
+  const month = now.getUTCMonth(); // 0-indexed
+  const isDST = (() => {
+    if (month > 2 && month < 10) return true;   // Apr–Oct always EDT
+    if (month < 2 || month > 10) return false;   // Jan–Feb, Dec always EST
+    // March: DST starts 2nd Sunday
+    if (month === 2) {
+      const firstDay = new Date(Date.UTC(now.getUTCFullYear(), 2, 1)).getUTCDay();
+      const secondSunday = firstDay === 0 ? 8 : 15 - firstDay;
+      return now.getUTCDate() > secondSunday || (now.getUTCDate() === secondSunday && now.getUTCHours() >= 7);
+    }
+    // November: DST ends 1st Sunday
+    const firstDay = new Date(Date.UTC(now.getUTCFullYear(), 10, 1)).getUTCDay();
+    const firstSunday = firstDay === 0 ? 1 : 8 - firstDay;
+    return now.getUTCDate() < firstSunday || (now.getUTCDate() === firstSunday && now.getUTCHours() < 6);
+  })();
+  const utcOffset = isDST ? 4 : 5;
+  const etMinutes = (now.getUTCHours() - utcOffset) * 60 + now.getUTCMinutes();
   return etMinutes >= 9 * 60 && etMinutes < 16 * 60 + 30;
 }
 
@@ -682,8 +700,8 @@ Deno.serve(async (req) => {
           notes: `${dirEmoji}${convictionEmoji} ${ts.ticker} Flow Signal · ${signalText}`,
           price: ts.underlyingPrice || 0,
           volume: ts.tradeCount,
-          change_pct: confidence,
-          rel_volume: ts.score,
+          change_pct: 0,          // Don't store confidence here — it was displayed as price change
+          rel_volume: ts.score,   // Frontend derives confidence from score: min(95, 60 + score/3)
           // New columns from migration
           sector: ts.sector || null,
           conviction: ts.conviction,

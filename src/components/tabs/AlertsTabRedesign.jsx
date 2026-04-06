@@ -52,12 +52,18 @@ function mapDbAlert(a, spyData, tagMap) {
   else if (!signal && type === 'ma_cross' && a.short_ma != null) signal = `${a.short_ma_period ?? 20}MA crossed above ${a.long_ma_period ?? 50}MA`;
   else if (!signal && type === 'vol_surge' && a.volume_ratio != null) signal = `Volume surging ${a.volume_ratio}x above average`;
 
-  const change = a.change ?? a.change_pct ?? a.gap_pct ?? null;
+  // For flow_signal alerts, change_pct was previously misused to store confidence.
+  // Use actual price change fields only; never fall back to change_pct for flow signals.
+  const isFlowSignal = type === 'flow_signal';
+  const change = isFlowSignal
+    ? (a.change ?? a.gap_pct ?? null)                      // skip change_pct for flow signals
+    : (a.change ?? a.change_pct ?? a.gap_pct ?? null);     // scanner alerts use change_pct normally
   const resistance = a.resistance ?? (type === '52w_high' ? a.high_52w : null);
   const support = a.support ?? a.prev_close ?? null;
 
-  let confidence = a.confidence ?? 70;
-  if (a.confidence == null) {
+  // Confidence: prefer explicit confidence field, then derive from signal quality
+  let confidence = a.confidence ?? (isFlowSignal ? Math.min(95, 60 + Math.round((a.rel_volume || 0) / 3)) : 70);
+  if (a.confidence == null && !isFlowSignal) {
     if (a.volume_ratio > 2) confidence += 10;
     if (a.pct_from_high != null && a.pct_from_high < 2) confidence += 5;
     if (change != null && change > 3) confidence += 5;
