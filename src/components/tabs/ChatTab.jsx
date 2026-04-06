@@ -21,11 +21,29 @@ const EMOJIS = ['🔥','📈','📉','🚀','💪','🎯','👀','💰','⚠️'
 // Returns { data, prose } where data has a `type` field and prose is the cleaned message.
 function extractUptikCard(text) {
   if (!text) return { data: null, prose: text };
-  const m = text.match(/```uptik\s*([\s\S]*?)```/);
-  if (!m) return { data: null, prose: text };
+  // Find the uptik marker (any number of backticks, or none), then brace-match the JSON.
+  const marker = text.match(/(`{0,3})\s*uptik\s*/i);
+  if (!marker) return { data: null, prose: text };
+  const startIdx = marker.index + marker[0].length;
+  const braceStart = text.indexOf('{', startIdx);
+  if (braceStart === -1 || braceStart > startIdx + 4) return { data: null, prose: text };
+  let depth = 0, end = -1, inStr = false, esc = false;
+  for (let i = braceStart; i < text.length; i++) {
+    const c = text[i];
+    if (esc) { esc = false; continue; }
+    if (c === '\\') { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === '{') depth++;
+    else if (c === '}') { depth--; if (depth === 0) { end = i; break; } }
+  }
+  if (end === -1) return { data: null, prose: text };
   try {
-    const data = JSON.parse(m[1].trim());
-    const prose = (text.slice(0, m.index) + text.slice(m.index + m[0].length)).trim();
+    const data = JSON.parse(text.slice(braceStart, end + 1));
+    // Swallow trailing backticks after the JSON block
+    let tail = end + 1;
+    while (text[tail] === '`') tail++;
+    const prose = (text.slice(0, marker.index) + text.slice(tail)).trim();
     return { data, prose };
   } catch {
     return { data: null, prose: text };
