@@ -1185,14 +1185,13 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               </div>
             </div>
             <button
-              style={S.csViewAll}
-              onClick={() => {
-                const next = !chatExpanded;
-                setChatExpanded(next);
-                loadChatMessages(null, next);
-              }}
+              style={S.privateChatBtn}
+              onClick={() => onTabChange?.('profile')}
             >
-              {chatExpanded ? 'Show less ‹' : 'View all ›'}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              Private Chat
             </button>
           </div>
 
@@ -1225,57 +1224,6 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               )}
             </div>
           </div>
-        </div>
-
-        <div style={S.sectionDivider} />
-
-        {/* ── MY GROUPS + CREATE GROUP CTA ── */}
-        <div style={S.groupSection}>
-          <div style={S.groupSectionHeader}>
-            <span style={S.groupSectionTitle}>My Groups</span>
-            <button style={S.groupCreateBtn} onClick={() => setShowCreateGroup(true)}>
-              + New
-            </button>
-          </div>
-
-          {/* Existing private groups */}
-          {customGroups.length > 0 ? (
-            <div style={S.myGroupsPills}>
-              {customGroups.map(g => (
-                <div
-                  key={g.id}
-                  style={S.myGroupPill}
-                  onClick={() => { onGroupSelect?.(g); onTabChange?.('chat'); }}
-                >
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: g.color || '#7B68EE', flexShrink: 0 }} />
-                  <span style={S.myGroupName}>{g.name}</span>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#7a8ea3" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
-                </div>
-              ))}
-              <div
-                style={{ ...S.myGroupPill, border: '1px dashed #d8e2ed', color: '#2a7d4b' }}
-                onClick={() => setShowCreateGroup(true)}
-              >
-                <span style={{ fontSize: 14, fontWeight: 700 }}>+</span>
-                <span style={S.myGroupName}>Create</span>
-              </div>
-            </div>
-          ) : (
-            /* Empty state — invite to create first group */
-            <div style={S.groupCta} onClick={() => setShowCreateGroup(true)}>
-              <div style={S.groupCtaIcon}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2a7d4b" strokeWidth="1.5">
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/>
-                  <line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>
-                </svg>
-              </div>
-              <div style={S.groupCtaText}>
-                <div style={S.groupCtaTitle}>Start a group</div>
-                <div style={S.groupCtaSub}>Chat privately with friends — invite with a link</div>
-              </div>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2a7d4b" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
-            </div>
-          )}
         </div>
 
       </div>
@@ -1516,7 +1464,14 @@ const S = {
   csTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 6 },
   csLive: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#2a7d4b', fontWeight: 500 },
   csLiveDot: { width: 5, height: 5, borderRadius: '50%', background: '#2a7d4b', animation: 'pulse 1.5s ease-in-out infinite' },
-  csViewAll: { fontSize: 13, color: '#2a7d4b', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' },
+  privateChatBtn: {
+    display: 'flex', alignItems: 'center', gap: 5,
+    fontSize: 12, fontWeight: 600, color: '#fff',
+    background: '#2a7d4b', border: 'none', borderRadius: 12,
+    padding: '5px 12px', cursor: 'pointer',
+    boxShadow: '0 2px 6px rgba(42,125,75,0.3)',
+    fontFamily: 'inherit',
+  },
 
   // ── My Groups section ──
   groupSection: { padding: '12px 14px 16px' },
