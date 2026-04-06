@@ -3,7 +3,7 @@
 // Main dashboard shell — reads from GroupContext
 // ============================================
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useGroup } from '../context/GroupContext';
@@ -107,9 +107,21 @@ export default function DashboardPage({ session }) {
     navigate('/login');
   };
 
+  // Ref so HomeTab can expose its scrollToChat function
+  const scrollToChatRef = useRef(null);
+
+  const handleTabChange = useCallback((tab) => {
+    if (tab === 'chat') {
+      // Redirect Chat to Home and scroll to chat section
+      setActiveTab('home');
+      setTimeout(() => scrollToChatRef.current?.(), 100);
+    } else {
+      setActiveTab(tab);
+    }
+  }, []);
+
   const handleGroupSelect = (group) => {
     enterGroup(group);
-    setActiveTab('chat');
   };
 
   function broadcastColor(type) {
@@ -188,9 +200,10 @@ export default function DashboardPage({ session }) {
           <HomeTab
             session={session}
             onGroupSelect={handleGroupSelect}
-            onAIPress={() => setActiveTab('ai')}
             onSignOut={handleSignOut}
             onProfilePress={() => setActiveTab('profile')}
+            onTabChange={handleTabChange}
+            scrollToChatRef={scrollToChatRef}
           />
         )}
         {activeTab === 'ai' && <AITab session={session} />}
@@ -228,8 +241,8 @@ export default function DashboardPage({ session }) {
       </div>
 
       <BottomNav
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
+        activeTab={activeTab === 'home' ? 'home' : activeTab}
+        onTabChange={handleTabChange}
         unreadAlerts={unreadAlerts}
         unreadChat={unreadChat}
       />

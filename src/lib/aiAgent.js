@@ -43,9 +43,6 @@ export async function fetchStockContext(tickers) {
       ]);
       const profileData = await profileRes.json();
       const earningsData = await earningsRes.json();
-      console.log('DEBUG fetchStockContext tickers:', tickers);
-      console.log('DEBUG FMP profile response:', profileData);
-      console.log('DEBUG FMP earnings response:', earningsData);
       const p = profileData?.[0];
       const nextEarnings = earningsData?.find(e => e.epsActual === null);
       const lastEarnings = earningsData?.find(e => e.epsActual !== null);

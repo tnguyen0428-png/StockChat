@@ -1,6 +1,7 @@
 // ============================================
 // UPTIKALERTS — BottomNav.jsx
-// 5 tabs: Home, Alerts, Chat (center), Challenge, Profile
+// 5 tabs: Home, Alerts, Chat, Challenge, Profile
+// Uniform icon sizing — no elevated chat
 // ============================================
 
 const HomeIcon = ({ active }) => (
@@ -24,23 +25,16 @@ const ProfileIcon = ({ active }) => (
   </svg>
 );
 
-const ChatIcon = ({ active, highlighted }) => (
-  <svg width={highlighted ? 24 : 22} height={highlighted ? 24 : 22} viewBox="0 0 24 24" fill="none">
+const ChatIcon = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"
-      fill={highlighted ? '#fff' : (active ? '#2a7d4b' : '#7a8ea3')} />
+      fill={active ? '#132d52' : '#7a8ea3'} />
   </svg>
 );
 
 const ChallengeIcon = ({ active }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
-      fill={active ? '#132d52' : '#7a8ea3'} />
-  </svg>
-);
-
-const FlowIcon = ({ active }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"
       fill={active ? '#132d52' : '#7a8ea3'} />
   </svg>
 );
@@ -59,23 +53,16 @@ export default function BottomNav({ activeTab, onTabChange, unreadAlerts }) {
       {TABS.map(({ id, label, Icon }) => {
         const isActive = activeTab === id;
         const hasBadge = id === 'alerts' && unreadAlerts;
-        const isChat = id === 'chat';
         return (
-          <div key={id} style={{ ...styles.item, ...(isChat ? { marginTop: -22 } : {}) }} onClick={() => onTabChange(id)}>
+          <div key={id} style={styles.item} onClick={() => onTabChange(id)}>
             <div style={styles.iconWrap}>
-              {isChat ? (
-                <div style={styles.chatCircle}>
-                  <Icon active={isActive} highlighted />
-                </div>
-              ) : (
-                <Icon active={isActive} />
-              )}
+              <Icon active={isActive} />
               {hasBadge && <div style={styles.badge} />}
             </div>
             <span style={{
               ...styles.label,
-              color: isChat ? '#2a7d4b' : (isActive ? '#132d52' : '#7a8ea3'),
-              fontWeight: isChat ? 600 : 500,
+              color: isActive ? '#132d52' : '#7a8ea3',
+              fontWeight: isActive ? 600 : 500,
             }}>
               {label}
             </span>
@@ -105,14 +92,6 @@ const styles = {
     WebkitTapHighlightColor: 'transparent',
   },
   iconWrap: { position: 'relative' },
-  chatCircle: {
-    width: 52, height: 52, borderRadius: '50%',
-    background: '#2a7d4b',
-    border: '3px solid #f8fafc',
-    boxShadow: '0 4px 14px rgba(42,125,75,0.3)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    position: 'relative', zIndex: 10000,
-  },
   badge: {
     position: 'absolute', top: -2, right: -4,
     width: 7, height: 7, background: 'var(--red)',

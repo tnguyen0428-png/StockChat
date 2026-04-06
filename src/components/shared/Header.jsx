@@ -7,11 +7,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
+import CreateGroupModal from './CreateGroupModal';
+import InviteModal from './InviteModal';
 
-const GROUP_COLORS = ['#7B68EE', '#4CAF50', '#FF7043', '#42A5F5', '#FFB300'];
 
 export default function Header({ group, profile, isAdmin, isModerator, activeTab, allGroups, onGroupSwitch, onGroupNameUpdate, onSignOut, onHomePress, onProfilePress }) {
-  const { sectorGroups, customGroups, createCustomGroup } = useGroup();
+  const { sectorGroups, customGroups } = useGroup();
 
   const [editing, setEditing]           = useState(false);
   const [editName, setEditName]         = useState('');
@@ -20,20 +21,12 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
   const [showDropdown, setShowDropdown] = useState(false);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
 
-  // Create group state
+  // Create/invite group modals
   const [showCreate, setShowCreate]     = useState(false);
-  const [newGroupName, setNewGroupName] = useState('');
-  const [newGroupColor, setNewGroupColor] = useState('#7B68EE');
-  const [creating, setCreating]         = useState(false);
-  const [createError, setCreateError]   = useState('');
-
-  // Invite share state
-  const [showInvite, setShowInvite]     = useState(null); // group object
-  const [copied, setCopied]             = useState(false);
+  const [showInvite, setShowInvite]     = useState(null);
 
   const dropdownRef  = useRef(null);
   const avatarRef    = useRef(null);
-  const createRef    = useRef(null);
 
   const canEdit        = isAdmin || isModerator;
   const hasMultiGroup  = (allGroups || []).length > 1 || customGroups.length > 0;
@@ -90,70 +83,6 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
   const handleGroupSwitch = (g) => {
     setShowDropdown(false);
     onGroupSwitch?.(g);
-  };
-
-  const handleCreateGroup = async () => {
-    if (!newGroupName.trim() || creating) return;
-    setCreating(true);
-    setCreateError('');
-
-    const result = await createCustomGroup(newGroupName, newGroupColor);
-
-    if (result.error) {
-      setCreateError(result.error);
-      setCreating(false);
-      return;
-    }
-
-    // Success — show invite screen for the new group
-    setCreating(false);
-    setShowCreate(false);
-    setNewGroupName('');
-    setNewGroupColor('#7B68EE');
-    setShowDropdown(false);
-
-    // Switch to the new group and show invite
-    onGroupSwitch?.(result.group);
-    setShowInvite(result.group);
-  };
-
-  const getInviteLink = (g) => {
-    return `${window.location.origin}/join/${g.invite_code}`;
-  };
-
-  const handleCopyLink = async (g) => {
-    try {
-      await navigator.clipboard.writeText(getInviteLink(g));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback for mobile
-      const input = document.createElement('input');
-      input.value = getInviteLink(g);
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand('copy');
-      document.body.removeChild(input);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const handleShareLink = async (g) => {
-    const link = getInviteLink(g);
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: `Join ${g.name} on UpTikAlerts`, text: `Join my group "${g.name}" on UpTikAlerts!`, url: link });
-      } catch {}
-    } else {
-      handleCopyLink(g);
-    }
-  };
-
-  const handleTextLink = (g) => {
-    const link = getInviteLink(g);
-    const text = encodeURIComponent(`Join my group "${g.name}" on UpTikAlerts! ${link}`);
-    window.open(`sms:?body=${text}`, '_self');
   };
 
   if (activeTab === 'home') return null;
@@ -283,114 +212,21 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
           </div>
         </div>
 
-        {/* ── Create Group Modal ── */}
-        {showCreate && (
-          <div style={styles.modalOverlay} onClick={() => { setShowCreate(false); setCreateError(''); }}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
-              <div style={styles.modalTitle}>Create group</div>
-
-              <div style={styles.fieldLabel}>Group name</div>
-              <input
-                ref={createRef}
-                style={styles.modalInput}
-                value={newGroupName}
-                onChange={e => setNewGroupName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleCreateGroup()}
-                placeholder="e.g. Options Gang"
-                maxLength={40}
-                autoFocus
-              />
-
-              <div style={styles.fieldLabel}>Color</div>
-              <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-                {GROUP_COLORS.map(c => (
-                  <div
-                    key={c}
-                    onClick={() => setNewGroupColor(c)}
-                    style={{
-                      width: 32, height: 32, borderRadius: '50%', background: c, cursor: 'pointer',
-                      border: newGroupColor === c ? '2.5px solid var(--text1)' : '2.5px solid transparent',
-                      transition: 'border 0.15s',
-                    }}
-                  />
-                ))}
-              </div>
-
-              {createError && (
-                <div style={{ fontSize: 12, color: '#EF4444', marginBottom: 8 }}>{createError}</div>
-              )}
-
-              <button
-                style={{ ...styles.modalSendBtn, opacity: creating || !newGroupName.trim() ? 0.5 : 1 }}
-                onClick={handleCreateGroup}
-                disabled={creating || !newGroupName.trim()}
-              >
-                {creating ? 'Creating...' : 'Create group'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Invite Share Modal ── */}
-        {showInvite && (
-          <div style={styles.modalOverlay} onClick={() => { setShowInvite(null); setCopied(false); }}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
-              <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <div style={{
-                  width: 52, height: 52, borderRadius: '50%',
-                  background: `${showInvite.color || '#7B68EE'}22`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  margin: '0 auto 12px',
-                }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={showInvite.color || '#7B68EE'} strokeWidth="1.5">
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/>
-                    <line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>
-                  </svg>
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text1)', marginBottom: 4 }}>
-                  Invite to {showInvite.name}
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--text3)', lineHeight: 1.4 }}>
-                  Share this link — one tap and they're in.
-                </div>
-              </div>
-
-              {/* Link display */}
-              <div style={styles.linkRow}>
-                <span style={styles.linkText}>{getInviteLink(showInvite)}</span>
-                <button
-                  style={{ ...styles.copyBtn, background: copied ? 'var(--green)' : 'var(--green)' }}
-                  onClick={() => handleCopyLink(showInvite)}
-                >
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-              </div>
-
-              {/* Share buttons */}
-              <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-                <button style={styles.shareOption} onClick={() => handleTextLink(showInvite)}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="1.5"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                  <span>Text it</span>
-                </button>
-                <button style={styles.shareOption} onClick={() => handleCopyLink(showInvite)}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  <span>Copy link</span>
-                </button>
-                <button style={styles.shareOption} onClick={() => handleShareLink(showInvite)}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="1.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-                  <span>Share</span>
-                </button>
-              </div>
-
-              <button
-                style={{ ...styles.skipBtn, marginTop: 16 }}
-                onClick={() => { setShowInvite(null); setCopied(false); }}
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        )}
+        {/* ── Shared Modals ── */}
+        <CreateGroupModal
+          open={showCreate}
+          onClose={() => setShowCreate(false)}
+          onCreated={(group) => {
+            setShowCreate(false);
+            setShowDropdown(false);
+            onGroupSwitch?.(group);
+            setShowInvite(group);
+          }}
+        />
+        <InviteModal
+          group={showInvite}
+          onClose={() => setShowInvite(null)}
+        />
       </>
     );
   }
