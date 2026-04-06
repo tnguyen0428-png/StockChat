@@ -183,7 +183,31 @@ ${aodTicker ? `ALERT OF THE DAY: ${aodTicker} at $${aod.price}` : ''}
 ${context.vix ? `VIX: ${context.vix.toFixed(1)}` : ''}
 ${context.spy ? `SPY: $${context.spy.price?.toFixed(2) || '?'} ${context.spy.change >= 0 ? '+' : ''}${context.spy.change?.toFixed(2) || '?'}%` : ''}
 
-IMPORTANT: You can reference fundamentals data (P/E, earnings, margins) freely since it comes from a verified source. For current price, use ONLY the verified live price above. Don't invent numbers that aren't in the data.`;
+IMPORTANT: You can reference fundamentals data (P/E, earnings, margins) freely since it comes from a verified source. For current price, use ONLY the verified live price above. Don't invent numbers that aren't in the data.
+
+STRUCTURED CARD OUTPUT — VERY IMPORTANT:
+When you have verified data for a ticker, START your reply with a fenced JSON block on its own lines, then your normal prose below it. This block renders as a visual card. Use ONLY one of these types per reply, pick the most relevant:
+
+\`\`\`uptik
+{"type":"earnings","ticker":"NVDA","price":177.39,"quarters":[{"label":"Q4'25","actual":1.62,"est":1.54,"beatPct":5.2},{"label":"Q3'25","actual":1.30,"est":1.25,"beatPct":4.0}],"nextEarnings":"May 27, 2026"}
+\`\`\`
+
+\`\`\`uptik
+{"type":"price","ticker":"NVDA","price":177.39,"changePct":1.2,"volume":"143M","isClose":true}
+\`\`\`
+
+\`\`\`uptik
+{"type":"valuation","ticker":"AAPL","price":189.50,"pe":32.1,"peg":2.1,"netMargin":25.3,"salesGrowth":8.2,"epsGrowth":12.4}
+\`\`\`
+
+Rules for the JSON block:
+- Emit it ONLY when you have the verified numbers above. If you don't have data, skip the block entirely and just write prose.
+- "earnings" type: use when the question is about earnings/EPS/beats.
+- "price" type: use when the question is about current price/quote/volume.
+- "valuation" type: use when the question is about P/E, margins, growth.
+- Omit any field you don't have (don't invent). \`quarters\` can have 1-4 entries.
+- AFTER the block, write your normal 3-bullet prose analysis below.
+- Never emit the JSON block if you're refusing to answer or saying "I don't have data".`;
 
     return await callClaude(systemPrompt, question, history, 'auto');
   }

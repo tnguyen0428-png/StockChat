@@ -16,6 +16,22 @@ const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 
 const EMOJIS = ['🔥','📈','📉','🚀','💪','🎯','👀','💰','⚠️','✅','❌','😎','🤔','👋','🙌','😂','💎','🐂','🐻','⏰'];
 
+// ── Structured JSON card extractor (preferred path) ──
+// The AI is instructed to prepend a ```uptik {...}``` fenced block when it has verified data.
+// Returns { data, prose } where data has a `type` field and prose is the cleaned message.
+function extractUptikCard(text) {
+  if (!text) return { data: null, prose: text };
+  const m = text.match(/```uptik\s*([\s\S]*?)```/);
+  if (!m) return { data: null, prose: text };
+  try {
+    const data = JSON.parse(m[1].trim());
+    const prose = (text.slice(0, m.index) + text.slice(m.index + m[0].length)).trim();
+    return { data, prose };
+  } catch {
+    return { data: null, prose: text };
+  }
+}
+
 // ── Earnings card parser ──
 // Handles both single-quarter and multi-quarter bullet-list earnings replies.
 function parseEarningsCard(text) {
@@ -366,16 +382,53 @@ const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven, onTic
         </div>
         {(() => {
           if (isAI) {
-            const earnings = parseEarningsCard(msg.text);
+            // Preferred path: structured JSON card block from AI
+            const { data: cardData, prose } = extractUptikCard(msg.text);
+            if (cardData && cardData.type) {
+              const note = prose || null;
+              let card = null;
+              if (cardData.type === 'earnings') {
+                const latest = cardData.quarters?.[0];
+                card = <EarningsCard data={{
+                  ticker: cardData.ticker, price: cardData.price,
+                  date: latest?.label || cardData.nextEarnings || null,
+                  actual: latest?.actual ?? null, est: latest?.est ?? null,
+                  beatPct: latest ? (latest.beatPct ?? 0) : 0,
+                  quarters: (cardData.quarters || []).map(q => ({ label: q.label, sign: (q.beatPct ?? 0) >= 0 ? 1 : -1, pct: Math.abs(q.beatPct ?? 0), actual: q.actual ?? null, est: q.est ?? null })),
+                  note,
+                }} onTickerClick={onTickerClick} />;
+              } else if (cardData.type === 'price') {
+                card = <PriceQuoteCard data={{
+                  ticker: cardData.ticker, price: cardData.price,
+                  pct: cardData.changePct ?? null,
+                  volume: cardData.volume || null,
+                  isClose: !!cardData.isClose,
+                  note,
+                }} onTickerClick={onTickerClick} />;
+              } else if (cardData.type === 'valuation') {
+                card = <ValuationCard data={{
+                  ticker: cardData.ticker,
+                  pe: cardData.pe, peg: cardData.peg ?? null,
+                  netMargin: cardData.netMargin ?? null,
+                  salesGrowth: cardData.salesGrowth ?? null,
+                  epsGrowth: cardData.epsGrowth ?? null,
+                }} onTickerClick={onTickerClick} />;
+              }
+              if (card) return card;
+            }
+            // Fallback: regex parsers against prose (if AI didn't emit JSON yet)
+            const fallbackText = prose || msg.text;
+            const earnings = parseEarningsCard(fallbackText);
             if (earnings) return <EarningsCard data={earnings} onTickerClick={onTickerClick} />;
-            const valuation = parseValuationCard(msg.text);
+            const valuation = parseValuationCard(fallbackText);
             if (valuation) return <ValuationCard data={valuation} onTickerClick={onTickerClick} />;
-            const flow = parseOptionsFlowCard(msg.text);
+            const flow = parseOptionsFlowCard(fallbackText);
             if (flow) return <OptionsFlowCard data={flow} onTickerClick={onTickerClick} />;
-            const quote = parsePriceQuoteCard(msg.text);
+            const quote = parsePriceQuoteCard(fallbackText);
             if (quote) return <PriceQuoteCard data={quote} onTickerClick={onTickerClick} />;
+            return <div style={styles.msgText}>{parseText(fallbackText, onTickerClick)}</div>;
           }
-          return <div style={styles.msgText}>{parseText(msg.text, isAI ? onTickerClick : null)}</div>;
+          return <div style={styles.msgText}>{parseText(msg.text, null)}</div>;
         })()}
         {isAI && onFeedback && (
           <div style={styles.feedbackRow}>
@@ -1249,26 +1302,37 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     if (!ticker || COMMON_WORDS.has(ticker)) return [];
     const text = lastAI.text;
     const chips = [];
-    // Context-aware branching off the last answer's content
-    if (/EPS|earnings|beat|miss/i.test(text)) {
+    // Prefer structured JSON card type when available (reliable, no keyword guessing)
+    const { data: card, prose } = extractUptikCard(text);
+    const cardType = card?.type || null;
+    const proseText = prose || text;
+    // Stronger keyword gates for the fallback path (avoid e.g. "earnings" appearing in narrative)
+    const isEarningsProse  = /\b(?:beat|miss(?:ed)?)\s*(?:by\s*)?[\d.]+\s*%|\$[\d.]+\s+vs\s+\$[\d.]+/i.test(proseText);
+    const isValuationProse = /P\/E[:\s]+[\d.]+|PEG[:\s]+[\d.]+/i.test(proseText);
+    const isFlowProse      = /\b[\d.]+\s*[CP]\b.*\$[\d.]+[KMB]|unusual flow|dark pool/i.test(proseText);
+    const isChartProse     = /\b(support|resistance|breakout)\b.*\$[\d.]+/i.test(proseText);
+    const isPriceProse     = /last close|closing price|\d+\s*[KMB]\s*shares/i.test(proseText);
+
+    if (cardType === 'earnings' || isEarningsProse) {
       chips.push(`What's ${ticker}'s next catalyst?`);
       chips.push(`How did ${ticker} guide forward?`);
-    } else if (/P\/E|PEG|margin|valuation/i.test(text)) {
+    } else if (cardType === 'valuation' || isValuationProse) {
       chips.push(`Is ${ticker} overvalued vs peers?`);
       chips.push(`Compare ${ticker} to its sector`);
-    } else if (/call|put|premium|flow|options/i.test(text)) {
+    } else if (cardType === 'flow' || isFlowProse) {
       chips.push(`Show more ${ticker} unusual flow`);
       chips.push(`What does the dark pool say on ${ticker}?`);
-    } else if (/support|resistance|breakout|chart/i.test(text)) {
+    } else if (isChartProse) {
       chips.push(`What's ${ticker}'s next key level?`);
       chips.push(`Is ${ticker} in a trend?`);
-    } else if (/last close|closing price|volume|shares/i.test(text)) {
+    } else if (cardType === 'price' || isPriceProse) {
       chips.push(`How did ${ticker}'s last earnings go?`);
       chips.push(`What's ${ticker}'s next catalyst?`);
       chips.push(`Any unusual flow on ${ticker}?`);
     } else {
-      if (!/earnings/i.test(text)) chips.push(`How did ${ticker}'s last earnings go?`);
-      if (!/compare/i.test(text)) chips.push(`Compare ${ticker} to competitors`);
+      // Pure prose with no structured signal (e.g. "I don't have data for KR")
+      chips.push(`What matters most for ${ticker}?`);
+      chips.push(`Compare ${ticker} to competitors`);
       chips.push(`Is ${ticker} a good buy right now?`);
     }
     return chips.slice(0, 3);
