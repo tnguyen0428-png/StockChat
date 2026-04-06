@@ -865,7 +865,12 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const callAI = useCallback(async (query) => {
     setAiLoading(true);
     // Extract ticker for loading indicator — only match $TICKER format or standalone uppercase tickers
-    const LOADING_IGNORE = new Set(['WHAT', 'WHATS', 'HOW', 'THE', 'TELL', 'ABOUT', 'TODAY', 'MARKET', 'MOVING', 'COMPARE', 'GOOD', 'BEST', 'LAST', 'WHEN', 'DOES', 'THEIR', 'THIS', 'THAT']);
+    const LOADING_IGNORE = new Set([
+      'WHAT', 'WHATS', 'HOW', 'THE', 'TELL', 'ABOUT', 'TODAY', 'MARKET',
+      'MOVING', 'COMPARE', 'GOOD', 'BEST', 'LAST', 'WHEN', 'DOES', 'THEIR',
+      'THIS', 'THAT', 'HOT', 'RIGHT', 'TGT', 'BUY', 'SELL', 'PRICE',
+      'HIGH', 'LOW', 'TOP', 'YES', 'NOW', 'JUST', 'LIKE', 'WILL',
+    ]);
     const dollarTicker = query.match(/\$([A-Z]{1,5})\b/);
     const bareTicker = query.match(/\b([A-Z]{2,5})\b/);
     const extractedTicker = dollarTicker ? dollarTicker[1] : (bareTicker && !LOADING_IGNORE.has(bareTicker[1]) ? bareTicker[1] : null);
@@ -907,7 +912,15 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   }, [group?.id, activeGroup?.name, profile?.username, watchlist, messages, aiLastTicker]);
 
   // Generate contextual follow-up chips based on last AI response
-  const COMMON_WORDS = new Set(['TODAY', 'NOW', 'ALL', 'THE', 'HOW', 'WHAT', 'WHY', 'BUY', 'SELL', 'MARKET', 'GOOD', 'BEST', 'TOP']);
+  const COMMON_WORDS = new Set([
+    'TODAY', 'NOW', 'ALL', 'THE', 'HOW', 'WHAT', 'WHY', 'BUY', 'SELL',
+    'MARKET', 'GOOD', 'BEST', 'TOP', 'HOT', 'RIGHT', 'TGT', 'YES', 'NO',
+    'HIGH', 'LOW', 'TELL', 'GET', 'JUST', 'LIKE', 'WILL', 'CAN', 'THIS',
+    'THAT', 'FOR', 'ARE', 'NOT', 'BUT', 'HAS', 'HAD', 'BEEN', 'DOES',
+    'HOLD', 'MOVE', 'DROP', 'RISE', 'FALL', 'GAIN', 'LOSS', 'BULL', 'BEAR',
+    'LONG', 'SHORT', 'SAFE', 'FREE', 'FAST', 'SLOW', 'REAL', 'SURE',
+    'STOCK', 'TRADE', 'PRICE', 'SHARE', 'FUND', 'BOND', 'CASH', 'DEBT',
+  ]);
   const getFollowUpChips = useCallback(() => {
     if (aiLoading) return [];
     const lastAI = [...messages].reverse().find(m => m.user_id === 'user_ai');

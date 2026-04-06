@@ -7,6 +7,7 @@ const ANTHROPIC_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
 const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 
 const IGNORE = new Set([
+  // Pronouns & determiners
   'AI', 'THE', 'FOR', 'AND', 'CAN', 'YOU', 'ARE', 'HOW', 'WHAT', 'WHEN',
   'WHY', 'IS', 'AT', 'IN', 'ON', 'TO', 'ME', 'MY', 'A', 'ABOUT', 'THEIR',
   'THEM', 'THEY', 'THIS', 'THAT', 'WITH', 'WILL', 'HAVE', 'HAS', 'HAD',
@@ -14,20 +15,58 @@ const IGNORE = new Set([
   'OUR', 'OUT', 'BUT', 'NOT', 'ALL', 'ANY', 'GET', 'GOT', 'HIT', 'RUN',
   'SET', 'PUT', 'LET', 'BIG', 'NEW', 'NOW', 'OLD', 'WAY', 'WHO', 'DID',
   'DO', 'UP', 'IF', 'OR', 'SO', 'WE', 'HE', 'SHE', 'IT', 'BE', 'BY',
+  // Common verbs & adverbs
   'NEXT', 'LAST', 'JUST', 'EVEN', 'MUCH', 'MORE', 'MOST', 'ALSO', 'BACK',
   'AFTER', 'BEFORE', 'WHICH', 'THERE', 'THESE', 'THOSE', 'COULD', 'WOULD',
   'SHOULD', 'CHECK', 'LOOK', 'SHOW', 'TELL', 'GIVE', 'TAKE', 'MAKE',
   'THINK', 'KNOW', 'WANT', 'NEED', 'FEEL', 'SEEM', 'CALL', 'KEEP',
-  'FIND', 'GOOD', 'WELL', 'LONG', 'HIGH', 'STRONG', 'MARKET', 'STOCK',
-  'PRICE', 'DATA', 'EARNINGS', 'SECTOR', 'TRADE', 'BUY', 'SELL', 'ITS',
-  'LATE', 'EARLY', 'OPEN', 'CLOSE', 'BEAT', 'MISS', 'NEXT', 'LAST',
+  'FIND', 'GOOD', 'WELL', 'LONG', 'HIGH', 'STRONG',
+  // Finance terms (not tickers)
+  'MARKET', 'STOCK', 'PRICE', 'DATA', 'EARNINGS', 'SECTOR', 'TRADE',
+  'BUY', 'SELL', 'LATE', 'EARLY', 'OPEN', 'CLOSE', 'BEAT', 'MISS',
   'VALUATION', 'VALUATIONS', 'REVENUE', 'GROWTH', 'REPORT', 'REPORTS', 'DATE',
+  'SHARE', 'SHARES', 'RATIO', 'INDEX', 'RALLY', 'CRASH', 'BULL', 'BEAR',
+  'LONG', 'SHORT', 'HEDGE', 'YIELD', 'BOND', 'BONDS', 'FUND', 'FUNDS',
+  'LOSS', 'GAIN', 'GAINS', 'CHART', 'TREND', 'RISE', 'RISES', 'DROP',
+  'DROPS', 'FELL', 'FALL', 'FALLS', 'HOLD', 'HOLDS', 'MOVE', 'MOVES',
+  'WORTH', 'VALUE', 'RISK', 'MONEY', 'CASH', 'DEBT', 'LOAN', 'RATE',
+  'RATES', 'SPLIT', 'FLOAT', 'CAP', 'CAPS', 'DEAL', 'DEALS',
+  // Common adjectives & words that look like tickers
+  'HOT', 'COLD', 'FAST', 'SLOW', 'REAL', 'SURE', 'TRUE', 'FAKE',
+  'BEST', 'WORST', 'TOP', 'LOW', 'LOWS', 'HIGHS', 'SAFE', 'FREE',
+  'HARD', 'EASY', 'FULL', 'HALF', 'MAIN', 'HUGE', 'TINY', 'WIDE',
+  'DEEP', 'FLAT', 'PEAK', 'WILD', 'RARE', 'PURE', 'RICH', 'POOR',
+  'SICK', 'FINE', 'NICE', 'COOL', 'WARM', 'DARK', 'FAIR',
+  // Direction & position words
+  'RIGHT', 'LEFT', 'DOWN', 'ABOVE', 'BELOW', 'OVER', 'UNDER', 'NEAR',
+  // Time words
+  'YEAR', 'YEARS', 'MONTH', 'WEEK', 'WEEKS', 'DAY', 'DAYS', 'TIME',
+  'TIMES', 'HOUR', 'HOURS', 'SINCE', 'UNTIL', 'SOON', 'EVER', 'STILL',
+  // Common question/conversation words
+  'YES', 'NO', 'YEAH', 'NOPE', 'HELP', 'LIKE', 'ONLY', 'VERY',
+  'SAME', 'BOTH', 'EACH', 'SUCH', 'OWN', 'TOO', 'BEEN', 'BEING',
+  'DOES', 'DONE', 'WENT', 'COME', 'CAME', 'SAID', 'SAYS', 'SAY',
+  'GOES', 'GONE', 'BEEN', 'SEEN', 'SEE', 'SAW', 'USE', 'USED',
+  // Words that match real tickers but are common English
+  'TGT', 'MAY', 'TWO', 'ONE', 'TEN', 'FEW', 'ADD', 'ODD', 'END',
+  'AGE', 'ERA', 'ACE', 'AIM', 'ASK', 'OWE', 'OWN', 'PAY', 'TRY',
+  'WIN', 'WINS', 'WORK', 'WORKS', 'PLAN', 'PLAY', 'PICK', 'PICK',
+  'STAY', 'STOP', 'WAIT', 'WATCH', 'SAVE', 'TURN', 'LEAD', 'LEAN',
+  'LOSE', 'LOST', 'PASS', 'PUSH', 'PULL', 'READ', 'REST', 'SEND',
+  'TALK', 'TELL', 'WALK', 'WENT', 'WISH', 'WORD', 'WORDS',
+  // Prevent "Give me a price target" → TGT
+  'POINT', 'BASED', 'BEING', 'GOING', 'THING', 'FOCUS',
 ]);
 
 export function detectTickers(text, lastTicker = null) {
   const upper = text.toUpperCase();
-  const matches = upper.match(/\$[A-Z]{1,5}|\b[A-Z]{2,5}\b/g) || [];
-  const tickers = [...new Set(matches.map(t => t.replace('$', '')).filter(t => !IGNORE.has(t)))].slice(0, 3);
+  // Prioritize $TICKER format (explicit stock references)
+  const dollarMatches = (upper.match(/\$([A-Z]{1,5})\b/g) || []).map(t => t.replace('$', ''));
+  // Bare uppercase words — only accept if not in IGNORE list
+  const bareMatches = (upper.match(/(?<!\$)\b([A-Z]{2,5})\b/g) || []).filter(t => !IGNORE.has(t));
+  // Dollar-prefixed tickers take priority; bare words only used if no dollar tickers found
+  const candidates = dollarMatches.length > 0 ? dollarMatches : bareMatches;
+  const tickers = [...new Set(candidates.filter(t => !IGNORE.has(t)))].slice(0, 3);
   const resolved = tickers.length > 0 ? tickers : (lastTicker ? [lastTicker] : []);
   const newLastTicker = tickers.length > 0 ? tickers[0] : lastTicker;
   return { tickers: resolved, newLastTicker };
