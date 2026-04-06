@@ -31,8 +31,9 @@ function mapDbAlert(a, spyData) {
   else if (!signal && type === 'vol_surge' && a.volume_ratio != null) signal = `Volume surging ${a.volume_ratio}x above average`;
 
   const change = a.change ?? a.change_pct ?? a.gap_pct ?? null;
-  const resistance = a.resistance ?? (type === '52w_high' ? a.high_52w : null);
-  const support = a.support ?? a.prev_close ?? null;
+  const price = a.price != null ? Number(a.price) : 0;
+  const resistance = a.resistance ?? (type === '52w_high' ? a.high_52w : null) ?? (price > 0 ? Math.ceil(price * 1.05) : null);
+  const support = a.support ?? a.prev_close ?? (price > 0 ? Math.floor(price * 0.95) : null);
 
   let confidence = a.confidence ?? 70;
   if (a.confidence == null) {
@@ -501,11 +502,11 @@ export default function AlertsTab({ session, group }) {
                 <div style={{ display: 'flex', gap: 6, margin: '8px 0' }}>
                   <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
                     <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Support</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${selectedAlert.support.toFixed(2)}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>{selectedAlert.support ? `$${selectedAlert.support.toFixed(2)}` : '—'}</div>
                   </div>
                   <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
                     <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Resistance</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>${selectedAlert.resistance.toFixed(2)}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>{selectedAlert.resistance ? `$${selectedAlert.resistance.toFixed(2)}` : '—'}</div>
                   </div>
                   <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
                     <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>vs SPY</div>
