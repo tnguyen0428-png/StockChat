@@ -14,12 +14,26 @@ const MIN_MARKET_CAP_B = 3; // Minimum market cap in billions ($3B floor)
 
 // ── Hard-excluded: ETFs & indexes (never alert) ─────────────────────────────
 const EXCLUDED_TICKERS = new Set([
+  // Major indexes & broad ETFs
   'SPY', 'QQQ', 'IWM', 'DIA', 'VTI', 'VOO', 'SPX', 'SPXW', 'NDX',
+  // Sector ETFs (Select Sector SPDRs)
   'XLF', 'XLE', 'XLK', 'XLV', 'XLI', 'XLU', 'XLP', 'XLY', 'XLB', 'XLRE',
+  // Commodity & bond ETFs
   'GLD', 'SLV', 'USO', 'TLT', 'HYG', 'LQD', 'EEM', 'EFA', 'VXX',
+  // Leveraged & inverse ETFs
   'SOXL', 'SOXS', 'TQQQ', 'SQQQ', 'UVXY', 'SVXY', 'ARKK',
+  // Thematic / international ETFs
   'SMH', 'KWEB', 'FXI', 'BITO', 'IBIT', 'GDX', 'GDXJ',
+  // Index symbols
   'VIX', 'RUT', 'OEX', 'XSP',
+  // SPDR portfolio ETFs & Dimensional ETFs (caught in flow data)
+  'SPYM', 'SPMD', 'SPLG', 'SPDW', 'SPEM', 'SPTM', 'SPTL', 'SPAB', 'SPSM',
+  'DFUS', 'DFAS', 'DFAI', 'DFAC', 'DFAT', 'DFIV', 'DFAE', 'DFAU',
+  // Additional broad / factor ETFs commonly in flow
+  'RSP', 'SCHD', 'JEPI', 'JEPQ', 'DIVO', 'VIG', 'VUG', 'VTV', 'VGT',
+  'VXUS', 'VEA', 'VWO', 'BND', 'VCIT', 'AGG', 'IEF', 'SHY', 'TIP',
+  'XBI', 'IBB', 'HACK', 'BOTZ', 'ROBO', 'DRIV', 'LIT', 'TAN', 'ICLN',
+  'JETS', 'PBW', 'ARKG', 'ARKW', 'ARKF', 'ARKQ',
 ]);
 
 // ── Mega-cap penalty list (score * 0.3 so mid/small caps rank higher) ───────

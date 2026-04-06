@@ -357,7 +357,13 @@ export default function AlertsTab({ session, group }) {
   // ── Fetch breakout_alerts + realtime ──
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase.from('breakout_alerts').select('*').order('created_at', { ascending: false }).limit(50);
+      // Only show alerts from the last 7 days to avoid stale pre-engine tickers
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const { data } = await supabase.from('breakout_alerts').select('*')
+        .gte('created_at', sevenDaysAgo.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(50);
       if (data) setLiveAlerts(data);
       setView("active");
     };
