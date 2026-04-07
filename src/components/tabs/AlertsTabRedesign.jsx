@@ -269,20 +269,15 @@ function HotSectors({ alerts, onSectorTap, activeSector, t, darkMode }) {
   return (
     <div style={{ background: t.card, borderRadius: 16, border: `1px solid ${t.border}`, boxShadow: t.shadow }}>
       {/* Collapsible header */}
-      <div onClick={() => setIsOpen(!isOpen)} style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+      <div onClick={() => setIsOpen(!isOpen)} style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 16 }}>🔥</span>
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: t.text1 }}>Hot Sectors</span>
+          <span style={{ fontSize: 14 }}>🔥</span>
+          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: t.text1 }}>Hot Sectors</span>
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: t.surfaceAlt, color: t.text2 }}>{seedSectors.length} active</span>
         </div>
         <span style={{ fontSize: 18, color: t.text3, transition: 'transform .2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', display: 'inline-block' }}>▾</span>
       </div>
-      {/* Summary when collapsed */}
-      {!isOpen && (
-        <p style={{ margin: 0, padding: '0 16px 12px', fontSize: 11, color: t.text3, fontFamily: "'DM Sans', sans-serif" }}>
-          Top: {topNames}
-        </p>
-      )}
+      {/* Collapsed summary removed — header badge shows count */}
       {/* Expanded grid */}
       {isOpen && (
         <div style={{ padding: '0 12px 14px' }}>
@@ -911,7 +906,7 @@ export default function AlertsTab({ session, group }) {
             if (!topOpt) return null;
             const fmtPremium = (v) => v >= 1e6 ? `$${(v/1e6).toFixed(1)}M` : v >= 1e3 ? `$${(v/1e3).toFixed(0)}K` : `$${v}`;
             return (
-              <div style={{ background: t.card, borderRadius: 14, border: `0.5px solid ${t.border}`, boxShadow: t.shadow, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ background: t.card, borderRadius: 14, border: `0.5px solid ${t.border}`, boxShadow: t.shadow, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6, position: 'relative', zIndex: 2 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 16, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{topOpt.ticker}</span>
@@ -978,7 +973,7 @@ export default function AlertsTab({ session, group }) {
             const avgShares = topDp.prints > 0 ? Math.round(topDp.totalShares / topDp.prints) : 0;
             const fmtShares = (v) => v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : v >= 1e3 ? `${(v/1e3).toFixed(1)}K` : `${v}`;
             return (
-              <div style={{ background: t.card, borderRadius: 14, border: `0.5px solid ${t.border}`, boxShadow: t.shadow, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ background: t.card, borderRadius: 14, border: `0.5px solid ${t.border}`, boxShadow: t.shadow, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6, position: 'relative', zIndex: 2 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 16, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{topDp.ticker}</span>
@@ -1024,7 +1019,7 @@ export default function AlertsTab({ session, group }) {
 
           {/* SCANNER DETAIL PANEL */}
           {selectedAlert && (
-            <div style={{ background: t.card, borderRadius: 14, border: `0.5px solid ${t.border}`, boxShadow: t.shadow, overflow: 'hidden' }}>
+            <div style={{ background: t.card, borderRadius: 14, border: `0.5px solid ${t.border}`, boxShadow: t.shadow, overflow: 'hidden', position: 'relative', zIndex: 2 }}>
               <div style={{ padding: '10px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -1225,20 +1220,14 @@ export default function AlertsTab({ session, group }) {
 
           {/* OPTIONS & DARKPOOL — live from options_flow + darkpool_trades */}
           <div ref={flowRef} style={{ background: t.card, borderRadius: 16, border: `1px solid ${t.border}`, boxShadow: t.shadow }}>
-            <button onClick={() => setShowFlow(!showFlow)} style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer" }}>
+            <button onClick={() => setShowFlow(!showFlow)} style={{ width: "100%", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>🏦 Options & DarkPool</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>🏦 Options & DarkPool</span>
                 <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: t.surfaceAlt, color: t.text2 }}>{darkpoolTrades.length + optionsFlow.length}</span>
               </div>
               <span style={{ fontSize: 18, color: t.text3, transition: "transform .2s", transform: showFlow ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
             </button>
-            {!showFlow && (
-              <p style={{ margin: 0, padding: "0 16px 12px", fontSize: 11, color: t.text3 }}>
-                {darkpoolTrades.length + optionsFlow.length > 0
-                  ? `Top: ${flowRanked.slice(0, 4).map(t => t.ticker).join(', ')}${bmBuying ? ` · ${bmBuying} buying` : ''}${bmSelling ? ` · ${bmSelling} selling` : ''}`
-                  : 'No flow data yet — updates every 30 min during market hours'}
-              </p>
-            )}
+            {/* Collapsed summary removed — header badge shows count */}
             {showFlow && (
               <div style={{ padding: "0 12px 12px" }}>
                 {flowTickerFilter && (

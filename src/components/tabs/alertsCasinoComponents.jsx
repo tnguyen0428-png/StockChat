@@ -233,7 +233,7 @@ export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, o
   const hitRate = history && history.length > 0 ? Math.round((hits / history.length) * 100) : 0;
 
   return (
-    <div style={{ position: 'relative', height: 210, marginBottom: 4 }}>
+    <div style={{ position: 'relative', height: 210, marginBottom: 8, overflow: 'hidden' }}>
       <style>{`
         @keyframes chipFloat0 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(3px,-4px); } }
         @keyframes chipFloat1 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-4px,3px); } }
