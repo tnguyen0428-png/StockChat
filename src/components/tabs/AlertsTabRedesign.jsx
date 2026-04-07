@@ -230,7 +230,7 @@ const SECTOR_TICKERS = {
 };
 
 function HotSectors({ alerts, onSectorTap, activeSector, t, darkMode }) {
-  const [showAll, setShowAll] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   // Count alerts per sector and compute heat score
   const sectorStats = useMemo(() => {
@@ -242,72 +242,77 @@ function HotSectors({ alerts, onSectorTap, activeSector, t, darkMode }) {
       stats[a.sectorKey].totalConf += a.confidence || 0;
       stats[a.sectorKey].tickers.add(a.ticker);
     });
-    // Sort by count then avg confidence
     return Object.values(stats)
       .map(s => ({ ...s, avgConf: s.count > 0 ? s.totalConf / s.count : 0, tickers: [...s.tickers] }))
       .sort((a, b) => b.count - a.count || b.avgConf - a.avgConf);
   }, [alerts]);
 
-  if (sectorStats.length === 0) return null;
+  // If no alert-driven sectors, show seed sectors so the section isn't empty
+  const seedSectors = useMemo(() => {
+    if (sectorStats.length > 0) return sectorStats;
+    return Object.keys(SECTOR_TICKERS).slice(0, 6).map(key => ({
+      key, count: 0, avgConf: 0, tickers: SECTOR_TICKERS[key] || [],
+    }));
+  }, [sectorStats]);
 
-  const maxCount = sectorStats[0]?.count || 1;
-  const visible = showAll ? sectorStats : sectorStats.slice(0, 4);
+  const maxCount = seedSectors[0]?.count || 1;
+  const topNames = seedSectors.slice(0, 3).map(s => SECTOR_LABELS[s.key] || s.key).join(' · ');
 
   return (
-    <div style={{
-      background: darkMode ? 'rgba(30,41,59,0.5)' : 'rgba(241,245,249,0.8)',
-      borderRadius: 14, border: `1px solid ${darkMode ? 'rgba(100,116,139,0.1)' : t.border}`,
-      padding: 12,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: t.text3, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14 }}>🔥</span> Hot Sectors
-        </span>
-        <span style={{ fontSize: 10, color: t.text3 }}>Where money is flowing now</span>
+    <div style={{ background: t.card, borderRadius: 16, border: `1px solid ${t.border}`, boxShadow: t.shadow }}>
+      {/* Collapsible header */}
+      <div onClick={() => setIsOpen(!isOpen)} style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16 }}>🔥</span>
+          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: t.text1 }}>Hot Sectors</span>
+          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: t.surfaceAlt, color: t.text2 }}>{seedSectors.length} active</span>
+        </div>
+        <span style={{ fontSize: 18, color: t.text3, transition: 'transform .2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', display: 'inline-block' }}>▾</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-        {visible.map(s => {
-          const label = SECTOR_LABELS[s.key] || s.key;
-          const color = SECTOR_COLORS[s.key] || '#64748B';
-          const emoji = SECTOR_EMOJIS[s.key] || '📊';
-          const tier = alerts.find(a => a.sectorKey === s.key)?.sectorTier;
-          const tierLabel = tier === 1 ? 'Tier 1' : tier === 2 ? 'Tier 2' : tier === 3 ? 'Tier 3' : null;
-          const tierClass = tier === 1 ? { bg: 'rgba(239,68,68,0.15)', color: '#f87171' } : tier === 2 ? { bg: 'rgba(234,179,8,0.15)', color: '#facc15' } : { bg: 'rgba(59,130,246,0.15)', color: '#60a5fa' };
-          const heatPct = Math.round((s.count / maxCount) * 100);
-          const isActive = activeSector === s.key;
-          // Show tickers from actual alerts, fall back to seed list
-          const displayTickers = s.tickers.length > 0 ? s.tickers.slice(0, 4) : (SECTOR_TICKERS[s.key] || []).slice(0, 4);
+      {/* Summary when collapsed */}
+      {!isOpen && (
+        <p style={{ margin: 0, padding: '0 16px 12px', fontSize: 11, color: t.text3, fontFamily: "'DM Sans', sans-serif" }}>
+          Top: {topNames}
+        </p>
+      )}
+      {/* Expanded grid */}
+      {isOpen && (
+        <div style={{ padding: '0 12px 14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            {seedSectors.map(s => {
+              const label = SECTOR_LABELS[s.key] || s.key;
+              const color = SECTOR_COLORS[s.key] || '#64748B';
+              const emoji = SECTOR_EMOJIS[s.key] || '📊';
+              const tier = alerts.find(a => a.sectorKey === s.key)?.sectorTier;
+              const tierLabel = tier === 1 ? 'T1' : tier === 2 ? 'T2' : tier === 3 ? 'T3' : null;
+              const tierClass = tier === 1 ? { bg: 'rgba(240,149,149,0.15)', color: '#f87171' } : tier === 2 ? { bg: 'rgba(250,199,117,0.15)', color: t.amber } : { bg: 'rgba(123,140,222,0.15)', color: t.blue };
+              const heatPct = maxCount > 0 ? Math.round((s.count / maxCount) * 100) : 50;
+              const isActive = activeSector === s.key;
+              const displayTickers = (s.tickers.length > 0 ? s.tickers : (SECTOR_TICKERS[s.key] || [])).slice(0, 4);
 
-          return (
-            <div key={s.key} onClick={() => onSectorTap(isActive ? null : s.key)} style={{
-              background: darkMode ? 'rgba(15,23,42,0.6)' : '#fff',
-              borderRadius: 10, padding: '10px 12px',
-              border: isActive ? `1.5px solid ${color}` : `1px solid ${darkMode ? 'rgba(100,116,139,0.08)' : t.border}`,
-              cursor: 'pointer', transition: 'all 0.15s', position: 'relative', overflow: 'hidden',
-            }}>
-              {/* Subtle color glow */}
-              <div style={{ position: 'absolute', top: 0, right: 0, width: 60, height: '100%', background: `linear-gradient(90deg, transparent, ${color})`, opacity: 0.06, pointerEvents: 'none' }} />
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: t.text1 }}>{emoji} {label}</span>
-                {tierLabel && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: tierClass.bg, color: tierClass.color, fontFamily: "'Outfit', sans-serif" }}>{tierLabel}</span>}
-              </div>
-              <div style={{ fontSize: 10, color: t.text3, lineHeight: 1.4 }}>
-                {displayTickers.map((tk, i) => (
-                  <span key={tk}>{i > 0 && ' · '}<strong style={{ color: i < 2 ? t.text2 : t.text3, fontWeight: i < 2 ? 600 : 400 }}>{tk}</strong></span>
-                ))}
-              </div>
-              <div style={{ marginTop: 6, height: 3, borderRadius: 2, background: darkMode ? 'rgba(100,116,139,0.1)' : '#f1f5f9', overflow: 'hidden' }}>
-                <div style={{ height: '100%', borderRadius: 2, width: `${heatPct}%`, background: color, transition: 'width 0.3s' }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {sectorStats.length > 4 && (
-        <div style={{ textAlign: 'center', marginTop: 8 }}>
-          <button onClick={(e) => { e.stopPropagation(); setShowAll(!showAll); }} style={{ fontSize: 11, fontWeight: 600, color: t.text3, background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
-            {showAll ? 'Show fewer ▴' : `Show all ${sectorStats.length} sectors ▾`}
-          </button>
+              return (
+                <div key={s.key} onClick={(e) => { e.stopPropagation(); onSectorTap(isActive ? null : s.key); }} style={{
+                  background: t.surface, borderRadius: 10, padding: '10px 12px',
+                  border: isActive ? `1.5px solid ${color}` : `1px solid rgba(30,61,98,0.4)`,
+                  cursor: 'pointer', transition: 'all 0.15s',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: t.text1 }}>{emoji} {label}</span>
+                    {tierLabel && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: tierClass.bg, color: tierClass.color, fontFamily: "'Outfit', sans-serif" }}>{tierLabel}</span>}
+                  </div>
+                  <div style={{ fontSize: 10, color: t.text3, lineHeight: 1.4, fontFamily: "'DM Sans', sans-serif" }}>
+                    {displayTickers.map((tk, i) => (
+                      <span key={tk}>{i > 0 && ' · '}<strong style={{ color: i < 2 ? t.text2 : t.text3, fontWeight: i < 2 ? 600 : 400 }}>{tk}</strong></span>
+                    ))}
+                  </div>
+                  {s.count > 0 && <div style={{ fontSize: 10, color: t.text3, marginTop: 4, fontFamily: "'DM Sans', sans-serif" }}><strong style={{ color: t.text2 }}>{s.count}</strong> alerts</div>}
+                  <div style={{ marginTop: 6, height: 3, borderRadius: 2, background: 'rgba(30,61,98,0.3)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 2, width: `${heatPct}%`, background: color, transition: 'width 0.3s' }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -864,11 +869,6 @@ export default function AlertsTab({ session, group }) {
 
       {/* FILTER PILLS removed — will add back when functional */}
 
-      {/* HOT SECTORS */}
-      {view === "active" && displayAlerts.length > 0 && (
-        <HotSectors alerts={displayAlerts} onSectorTap={setSectorFilter} activeSector={sectorFilter} t={t} darkMode={darkMode} />
-      )}
-
       {/* STATES */}
       {view === "loading" && <><SkeletonCard t={t} /><SkeletonCard t={t} /></>}
       {view === "active" && (
@@ -1263,6 +1263,9 @@ export default function AlertsTab({ session, group }) {
               </div>
             )}
           </div>
+
+          {/* HOT SECTORS — collapsible, shows even with 0 scanner alerts */}
+          <HotSectors alerts={displayAlerts} onSectorTap={setSectorFilter} activeSector={sectorFilter} t={t} darkMode={darkMode} />
         </>
       )}
 
