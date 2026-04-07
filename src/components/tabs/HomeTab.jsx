@@ -249,11 +249,25 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
     setOnboardSearchLoading(true);
     onboardSearchTimeout.current = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `https://api.polygon.io/v3/reference/tickers?search=${val}&active=true&limit=6&apiKey=${POLYGON_KEY}`
+        const upper = val.toUpperCase();
+        const majorExchanges = new Set(['XNYS', 'XNAS', 'XASE']);
+        const [exactRes, searchRes] = await Promise.all([
+          fetch(`https://api.polygon.io/v3/reference/tickers?ticker=${upper}&active=true&apiKey=${POLYGON_KEY}`),
+          fetch(`https://api.polygon.io/v3/reference/tickers?search=${val}&active=true&market=stocks&locale=us&limit=8&apiKey=${POLYGON_KEY}`),
+        ]);
+        const [exactData, searchData] = await Promise.all([exactRes.json(), searchRes.json()]);
+        const filtered = (searchData.results || []).filter(t =>
+          majorExchanges.has(t.primary_exchange)
         );
-        const data = await res.json();
-        setOnboardSearchResults((data.results || []).map(t => ({
+        const seen = new Set();
+        const merged = [];
+        for (const t of [...(exactData.results || []), ...filtered]) {
+          if (!seen.has(t.ticker)) {
+            seen.add(t.ticker);
+            merged.push(t);
+          }
+        }
+        setOnboardSearchResults(merged.slice(0, 6).map(t => ({
           symbol: t.ticker, name: t.name,
         })));
       } catch { setOnboardSearchResults([]); }
@@ -802,11 +816,28 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
     if (query.length < 1) { setSearchResults([]); return; }
     setSearchLoading(true);
     try {
-      const res = await fetch(
-        `https://api.polygon.io/v3/reference/tickers?search=${query}&active=true&limit=5&apiKey=${POLYGON_KEY}`
+      const upper = query.toUpperCase();
+      const majorExchanges = new Set(['XNYS', 'XNAS', 'XASE']);
+      // Exact ticker match + text search (US stocks only) in parallel
+      const [exactRes, searchRes] = await Promise.all([
+        fetch(`https://api.polygon.io/v3/reference/tickers?ticker=${upper}&active=true&apiKey=${POLYGON_KEY}`),
+        fetch(`https://api.polygon.io/v3/reference/tickers?search=${query}&active=true&market=stocks&locale=us&limit=8&apiKey=${POLYGON_KEY}`),
+      ]);
+      const [exactData, searchData] = await Promise.all([exactRes.json(), searchRes.json()]);
+      // Filter text search results to major US exchanges (excludes OTC/pink sheets)
+      const filtered = (searchData.results || []).filter(t =>
+        majorExchanges.has(t.primary_exchange)
       );
-      const data = await res.json();
-      setSearchResults((data.results || []).map(t => ({
+      // Merge: exact match first, then filtered results (deduplicated)
+      const seen = new Set();
+      const merged = [];
+      for (const t of [...(exactData.results || []), ...filtered]) {
+        if (!seen.has(t.ticker)) {
+          seen.add(t.ticker);
+          merged.push(t);
+        }
+      }
+      setSearchResults(merged.slice(0, 6).map(t => ({
         symbol: t.ticker,
         name: t.name,
         alreadyAdded: watchlist.some(w => w.symbol === t.ticker),
