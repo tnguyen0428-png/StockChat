@@ -53,6 +53,6 @@ USER LEVEL: ${level} — ${level === 'beginner' ? 'Simple words only. Explain ev
 
 FINAL INSTRUCTION: Your response MUST end with a period. Not a question mark. If your last character is "?" you have failed. Delete that sentence.`;
 
-    return await callClaude(systemPrompt, question, history, 'fast');
+    return await callClaude(systemPrompt, question, history, 'auto');
   }
 };

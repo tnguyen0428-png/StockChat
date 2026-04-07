@@ -137,7 +137,14 @@ Short is smart. Every extra sentence dilutes your credibility.`;
 }
 
 export const stripMarkdown = (text) => {
-  return text
+  // Extract uptik blocks before stripping
+  const uptikBlocks = [];
+  const preserved = text.replace(/```uptik[\s\S]*?```/g, (match) => {
+    uptikBlocks.push(match);
+    return `__UPTIK_BLOCK_${uptikBlocks.length - 1}__`;
+  });
+
+  let cleaned = preserved
     .replace(/#{1,6}\s+/g, '')
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\*(.*?)\*/g, '$1')
@@ -145,6 +152,13 @@ export const stripMarkdown = (text) => {
     .replace(/^\s*[-•]\s+/gm, '• ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+
+  // Restore uptik blocks
+  uptikBlocks.forEach((block, i) => {
+    cleaned = cleaned.replace(`__UPTIK_BLOCK_${i}__`, block);
+  });
+
+  return cleaned;
 };
 
 // ── New pipeline integration ──

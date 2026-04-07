@@ -54,10 +54,13 @@ function checkForHallucination(response, context, agentType) {
       response = response.replace(/\d+\.?\d*\s*(million|M)\s*(shares|volume)[^.]*\./i, '');
     }
 
-    // Strip any price targets or levels not from Polygon data
+    // Strip fabricated price targets — but allow small values that are likely EPS, ratios, etc.
+    // Only flag prices that look like stock prices (> $5) and deviate from real price
     for (const rp of responsePrices) {
+      // Skip small dollar amounts — these are likely EPS, dividends, or per-share metrics
+      if (rp < 5) continue;
       const diff = Math.abs(rp - realPrice) / realPrice;
-      if (diff > 0.01 && diff <= 1.0) {
+      if (diff > 0.05 && diff <= 1.0) {
         console.warn('[UpTik AI] Stripping fabricated price level: $' + rp, '(real: $' + realPrice + ')');
         const escaped = rp.toString().replace('.', '\\.');
         const regex = new RegExp(`[^.]*\\$${escaped}[^.]*\\.?`, 'g');
@@ -87,9 +90,16 @@ function checkForHallucination(response, context, agentType) {
   return response.trim();
 }
 
-// Strip markdown formatting for clean chat display
+// Strip markdown formatting for clean chat display — preserves ```uptik blocks
 function stripMarkdown(text) {
-  return text
+  // Extract uptik blocks before stripping
+  const uptikBlocks = [];
+  const preserved = text.replace(/```uptik[\s\S]*?```/g, (match) => {
+    uptikBlocks.push(match);
+    return `__UPTIK_BLOCK_${uptikBlocks.length - 1}__`;
+  });
+
+  let cleaned = preserved
     .replace(/#{1,6}\s+/g, '')
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\*(.*?)\*/g, '$1')
@@ -97,6 +107,13 @@ function stripMarkdown(text) {
     .replace(/^\s*[-•]\s+/gm, '• ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+
+  // Restore uptik blocks
+  uptikBlocks.forEach((block, i) => {
+    cleaned = cleaned.replace(`__UPTIK_BLOCK_${i}__`, block);
+  });
+
+  return cleaned;
 }
 
 export async function runPipeline(userMessage, conversationHistory, supabase, userId) {
