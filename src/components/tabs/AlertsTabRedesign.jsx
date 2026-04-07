@@ -6,6 +6,17 @@ import { useTheme, ChipField, DarkModeToggle } from './alertsCasinoComponents';
 // Default scanner tag mapping (used as fallback before DB alert_types load)
 const DEFAULT_TAG_MAP = { '52w_high': 'Yearly High', 'vol_surge': 'Volume Spike', 'gap_up': 'Gap Up', 'ma_cross': 'Trend Change', 'vcp': 'VCP Pattern', 'flow_signal': 'Flow Signal' };
 
+// Filter pill config with icons and colors (matches mockup upgrade)
+const FILTER_PILL_CONFIG = {
+  'All':          { icon: '⚡', label: 'All',         iconBg: 'rgba(212,168,83,0.15)',  iconColor: '#f0d78c' },
+  '52w_high':     { icon: '👑', label: 'Near High',   iconBg: 'rgba(34,197,94,0.15)',   iconColor: '#4ade80' },
+  'vol_surge':    { icon: '📊', label: 'Unusual Vol',  iconBg: 'rgba(249,115,22,0.15)',  iconColor: '#fb923c' },
+  'gap_up':       { icon: '⬆️', label: 'Gap Up',       iconBg: 'rgba(59,130,246,0.15)',  iconColor: '#60a5fa' },
+  'ma_cross':     { icon: '📈', label: 'Trend Shift',  iconBg: 'rgba(168,85,247,0.15)',  iconColor: '#c084fc' },
+  'flow_signal':  { icon: '💰', label: 'Big Money',    iconBg: 'rgba(16,185,129,0.15)',  iconColor: '#34d399' },
+  'vcp':          { icon: '🔄', label: 'VCP Pattern',  iconBg: 'rgba(234,179,8,0.15)',   iconColor: '#facc15' },
+};
+
 // Sector display labels
 const SECTOR_LABELS = {
   'AI_INFRA_COOLING': 'AI Cooling', 'AI_INFRA_COMPUTE': 'AI Compute', 'AI_INFRA_POWER': 'AI Power',
@@ -188,6 +199,117 @@ function BigMoneyBadge({ ticker, flowData, onClick, t: theme }) {
     <div onClick={e => { e.stopPropagation(); onClick(ticker); }} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 8, background: greenBg, border: `1px solid ${green}40`, marginTop: 6, cursor: "pointer" }}>
       <span style={{ fontSize: 11 }}>🎯</span>
       <span style={{ fontSize: 11, fontWeight: 600, color: green }}>Big money is also buying</span>
+    </div>
+  );
+}
+
+// ===== HOT SECTORS COMPONENT =====
+const SECTOR_EMOJIS = {
+  'AI_INFRA_COOLING': '🧊', 'AI_INFRA_COMPUTE': '🖥️', 'AI_INFRA_POWER': '⚡',
+  'NUCLEAR_ENERGY': '☢️', 'GRID_POWER': '🔌', 'SEMICONDUCTORS_HBM': '🧠',
+  'PHOTONICS_OPTICAL': '💡', 'AGENTIC_AI': '🤖', 'DEFENSE_AI': '🛡️',
+  'QUANTUM': '🔮', 'ROBOTICS': '🦾', 'SPACE_SAT': '🛰️',
+  'BIOTECH_AI': '🧬', 'ENERGY_STORAGE': '🔋',
+};
+
+const SECTOR_TICKERS = {
+  'AI_INFRA_COOLING': ['VRT', 'CRSR', 'LIQT'],
+  'AI_INFRA_COMPUTE': ['NVDA', 'AMD', 'SMCI'],
+  'AI_INFRA_POWER': ['POWL', 'ETN', 'VRT'],
+  'NUCLEAR_ENERGY': ['VST', 'CEG', 'SMR', 'NNE'],
+  'GRID_POWER': ['ETN', 'PWR', 'VRT'],
+  'SEMICONDUCTORS_HBM': ['MU', 'ALAB', 'RMBS'],
+  'PHOTONICS_OPTICAL': ['COHR', 'II-VI', 'LITE'],
+  'AGENTIC_AI': ['CRM', 'PATH', 'AI'],
+  'DEFENSE_AI': ['PLTR', 'LMT', 'RTX'],
+  'QUANTUM': ['IONQ', 'RGTI', 'QUBT'],
+  'ROBOTICS': ['ISRG', 'TER', 'IRBT'],
+  'SPACE_SAT': ['RKLB', 'ASTS', 'LUNR'],
+  'BIOTECH_AI': ['RXRX', 'SDGR', 'ABCL'],
+  'ENERGY_STORAGE': ['ENVX', 'QS', 'STEM'],
+};
+
+function HotSectors({ alerts, onSectorTap, activeSector, t, darkMode }) {
+  const [showAll, setShowAll] = useState(false);
+
+  // Count alerts per sector and compute heat score
+  const sectorStats = useMemo(() => {
+    const stats = {};
+    alerts.forEach(a => {
+      if (!a.sectorKey) return;
+      if (!stats[a.sectorKey]) stats[a.sectorKey] = { key: a.sectorKey, count: 0, totalConf: 0, tickers: new Set() };
+      stats[a.sectorKey].count++;
+      stats[a.sectorKey].totalConf += a.confidence || 0;
+      stats[a.sectorKey].tickers.add(a.ticker);
+    });
+    // Sort by count then avg confidence
+    return Object.values(stats)
+      .map(s => ({ ...s, avgConf: s.count > 0 ? s.totalConf / s.count : 0, tickers: [...s.tickers] }))
+      .sort((a, b) => b.count - a.count || b.avgConf - a.avgConf);
+  }, [alerts]);
+
+  if (sectorStats.length === 0) return null;
+
+  const maxCount = sectorStats[0]?.count || 1;
+  const visible = showAll ? sectorStats : sectorStats.slice(0, 4);
+
+  return (
+    <div style={{
+      background: darkMode ? 'rgba(30,41,59,0.5)' : 'rgba(241,245,249,0.8)',
+      borderRadius: 14, border: `1px solid ${darkMode ? 'rgba(100,116,139,0.1)' : t.border}`,
+      padding: 12,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: t.text3, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 14 }}>🔥</span> Hot Sectors
+        </span>
+        <span style={{ fontSize: 10, color: t.text3 }}>Where money is flowing now</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        {visible.map(s => {
+          const label = SECTOR_LABELS[s.key] || s.key;
+          const color = SECTOR_COLORS[s.key] || '#64748B';
+          const emoji = SECTOR_EMOJIS[s.key] || '📊';
+          const tier = alerts.find(a => a.sectorKey === s.key)?.sectorTier;
+          const tierLabel = tier === 1 ? 'Tier 1' : tier === 2 ? 'Tier 2' : tier === 3 ? 'Tier 3' : null;
+          const tierClass = tier === 1 ? { bg: 'rgba(239,68,68,0.15)', color: '#f87171' } : tier === 2 ? { bg: 'rgba(234,179,8,0.15)', color: '#facc15' } : { bg: 'rgba(59,130,246,0.15)', color: '#60a5fa' };
+          const heatPct = Math.round((s.count / maxCount) * 100);
+          const isActive = activeSector === s.key;
+          // Show tickers from actual alerts, fall back to seed list
+          const displayTickers = s.tickers.length > 0 ? s.tickers.slice(0, 4) : (SECTOR_TICKERS[s.key] || []).slice(0, 4);
+
+          return (
+            <div key={s.key} onClick={() => onSectorTap(isActive ? null : s.key)} style={{
+              background: darkMode ? 'rgba(15,23,42,0.6)' : '#fff',
+              borderRadius: 10, padding: '10px 12px',
+              border: isActive ? `1.5px solid ${color}` : `1px solid ${darkMode ? 'rgba(100,116,139,0.08)' : t.border}`,
+              cursor: 'pointer', transition: 'all 0.15s', position: 'relative', overflow: 'hidden',
+            }}>
+              {/* Subtle color glow */}
+              <div style={{ position: 'absolute', top: 0, right: 0, width: 60, height: '100%', background: `linear-gradient(90deg, transparent, ${color})`, opacity: 0.06, pointerEvents: 'none' }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: t.text1 }}>{emoji} {label}</span>
+                {tierLabel && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: tierClass.bg, color: tierClass.color, fontFamily: "'Outfit', sans-serif" }}>{tierLabel}</span>}
+              </div>
+              <div style={{ fontSize: 10, color: t.text3, lineHeight: 1.4 }}>
+                {displayTickers.map((tk, i) => (
+                  <span key={tk}>{i > 0 && ' · '}<strong style={{ color: i < 2 ? t.text2 : t.text3, fontWeight: i < 2 ? 600 : 400 }}>{tk}</strong></span>
+                ))}
+              </div>
+              <div style={{ marginTop: 6, height: 3, borderRadius: 2, background: darkMode ? 'rgba(100,116,139,0.1)' : '#f1f5f9', overflow: 'hidden' }}>
+                <div style={{ height: '100%', borderRadius: 2, width: `${heatPct}%`, background: color, transition: 'width 0.3s' }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {sectorStats.length > 4 && (
+        <div style={{ textAlign: 'center', marginTop: 8 }}>
+          <button onClick={(e) => { e.stopPropagation(); setShowAll(!showAll); }} style={{ fontSize: 11, fontWeight: 600, color: t.text3, background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
+            {showAll ? 'Show fewer ▴' : `Show all ${sectorStats.length} sectors ▾`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -742,11 +864,31 @@ export default function AlertsTab({ session, group }) {
         </div>
       </div>
 
-      {/* SCANNER TYPE FILTERS */}
+      {/* SCANNER TYPE FILTERS — upgraded with icon boxes */}
       <div className="filter-row">
         {filterConfig.map(f => {
           const count = f.key === "All" ? displayAlerts.length : displayAlerts.filter(a => a.scannerTag === f.match).length;
-          return (<button key={f.key} onClick={() => setFilter(f.key)} style={{ flexShrink: 0, padding: "8px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, border: filter === f.key ? "none" : `1px solid ${t.border}`, background: filter === f.key ? t.btnActive : t.card, color: filter === f.key ? "#fff" : t.text2, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "'DM Sans', sans-serif" }}>{f.label}<span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 10, background: filter === f.key ? "rgba(255,255,255,.2)" : t.surfaceAlt, color: filter === f.key ? "#fff" : t.text3 }}>{count}</span></button>);
+          const pill = FILTER_PILL_CONFIG[f.key] || { icon: '📊', label: f.label, iconBg: 'rgba(100,116,139,0.15)', iconColor: '#94a3b8' };
+          const isActive = filter === f.key;
+          return (<button key={f.key} onClick={() => setFilter(f.key)} style={{
+            flexShrink: 0, padding: "7px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+            border: isActive ? 'none' : `1px solid ${t.border}`,
+            background: isActive ? 'linear-gradient(135deg, rgba(212,168,83,0.2), rgba(212,168,83,0.08))' : `${t.card}cc`,
+            color: isActive ? '#f0d78c' : t.text2, cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 5, fontFamily: "'DM Sans', sans-serif",
+            transition: 'all 0.15s',
+          }}>
+            <span style={{
+              width: 18, height: 18, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 10, fontWeight: 800, background: pill.iconBg, color: pill.iconColor,
+            }}>{pill.icon}</span>
+            {pill.label}
+            <span style={{
+              fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 8,
+              background: isActive ? 'rgba(240,215,140,0.15)' : 'rgba(100,116,139,0.15)',
+              color: isActive ? '#f0d78c' : t.text3,
+            }}>{count}</span>
+          </button>);
         })}
       </div>
 
@@ -769,6 +911,11 @@ export default function AlertsTab({ session, group }) {
           return (<button key={key} onClick={() => setSectorFilter(active ? null : key)} style={{ flexShrink: 0, padding: "6px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600, border: active ? 'none' : `1px solid ${color}40`, background: active ? color : `${color}10`, color: active ? '#fff' : color, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontFamily: "'DM Sans', sans-serif" }}>{label}<span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 8, background: active ? "rgba(255,255,255,.2)" : `${color}15`, color: active ? '#fff' : color }}>{count}</span></button>);
         })}
       </div>
+
+      {/* HOT SECTORS */}
+      {view === "active" && displayAlerts.length > 0 && (
+        <HotSectors alerts={displayAlerts} onSectorTap={setSectorFilter} activeSector={sectorFilter} t={t} darkMode={darkMode} />
+      )}
 
       {/* STATES */}
       {view === "loading" && <><SkeletonCard t={t} /><SkeletonCard t={t} /></>}
