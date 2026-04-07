@@ -129,11 +129,36 @@ export default function PortfolioTab({ session }) {
   // ── Load portfolio ──
   const loadPortfolio = useCallback(async () => {
     if (!session?.user?.id) return;
-    await supabase.rpc('ensure_paper_portfolio');
+
+    // Check if portfolio already exists BEFORE calling ensure_paper_portfolio
+    // This prevents the RPC from potentially resetting an existing portfolio
+    const { data: existingPf } = await supabase
+      .from('paper_portfolios')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .maybeSingle();
+
+    if (!existingPf) {
+      // Only call ensure_paper_portfolio for truly new users
+      await supabase.rpc('ensure_paper_portfolio');
+    }
+
     const [{ data: pf }, { data: openTrades }] = await Promise.all([
       supabase.from('paper_portfolios').select('*').eq('user_id', session.user.id).single(),
       supabase.from('paper_trades').select('*').eq('user_id', session.user.id).eq('status', 'open'),
     ]);
+
+    // Safety check: if portfolio exists but cash_balance got reset to starting amount
+    // while user has trade history, something went wrong — log it
+    if (pf && existingPf && Number(pf.cash_balance) === STARTING_CASH && Number(existingPf.cash_balance) !== STARTING_CASH) {
+      console.error('[Challenge] POSSIBLE DATA RESET DETECTED — cash_balance was', existingPf.cash_balance, 'now', pf.cash_balance);
+      // Restore the pre-RPC value
+      await supabase.from('paper_portfolios')
+        .update({ cash_balance: existingPf.cash_balance })
+        .eq('user_id', session.user.id);
+      pf.cash_balance = existingPf.cash_balance;
+    }
+
     setPortfolio(pf);
     setTrades(openTrades || []);
     setLoadingData(false);

@@ -24,6 +24,7 @@ export default function SellModal({ session, trade, onClose, onComplete }) {
     setError('');
 
     try {
+      // Close the trade first
       const { error: updateErr } = await supabase
         .from('paper_trades')
         .update({
@@ -31,22 +32,27 @@ export default function SellModal({ session, trade, onClose, onComplete }) {
           status: 'closed',
           sold_at: new Date().toISOString(),
         })
-        .eq('id', trade.id);
+        .eq('id', trade.id)
+        .eq('status', 'open'); // Guard: only close if still open (prevents double-sell)
       if (updateErr) throw updateErr;
 
-      // Return cash
-      const { data: pf } = await supabase
+      // Return cash — read fresh balance then update atomically
+      const { data: pf, error: readErr } = await supabase
         .from('paper_portfolios')
         .select('cash_balance')
         .eq('user_id', session.user.id)
         .single();
+      if (readErr || !pf) throw readErr || new Error('Portfolio not found');
 
-      const newCash = Number(pf.cash_balance) + saleValue;
+      const previousCash = Number(pf.cash_balance);
+      const newCash = previousCash + saleValue;
       const { error: cashErr } = await supabase
         .from('paper_portfolios')
         .update({ cash_balance: newCash })
         .eq('user_id', session.user.id);
       if (cashErr) throw cashErr;
+
+      console.log(`[Challenge] Sold ${trade.ticker}: cash ${previousCash} → ${newCash} (+${saleValue.toFixed(2)})`);
 
       onComplete();
     } catch (err) {
