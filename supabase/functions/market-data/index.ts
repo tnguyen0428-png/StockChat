@@ -85,6 +85,28 @@ Deno.serve(async () => {
     errors.sectors = e.message;
   }
 
+  // CNN Fear & Greed Index (daily)
+  try {
+    const fgRes = await fetch("https://production.dataviz.cnn.io/index/fearandgreed/graphdata/");
+    if (fgRes.ok) {
+      const fgData = await fgRes.json();
+      const current = fgData?.fear_and_greed?.score;
+      const rating = fgData?.fear_and_greed?.rating; // e.g. "Fear", "Greed", "Extreme Fear"
+      if (current != null) {
+        await supabase.from("market_data").upsert({
+          key: "fear_greed",
+          value: { score: Math.round(current), rating: rating || null, updated: new Date().toISOString() },
+          updated_at: new Date().toISOString(),
+        });
+        results.fear_greed = Math.round(current);
+      }
+    } else {
+      errors.fear_greed = `CNN endpoint returned ${fgRes.status}`;
+    }
+  } catch (e) {
+    errors.fear_greed = e.message;
+  }
+
   return new Response(
     JSON.stringify({ ok: Object.keys(errors).length === 0, results, errors }),
     { status: 200 }

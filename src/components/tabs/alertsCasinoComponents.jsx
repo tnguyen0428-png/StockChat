@@ -50,23 +50,25 @@ export function ConfidenceRing({ value, size = 16, t }) {
 }
 
 // ── Rolex Gauge (subtle background) ──
+// Scale: 0 = Extreme Fear (left) → 100 = Extreme Greed (right)
 export function RolexGauge({ score, t, darkMode }) {
-  const s = score ?? 34;
-  const needleAngle = -90 + (Math.min(Math.max(s, 0), 50) / 50) * 180;
+  const s = Math.min(Math.max(score ?? 50, 0), 100);
+  const needleAngle = -90 + (s / 100) * 180;
   const cx = 160, cy = 150, nr = 80;
-  const rad = (needleAngle - 90) * Math.PI / 180;
-  const nx = cx + nr * Math.cos(rad);
-  const ny = cy + nr * Math.sin(rad);
+
+  // Number positions along the arch (0, 25, 50, 75, 100)
+  const numberMarks = [0, 25, 50, 75, 100];
+  const archR = 110; // radius for number placement (outside the bezel)
 
   return (
     <svg viewBox="0 0 320 170" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.25 }}>
       <defs>
         <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#22c55e"/>
-          <stop offset="30%" stopColor="#84cc16"/>
+          <stop offset="0%" stopColor="#ef4444"/>
+          <stop offset="25%" stopColor="#f97316"/>
           <stop offset="50%" stopColor="#eab308"/>
-          <stop offset="75%" stopColor="#f97316"/>
-          <stop offset="100%" stopColor="#ef4444"/>
+          <stop offset="75%" stopColor="#84cc16"/>
+          <stop offset="100%" stopColor="#22c55e"/>
         </linearGradient>
       </defs>
       {/* Outer bezel */}
@@ -75,15 +77,38 @@ export function RolexGauge({ score, t, darkMode }) {
       <path d="M60 150 A100 100 0 0 1 260 150" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" strokeDasharray="1 3.5"/>
       {/* Color gauge track */}
       <path d="M68 150 A92 92 0 0 1 252 150" fill="none" stroke="url(#gaugeGrad)" strokeWidth="3" strokeLinecap="round"/>
-      {/* Tick marks */}
+      {/* Tick marks — 9 evenly spaced */}
       {[-72,-54,-36,-18,0,18,36,54,72].map(angle => (
         <line key={angle} x1="72" y1="140" x2="72" y2="148" stroke="rgba(255,255,255,0.4)" strokeWidth="1" transform={`rotate(${angle}, 160, 150)`}/>
       ))}
+      {/* Subtle numbers along the arch: 0, 25, 50, 75, 100 */}
+      {numberMarks.map(val => {
+        const angle = -180 + (val / 100) * 180; // -180 (left) to 0 (right)
+        const rad = angle * Math.PI / 180;
+        const tx = cx + archR * Math.cos(rad);
+        const ty = cy + archR * Math.sin(rad);
+        return (
+          <text key={val} x={tx} y={ty} textAnchor="middle" dominantBaseline="middle"
+            fontSize="7" fill="rgba(255,255,255,0.35)" fontWeight="500"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>{val}</text>
+        );
+      })}
       {/* Labels */}
-      <text x="62" y="165" textAnchor="middle" fontSize="8" fill="#22c55e" fontWeight="600" style={{ fontFamily: "'Outfit', sans-serif" }}>GREED</text>
-      <text x="258" y="165" textAnchor="middle" fontSize="8" fill="#ef4444" fontWeight="600" style={{ fontFamily: "'Outfit', sans-serif" }}>FEAR</text>
-      {/* Needle */}
-      <line x1={cx} y1={cy} x2={nx} y2={ny} stroke={t.text1} strokeWidth="1.5" strokeLinecap="round"/>
+      <text x="62" y="165" textAnchor="middle" fontSize="8" fill="#ef4444" fontWeight="600" style={{ fontFamily: "'Outfit', sans-serif" }}>FEAR</text>
+      <text x={cx} y="168" textAnchor="middle" fontSize="10" fill={s <= 24 ? '#ef4444' : s <= 44 ? '#f97316' : s <= 55 ? '#eab308' : s <= 74 ? '#84cc16' : '#22c55e'} fontWeight="700" style={{ fontFamily: "'DM Sans', sans-serif" }}>{Math.round(s)}</text>
+      <text x="258" y="165" textAnchor="middle" fontSize="8" fill="#22c55e" fontWeight="600" style={{ fontFamily: "'Outfit', sans-serif" }}>GREED</text>
+      {/* Needle — thin Rolex arrow hand */}
+      <g transform={`rotate(${needleAngle}, ${cx}, ${cy})`}>
+        {/* Tail (short counterweight) */}
+        <polygon points={`${cx-1.5},${cy} ${cx+1.5},${cy} ${cx+0.8},${cy+10} ${cx-0.8},${cy+10}`} fill={t.text1} opacity="0.5"/>
+        {/* Main hand body — thin tapered */}
+        <polygon points={`${cx-1.5},${cy} ${cx+1.5},${cy} ${cx+0.6},${cy-54} ${cx-0.6},${cy-54}`} fill={t.text1}/>
+        {/* Lume rectangle — narrow */}
+        <rect x={cx-1.2} y={cy-50} width="2.4" height="20" rx="0.8" fill={darkMode ? "rgba(200,220,240,0.45)" : "rgba(200,220,240,0.6)"}/>
+        {/* Arrow tip — small */}
+        <polygon points={`${cx},${cy-nr} ${cx-2.5},${cy-58} ${cx+2.5},${cy-58}`} fill={t.text1}/>
+      </g>
+      {/* Center cap */}
       <circle cx={cx} cy={cy} r="4" fill={darkMode ? "#1e3d62" : "#c8d6e5"} stroke={t.text1} strokeWidth="1"/>
       <circle cx={cx} cy={cy} r="1.5" fill={t.text1}/>
     </svg>
@@ -246,13 +271,7 @@ export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, o
       `}</style>
       <RolexGauge score={fearScore} t={t} darkMode={darkMode} />
 
-      {/* Score label */}
-      <div style={{ position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)', textAlign: 'center', opacity: 0.45 }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: (fearScore ?? 34) > 30 ? '#f97316' : (fearScore ?? 34) > 20 ? '#eab308' : '#22c55e', fontFamily: "'Outfit', sans-serif" }}>{Math.round(fearScore ?? 34)}</div>
-        <div style={{ fontSize: 7, fontWeight: 600, color: (fearScore ?? 34) > 30 ? '#f97316' : (fearScore ?? 34) > 20 ? '#eab308' : '#22c55e', fontFamily: "'Outfit', sans-serif", letterSpacing: 1.5, marginTop: -2 }}>
-          {(fearScore ?? 34) > 30 ? "FEARFUL" : (fearScore ?? 34) > 20 ? "NEUTRAL" : "GREEDY"}
-        </div>
-      </div>
+      {/* Score label removed from center — now rendered inside the SVG gauge under FEAR/GREED */}
 
       {/* Bead plate */}
       <div style={{ position: 'absolute', bottom: 36, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 3, opacity: 0.45 }}>

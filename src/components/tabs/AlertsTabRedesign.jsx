@@ -273,7 +273,6 @@ function HotSectors({ alerts, onSectorTap, activeSector, t, darkMode }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 14 }}>🔥</span>
           <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: t.text1 }}>Hot Sectors</span>
-          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: t.surfaceAlt, color: t.text2 }}>{seedSectors.length} active</span>
         </div>
         <span style={{ fontSize: 18, color: t.text3, transition: 'transform .2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', display: 'inline-block' }}>▾</span>
       </div>
@@ -640,7 +639,8 @@ export default function AlertsTab({ session, group }) {
     supabase.from('market_data').select('*').then(({ data }) => {
       if (!data) return;
       data.forEach(row => {
-        if (row.key === 'vix_score') setFearScore(row.value?.score ?? null);
+        if (row.key === 'fear_greed') setFearScore(row.value?.score ?? null);
+        else if (row.key === 'vix_score' && !data.some(r => r.key === 'fear_greed')) setFearScore(row.value?.score ?? null); // fallback to VIX
         if (row.key === 'spy_price') setSpyData(row.value);
       });
     });
@@ -816,7 +816,7 @@ export default function AlertsTab({ session, group }) {
       if (MEGA_CAP_PENALTY.has(ts.ticker)) ts.score = Math.round(ts.score * 0.3);
     }
     return Object.values(tickerScores)
-      .filter(t => !ETF_EXCLUDE.has(t.ticker) && t.optionsCount >= 1 && t.score > 0)
+      .filter(t => !ETF_EXCLUDE.has(t.ticker) && t.count >= 1 && t.score > 0)
       .sort((a, b) => b.score - a.score);
   }, [optionsFlow, darkpoolTrades]);
 
@@ -1223,7 +1223,6 @@ export default function AlertsTab({ session, group }) {
             <button onClick={() => setShowFlow(!showFlow)} style={{ width: "100%", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>🏦 Options & DarkPool</span>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: t.surfaceAlt, color: t.text2 }}>{darkpoolTrades.length + optionsFlow.length}</span>
               </div>
               <span style={{ fontSize: 18, color: t.text3, transition: "transform .2s", transform: showFlow ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
             </button>
