@@ -1613,7 +1613,7 @@ const S = {
   pulseVal: { fontSize: 12, fontWeight: 600 },
 
   // ── Content ──
-  content: { flex: 1, overflowY: 'auto', paddingBottom: 56, background: '#eef2f7' },
+  content: { flex: 1, overflowY: 'auto', paddingBottom: 110, background: '#eef2f7' },
   sectionDivider: { height: 1, background: '#dce4ed', margin: '0 14px' },
 
   fixedChatBar: {
