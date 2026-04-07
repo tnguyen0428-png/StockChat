@@ -866,7 +866,7 @@ export default function AlertsTab({ session, group }) {
 
       {/* HEADER — mood text removed (gauge already shows fear/greed) */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h2 style={{ margin: 0, fontSize: 11, fontWeight: 700, color: t.text3, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "'Outfit', sans-serif" }}>Breakout Alerts</h2>
+        <h2 style={{ margin: 0, fontSize: 11, fontWeight: 700, color: t.text3, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "'Outfit', sans-serif" }}>Action Alerts</h2>
         <DarkModeToggle darkMode={darkMode} onToggle={() => setDarkMode(d => !d)} t={t} />
       </div>
 
