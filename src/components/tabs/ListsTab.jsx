@@ -16,6 +16,7 @@ export default function ListsTab({ session, profile, group, isAdmin }) {
   const [notesDraft, setNotesDraft] = useState('');
   const [savingStock, setSavingStock] = useState(false);
   const [newTicker, setNewTicker] = useState('');
+  const [watchlistError, setWatchlistError] = useState('');
   const [loading, setLoading]     = useState(false);
   const [addTickers, setAddTickers] = useState({});
 
@@ -123,18 +124,36 @@ export default function ListsTab({ session, profile, group, isAdmin }) {
 
   // ── Personal watchlist ──
 
+  const showWatchlistError = (msg) => {
+    setWatchlistError(msg);
+    setTimeout(() => setWatchlistError(''), 3000);
+  };
+
   const addToWatchlist = async () => {
     const sym = newTicker.trim().toUpperCase().replace(/[^A-Z]/g, '');
-    if (!sym || sym.length > 5) return;
-    if (watchlist.find(w => w.symbol === sym)) return;
-    const { data } = await supabase
+    if (!sym || sym.length > 5) {
+      showWatchlistError('Enter a valid ticker (1–5 letters).');
+      return;
+    }
+    if (watchlist.find(w => w.symbol === sym)) {
+      showWatchlistError(`${sym} is already in your watchlist.`);
+      return;
+    }
+    console.log('[addToWatchlist] inserting:', sym, 'for user:', session.user.id);
+    const { data, error } = await supabase
       .from('user_watchlist')
       .insert({ user_id: session.user.id, symbol: sym })
       .select()
       .single();
+    console.log('[addToWatchlist] result — data:', data, 'error:', error);
+    if (error) {
+      showWatchlistError(error.message || 'Failed to add ticker. Please try again.');
+      return;
+    }
     if (data) {
       setWatchlist(prev => [data, ...prev]);
       setNewTicker('');
+      setWatchlistError('');
     }
   };
 
@@ -304,6 +323,10 @@ export default function ListsTab({ session, profile, group, isAdmin }) {
               <button style={styles.addBtn} onClick={addToWatchlist}>Add</button>
             </div>
 
+            {watchlistError && (
+              <div style={styles.watchlistError}>{watchlistError}</div>
+            )}
+
             {watchlist.length === 0 && (
               <div style={styles.emptyWrap}>
                 <div style={styles.emptyIcon}>⭐</div>
@@ -398,6 +421,10 @@ const styles = {
     border: 'none', padding: '9px 16px',
     borderRadius: 8, fontSize: 13,
     fontWeight: 600, cursor: 'pointer',
+  },
+
+  watchlistError: {
+    color: '#e05252', fontSize: 12, marginBottom: 8, marginTop: -4,
   },
 
   // ── Watch / stock items (shared style) ──
