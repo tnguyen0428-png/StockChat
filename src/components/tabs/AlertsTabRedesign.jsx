@@ -852,7 +852,7 @@ export default function AlertsTab({ session, group }) {
     <div className="alerts-container" style={{ background: t.bg, transition: 'background .2s' }}>
       <style>{`
         *, *::before, *::after { box-sizing: border-box; }
-        .alerts-container { max-width: 480px; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; flex-shrink: 0; }
+        .alerts-container { max-width: 480px; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; flex: 1; min-height: 100%; }
         .filter-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
         .filter-row::-webkit-scrollbar { display: none; }
         @media (max-width: 480px) {
