@@ -922,7 +922,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   // RENDER
   // ═══════════════════════════════════════
   return (
-    <div style={S.scroll}>
+    <div style={S.outerWrap}>
 
       {/* ═══ TOAST ═══ */}
       {toast && (
@@ -1476,29 +1476,29 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
           );
         })()}
 
-        {/* ═══ CHAT INPUT — sticky at bottom of scroll ═══ */}
-        <div ref={chatBarRef} style={S.fixedChatBar}>
-          <div
-            style={{ ...S.ccAiBtn, ...(aiMode ? S.ccAiBtnActive : S.ccAiBtnOff) }}
-            onClick={() => setAiMode(prev => !prev)}
-          >AI</div>
-          <input
-            ref={chatInputRef}
-            style={{ ...S.ccInput, ...(aiMode ? { border: '1.5px solid #8B5CF6' } : {}) }}
-            placeholder={aiMode ? 'Ask AI anything...' : 'Message UpTik Public...'}
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleHomeSend(); } }}
-          />
-          <button
-            style={{ ...S.ccSend, opacity: chatInput.trim() ? 1 : 0.4, ...(aiMode ? { background: '#8B5CF6' } : {}) }}
-            onClick={handleHomeSend}
-            disabled={!chatInput.trim() || chatSending}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          </button>
-        </div>
+      </div>
 
+      {/* ═══ CHAT INPUT — pinned outside scroll area ═══ */}
+      <div ref={chatBarRef} style={S.fixedChatBar}>
+        <div
+          style={{ ...S.ccAiBtn, ...(aiMode ? S.ccAiBtnActive : S.ccAiBtnOff) }}
+          onClick={() => setAiMode(prev => !prev)}
+        >AI</div>
+        <input
+          ref={chatInputRef}
+          style={{ ...S.ccInput, ...(aiMode ? { border: '1.5px solid #8B5CF6' } : {}) }}
+          placeholder={aiMode ? 'Ask AI anything...' : 'Message UpTik Public...'}
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleHomeSend(); } }}
+        />
+        <button
+          style={{ ...S.ccSend, opacity: chatInput.trim() ? 1 : 0.4, ...(aiMode ? { background: '#8B5CF6' } : {}) }}
+          onClick={handleHomeSend}
+          disabled={!chatInput.trim() || chatSending}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
       </div>
 
       {/* ── Modals ── */}
@@ -1747,7 +1747,7 @@ function getTimeAgo(timestamp) {
 // STYLES
 // ═══════════════════════════════════════
 const S = {
-  scroll: { flex: 1, overflowY: 'auto', padding: 0, paddingBottom: 60, WebkitOverflowScrolling: 'touch' },
+  outerWrap: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 },
 
   // ── Toast ──
   toast: {
@@ -1796,15 +1796,14 @@ const S = {
   pulsePrice: { fontSize: 13, fontWeight: 700 },
   pulseVal: { fontSize: 12, fontWeight: 600 },
 
-  // ── Content ──
-  content: { flex: 1, overflowY: 'auto', paddingBottom: 0, background: '#eef2f7' },
+  // ── Content (scrollable area) ──
+  content: { flex: 1, overflowY: 'auto', paddingBottom: 8, background: '#eef2f7', WebkitOverflowScrolling: 'touch' },
   sectionDivider: { height: 1, background: '#dce4ed', margin: '0 14px' },
 
   fixedChatBar: {
-    position: 'sticky', bottom: 0,
-    marginTop: 8,
-    padding: '6px 12px', background: '#eef2f7',
-    display: 'flex', alignItems: 'center', gap: 6,
+    flexShrink: 0,
+    padding: '10px 14px', background: '#eef2f7',
+    display: 'flex', alignItems: 'center', gap: 8,
     zIndex: 50,
     borderTop: '1px solid #d8e2ed',
   },

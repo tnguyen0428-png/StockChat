@@ -196,7 +196,7 @@ export default function DashboardPage({ session }) {
       })()}
 
       {/* Tab Content */}
-      <div style={styles.content}>
+      <div style={{ ...styles.content, ...(activeTab === 'home' ? { paddingBottom: 58, overflow: 'hidden' } : {}) }}>
         {activeTab === 'home' && (
           <HomeTab
             session={session}
@@ -290,5 +290,5 @@ const styles = {
     borderRadius: '50%', display: 'flex',
     alignItems: 'center', justifyContent: 'center', lineHeight: 1,
   },
-  content: { flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: 90 },
+  content: { flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: 'calc(90px + env(safe-area-inset-bottom, 0px))' },
 };
