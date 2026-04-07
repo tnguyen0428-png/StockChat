@@ -11,18 +11,18 @@ const FMP_KEY  = import.meta.env.VITE_FMP_API_KEY;
 const BASE     = 'https://financialmodelingprep.com/stable';
 const BASE_V3  = 'https://financialmodelingprep.com/api/v3';
 
-// 52W High: how close to the high counts (default 2%)
-export const DEFAULT_THRESHOLD = 2.0;
+// 52W High: within 5% of the high catches breakouts early while filtering noise
+export const DEFAULT_THRESHOLD = 5.0;
 
-// Vol Surge: how many times avg volume counts as a surge (default 3x)
-export const DEFAULT_VOL_MULTIPLIER = 3.0;
+// Vol Surge: 2x avg volume flags meaningful institutional activity
+export const DEFAULT_VOL_MULTIPLIER = 2.0;
 
-// Gap Up: how far above prev close the open must be (default 3%)
-export const DEFAULT_GAP_THRESHOLD = 3.0;
+// Gap Up: 1.5% catches actionable gaps without flooding with micro-gaps
+export const DEFAULT_GAP_THRESHOLD = 1.5;
 
-// MA Cross: short and long period defaults (days)
-export const DEFAULT_SHORT_MA = 20;
-export const DEFAULT_LONG_MA  = 50;
+// MA Cross: 9/21 is responsive for short-term momentum signals
+export const DEFAULT_SHORT_MA = 9;
+export const DEFAULT_LONG_MA  = 21;
 
 async function fetchQuote(symbol) {
   try {
@@ -36,18 +36,18 @@ async function fetchQuote(symbol) {
 }
 
 // Returns tickers already alerted today for a given alert_type
-async function getAlertedTodaySet(alertType) {
+async function getAlertedTodaySet(signalType) {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
   const { data } = await supabase
     .from('breakout_alerts')
-    .select('tickers')
-    .eq('alert_type', alertType)
+    .select('ticker')
+    .eq('signal_type', signalType)
     .gte('created_at', startOfDay.toISOString());
 
   const alerted = new Set();
-  (data || []).forEach(row => row.tickers?.forEach(t => alerted.add(t)));
+  (data || []).forEach(row => { if (row.ticker) alerted.add(row.ticker); });
   return alerted;
 }
 
@@ -72,9 +72,13 @@ export async function scan52wHigh(threshold = DEFAULT_THRESHOLD, onProgress) {
       if (pctFromHigh <= threshold) {
         results.push({
           symbol,
-          price:        q.price,
-          high_52w:     q.yearHigh,
+          price:         q.price,
+          change_pct:    q.changesPercentage ?? null,
+          volume:        q.volume ?? null,
+          avg_volume:    q.avgVolume ?? null,
+          high_52w:      q.yearHigh,
           pct_from_high: parseFloat(pctFromHigh.toFixed(2)),
+          sector:        q.sector ?? null,
         });
       }
     }));
@@ -97,14 +101,16 @@ export async function run52wHighScan(threshold = DEFAULT_THRESHOLD, onProgress) 
   if (hits.length === 0) return { inserted: 0, hits: [] };
 
   const rows = hits.map(h => ({
-    alert_type:    '52w_high',
-    tickers:       [h.symbol],
-    title:         `${h.symbol} is within ${h.pct_from_high.toFixed(2)}% of its 52-week high`,
-    body:          `Price $${h.price.toFixed(2)} · 52W High $${h.high_52w.toFixed(2)} · ${h.pct_from_high.toFixed(2)}% away`,
+    signal_type:   '52w_high',
+    ticker:        h.symbol,
     price:         h.price,
+    change_pct:    h.change_pct,
+    volume:        h.volume,
+    avg_volume:    h.avg_volume,
     high_52w:      h.high_52w,
     pct_from_high: h.pct_from_high,
-    sent_by:       'scanner',
+    sector:        h.sector,
+    notes:         `Price $${h.price.toFixed(2)} · 52W High $${h.high_52w.toFixed(2)} · ${h.pct_from_high.toFixed(2)}% away`,
   }));
 
   const { error } = await supabase.from('breakout_alerts').insert(rows);
@@ -136,9 +142,14 @@ export async function scanGapUp(threshold = DEFAULT_GAP_THRESHOLD, onProgress) {
       if (gapPct >= threshold) {
         results.push({
           symbol,
+          price:      q.price,
+          change_pct: q.changesPercentage ?? null,
+          volume:     q.volume ?? null,
+          avg_volume: q.avgVolume ?? null,
           open_price: q.open,
           prev_close: q.previousClose,
           gap_pct:    parseFloat(gapPct.toFixed(2)),
+          sector:     q.sector ?? null,
         });
       }
     }));
@@ -161,14 +172,17 @@ export async function runGapUpScan(threshold = DEFAULT_GAP_THRESHOLD, onProgress
   if (hits.length === 0) return { inserted: 0, hits: [] };
 
   const rows = hits.map(h => ({
-    alert_type: 'gap_up',
-    tickers:    [h.symbol],
-    title:      `${h.symbol} gapped up +${h.gap_pct.toFixed(2)}% at the open`,
-    body:       `Open $${h.open_price.toFixed(2)} · Prev Close $${h.prev_close.toFixed(2)} · +${h.gap_pct.toFixed(2)}% gap`,
-    open_price: h.open_price,
-    prev_close: h.prev_close,
-    gap_pct:    h.gap_pct,
-    sent_by:    'scanner',
+    signal_type: 'gap_up',
+    ticker:      h.symbol,
+    price:       h.price,
+    change_pct:  h.change_pct,
+    volume:      h.volume,
+    avg_volume:  h.avg_volume,
+    open_price:  h.open_price,
+    prev_close:  h.prev_close,
+    gap_pct:     h.gap_pct,
+    sector:      h.sector,
+    notes:       `Open $${h.open_price.toFixed(2)} · Prev Close $${h.prev_close.toFixed(2)} · +${h.gap_pct.toFixed(2)}% gap`,
   }));
 
   const { error } = await supabase.from('breakout_alerts').insert(rows);
@@ -236,12 +250,19 @@ export async function scanMACross(
         yesterdayShort <= yesterdayLong && todayShort > todayLong;
 
       if (crossedAbove) {
+        // Fetch live quote for price, volume, sector
+        const q = await fetchQuote(symbol);
         results.push({
           symbol,
+          price:           q?.price ?? null,
+          change_pct:      q?.changesPercentage ?? null,
+          volume:          q?.volume ?? null,
+          avg_volume:      q?.avgVolume ?? null,
           short_ma:        parseFloat(todayShort.toFixed(2)),
           long_ma:         parseFloat(todayLong.toFixed(2)),
           short_ma_period: shortPeriod,
           long_ma_period:  longPeriod,
+          sector:          q?.sector ?? null,
         });
       }
     }));
@@ -268,15 +289,18 @@ export async function runMACrossScan(
   if (hits.length === 0) return { inserted: 0, hits: [] };
 
   const rows = hits.map(h => ({
-    alert_type:      'ma_cross',
-    tickers:         [h.symbol],
-    title:           `${h.symbol} ${h.short_ma_period}-day MA crossed above ${h.long_ma_period}-day MA`,
-    body:            `${h.short_ma_period}MA $${h.short_ma.toFixed(2)} · ${h.long_ma_period}MA $${h.long_ma.toFixed(2)} · bullish crossover`,
+    signal_type:     'ma_cross',
+    ticker:          h.symbol,
+    price:           h.price,
+    change_pct:      h.change_pct,
+    volume:          h.volume,
+    avg_volume:      h.avg_volume,
     short_ma:        h.short_ma,
     long_ma:         h.long_ma,
     short_ma_period: h.short_ma_period,
     long_ma_period:  h.long_ma_period,
-    sent_by:         'scanner',
+    sector:          h.sector,
+    notes:           `${h.short_ma_period}MA $${h.short_ma.toFixed(2)} · ${h.long_ma_period}MA $${h.long_ma.toFixed(2)} · bullish crossover`,
   }));
 
   const { error } = await supabase.from('breakout_alerts').insert(rows);
@@ -308,9 +332,12 @@ export async function scanVolSurge(multiplier = DEFAULT_VOL_MULTIPLIER, onProgre
       if (ratio >= multiplier) {
         results.push({
           symbol,
+          price:          q.price,
+          change_pct:     q.changesPercentage ?? null,
           current_volume: q.volume,
           avg_volume:     q.avgVolume,
           volume_ratio:   parseFloat(ratio.toFixed(2)),
+          sector:         q.sector ?? null,
         });
       }
     }));
@@ -333,14 +360,15 @@ export async function runVolSurgeScan(multiplier = DEFAULT_VOL_MULTIPLIER, onPro
   if (hits.length === 0) return { inserted: 0, hits: [] };
 
   const rows = hits.map(h => ({
-    alert_type:     'vol_surge',
-    tickers:        [h.symbol],
-    title:          `${h.symbol} volume is ${h.volume_ratio}x above average`,
-    body:           `Vol ${(h.current_volume / 1e6).toFixed(1)}M · Avg ${(h.avg_volume / 1e6).toFixed(1)}M · ${h.volume_ratio}x avg`,
-    current_volume: h.current_volume,
+    signal_type:    'vol_surge',
+    ticker:         h.symbol,
+    price:          h.price,
+    change_pct:     h.change_pct,
+    volume:         h.current_volume,
     avg_volume:     h.avg_volume,
     volume_ratio:   h.volume_ratio,
-    sent_by:        'scanner',
+    sector:         h.sector,
+    notes:          `Vol ${(h.current_volume / 1e6).toFixed(1)}M · Avg ${(h.avg_volume / 1e6).toFixed(1)}M · ${h.volume_ratio}x avg`,
   }));
 
   const { error } = await supabase.from('breakout_alerts').insert(rows);
