@@ -132,7 +132,7 @@ export default function DashboardPage({ session }) {
   if (loading) {
     return (
       <div style={{
-        minHeight: '100vh', background: '#132d52',
+        minHeight: '100dvh', background: '#132d52',
         display: 'flex', alignItems: 'center',
         justifyContent: 'center', flexDirection: 'column', gap: 12,
       }}>
@@ -253,7 +253,7 @@ export default function DashboardPage({ session }) {
 
 const styles = {
   page: {
-    height: '100vh', background: 'var(--bg)',
+    height: '100dvh', background: 'var(--bg)',
     display: 'flex', flexDirection: 'column',
     overflow: 'hidden', maxWidth: 480,
     margin: '0 auto', position: 'relative',

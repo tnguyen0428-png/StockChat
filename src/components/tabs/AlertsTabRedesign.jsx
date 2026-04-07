@@ -1275,4 +1275,11 @@ export default function AlertsTab({ session, group }) {
           </div>
 
           {/* HOT SECTORS — collapsible, shows even with 0 scanner alerts */}
-          <HotSectors alerts={displayAlerts} onSectorTap={setSectorFilter} activeSector={sectorFilter} t={t} darkMode={darkMode
+          <HotSectors alerts={displayAlerts} onSectorTap={setSectorFilter} activeSector={sectorFilter} t={t} darkMode={darkMode} />
+        </>
+      )}
+
+      {modalAlert && <Modal alert={modalAlert} onClose={() => setModalAlert(null)} t={t} />}
+    </div>
+  );
+}

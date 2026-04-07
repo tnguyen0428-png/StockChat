@@ -68,12 +68,18 @@
 
 html, body {
   height: 100%;
+  height: -webkit-fill-available;
   background: var(--bg);
   font-family: var(--font);
   color: var(--text1);
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100%;
+  min-height: -webkit-fill-available;
 }
 
 /* ── SCROLLBAR ── */
