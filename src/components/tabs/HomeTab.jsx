@@ -99,25 +99,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   const chatSectionRef = useRef(null);
   const chatBarRef = useRef(null);
 
-  // iOS keyboard fix: adjust fixed chat bar position when keyboard opens
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const onResize = () => {
-      if (chatBarRef.current) {
-        const offset = window.innerHeight - vv.height;
-        // Only adjust if offset is large enough to be a keyboard (>100px)
-        // Small offsets from Safari toolbar should be ignored
-        chatBarRef.current.style.bottom = offset > 100 ? `${offset}px` : '58px';
-      }
-    };
-    vv.addEventListener('resize', onResize);
-    vv.addEventListener('scroll', onResize);
-    return () => {
-      vv.removeEventListener('resize', onResize);
-      vv.removeEventListener('scroll', onResize);
-    };
-  }, []);
+  // iOS keyboard — no special handling needed with sticky positioning
 
   // Expose scrollToChat for parent (when Chat bottom nav is tapped)
   useEffect(() => {
@@ -1391,6 +1373,29 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
           </div>
         </div>
 
+        {/* ═══ CHAT INPUT — sticky at bottom of scroll ═══ */}
+        <div ref={chatBarRef} style={S.fixedChatBar}>
+          <div
+            style={{ ...S.ccAiBtn, ...(aiMode ? S.ccAiBtnActive : S.ccAiBtnOff) }}
+            onClick={() => setAiMode(prev => !prev)}
+          >AI</div>
+          <input
+            ref={chatInputRef}
+            style={{ ...S.ccInput, ...(aiMode ? { border: '1.5px solid #8B5CF6' } : {}) }}
+            placeholder={aiMode ? 'Ask AI anything...' : 'Message UpTik Public...'}
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleHomeSend(); } }}
+          />
+          <button
+            style={{ ...S.ccSend, opacity: chatInput.trim() ? 1 : 0.4, ...(aiMode ? { background: '#8B5CF6' } : {}) }}
+            onClick={handleHomeSend}
+            disabled={!chatInput.trim() || chatSending}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+
       </div>
 
       {/* ── Modals ── */}
@@ -1406,29 +1411,6 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
         group={showInviteGroup}
         onClose={() => setShowInviteGroup(null)}
       />
-
-      {/* ═══ FIXED CHAT INPUT — pinned above bottom nav ═══ */}
-      <div ref={chatBarRef} style={S.fixedChatBar}>
-        <div
-          style={{ ...S.ccAiBtn, ...(aiMode ? S.ccAiBtnActive : S.ccAiBtnOff) }}
-          onClick={() => setAiMode(prev => !prev)}
-        >AI</div>
-        <input
-          ref={chatInputRef}
-          style={{ ...S.ccInput, ...(aiMode ? { border: '1.5px solid #8B5CF6' } : {}) }}
-          placeholder={aiMode ? 'Ask AI anything...' : 'Message UpTik Public...'}
-          value={chatInput}
-          onChange={(e) => setChatInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleHomeSend(); } }}
-        />
-        <button
-          style={{ ...S.ccSend, opacity: chatInput.trim() ? 1 : 0.4, ...(aiMode ? { background: '#8B5CF6' } : {}) }}
-          onClick={handleHomeSend}
-          disabled={!chatInput.trim() || chatSending}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        </button>
-      </div>
     </div>
   );
 }
@@ -1613,15 +1595,15 @@ const S = {
   pulseVal: { fontSize: 12, fontWeight: 600 },
 
   // ── Content ──
-  content: { flex: 1, overflowY: 'auto', paddingBottom: 120, background: '#eef2f7' },
+  content: { flex: 1, overflowY: 'auto', paddingBottom: 0, background: '#eef2f7' },
   sectionDivider: { height: 1, background: '#dce4ed', margin: '0 14px' },
 
   fixedChatBar: {
-    position: 'fixed', bottom: 58, left: 0, right: 0,
-    maxWidth: 480, margin: '0 auto',
+    position: 'sticky', bottom: 0,
     padding: '10px 14px', background: '#eef2f7',
     display: 'flex', alignItems: 'center', gap: 8,
-    zIndex: 9998,
+    zIndex: 50,
+    borderTop: '1px solid #d8e2ed',
   },
 
   // ── Watchlist / My List helpers ──
