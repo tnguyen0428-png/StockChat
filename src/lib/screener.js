@@ -7,7 +7,7 @@
 const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 const BASE    = 'https://financialmodelingprep.com/stable';
 
-// ── S&P 500 + Nasdaq 100 tickers (hardcoded) ──
+// ── S&P 500 + Nasdaq 100 tickers (hardcoded, deduplicated) ──
 export const SCREENER_TICKERS = [
   // Tech
   'AAPL','MSFT','NVDA','GOOGL','GOOG','META','AVGO','ORCL','AMD','QCOM',
@@ -33,10 +33,11 @@ export const SCREENER_TICKERS = [
   'AMZN','TSLA','HD','MCD','NKE','SBUX','TGT','WMT','COST','TJX',
   'LOW','BKNG','MAR','HLT','YUM','DPZ','CMG','ROST','EBAY','ETSY',
   'DKNG','ABNB','UBER','LYFT','DASH',
-  // Communication
-  'NFLX','DIS','CHTR','TMUS','VZ','T','CMCSA','EA','TTWO','ATVI',
-  'GOOGL','META','SNAP','PINS','RBLX','WBD','PARA','FOX','FOXA',
-  // Utilities / Other
+  // Communication (GOOGL/META already in Tech — not duplicated here)
+  'NFLX','DIS','CHTR','TMUS','VZ','T','CMCSA','EA','TTWO',
+  'SNAP','PINS','RBLX','WBD','FOX','FOXA',
+  'LYV','MTCH','IPG','OMC',
+  // Utilities
   'NEE','DUK','SO','D','AEP','XEL','ED','EXC','SRE','PEG',
   'AWK','ES','WEC','ETR','PPL','CMS','NI','AES','FE','CNP',
   // Materials
@@ -55,7 +56,10 @@ export const SECTOR_MAP = {
   Energy:       ['XOM','CVX','COP','EOG','SLB','MPC','PSX','VLO','OXY','PXD','HAL','DVN','FANG','HES','BKR','CTRA','EQT','APA','MRO','NOV'],
   Industrial:   ['GE','HON','UPS','CAT','DE','LMT','RTX','NOC','GD','BA','EMR','ETN','PH','ITW','ROK','XYL','IR','CARR','OTIS','TT','FDX','DAL','UAL','ALK','AAL','CSX','UNP','NSC','CHRW','EXPD'],
   Consumer:     ['AMZN','TSLA','HD','MCD','NKE','SBUX','TGT','WMT','COST','TJX','LOW','BKNG','MAR','HLT','YUM','DPZ','CMG','ROST','EBAY','ETSY','DKNG','ABNB','UBER','LYFT','DASH'],
-  Communication:['NFLX','DIS','CHTR','TMUS','VZ','T','CMCSA','EA','TTWO','SNAP','PINS','RBLX','WBD','PARA','FOX','FOXA'],
+  Communication:['NFLX','DIS','CHTR','TMUS','VZ','T','CMCSA','EA','TTWO','SNAP','PINS','RBLX','WBD','FOX','FOXA','LYV','MTCH','IPG','OMC'],
+  Utilities:    ['NEE','DUK','SO','D','AEP','XEL','ED','EXC','SRE','PEG','AWK','ES','WEC','ETR','PPL','CMS','NI','AES','FE','CNP'],
+  Materials:    ['LIN','APD','SHW','ECL','DD','DOW','NEM','FCX','ALB','CF','MOS','FMC','IFF','PPG','VMC','MLM','NUE','STLD','RS','BALL'],
+  RealEstate:   ['AMT','PLD','CCI','EQIX','PSA','WELL','DLR','SPG','O','EQR','AVB','VTR','BXP','KIM','REG','FRT','HST','MAA','UDR','CPT'],
   General:      [],
 };
 
@@ -82,7 +86,10 @@ export async function scoreTicker(symbol) {
       fetchWithRetry(`${BASE}/profile?symbol=${symbol}&apikey=${FMP_KEY}`),
     ]);
 
-    if (!ratios?.[0] || !profile?.[0]) return null;
+    if (!ratios?.[0] || !profile?.[0]) {
+      console.warn(`[Screener] ${symbol} skipped — missing data (ratios: ${!!ratios?.[0]}, profile: ${!!profile?.[0]})`);
+      return null;
+    }
 
     const r = ratios[0];
     const p = profile[0];
@@ -186,6 +193,43 @@ function generateThesis(symbol, profile, ratios, beatRate, epsGrowth, salesGrowt
     : `${symbol} is a ${profile.sector || 'market'} stock with a current price of $${profile.price?.toFixed(2)}.`;
 }
 
+// ── Fallback tickers by sector (used when primary list doesn't yield 15) ──
+const SECTOR_FALLBACKS = {
+  Tech:         ['ANET','OKTA','ZM','DOCU','TWLO','AKAM','FFIV','JNPR','KEYS','ZBRA'],
+  Healthcare:   ['ZTS','HOLX','TFX','ALGN','BAX','CAH','MCK','HSIC','XRAY','WAT'],
+  Finance:      ['MET','PRU','AFL','AIG','ALL','CB','TROW','NTRS','ZION','HBAN'],
+  Energy:       ['WMB','KMI','OKE','TRGP','LNG','AM','AR','RRC','CNX','SM'],
+  Industrial:   ['FAST','GWW','SWK','MAS','DOV','AME','NDSN','RBC','TDY','GNRC'],
+  Consumer:     ['ORLY','AZO','BBY','DG','DLTR','POOL','DECK','LULU','GRMN','EXPE'],
+  Communication:['ROKU','TTD','ZG','YELP','SPOT','IMAX','SIRI','NWSA','LBRDA','PARA'],
+  Utilities:    ['ATO','EVRG','LNT','OGE','BKH','AVA','PNW','NWE','SWX','UTL'],
+  Materials:    ['EMN','CE','HUN','OLN','SEE','SON','AVNT','WRK','IP','GEF'],
+  RealEstate:   ['SUI','INVH','ARE','CBRE','COLD','ESS','PEAK','NNN','STAG','CUBE'],
+};
+
+// ── Scan a list of tickers in batches, returns scored results ──
+async function scanTickers(tickers, onProgress, progressOffset = 0, totalTickers = 0) {
+  const results = [];
+  const total = totalTickers || tickers.length;
+  let processed = 0;
+  const batchSize = 5;
+
+  for (let i = 0; i < tickers.length; i += batchSize) {
+    const batch = tickers.slice(i, i + batchSize);
+    const scores = await Promise.all(batch.map(t => scoreTicker(t)));
+    scores.forEach((s, idx) => {
+      if (s) results.push(s);
+      else console.warn(`[Screener] ${batch[idx]} returned no score`);
+    });
+    processed += batch.length;
+    onProgress?.(Math.round(((progressOffset + processed) / total) * 100));
+    if (i + batchSize < tickers.length) {
+      await new Promise(r => setTimeout(r, 600));
+    }
+  }
+  return results;
+}
+
 // ── Run full screener for a sector ──
 export async function runScreener(sector, onProgress) {
   const tickers = SECTOR_MAP[sector] || [];
@@ -195,23 +239,27 @@ export async function runScreener(sector, onProgress) {
     return [];
   }
 
-  console.log('Running screener for', sector, 'with', tickers.length, 'tickers');
+  const fallbacks = SECTOR_FALLBACKS[sector] || [];
+  // Remove any fallback tickers already in the primary list
+  const uniqueFallbacks = fallbacks.filter(t => !tickers.includes(t));
+  const totalPossible = tickers.length + uniqueFallbacks.length;
 
-  const results = [];
-  let processed = 0;
+  console.log('Running screener for', sector, 'with', tickers.length, 'tickers (+', uniqueFallbacks.length, 'fallbacks available)');
 
-  const batchSize = 5;
-  for (let i = 0; i < tickers.length; i += batchSize) {
-    const batch = tickers.slice(i, i + batchSize);
-    const scores = await Promise.all(batch.map(t => scoreTicker(t)));
-    scores.forEach(s => { if (s) results.push(s); });
-    processed += batch.length;
-    onProgress?.(Math.round((processed / tickers.length) * 100));
-    if (i + batchSize < tickers.length) {
-      await new Promise(r => setTimeout(r, 300));
-    }
+  // ── Phase 1: scan primary tickers ──
+  let results = await scanTickers(tickers, onProgress, 0, totalPossible);
+
+  // ── Phase 2: if under 15 results, scan fallbacks ──
+  if (results.length < 15 && uniqueFallbacks.length > 0) {
+    console.log(`[Screener] Only ${results.length} results from primary list — scanning ${uniqueFallbacks.length} fallback tickers`);
+    const already = new Set(results.map(r => r.symbol));
+    const fallbackResults = await scanTickers(uniqueFallbacks, onProgress, tickers.length, totalPossible);
+    fallbackResults.forEach(r => {
+      if (!already.has(r.symbol)) results.push(r);
+    });
   }
 
+  onProgress?.(100);
   console.log('Screener complete:', results.length, 'results');
 
   return results

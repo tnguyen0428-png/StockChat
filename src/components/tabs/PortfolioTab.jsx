@@ -171,11 +171,23 @@ export default function PortfolioTab({ session }) {
   const fetchPrices = async (tickers) => {
     if (!tickers) return;
     try {
-      const res = await fetch(`https://financialmodelingprep.com/stable/quote-short?symbol=${tickers}&apikey=${FMP_KEY}`);
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        const map = {};
-        data.forEach(q => { map[q.symbol] = q.price; });
+      // FMP plan only supports single symbol per request — fetch individually
+      const symbols = tickers.split(',').map(s => s.trim()).filter(Boolean);
+      const map = {};
+      for (let i = 0; i < symbols.length; i += 6) {
+        const batch = symbols.slice(i, i + 6);
+        await Promise.all(batch.map(async (sym) => {
+          try {
+            const res = await fetch(`https://financialmodelingprep.com/stable/quote-short?symbol=${sym}&apikey=${FMP_KEY}`);
+            const data = await res.json();
+            if (Array.isArray(data) && data[0]?.price) {
+              map[data[0].symbol] = data[0].price;
+            }
+          } catch { /* skip */ }
+        }));
+        if (i + 6 < symbols.length) await new Promise(r => setTimeout(r, 250));
+      }
+      if (Object.keys(map).length > 0) {
         setPrices(prev => ({ ...prev, ...map }));
         setLastUpdated(new Date());
       }
@@ -210,12 +222,21 @@ export default function PortfolioTab({ session }) {
     let priceMap = { ...prices };
     if (allTickers.length > 0) {
       try {
-        const res = await fetch(`https://financialmodelingprep.com/stable/quote-short?symbol=${allTickers.join(',')}&apikey=${FMP_KEY}`);
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          data.forEach(q => { priceMap[q.symbol] = q.price; });
-          setPrices(prev => ({ ...prev, ...priceMap }));
+        // FMP plan only supports single symbol per request
+        for (let i = 0; i < allTickers.length; i += 6) {
+          const batch = allTickers.slice(i, i + 6);
+          await Promise.all(batch.map(async (sym) => {
+            try {
+              const res = await fetch(`https://financialmodelingprep.com/stable/quote-short?symbol=${sym}&apikey=${FMP_KEY}`);
+              const data = await res.json();
+              if (Array.isArray(data) && data[0]?.price) {
+                priceMap[data[0].symbol] = data[0].price;
+              }
+            } catch { /* skip */ }
+          }));
+          if (i + 6 < allTickers.length) await new Promise(r => setTimeout(r, 250));
         }
+        setPrices(prev => ({ ...prev, ...priceMap }));
       } catch { /* silent */ }
     }
 

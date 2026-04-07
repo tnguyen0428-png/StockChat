@@ -4,17 +4,17 @@ import { useGroup } from '../../context/GroupContext';
 import { useTheme, ChipField, DarkModeToggle, timeAgo, SentimentPill } from './alertsCasinoComponents';
 
 // Default scanner tag mapping (used as fallback before DB alert_types load)
-const DEFAULT_TAG_MAP = { '52w_high': 'Yearly High', 'vol_surge': 'Volume Spike', 'gap_up': 'Gap Up', 'ma_cross': 'Trend Change', 'vcp': 'VCP Pattern', 'flow_signal': 'Flow Signal' };
+const DEFAULT_TAG_MAP = { '52w_high': '52W High (5%)', 'vol_surge': 'Vol Surge (2x Avg)', 'gap_up': 'Gap Up (1.5%)', 'ma_cross': 'MA Cross (9/21)', 'vcp': 'VCP Pattern', 'flow_signal': 'Big Money' };
 
 // Filter pill config with icons and colors (matches mockup upgrade)
 const FILTER_PILL_CONFIG = {
   'All':          { icon: '⚡', label: 'All',         iconBg: 'rgba(212,168,83,0.15)',  iconColor: '#f0d78c' },
-  '52w_high':     { icon: '👑', label: 'Near High',   iconBg: 'rgba(34,197,94,0.15)',   iconColor: '#4ade80' },
-  'vol_surge':    { icon: '📊', label: 'Unusual Vol',  iconBg: 'rgba(249,115,22,0.15)',  iconColor: '#fb923c' },
-  'gap_up':       { icon: '⬆️', label: 'Gap Up',       iconBg: 'rgba(59,130,246,0.15)',  iconColor: '#60a5fa' },
-  'ma_cross':     { icon: '📈', label: 'Trend Shift',  iconBg: 'rgba(168,85,247,0.15)',  iconColor: '#c084fc' },
+  '52w_high':     { icon: '⚡', label: '52W High',     iconBg: 'rgba(217,119,6,0.15)',   iconColor: '#fbbf24' },
+  'vol_surge':    { icon: '🔥', label: 'Vol Surge',    iconBg: 'rgba(124,58,237,0.15)',  iconColor: '#a78bfa' },
+  'gap_up':       { icon: '📈', label: 'Gap Up',       iconBg: 'rgba(22,163,74,0.15)',   iconColor: '#4ade80' },
+  'ma_cross':     { icon: '🔀', label: 'MA Cross',     iconBg: 'rgba(37,99,235,0.15)',   iconColor: '#60a5fa' },
   'flow_signal':  { icon: '💰', label: 'Big Money',    iconBg: 'rgba(16,185,129,0.15)',  iconColor: '#34d399' },
-  'vcp':          { icon: '🔄', label: 'VCP Pattern',  iconBg: 'rgba(234,179,8,0.15)',   iconColor: '#facc15' },
+  'vcp':          { icon: '📐', label: 'VCP Pattern',  iconBg: 'rgba(236,72,153,0.15)',  iconColor: '#f472b6' },
 };
 
 // Sector display labels
@@ -534,6 +534,13 @@ export default function AlertsTab({ session, group }) {
   const [mysterySelected, setMysterySelected] = useState(null); // 'options' | 'darkpool' | null
   const flowRef = useRef(null);
 
+  // ── History view state ──
+  const [alertTab, setAlertTab] = useState('live'); // 'live' | 'history'
+  const [historyAlerts, setHistoryAlerts] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyPrices, setHistoryPrices] = useState({}); // { AAPL: 189.50, ... }
+  const [historyExpanded, setHistoryExpanded] = useState(null);
+
   // ── Live data state ──
   const [liveAlerts, setLiveAlerts] = useState([]);
   const [fearScore, setFearScore] = useState(null);
@@ -677,6 +684,48 @@ export default function AlertsTab({ session, group }) {
   useEffect(() => {
     try { localStorage.setItem('uptik_darkMode', String(darkMode)); } catch {}
   }, [darkMode]);
+
+  // ── Load alert history when History tab is selected ──
+  useEffect(() => {
+    if (alertTab !== 'history') return;
+    const loadHistory = async () => {
+      setHistoryLoading(true);
+      try {
+        const { data } = await supabase.from('breakout_alerts').select('*')
+          .eq('featured', true)
+          .order('created_at', { ascending: false })
+          .limit(200);
+        if (data) {
+          setHistoryAlerts(data);
+          // Fetch current prices for unique tickers
+          // Note: /stable/quote only accepts one symbol at a time on this plan
+          const tickers = [...new Set(data.map(a => a.ticker).filter(Boolean))];
+          if (tickers.length > 0) {
+            const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
+            const prices = {};
+            // Fetch in parallel batches of 8 (one request per ticker)
+            for (let i = 0; i < tickers.length; i += 8) {
+              const batch = tickers.slice(i, i + 8);
+              await Promise.all(batch.map(async (sym) => {
+                try {
+                  const res = await fetch(`https://financialmodelingprep.com/stable/quote?symbol=${sym}&apikey=${FMP_KEY}`);
+                  const quotes = await res.json();
+                  if (Array.isArray(quotes) && quotes[0]?.price) {
+                    prices[sym] = quotes[0].price;
+                  }
+                } catch (e) { console.error(`[History] FMP error for ${sym}:`, e.message); }
+              }));
+              // Brief pause between batches to avoid rate limits
+              if (i + 8 < tickers.length) await new Promise(r => setTimeout(r, 200));
+            }
+            setHistoryPrices(prices);
+          }
+        }
+      } catch (e) { console.error('[History] Load error:', e.message); }
+      finally { setHistoryLoading(false); }
+    };
+    loadHistory();
+  }, [alertTab]);
 
   // ── Fetch market_data (VIX, SPY) ──
   useEffect(() => {
@@ -937,6 +986,140 @@ export default function AlertsTab({ session, group }) {
         <DarkModeToggle darkMode={darkMode} onToggle={() => setDarkMode(d => !d)} t={t} />
       </div>
 
+      {/* LIVE / HISTORY TOGGLE */}
+      <div style={{ display: 'flex', background: t.card, borderRadius: 10, border: `1px solid ${t.border}`, overflow: 'hidden' }}>
+        {['live', 'history'].map(tab => {
+          const active = alertTab === tab;
+          return (
+            <button key={tab} onClick={() => setAlertTab(tab)} style={{
+              flex: 1, padding: '8px 0', border: 'none', cursor: 'pointer',
+              background: active ? t.text1 : 'transparent',
+              color: active ? t.card : t.text2,
+              fontSize: 12, fontWeight: 700, fontFamily: "'Outfit', sans-serif",
+              textTransform: 'uppercase', letterSpacing: '1px', transition: 'all .15s',
+            }}>{tab === 'live' ? '⚡ Live' : '📊 History'}</button>
+          );
+        })}
+      </div>
+
+      {/* ── HISTORY VIEW ── */}
+      {alertTab === 'history' && (
+        <div>
+          {historyLoading ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: t.text3, fontSize: 13 }}>Loading alert history...</div>
+          ) : historyAlerts.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: t.text3, fontSize: 13 }}>No archived alerts yet.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Summary stats */}
+              {(() => {
+                const withPrices = historyAlerts.filter(a => a.ticker && a.price && historyPrices[a.ticker]);
+                const winners = withPrices.filter(a => historyPrices[a.ticker] > a.price);
+                const winRate = withPrices.length > 0 ? Math.round((winners.length / withPrices.length) * 100) : 0;
+                const avgReturn = withPrices.length > 0
+                  ? (withPrices.reduce((sum, a) => sum + ((historyPrices[a.ticker] - a.price) / a.price) * 100, 0) / withPrices.length).toFixed(1)
+                  : '0.0';
+                return (
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                    <div style={{ flex: 1, background: t.card, borderRadius: 10, border: `1px solid ${t.border}`, padding: '12px 10px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: t.text1 }}>{historyAlerts.length}</div>
+                      <div style={{ fontSize: 10, color: t.text3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Alerts</div>
+                    </div>
+                    <div style={{ flex: 1, background: t.card, borderRadius: 10, border: `1px solid ${t.border}`, padding: '12px 10px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: winRate >= 50 ? '#22c55e' : '#ef4444' }}>{winRate}%</div>
+                      <div style={{ fontSize: 10, color: t.text3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Win Rate</div>
+                    </div>
+                    <div style={{ flex: 1, background: t.card, borderRadius: 10, border: `1px solid ${t.border}`, padding: '12px 10px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: Number(avgReturn) >= 0 ? '#22c55e' : '#ef4444' }}>{Number(avgReturn) >= 0 ? '+' : ''}{avgReturn}%</div>
+                      <div style={{ fontSize: 10, color: t.text3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Avg Return</div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Alert history rows */}
+              {historyAlerts.map((a, idx) => {
+                const ticker = a.ticker ?? '—';
+                const alertPrice = a.price != null ? Number(a.price) : null;
+                const currentPrice = historyPrices[ticker] ?? null;
+                const pctChange = alertPrice && currentPrice ? ((currentPrice - alertPrice) / alertPrice * 100) : null;
+                const type = a.signal_type ?? a.alert_type ?? '';
+                const pillCfg = FILTER_PILL_CONFIG[type] || FILTER_PILL_CONFIG['vol_surge'];
+                const createdAt = a.created_at ? new Date(a.created_at) : null;
+                const daysAgo = createdAt ? Math.floor((Date.now() - createdAt.getTime()) / 86400000) : null;
+                const expanded = historyExpanded === idx;
+
+                return (
+                  <div key={a.id || idx} onClick={() => setHistoryExpanded(expanded ? null : idx)} style={{
+                    background: t.card, borderRadius: 12, border: `1px solid ${t.border}`,
+                    padding: '12px 14px', cursor: 'pointer', transition: 'all .15s',
+                  }}>
+                    {/* Main row */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {/* Ticker + type */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 15, fontWeight: 700, color: t.text1 }}>{ticker}</span>
+                          <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6, background: pillCfg.iconBg, color: pillCfg.iconColor }}>{pillCfg.icon} {pillCfg.label}</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: t.text3, marginTop: 2 }}>
+                          {createdAt ? createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                          {daysAgo != null && <span style={{ marginLeft: 6, opacity: 0.7 }}>({daysAgo === 0 ? 'today' : daysAgo === 1 ? '1d ago' : `${daysAgo}d ago`})</span>}
+                        </div>
+                      </div>
+                      {/* Price info */}
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        {pctChange != null ? (
+                          <div style={{ fontSize: 16, fontWeight: 700, color: pctChange >= 0 ? '#22c55e' : '#ef4444' }}>
+                            {pctChange >= 0 ? '+' : ''}{pctChange.toFixed(1)}%
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 14, fontWeight: 600, color: t.text3 }}>—</div>
+                        )}
+                        {currentPrice != null && (
+                          <div style={{ fontSize: 10, color: t.text3 }}>${currentPrice.toFixed(2)}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Expanded detail */}
+                    {expanded && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${t.border}`, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <div style={{ flex: '1 1 45%', fontSize: 11, color: t.text2 }}>
+                          <span style={{ color: t.text3 }}>Alert Price:</span> {alertPrice ? `$${alertPrice.toFixed(2)}` : '—'}
+                        </div>
+                        <div style={{ flex: '1 1 45%', fontSize: 11, color: t.text2 }}>
+                          <span style={{ color: t.text3 }}>Current:</span> {currentPrice ? `$${currentPrice.toFixed(2)}` : '—'}
+                        </div>
+                        <div style={{ flex: '1 1 45%', fontSize: 11, color: t.text2 }}>
+                          <span style={{ color: t.text3 }}>P&L:</span>{' '}
+                          {pctChange != null
+                            ? <span style={{ fontWeight: 600, color: pctChange >= 0 ? '#22c55e' : '#ef4444' }}>{pctChange >= 0 ? '+' : ''}{pctChange.toFixed(2)}%</span>
+                            : '—'}
+                        </div>
+                        <div style={{ flex: '1 1 45%', fontSize: 11, color: t.text2 }}>
+                          <span style={{ color: t.text3 }}>Volume:</span> {a.volume ? Number(a.volume).toLocaleString() : a.current_volume ? Number(a.current_volume).toLocaleString() : '—'}
+                        </div>
+                        {a.sector && (
+                          <div style={{ flex: '1 1 100%', fontSize: 11, color: t.text2 }}>
+                            <span style={{ color: t.text3 }}>Sector:</span> {SECTOR_LABELS[a.sector] || a.sector}
+                          </div>
+                        )}
+                        {a.notes && (
+                          <div style={{ flex: '1 1 100%', fontSize: 11, color: t.text3, fontStyle: 'italic' }}>{a.notes}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── LIVE VIEW ── */}
+      {alertTab === 'live' && <>
       {/* QUICK FILTER CHIPS */}
       <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
         {[
@@ -1373,6 +1556,7 @@ export default function AlertsTab({ session, group }) {
           <HotSectors alerts={displayAlerts} onSectorTap={setHotSectorPick} activeSector={hotSectorPick} t={t} darkMode={darkMode} />
         </>
       )}
+      </>}{/* end alertTab === 'live' */}
 
       {modalAlert && <Modal alert={modalAlert} onClose={() => setModalAlert(null)} t={t} />}
     </div>

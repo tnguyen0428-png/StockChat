@@ -59,6 +59,12 @@ function AdminPanel({ session, profile }) {
   const [scanningMA, setScanningMA] = useState(false);
   const [scanMAProgress, setScanMAProgress] = useState(0);
   const [scanMAStatus, setScanMAStatus] = useState(null);
+  const [scanningAll, setScanningAll] = useState(false);
+  const [scanAllProgress, setScanAllProgress] = useState('');
+  const [scanningFlow, setScanningFlow] = useState(false);
+  const [scanFlowStatus, setScanFlowStatus] = useState(null);
+
+  const isAnyScanRunning = scanning52w || scanningVol || scanningGap || scanningMA || scanningAll || scanningFlow;
 
   const handle52wScan = async () => {
     setScanning52w(true); setScan52wProgress(0); setScan52wStatus(null);
@@ -83,6 +89,130 @@ function AdminPanel({ session, profile }) {
     try { const { inserted } = await runMACrossScan(DEFAULT_SHORT_MA, DEFAULT_LONG_MA, setScanMAProgress); setScanMAStatus({ inserted }); }
     catch (e) { setScanMAStatus({ error: e.message }); }
     finally { setScanningMA(false); }
+  };
+  const handleFlowScan = async () => {
+    setScanningFlow(true); setScanFlowStatus(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-flow-data', {
+        body: { force: true },
+      });
+      if (error) throw error;
+      const inserted = data?.inserted ?? data?.alerts_inserted ?? 0;
+      setScanFlowStatus({ inserted });
+      // Re-flag featured after flow data comes in
+      await flagFeaturedAlerts();
+    } catch (e) {
+      setScanFlowStatus({ error: e.message || 'Edge function failed' });
+    } finally {
+      setScanningFlow(false);
+    }
+  };
+
+  // ── Auto-flag top 4 alerts of the day as "featured" for History tab ──
+  const flagFeaturedAlerts = async () => {
+    try {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      // Fetch all of today's alerts — rank client-side since confidence is computed
+      const { data: todayAlerts, error: fetchErr } = await supabase
+        .from('breakout_alerts')
+        .select('id, ticker, signal_type, volume_ratio, change_pct, pct_from_high, gap_pct, rel_volume')
+        .gte('created_at', todayStart.toISOString());
+
+      if (fetchErr) { console.error('[Featured] Fetch error:', fetchErr.message); return; }
+      if (!todayAlerts || todayAlerts.length === 0) return;
+
+      // Compute a simple "strength" score per alert (mirrors mapDbAlert confidence logic)
+      const scored = todayAlerts.map(a => {
+        let score = 70; // base
+        if (a.volume_ratio > 2) score += 10;
+        if (a.volume_ratio > 3) score += 5;
+        if (a.pct_from_high != null && a.pct_from_high < 2) score += 10;
+        if (a.pct_from_high != null && a.pct_from_high < 1) score += 5;
+        if (a.change_pct != null && Math.abs(a.change_pct) > 3) score += 5;
+        if (a.gap_pct != null && a.gap_pct > 3) score += 5;
+        if (a.rel_volume > 5) score += 10;
+        if (a.signal_type === 'flow_signal') score += 5; // prioritize flow signals
+        return { ...a, score };
+      }).sort((a, b) => b.score - a.score);
+
+      // Deduplicate by ticker — keep highest score per ticker
+      const seen = new Set();
+      const unique = [];
+      for (const a of scored) {
+        if (!seen.has(a.ticker)) {
+          seen.add(a.ticker);
+          unique.push(a);
+        }
+      }
+
+      // Top 4 become featured
+      const topIds = unique.slice(0, 4).map(a => a.id);
+
+      // Clear any previous featured flags for today, then set new ones
+      const { data: allToday } = await supabase
+        .from('breakout_alerts')
+        .select('id')
+        .gte('created_at', todayStart.toISOString())
+        .eq('featured', true);
+
+      if (allToday && allToday.length > 0) {
+        const clearIds = allToday.map(a => a.id);
+        await supabase.from('breakout_alerts').update({ featured: false }).in('id', clearIds);
+      }
+
+      // Flag the top 4
+      if (topIds.length > 0) {
+        await supabase.from('breakout_alerts').update({ featured: true }).in('id', topIds);
+      }
+
+      console.log(`[Featured] Flagged ${topIds.length} alerts:`, unique.slice(0, 4).map(a => a.ticker));
+    } catch (e) {
+      console.error('[Featured] Error flagging alerts:', e.message);
+    }
+  };
+
+  const handleScanAll = async () => {
+    setScanningAll(true);
+    // Clear all previous statuses and progress
+    setScan52wStatus(null); setScanVolStatus(null); setScanGapStatus(null); setScanMAStatus(null);
+    setScan52wProgress(0); setScanVolProgress(0); setScanGapProgress(0); setScanMAProgress(0);
+
+    try {
+      setScanAllProgress('⚡ 52W High…');
+      setScanning52w(true);
+      try { const { inserted } = await run52wHighScan(DEFAULT_THRESHOLD, setScan52wProgress); setScan52wStatus({ inserted }); }
+      catch (e) { setScan52wStatus({ error: e.message }); }
+      finally { setScanning52w(false); }
+
+      setScanAllProgress('🔥 Vol Surge…');
+      setScanningVol(true);
+      try { const { inserted } = await runVolSurgeScan(DEFAULT_VOL_MULTIPLIER, setScanVolProgress); setScanVolStatus({ inserted }); }
+      catch (e) { setScanVolStatus({ error: e.message }); }
+      finally { setScanningVol(false); }
+
+      setScanAllProgress('📈 Gap Up…');
+      setScanningGap(true);
+      try { const { inserted } = await runGapUpScan(DEFAULT_GAP_THRESHOLD, setScanGapProgress); setScanGapStatus({ inserted }); }
+      catch (e) { setScanGapStatus({ error: e.message }); }
+      finally { setScanningGap(false); }
+
+      setScanAllProgress('🔀 MA Cross…');
+      setScanningMA(true);
+      try { const { inserted } = await runMACrossScan(DEFAULT_SHORT_MA, DEFAULT_LONG_MA, setScanMAProgress); setScanMAStatus({ inserted }); }
+      catch (e) { setScanMAStatus({ error: e.message }); }
+      finally { setScanningMA(false); }
+
+      // After all scans, flag top 4 as featured for History
+      setScanAllProgress('⭐ Flagging top alerts…');
+      await flagFeaturedAlerts();
+
+    } finally {
+      // Always clean up — even if something unexpected happens
+      setScanningAll(false);
+      setScanAllProgress('');
+    }
   };
 
   useEffect(() => {
@@ -162,6 +292,7 @@ function AdminPanel({ session, profile }) {
       setScreenerResults(results);
       console.log('Screener results:', results.length, 'Group ID:', groupId);
     } catch (e) {
+      setScreenerResults([]);
       alert('Screener error: ' + e.message);
     } finally {
       setScreenerRunning(false);
@@ -188,7 +319,12 @@ function AdminPanel({ session, profile }) {
       thesis: r.thesis,
       notes: `P/E: ${r.pe?.toFixed(1) || 'N/A'} · PEG: ${r.peg?.toFixed(2) || 'N/A'} · Net Margin: ${r.netMargin ? (r.netMargin * 100).toFixed(1) + '%' : 'N/A'} · Sales Growth: ${r.salesGrowth != null ? r.salesGrowth + '%' : 'N/A'} · EPS Growth: ${r.epsGrowth != null ? r.epsGrowth + '%' : 'N/A'} · Beat Rate: ${r.beatRate != null ? r.beatRate + '%' : 'N/A'}`,
     }));
-    await supabase.from('curated_stocks').insert(rows);
+    const { error } = await supabase.from('curated_stocks').insert(rows);
+    if (error) {
+      console.error('[Screener] Save error:', error.message);
+      alert('Failed to save: ' + error.message);
+      return;
+    }
     setScreenerSaved(true);
     alert(`Saved top 15 ${screenerSector} stocks!`);
   };
@@ -232,7 +368,10 @@ function AdminPanel({ session, profile }) {
         return !FILTER_OUT.some(keyword => text.includes(keyword));
       });
       setNewsItems(filtered);
-    } catch {}
+    } catch (e) {
+      console.error('[News Scanner] Fetch error:', e.message);
+      setNewsItems([]);
+    }
     setNewsLoading(false);
   };
 
@@ -288,24 +427,45 @@ function AdminPanel({ session, profile }) {
                 <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>
                   Scans S&P 500 + Nasdaq 100 for breakout signals. Results appear in the Alerts tab.
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-                  <button style={{ ...adminStyles.btn, opacity: scanning52w ? 0.6 : 1 }} onClick={handle52wScan} disabled={scanning52w}>
-                    {scanning52w ? `52W… ${scan52wProgress}%` : '52W High'}
-                  </button>
-                  <button style={{ ...adminStyles.btn, opacity: scanningVol ? 0.6 : 1 }} onClick={handleVolScan} disabled={scanningVol}>
-                    {scanningVol ? `Vol… ${scanVolProgress}%` : 'Vol Surge'}
-                  </button>
-                  <button style={{ ...adminStyles.btn, opacity: scanningGap ? 0.6 : 1 }} onClick={handleGapScan} disabled={scanningGap}>
-                    {scanningGap ? `Gap… ${scanGapProgress}%` : 'Gap Up'}
-                  </button>
-                  <button style={{ ...adminStyles.btn, opacity: scanningMA ? 0.6 : 1 }} onClick={handleMAScan} disabled={scanningMA}>
-                    {scanningMA ? `MA… ${scanMAProgress}%` : 'MA Cross'}
-                  </button>
+                <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+                  {/* Manual — runs all 4 client-side scanners */}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <button
+                      style={{ ...adminStyles.btn, width: '100%', fontSize: 14, background: scanningAll ? 'var(--border)' : '#1a3c2a', opacity: isAnyScanRunning && !scanningAll ? 0.4 : 1 }}
+                      onClick={handleScanAll} disabled={isAnyScanRunning}
+                    >
+                      {scanningAll ? `🔧 Manual… ${scanAllProgress}` : '🔧 Manual'}
+                    </button>
+                    <div style={{ fontSize: 10, color: 'var(--text2)', lineHeight: 1.5, padding: '0 2px' }}>
+                      ⚡ 52W High (5%)<br/>
+                      🔥 Vol Surge (2x)<br/>
+                      📈 Gap Up (1.5%)<br/>
+                      🔀 MA Cross (9/21)
+                    </div>
+                  </div>
+                  {/* Auto — triggers the server-side flow scanner */}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <button
+                      style={{ ...adminStyles.btn, width: '100%', fontSize: 14, background: scanningFlow ? 'var(--border)' : '#4a3520', opacity: isAnyScanRunning && !scanningFlow ? 0.4 : 1 }}
+                      onClick={handleFlowScan} disabled={isAnyScanRunning}
+                    >
+                      {scanningFlow ? '💰 Auto…' : '💰 Auto'}
+                    </button>
+                    <div style={{ fontSize: 10, color: 'var(--text2)', lineHeight: 1.5, padding: '0 2px' }}>
+                      🐋 Dark Pool Trades<br/>
+                      📊 Options Flow<br/>
+                      🏦 $3B+ Market Cap<br/>
+                      🔁 Runs every 30 min
+                    </div>
+                  </div>
                 </div>
-                {scan52wStatus && <div style={{ fontSize: 12, color: scan52wStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scan52wStatus.error ? `Error: ${scan52wStatus.error}` : scan52wStatus.inserted === 0 ? '52W — no new breakouts' : `52W — ${scan52wStatus.inserted} alert${scan52wStatus.inserted > 1 ? 's' : ''} added`}</div>}
-                {scanVolStatus && <div style={{ fontSize: 12, color: scanVolStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scanVolStatus.error ? `Error: ${scanVolStatus.error}` : scanVolStatus.inserted === 0 ? 'Vol — no surges found' : `Vol — ${scanVolStatus.inserted} alert${scanVolStatus.inserted > 1 ? 's' : ''} added`}</div>}
-                {scanGapStatus && <div style={{ fontSize: 12, color: scanGapStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scanGapStatus.error ? `Error: ${scanGapStatus.error}` : scanGapStatus.inserted === 0 ? 'Gap — no gaps found' : `Gap — ${scanGapStatus.inserted} alert${scanGapStatus.inserted > 1 ? 's' : ''} added`}</div>}
-                {scanMAStatus && <div style={{ fontSize: 12, color: scanMAStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scanMAStatus.error ? `Error: ${scanMAStatus.error}` : scanMAStatus.inserted === 0 ? 'MA — no crossovers found' : `MA — ${scanMAStatus.inserted} alert${scanMAStatus.inserted > 1 ? 's' : ''} added`}</div>}
+                {/* Manual scan results */}
+                {scan52wStatus && <div style={{ fontSize: 12, color: scan52wStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scan52wStatus.error ? `Error: ${scan52wStatus.error}` : scan52wStatus.inserted === 0 ? '⚡ 52W — no new breakouts' : `⚡ 52W — ${scan52wStatus.inserted} alert${scan52wStatus.inserted > 1 ? 's' : ''} added`}</div>}
+                {scanVolStatus && <div style={{ fontSize: 12, color: scanVolStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scanVolStatus.error ? `Error: ${scanVolStatus.error}` : scanVolStatus.inserted === 0 ? '🔥 Vol — no surges found' : `🔥 Vol — ${scanVolStatus.inserted} alert${scanVolStatus.inserted > 1 ? 's' : ''} added`}</div>}
+                {scanGapStatus && <div style={{ fontSize: 12, color: scanGapStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scanGapStatus.error ? `Error: ${scanGapStatus.error}` : scanGapStatus.inserted === 0 ? '📈 Gap — no gaps found' : `📈 Gap — ${scanGapStatus.inserted} alert${scanGapStatus.inserted > 1 ? 's' : ''} added`}</div>}
+                {scanMAStatus && <div style={{ fontSize: 12, color: scanMAStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scanMAStatus.error ? `Error: ${scanMAStatus.error}` : scanMAStatus.inserted === 0 ? '🔀 MA — no crossovers found' : `🔀 MA — ${scanMAStatus.inserted} alert${scanMAStatus.inserted > 1 ? 's' : ''} added`}</div>}
+                {/* Auto scan result */}
+                {scanFlowStatus && <div style={{ fontSize: 12, color: scanFlowStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scanFlowStatus.error ? `Error: ${scanFlowStatus.error}` : scanFlowStatus.inserted === 0 ? '💰 Big Money — no flow signals found' : `💰 Big Money — ${scanFlowStatus.inserted} alert${scanFlowStatus.inserted > 1 ? 's' : ''} added`}</div>}
               </div>
             ) : s.id === 'screener' ? (
               <div style={adminStyles.body}>

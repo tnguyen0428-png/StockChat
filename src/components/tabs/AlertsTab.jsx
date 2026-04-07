@@ -998,7 +998,7 @@ export default function AlertsTab({ session }) {
             }}
             onClick={() => setFilter(f)}
           >
-            {f === 'all' ? 'All' : BADGE_CONFIG[f]?.label || f}
+            {f === 'all' ? 'All' : BADGE_CONFIG[f]?.shortLabel || BADGE_CONFIG[f]?.label || f}
           </button>
         ))}
       </div>
@@ -1132,7 +1132,7 @@ export default function AlertsTab({ session }) {
                   }}
                   onClick={() => setHistoryFilter(f)}
                 >
-                  {f === 'all' ? 'All' : BADGE_CONFIG[f]?.label || f}
+                  {f === 'all' ? 'All' : BADGE_CONFIG[f]?.shortLabel || BADGE_CONFIG[f]?.label || f}
                 </button>
               ))}
             </div>

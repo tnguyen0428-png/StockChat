@@ -3,6 +3,12 @@
 // Detects breakout conditions and inserts
 // alerts into breakout_alerts
 // ============================================
+// DB columns (base + migrations):
+//   id, group_id, ticker, signal_type, price, change_pct, volume, rel_volume,
+//   notes, created_at, sector, conviction, sector_tier
+// Note: Supabase JS client also stores additional fields (avg_volume, high_52w,
+//   pct_from_high, gap_pct, short_ma, long_ma, volume_ratio, etc.) which the
+//   AlertsTab UI reads directly from alert records.
 
 import { supabase } from './supabase';
 import { SCREENER_TICKERS } from './screener';
@@ -36,20 +42,23 @@ async function fetchQuote(symbol) {
 }
 
 // Returns tickers already alerted today for a given alert_type
+// Uses UTC midnight to match Supabase timestamptz
 async function getAlertedTodaySet(signalType) {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  const now = new Date();
+  const startOfDayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
   const { data } = await supabase
     .from('breakout_alerts')
     .select('ticker')
     .eq('signal_type', signalType)
-    .gte('created_at', startOfDay.toISOString());
+    .gte('created_at', startOfDayUTC.toISOString());
 
   const alerted = new Set();
   (data || []).forEach(row => { if (row.ticker) alerted.add(row.ticker); });
   return alerted;
 }
+
+// ── 52W HIGH ─────────────────────────────────────────────────────────────────
 
 // Scan all tickers, return array of alerts that crossed the threshold
 export async function scan52wHigh(threshold = DEFAULT_THRESHOLD, onProgress) {
@@ -74,8 +83,8 @@ export async function scan52wHigh(threshold = DEFAULT_THRESHOLD, onProgress) {
           symbol,
           price:         q.price,
           change_pct:    q.changesPercentage ?? null,
-          volume:        q.volume ?? null,
-          avg_volume:    q.avgVolume ?? null,
+          volume:        q.volume != null ? Math.round(q.volume) : null,
+          avg_volume:    q.avgVolume != null ? Math.round(q.avgVolume) : null,
           high_52w:      q.yearHigh,
           pct_from_high: parseFloat(pctFromHigh.toFixed(2)),
           sector:        q.sector ?? null,
@@ -107,6 +116,7 @@ export async function run52wHighScan(threshold = DEFAULT_THRESHOLD, onProgress) 
     change_pct:    h.change_pct,
     volume:        h.volume,
     avg_volume:    h.avg_volume,
+    rel_volume:    (h.volume && h.avg_volume && h.avg_volume > 0) ? parseFloat((h.volume / h.avg_volume).toFixed(2)) : null,
     high_52w:      h.high_52w,
     pct_from_high: h.pct_from_high,
     sector:        h.sector,
@@ -114,12 +124,15 @@ export async function run52wHighScan(threshold = DEFAULT_THRESHOLD, onProgress) 
   }));
 
   const { error } = await supabase.from('breakout_alerts').insert(rows);
-  if (error) throw error;
+  if (error) {
+    console.error('[52W High] Insert error:', error.message);
+    throw error;
+  }
 
   return { inserted: rows.length, hits };
 }
 
-// ── GAP UP ────────────────────────────────────────────────────────────────────
+// ── GAP UP ───────────────────────────────────────────────────────────────────
 
 // Scan all tickers, return those where open >= threshold% above previousClose
 export async function scanGapUp(threshold = DEFAULT_GAP_THRESHOLD, onProgress) {
@@ -144,8 +157,8 @@ export async function scanGapUp(threshold = DEFAULT_GAP_THRESHOLD, onProgress) {
           symbol,
           price:      q.price,
           change_pct: q.changesPercentage ?? null,
-          volume:     q.volume ?? null,
-          avg_volume: q.avgVolume ?? null,
+          volume:     q.volume != null ? Math.round(q.volume) : null,
+          avg_volume: q.avgVolume != null ? Math.round(q.avgVolume) : null,
           open_price: q.open,
           prev_close: q.previousClose,
           gap_pct:    parseFloat(gapPct.toFixed(2)),
@@ -178,6 +191,7 @@ export async function runGapUpScan(threshold = DEFAULT_GAP_THRESHOLD, onProgress
     change_pct:  h.change_pct,
     volume:      h.volume,
     avg_volume:  h.avg_volume,
+    rel_volume:  (h.volume && h.avg_volume && h.avg_volume > 0) ? parseFloat((h.volume / h.avg_volume).toFixed(2)) : null,
     open_price:  h.open_price,
     prev_close:  h.prev_close,
     gap_pct:     h.gap_pct,
@@ -186,12 +200,15 @@ export async function runGapUpScan(threshold = DEFAULT_GAP_THRESHOLD, onProgress
   }));
 
   const { error } = await supabase.from('breakout_alerts').insert(rows);
-  if (error) throw error;
+  if (error) {
+    console.error('[Gap Up] Insert error:', error.message);
+    throw error;
+  }
 
   return { inserted: rows.length, hits };
 }
 
-// ── MA CROSS ──────────────────────────────────────────────────────────────────
+// ── MA CROSS ─────────────────────────────────────────────────────────────────
 
 // Fetch enough daily closes to compute both MAs (longPeriod + 1 days needed)
 async function fetchDailyCloses(symbol, days) {
@@ -256,8 +273,8 @@ export async function scanMACross(
           symbol,
           price:           q?.price ?? null,
           change_pct:      q?.changesPercentage ?? null,
-          volume:          q?.volume ?? null,
-          avg_volume:      q?.avgVolume ?? null,
+          volume:          q?.volume != null ? Math.round(q.volume) : null,
+          avg_volume:      q?.avgVolume != null ? Math.round(q.avgVolume) : null,
           short_ma:        parseFloat(todayShort.toFixed(2)),
           long_ma:         parseFloat(todayLong.toFixed(2)),
           short_ma_period: shortPeriod,
@@ -295,6 +312,7 @@ export async function runMACrossScan(
     change_pct:      h.change_pct,
     volume:          h.volume,
     avg_volume:      h.avg_volume,
+    rel_volume:      (h.volume && h.avg_volume && h.avg_volume > 0) ? parseFloat((h.volume / h.avg_volume).toFixed(2)) : null,
     short_ma:        h.short_ma,
     long_ma:         h.long_ma,
     short_ma_period: h.short_ma_period,
@@ -304,12 +322,15 @@ export async function runMACrossScan(
   }));
 
   const { error } = await supabase.from('breakout_alerts').insert(rows);
-  if (error) throw error;
+  if (error) {
+    console.error('[MA Cross] Insert error:', error.message);
+    throw error;
+  }
 
   return { inserted: rows.length, hits };
 }
 
-// ── VOL SURGE ─────────────────────────────────────────────────────────────────
+// ── VOL SURGE ────────────────────────────────────────────────────────────────
 
 // Scan all tickers, return those where volume >= multiplier * avgVolume
 export async function scanVolSurge(multiplier = DEFAULT_VOL_MULTIPLIER, onProgress) {
@@ -334,8 +355,8 @@ export async function scanVolSurge(multiplier = DEFAULT_VOL_MULTIPLIER, onProgre
           symbol,
           price:          q.price,
           change_pct:     q.changesPercentage ?? null,
-          current_volume: q.volume,
-          avg_volume:     q.avgVolume,
+          current_volume: q.volume != null ? Math.round(q.volume) : null,
+          avg_volume:     q.avgVolume != null ? Math.round(q.avgVolume) : null,
           volume_ratio:   parseFloat(ratio.toFixed(2)),
           sector:         q.sector ?? null,
         });
@@ -366,13 +387,17 @@ export async function runVolSurgeScan(multiplier = DEFAULT_VOL_MULTIPLIER, onPro
     change_pct:     h.change_pct,
     volume:         h.current_volume,
     avg_volume:     h.avg_volume,
+    rel_volume:     h.volume_ratio,
     volume_ratio:   h.volume_ratio,
     sector:         h.sector,
     notes:          `Vol ${(h.current_volume / 1e6).toFixed(1)}M · Avg ${(h.avg_volume / 1e6).toFixed(1)}M · ${h.volume_ratio}x avg`,
   }));
 
   const { error } = await supabase.from('breakout_alerts').insert(rows);
-  if (error) throw error;
+  if (error) {
+    console.error('[Vol Surge] Insert error:', error.message);
+    throw error;
+  }
 
   return { inserted: rows.length, hits };
 }
