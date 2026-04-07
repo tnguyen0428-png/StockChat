@@ -146,7 +146,9 @@ function mapDbAlert(a, spyData, tagMap) {
 // ===== HELPERS =====
 const nowTs = () => new Date();
 function relTime(ts) {
+  if (!ts) return '—';
   const d = Math.floor((nowTs() - new Date(ts)) / 60000);
+  if (isNaN(d)) return '—';
   if (d < 1) return "Just now";
   if (d === 1) return "1 min ago";
   if (d < 60) return `${d} min ago`;
@@ -154,13 +156,17 @@ function relTime(ts) {
   return `${Math.floor(d / 1440)}d ago`;
 }
 function freshDotColor(ts) {
+  if (!ts) return "#cbd5e1";
   const d = Math.floor((nowTs() - new Date(ts)) / 60000);
+  if (isNaN(d)) return "#cbd5e1";
   if (d <= 5) return "#22c55e"; if (d <= 15) return "#f59e0b"; return "#cbd5e1";
 }
-function cardOpacity(ts) { return Math.floor((nowTs() - new Date(ts)) / 60000) > 15 ? 0.75 : 1; }
+function cardOpacity(ts) { if (!ts) return 0.75; const d = Math.floor((nowTs() - new Date(ts)) / 60000); return isNaN(d) || d > 15 ? 0.75 : 1; }
 
 function formatDollar(n) {
-  if (!n && n !== 0) return '—';
+  if (n == null) return '—';
+  n = Number(n);
+  if (isNaN(n)) return '—';
   if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
   if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
   if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
@@ -168,7 +174,9 @@ function formatDollar(n) {
 }
 
 function formatShares(n) {
-  if (!n && n !== 0) return '—';
+  if (n == null) return '—';
+  n = Number(n);
+  if (isNaN(n)) return '—';
   if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
   if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`;
   return String(n);
@@ -404,7 +412,7 @@ function BigMoneyCard({ trade, isExpanded, onToggle, t: theme }) {
   const text3 = theme?.text3 || "#94a3b8";
   const text2 = theme?.text2 || "#475569";
   const borderLight = theme?.borderLight || "#f1f5f9";
-  const mult = trade.multiplier || 1;
+  const mult = Number(trade.multiplier) || 1;
   return (
     <div onClick={onToggle} style={{ background: cardBg, borderRadius: 14, border: `1px solid ${border}`, borderLeft: `${mult >= 8 ? 4 : 3}px solid ${dc.border}`, padding: "12px 14px", cursor: "pointer", opacity: cardOpacity(trade.executed_at || trade.fetched_at) }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 4 }}>
@@ -852,7 +860,7 @@ export default function AlertsTab({ session, group }) {
     <div className="alerts-container" style={{ background: t.bg, transition: 'background .2s' }}>
       <style>{`
         *, *::before, *::after { box-sizing: border-box; }
-        .alerts-container { max-width: 480px; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; flex: 1; min-height: 100%; }
+        .alerts-container { width: 100%; max-width: 480px; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; flex: 1; min-height: 100%; }
         .filter-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
         .filter-row::-webkit-scrollbar { display: none; }
         @media (max-width: 480px) {
@@ -1267,11 +1275,4 @@ export default function AlertsTab({ session, group }) {
           </div>
 
           {/* HOT SECTORS — collapsible, shows even with 0 scanner alerts */}
-          <HotSectors alerts={displayAlerts} onSectorTap={setSectorFilter} activeSector={sectorFilter} t={t} darkMode={darkMode} />
-        </>
-      )}
-
-      {modalAlert && <Modal alert={modalAlert} onClose={() => setModalAlert(null)} t={t} />}
-    </div>
-  );
-}
+          <HotSectors alerts={displayAlerts} onSectorTap={setSectorFilter} activeSector={sectorFilter} t={t} darkMode={darkMode
