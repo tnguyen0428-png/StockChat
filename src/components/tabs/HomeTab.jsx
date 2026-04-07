@@ -97,6 +97,25 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   const chatInputRef = useRef(null);
   const chatStripRef = useRef(null);
   const chatSectionRef = useRef(null);
+  const chatBarRef = useRef(null);
+
+  // iOS keyboard fix: adjust fixed chat bar position when keyboard opens
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      if (chatBarRef.current) {
+        const offset = window.innerHeight - vv.height;
+        chatBarRef.current.style.bottom = `${58 + offset}px`;
+      }
+    };
+    vv.addEventListener('resize', onResize);
+    vv.addEventListener('scroll', onResize);
+    return () => {
+      vv.removeEventListener('resize', onResize);
+      vv.removeEventListener('scroll', onResize);
+    };
+  }, []);
 
   // Expose scrollToChat for parent (when Chat bottom nav is tapped)
   useEffect(() => {
@@ -1387,7 +1406,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
       />
 
       {/* ═══ FIXED CHAT INPUT — pinned above bottom nav ═══ */}
-      <div style={S.fixedChatBar}>
+      <div ref={chatBarRef} style={S.fixedChatBar}>
         <div
           style={{ ...S.ccAiBtn, ...(aiMode ? S.ccAiBtnActive : S.ccAiBtnOff) }}
           onClick={() => setAiMode(prev => !prev)}
