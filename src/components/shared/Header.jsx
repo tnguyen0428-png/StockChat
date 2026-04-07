@@ -276,7 +276,6 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
         )}
           </div>
         </div>
-        <div style={styles.slogan}>ONE TEAM, ONE TRADE</div>
       </div>
     </div>
   );

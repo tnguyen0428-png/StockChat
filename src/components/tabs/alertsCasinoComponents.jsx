@@ -5,6 +5,22 @@
 
 import { useState, useEffect } from 'react';
 
+// ── Relative time helper ──
+export function timeAgo(ts) {
+  if (!ts) return '';
+  const then = new Date(ts).getTime();
+  if (isNaN(then)) return '';
+  const s = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (s < 45) return 'just now';
+  if (s < 90) return '1m ago';
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.round(h / 24);
+  return `${d}d ago`;
+}
+
 // ── Dark / Light Theme System ──
 export function useTheme(darkMode) {
   return darkMode ? {
@@ -49,71 +65,31 @@ export function ConfidenceRing({ value, size = 16, t }) {
   );
 }
 
-// ── Rolex Gauge (subtle background) ──
-// Scale: 0 = Extreme Fear (left) → 100 = Extreme Greed (right)
-export function RolexGauge({ score, t, darkMode }) {
-  const s = Math.min(Math.max(score ?? 50, 0), 100);
-  const needleAngle = -90 + (s / 100) * 180;
-  const cx = 160, cy = 150, nr = 80;
-
-  // Number positions along the arch (0, 25, 50, 75, 100)
-  const numberMarks = [0, 25, 50, 75, 100];
-  const archR = 110; // radius for number placement (outside the bezel)
-
+// ── Sentiment Pill (inline, replaces RolexGauge bubble) ──
+export function SentimentPill({ score, darkMode }) {
+  if (score == null || isNaN(score)) return null;
+  const s = Math.min(Math.max(score, 0), 100);
+  const label = s > 55 ? 'Greed' : s > 45 ? 'Neutral' : s > 25 ? 'Fear' : 'Extreme Fear';
+  const color = s > 55 ? '#22c55e' : s > 45 ? '#eab308' : s > 25 ? '#f97316' : '#ef4444';
   return (
-    <svg viewBox="0 0 320 170" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.25 }}>
-      <defs>
-        <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#ef4444"/>
-          <stop offset="25%" stopColor="#f97316"/>
-          <stop offset="50%" stopColor="#eab308"/>
-          <stop offset="75%" stopColor="#84cc16"/>
-          <stop offset="100%" stopColor="#22c55e"/>
-        </linearGradient>
-      </defs>
-      {/* Outer bezel */}
-      <path d="M60 150 A100 100 0 0 1 260 150" fill="none" stroke={darkMode ? "#2a4a6e" : "#c8d6e5"} strokeWidth="10"/>
-      {/* Fluted bezel ticks */}
-      <path d="M60 150 A100 100 0 0 1 260 150" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" strokeDasharray="1 3.5"/>
-      {/* Color gauge track */}
-      <path d="M68 150 A92 92 0 0 1 252 150" fill="none" stroke="url(#gaugeGrad)" strokeWidth="3" strokeLinecap="round"/>
-      {/* Tick marks — 9 evenly spaced */}
-      {[-72,-54,-36,-18,0,18,36,54,72].map(angle => (
-        <line key={angle} x1="72" y1="140" x2="72" y2="148" stroke="rgba(255,255,255,0.4)" strokeWidth="1" transform={`rotate(${angle}, 160, 150)`}/>
-      ))}
-      {/* Subtle numbers along the arch: 0, 25, 50, 75, 100 */}
-      {numberMarks.map(val => {
-        const angle = -180 + (val / 100) * 180; // -180 (left) to 0 (right)
-        const rad = angle * Math.PI / 180;
-        const tx = cx + archR * Math.cos(rad);
-        const ty = cy + archR * Math.sin(rad);
-        return (
-          <text key={val} x={tx} y={ty} textAnchor="middle" dominantBaseline="middle"
-            fontSize="7" fill="rgba(255,255,255,0.35)" fontWeight="500"
-            style={{ fontFamily: "'DM Sans', sans-serif" }}>{val}</text>
-        );
-      })}
-      {/* Labels */}
-      <text x="62" y="165" textAnchor="middle" fontSize="8" fill="#ef4444" fontWeight="600" style={{ fontFamily: "'Outfit', sans-serif" }}>FEAR</text>
-      <text x={cx} y="168" textAnchor="middle" fontSize="10" fill={s <= 24 ? '#ef4444' : s <= 44 ? '#f97316' : s <= 55 ? '#eab308' : s <= 74 ? '#84cc16' : '#22c55e'} fontWeight="700" style={{ fontFamily: "'DM Sans', sans-serif" }}>{Math.round(s)}</text>
-      <text x="258" y="165" textAnchor="middle" fontSize="8" fill="#22c55e" fontWeight="600" style={{ fontFamily: "'Outfit', sans-serif" }}>GREED</text>
-      {/* Needle — thin Rolex arrow hand */}
-      <g transform={`rotate(${needleAngle}, ${cx}, ${cy})`}>
-        {/* Tail (short counterweight) */}
-        <polygon points={`${cx-1.5},${cy} ${cx+1.5},${cy} ${cx+0.8},${cy+10} ${cx-0.8},${cy+10}`} fill={t.text1} opacity="0.5"/>
-        {/* Main hand body — thin tapered */}
-        <polygon points={`${cx-1.5},${cy} ${cx+1.5},${cy} ${cx+0.6},${cy-54} ${cx-0.6},${cy-54}`} fill={t.text1}/>
-        {/* Lume rectangle — narrow */}
-        <rect x={cx-1.2} y={cy-50} width="2.4" height="20" rx="0.8" fill={darkMode ? "rgba(200,220,240,0.45)" : "rgba(200,220,240,0.6)"}/>
-        {/* Arrow tip — small */}
-        <polygon points={`${cx},${cy-nr} ${cx-2.5},${cy-58} ${cx+2.5},${cy-58}`} fill={t.text1}/>
-      </g>
-      {/* Center cap */}
-      <circle cx={cx} cy={cy} r="4" fill={darkMode ? "#1e3d62" : "#c8d6e5"} stroke={t.text1} strokeWidth="1"/>
-      <circle cx={cx} cy={cy} r="1.5" fill={t.text1}/>
-    </svg>
+    <div
+      title={`Market sentiment: ${label} (${Math.round(s)}/100)`}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '3px 8px', borderRadius: 999,
+        background: darkMode ? 'rgba(30,61,98,0.55)' : 'rgba(0,0,0,0.035)',
+        border: `1px solid ${darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+        fontFamily: "'Outfit', sans-serif",
+      }}
+    >
+      <span style={{ fontSize: 10, fontWeight: 600, color, letterSpacing: 0.3, textTransform: 'uppercase' }}>
+        {label} {Math.round(s)}
+      </span>
+    </div>
   );
 }
+// Keep old export as no-op shim to avoid breaking imports
+export function RolexGauge() { return null; }
 
 // ── Poker Chip ──
 export function PokerChip({ alert, isSelected, onTap, size, t }) {
@@ -150,11 +126,18 @@ export function PokerChip({ alert, isSelected, onTap, size, t }) {
           position: 'absolute', top: -5,
           background: t.gold, color: '#0a1628',
           fontSize: 6, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
-          fontFamily: "'Outfit', sans-serif", letterSpacing: '0.5px',
-        }}>AOTD</div>
+          fontFamily: "'Outfit', sans-serif", letterSpacing: '0.5px', cursor: 'help',
+        }} title="Alert of the Day — highest-conviction pick right now">AOTD</div>
       )}
       <span style={{ fontSize: tickerSize, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif", lineHeight: 1, position: 'relative' }}>{alert.ticker}</span>
       <span style={{ fontSize: pctSize, fontWeight: 700, color: borderColor, lineHeight: 1.2, position: 'relative' }}>{pctText}</span>
+      {(alert.created_at || alert.createdAt) && (
+        <span style={{
+          position: 'absolute', top: '100%', marginTop: 2, left: '50%', transform: 'translateX(-50%)',
+          fontSize: 8, fontWeight: 600, color: t.text3, whiteSpace: 'nowrap',
+          fontFamily: "'DM Sans', sans-serif", letterSpacing: '0.2px',
+        }}>{timeAgo(alert.created_at || alert.createdAt)}</span>
+      )}
     </div>
   );
 }
@@ -188,8 +171,8 @@ export function MysteryChip({ type, isSelected, onTap, size, t }) {
           position: 'absolute', top: -5,
           background: t.gold, color: '#0a1628',
           fontSize: 6, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
-          fontFamily: "'Outfit', sans-serif", letterSpacing: '0.5px',
-        }}>AOTD</div>
+          fontFamily: "'Outfit', sans-serif", letterSpacing: '0.5px', cursor: 'help',
+        }} title="Alert of the Day — highest-conviction pick right now">AOTD</div>
       )}
       <span style={{ fontSize: tickerSize, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif", lineHeight: 1, position: 'relative' }}>{label}</span>
       <span style={{ fontSize: 9, fontWeight: 600, color: borderColor, lineHeight: 1, position: 'relative', marginTop: 2 }}>{emoji}</span>
@@ -258,7 +241,7 @@ export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, o
   const hitRate = history && history.length > 0 ? Math.round((hits / history.length) * 100) : 0;
 
   return (
-    <div style={{ position: 'relative', height: 210, marginBottom: 8, overflow: 'hidden' }}>
+    <div style={{ position: 'relative', height: 210, minHeight: 210, flexShrink: 0, marginBottom: 8, overflow: 'hidden' }}>
       <style>{`
         @keyframes chipFloat0 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(3px,-4px); } }
         @keyframes chipFloat1 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-4px,3px); } }
@@ -270,8 +253,6 @@ export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, o
         @keyframes chipPulseGold { 0%,100% { box-shadow: 0 0 6px rgba(212,160,23,0.2), 0 0 20px rgba(212,160,23,0.1); } 50% { box-shadow: 0 0 18px rgba(212,160,23,0.5), 0 0 36px rgba(212,160,23,0.15); } }
       `}</style>
       <RolexGauge score={fearScore} t={t} darkMode={darkMode} />
-
-      {/* Score label removed from center — now rendered inside the SVG gauge under FEAR/GREED */}
 
       {/* Bead plate */}
       <div style={{ position: 'absolute', bottom: 36, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 3, opacity: 0.45 }}>
@@ -321,8 +302,8 @@ export function DarkModeToggle({ darkMode, onToggle, t }) {
       border: `1px solid ${t.border}`, cursor: 'pointer',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: 14, padding: 0, lineHeight: 1,
-    }} aria-label="Toggle dark mode">
+    }} aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
       {darkMode ? '☀️' : '🌙'}
     </button>
   );
-}
+}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
-import { useTheme, ChipField, DarkModeToggle } from './alertsCasinoComponents';
+import { useTheme, ChipField, DarkModeToggle, timeAgo, SentimentPill } from './alertsCasinoComponents';
 
 // Default scanner tag mapping (used as fallback before DB alert_types load)
 const DEFAULT_TAG_MAP = { '52w_high': 'Yearly High', 'vol_surge': 'Volume Spike', 'gap_up': 'Gap Up', 'ma_cross': 'Trend Change', 'vcp': 'VCP Pattern', 'flow_signal': 'Flow Signal' };
@@ -110,6 +110,13 @@ function mapDbAlert(a, spyData, tagMap) {
     if (flowScore >= 80) whyAlerting.push({ icon: "✅", label: "Strong Signal", text: `Score ${flowScore} — multiple converging indicators` });
     else if (flowScore >= 40) whyAlerting.push({ icon: "📊", label: "Moderate Signal", text: `Score ${flowScore} — notable institutional interest` });
     else whyAlerting.push({ icon: "🔍", label: "Early Signal", text: `Score ${flowScore} — monitor for confirmation` });
+    // Fallback bullets when sparse data — always ensure ≥3 bullets for visual parity with scanner alerts
+    if (whyAlerting.length < 3) {
+      whyAlerting.push({ icon: "🎯", label: "Conviction", text: `${confidence}% confidence — institutional-grade setup` });
+    }
+    if (whyAlerting.length < 3) {
+      whyAlerting.push({ icon: "📈", label: "Flow Signal", text: `Unusual activity detected on ${ticker} — watch for follow-through` });
+    }
   } else {
     // Scanner alert bullets (original logic)
     if (signal) whyAlerting.push({ icon: "📊", label: scannerTag, text: signal });
@@ -315,6 +322,34 @@ function HotSectors({ alerts, onSectorTap, activeSector, t, darkMode }) {
               );
             })}
           </div>
+          {activeSector && (() => {
+            const s = seedSectors.find(x => x.key === activeSector);
+            if (!s) return null;
+            const label = SECTOR_LABELS[s.key] || s.key;
+            const color = SECTOR_COLORS[s.key] || '#64748B';
+            const emoji = SECTOR_EMOJIS[s.key] || '📊';
+            const tickers = (s.tickers.length > 0 ? s.tickers : (SECTOR_TICKERS[s.key] || []));
+            const sectorAlerts = alerts.filter(a => a.sectorKey === s.key);
+            return (
+              <div style={{ marginTop: 10, padding: '10px 12px', background: t.surface, borderRadius: 10, border: `1px solid ${color}40` }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: t.text1 }}>{emoji} {label}</span>
+                  <span onClick={(e) => { e.stopPropagation(); onSectorTap(null); }} style={{ fontSize: 14, color: t.text3, cursor: 'pointer', padding: '0 4px' }}>▴</span>
+                </div>
+                <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px', marginBottom: 4, fontFamily: "'Outfit', sans-serif" }}>Tickers to watch</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
+                  {tickers.map(tk => (
+                    <span key={tk} style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 8, background: `${color}18`, color: color, fontFamily: "'DM Sans', sans-serif" }}>{tk}</span>
+                  ))}
+                </div>
+                <div style={{ fontSize: 11, color: t.text2, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5 }}>
+                  {sectorAlerts.length > 0
+                    ? <><strong style={{ color: t.text1 }}>{sectorAlerts.length}</strong> live alert{sectorAlerts.length > 1 ? 's' : ''} firing in this sector{sectorAlerts[0]?.ticker ? ` — lead: ${sectorAlerts[0].ticker}` : ''}.</>
+                    : <>No live alerts yet — these are the sector leaders our scanners watch.</>}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
@@ -434,7 +469,8 @@ function BigMoneyCard({ trade, isExpanded, onToggle, t: theme }) {
 }
 
 function SmartBetCard({ bet, isExpanded, onToggle, t: theme }) {
-  const isUp = bet.direction === "bullish";
+  const _optType = (bet.option_type || bet.trade_type || '').toLowerCase();
+  const isUp = _optType.includes('call') ? true : _optType.includes('put') ? false : bet.direction === "bullish";
   const dc = isUp ? { bg: "#f0fdf4", border: "#22c55e", color: "#15803d" } : { bg: "#fef2f2", border: "#ef4444", color: "#dc2626" };
   const cardBg = theme?.card || "#fff";
   const border = theme?.border || "#e2e8f0";
@@ -519,7 +555,15 @@ export default function AlertsTab({ session, group }) {
 
   // ── Sector filter state ──
   const [sectorFilter, setSectorFilter] = useState(null);
+  const [hotSectorPick, setHotSectorPick] = useState(null);
   const [convictionFilter, setConvictionFilter] = useState(null);
+  const [quickFilter, setQuickFilter] = useState('all');
+  // ── Next scan countdown (60s cycle) ──
+  const [nextScanSec, setNextScanSec] = useState(60);
+  useEffect(() => {
+    const id = setInterval(() => setNextScanSec(s => s <= 1 ? 60 : s - 1), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // ── Live institutional flow ──
   const [darkpoolTrades, setDarkpoolTrades] = useState([]);
@@ -701,6 +745,25 @@ export default function AlertsTab({ session, group }) {
   if (convictionFilter) {
     filtered = filtered.filter(a => a.conviction === convictionFilter);
   }
+  if (quickFilter === 'bullish') {
+    filtered = filtered.filter(a => {
+      const ot = (a.option_type || a.trade_type || '').toLowerCase();
+      if (ot.includes('call')) return true;
+      if (ot.includes('put')) return false;
+      return (a.change ?? 0) >= 0;
+    });
+  } else if (quickFilter === 'bearish') {
+    filtered = filtered.filter(a => {
+      const ot = (a.option_type || a.trade_type || '').toLowerCase();
+      if (ot.includes('put')) return true;
+      if (ot.includes('call')) return false;
+      return (a.change ?? 0) < 0;
+    });
+  } else if (quickFilter === 'darkpool') {
+    filtered = filtered.filter(a => a.isFlowSignal || (a.scannerTag || '').toLowerCase().includes('dark'));
+  } else if (quickFilter === 'high') {
+    filtered = filtered.filter(a => (a.confidence ?? 0) >= 80);
+  }
   const sorted = [...filtered].sort((a, b) => {
     if (a.isAlertOfDay && !b.isAlertOfDay) return -1;
     if (!a.isAlertOfDay && b.isAlertOfDay) return 1;
@@ -708,7 +771,8 @@ export default function AlertsTab({ session, group }) {
   });
 
   // Auto-select AOTD or first alert on load
-  const selectedAlert = selectedChipId ? sorted.find(a => a.id === selectedChipId) : null;
+  // Look up selected alert in the full (unfiltered) list so a sector filter can't hide it
+  const selectedAlert = selectedChipId ? (displayAlerts.find(a => a.id === selectedChipId) || sorted.find(a => a.id === selectedChipId)) : null;
 
   // ── Compute performance stats from live data ──
   const perfStats = useMemo(() => {
@@ -855,7 +919,7 @@ export default function AlertsTab({ session, group }) {
     <div className="alerts-container" style={{ background: t.bg, transition: 'background .2s' }}>
       <style>{`
         *, *::before, *::after { box-sizing: border-box; }
-        .alerts-container { width: 100%; max-width: 480px; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; flex: 1; min-height: 100%; }
+        .alerts-container { width: 100%; max-width: 480px; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
         .filter-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
         .filter-row::-webkit-scrollbar { display: none; }
         @media (max-width: 480px) {
@@ -866,11 +930,35 @@ export default function AlertsTab({ session, group }) {
 
       {/* HEADER — mood text removed (gauge already shows fear/greed) */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h2 style={{ margin: 0, fontSize: 11, fontWeight: 700, color: t.text3, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "'Outfit', sans-serif" }}>Action Alerts</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 style={{ margin: 0, fontSize: 11, fontWeight: 700, color: t.text3, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "'Outfit', sans-serif" }}>Action Alerts</h2>
+          <SentimentPill score={fearScore} darkMode={darkMode} />
+        </div>
         <DarkModeToggle darkMode={darkMode} onToggle={() => setDarkMode(d => !d)} t={t} />
       </div>
 
-      {/* FILTER PILLS removed — will add back when functional */}
+      {/* QUICK FILTER CHIPS */}
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
+        {[
+          { k: 'all', label: 'All' },
+          { k: 'bullish', label: '📈 Calls' },
+          { k: 'bearish', label: '📉 Puts' },
+          { k: 'darkpool', label: '🏦 Darkpool' },
+          { k: 'high', label: '🔥 >80%' },
+        ].map(c => {
+          const active = quickFilter === c.k;
+          return (
+            <button key={c.k} onClick={() => setQuickFilter(c.k)} style={{
+              flexShrink: 0, padding: '6px 12px', borderRadius: 999,
+              border: `1px solid ${active ? t.text1 : t.border}`,
+              background: active ? t.text1 : t.card,
+              color: active ? t.card : t.text2,
+              fontSize: 11, fontWeight: 700, fontFamily: "'Outfit', sans-serif",
+              cursor: 'pointer', transition: 'all .15s', whiteSpace: 'nowrap',
+            }}>{c.label}</button>
+          );
+        })}
+      </div>
 
       {/* STATES */}
       {view === "loading" && <><SkeletonCard t={t} /><SkeletonCard t={t} /></>}
@@ -878,7 +966,7 @@ export default function AlertsTab({ session, group }) {
         <>
           {/* CHIP FIELD — always show (mystery chips appear even with 0 scanner alerts) */}
           <ChipField
-            alerts={displayAlerts}
+            alerts={sorted}
             fearScore={fearScore}
             history={historyDisplay}
             selectedId={selectedChipId}
@@ -1031,6 +1119,9 @@ export default function AlertsTab({ session, group }) {
                     {selectedAlert.conviction !== 'standard' && (
                       <span style={{ padding: '2px 8px', borderRadius: 10, background: selectedAlert.convictionBg, color: selectedAlert.convictionColor, fontSize: 10, fontWeight: 700, fontFamily: "'Outfit', sans-serif" }}>{selectedAlert.convictionEmoji} {selectedAlert.convictionLabel}</span>
                     )}
+                    {(selectedAlert.created_at || selectedAlert.createdAt) && (
+                      <span style={{ padding: '2px 8px', borderRadius: 10, background: t.surfaceAlt, color: t.text3, fontSize: 10, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>🕒 {timeAgo(selectedAlert.created_at || selectedAlert.createdAt)}</span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 16, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>${selectedAlert.price.toFixed(2)}</span>
@@ -1101,8 +1192,8 @@ export default function AlertsTab({ session, group }) {
                       <div style={{ fontSize: 13, fontWeight: 700, color: selectedAlert.confidence >= 80 ? t.green : t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>{selectedAlert.confidence}%</div>
                     </div>
                     <div style={{ flex: 1, background: t.surface, borderRadius: 8, padding: 5, textAlign: 'center' }}>
-                      <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Trades</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>{selectedAlert.flowOptCount + selectedAlert.flowDpCount}</div>
+                      <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>{(selectedAlert.flowOptCount + selectedAlert.flowDpCount) > 0 ? 'Trades' : 'Price'}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>{(selectedAlert.flowOptCount + selectedAlert.flowDpCount) > 0 ? (selectedAlert.flowOptCount + selectedAlert.flowDpCount) : `$${selectedAlert.price.toFixed(2)}`}</div>
                     </div>
                   </div>
                 ) : (
@@ -1123,7 +1214,23 @@ export default function AlertsTab({ session, group }) {
                     </div>
                   </div>
                 )}
-                {/* Watchlist + Details buttons removed — low friction principle */}
+                {/* PRIMARY CTA — jump to this ticker's flow rows */}
+                <button
+                  onClick={() => openFlowForTicker(selectedAlert.ticker)}
+                  style={{
+                    marginTop: 10, width: '100%', padding: '10px 14px',
+                    border: 'none', borderRadius: 10, cursor: 'pointer',
+                    background: t.text1, color: t.card,
+                    fontSize: 12, fontWeight: 700, fontFamily: "'Outfit', sans-serif",
+                    letterSpacing: '0.3px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    transition: 'transform .1s',
+                  }}
+                  onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
+                  onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                  🏦 View {selectedAlert.ticker} flow & dark pool →
+                </button>
               </div>
             </div>
           )}
@@ -1263,7 +1370,7 @@ export default function AlertsTab({ session, group }) {
           </div>
 
           {/* HOT SECTORS — collapsible, shows even with 0 scanner alerts */}
-          <HotSectors alerts={displayAlerts} onSectorTap={setSectorFilter} activeSector={sectorFilter} t={t} darkMode={darkMode} />
+          <HotSectors alerts={displayAlerts} onSectorTap={setHotSectorPick} activeSector={hotSectorPick} t={t} darkMode={darkMode} />
         </>
       )}
 
