@@ -106,7 +106,9 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
     const onResize = () => {
       if (chatBarRef.current) {
         const offset = window.innerHeight - vv.height;
-        chatBarRef.current.style.bottom = `${58 + offset}px`;
+        // Only adjust if offset is large enough to be a keyboard (>100px)
+        // Small offsets from Safari toolbar should be ignored
+        chatBarRef.current.style.bottom = offset > 100 ? `${offset}px` : '58px';
       }
     };
     vv.addEventListener('resize', onResize);
