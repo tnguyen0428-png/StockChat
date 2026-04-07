@@ -68,7 +68,14 @@ export async function route(message, history = [], lastTicker = null) {
 
   // Check for pronoun references ("it", "that stock", "the same one", "this one")
   const pronouns = /\b(it|its|that stock|this stock|that one|this one|the same|same stock|same ticker)\b/i;
-  if (pronouns.test(message)) {
+
+  // Also catch follow-up queries that imply "the stock we were just talking about"
+  // e.g. "pull up last earnings", "what about the chart", "show me technicals"
+  const followUpPatterns = /^(pull up|show me|what about|how about|and |also |check |look at |give me )/i;
+  const stockDataWords = /\b(earnings|revenue|chart|technicals|options|calls|puts|valuation|price target|dividend|insider|guidance|forecast|financials|balance sheet|income statement|cash flow|eps|p\/e|margin|volume|float)\b/i;
+  const isFollowUp = pronouns.test(message) || (followUpPatterns.test(lower) && stockDataWords.test(lower));
+
+  if (isFollowUp) {
     // Look backwards through history for the last mentioned ticker
     for (let i = history.length - 1; i >= 0; i--) {
       const h = history[i]?.content || '';
@@ -86,7 +93,7 @@ export async function route(message, history = [], lastTicker = null) {
     }
     // Final fallback: use the last resolved ticker from previous turn
     if (lastTicker) {
-      console.log('[Router] Pronoun resolved via lastTicker:', lastTicker);
+      console.log('[Router] Follow-up resolved via lastTicker:', lastTicker);
       return { agent: 'data', params: { ticker: lastTicker } };
     }
   }

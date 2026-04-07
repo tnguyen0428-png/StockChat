@@ -38,6 +38,77 @@ const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven }) => 
     );
   };
 
+  // Parse uptik card blocks from AI responses
+  const rawText = msg.text || '';
+  const uptikMatch = rawText.match(/```uptik\s*([\s\S]*?)```/);
+  let cardData = null;
+  let prose = rawText;
+  if (uptikMatch) {
+    try { cardData = JSON.parse(uptikMatch[1].trim()); } catch {}
+    prose = rawText.replace(/```uptik[\s\S]*?```/, '').trim();
+  }
+
+  const renderCard = (d) => {
+    if (!d || !d.type) return null;
+    const cs = { background: '#0d1f3c', borderRadius: 10, padding: '10px 12px', marginBottom: 6, border: '1px solid #1e3a5f' };
+    const lb = { fontSize: 10, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: 0.5 };
+    const vl = { fontSize: 14, fontWeight: 600, color: '#e8e6e1' };
+    const gn = { color: '#4CAF50' };
+    const rd = { color: '#ef5350' };
+
+    if (d.type === 'earnings') {
+      return (
+        <div style={cs}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ ...vl, color: '#8B5CF6' }}>{d.ticker}</span>
+            <span style={vl}>${d.price}</span>
+          </div>
+          {d.quarters?.map((q, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderTop: '1px solid #1e3a5f' }}>
+              <span style={{ fontSize: 12, color: '#7a8ea3' }}>{q.label}</span>
+              <span style={{ fontSize: 12, ...(q.actual >= q.est ? gn : rd) }}>
+                ${q.actual} vs ${q.est} ({q.beatPct > 0 ? '+' : ''}{q.beatPct}%)
+              </span>
+            </div>
+          ))}
+          {d.nextEarnings && <div style={{ ...lb, marginTop: 6 }}>Next: {d.nextEarnings}</div>}
+        </div>
+      );
+    }
+    if (d.type === 'price') {
+      const isUp = d.changePct >= 0;
+      return (
+        <div style={cs}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ ...vl, color: '#8B5CF6' }}>{d.ticker}</span>
+            <div style={{ textAlign: 'right' }}>
+              <div style={vl}>${d.price}</div>
+              <div style={{ fontSize: 12, ...(isUp ? gn : rd) }}>{isUp ? '+' : ''}{d.changePct}%</div>
+            </div>
+          </div>
+          {d.volume && <div style={{ ...lb, marginTop: 4 }}>Vol: {d.volume}</div>}
+        </div>
+      );
+    }
+    if (d.type === 'valuation') {
+      return (
+        <div style={cs}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ ...vl, color: '#8B5CF6' }}>{d.ticker}</span>
+            <span style={vl}>${d.price}</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
+            {d.pe && <div><span style={lb}>P/E </span><span style={{ fontSize: 12, color: '#e8e6e1' }}>{d.pe}</span></div>}
+            {d.peg && <div><span style={lb}>PEG </span><span style={{ fontSize: 12, color: '#e8e6e1' }}>{d.peg}</span></div>}
+            {d.netMargin && <div><span style={lb}>Margin </span><span style={{ fontSize: 12, color: '#e8e6e1' }}>{d.netMargin}%</span></div>}
+            {d.salesGrowth && <div><span style={lb}>Sales </span><span style={{ fontSize: 12, color: '#4CAF50' }}>+{d.salesGrowth}%</span></div>}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   const bodyStyle = {
     ...styles.msgBody,
     ...(isAdmin ? styles.adminBody : {}),
@@ -55,7 +126,8 @@ const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven }) => 
           {isAI    && <span style={styles.aiBadge}>AI</span>}
           <span style={styles.msgTime}>{formatTime(msg.created_at)}</span>
         </div>
-        <div style={styles.msgText}>{parseText(msg.text)}</div>
+        {isAI && cardData && renderCard(cardData)}
+        <div style={styles.msgText}>{parseText(prose)}</div>
         {isAI && onFeedback && (
           <div style={styles.feedbackRow}>
             {feedbackGiven ? (

@@ -93,6 +93,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   const [aiMode, setAiMode]                     = useState(false);
   const [chatExpanded, setChatExpanded]          = useState(false);
   const [aiLoading, setAiLoading]               = useState(false);
+  const [aiLastTicker, setAiLastTicker]         = useState(null);
   const chatInputRef = useRef(null);
   const chatStripRef = useRef(null);
   const chatSectionRef = useRef(null);
@@ -442,13 +443,23 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
           setAiLoading(true);
           try {
             const query = raw;
-            const { text: aiReply } = await askUpTikAI({
+            // Build recent history from chat messages for pronoun resolution
+            const recentHistory = chatMessages
+              .filter(m => m.user_id === 'user_ai' || /@AI\b/i.test(m.text))
+              .slice(-8)
+              .map(m => ({
+                role: m.user_id === 'user_ai' ? 'assistant' : 'user',
+                content: (m.text || '').replace(/@AI\s*/i, ''),
+              }));
+            const { text: aiReply, newLastTicker } = await askUpTikAI({
               userText: query,
-              history: [],
+              history: recentHistory,
+              lastTicker: aiLastTicker,
               username: profile?.username,
               groupName: homeGroup?.name,
               watchlist: watchlist.map(w => w.symbol),
             });
+            if (newLastTicker) setAiLastTicker(newLastTicker);
             const { data: aiMsg } = await supabase.from('chat_messages').insert({
               group_id: homeGroup.id, user_id: 'user_ai',
               username: 'UpTik', user_color: '#8B5CF6',
@@ -1431,9 +1442,82 @@ function ChatBubble({ msg }) {
   const color = msg.user_color || colors[name.charCodeAt(0) % colors.length];
   const timeAgo = getTimeAgo(msg.created_at);
 
-  // chat_messages uses "text", group_chat_messages used "content"
   const rawText = msg.text || msg.content || '';
-  const parts = rawText.split(/(\$[A-Z]{1,5})/g);
+
+  // Parse uptik card blocks and separate prose
+  const uptikMatch = rawText.match(/```uptik\s*([\s\S]*?)```/);
+  let cardData = null;
+  let prose = rawText;
+  if (uptikMatch) {
+    try { cardData = JSON.parse(uptikMatch[1].trim()); } catch {}
+    prose = rawText.replace(/```uptik[\s\S]*?```/, '').trim();
+  }
+
+  const renderProse = (text) => {
+    const parts = text.split(/(\$[A-Z]{1,5})/g);
+    return parts.map((p, i) => p.startsWith('$') ? <span key={i} style={S.ccTk}>{p}</span> : p);
+  };
+
+  const renderCard = (d) => {
+    if (!d || !d.type) return null;
+    const cardStyle = { background: '#0d1f3c', borderRadius: 10, padding: '10px 12px', marginBottom: 6, border: '1px solid #1e3a5f' };
+    const labelStyle = { fontSize: 10, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: 0.5 };
+    const valStyle = { fontSize: 14, fontWeight: 600, color: '#e8e6e1' };
+    const greenStyle = { color: '#4CAF50' };
+    const redStyle = { color: '#ef5350' };
+
+    if (d.type === 'earnings') {
+      return (
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ ...valStyle, color: '#8B5CF6' }}>{d.ticker}</span>
+            <span style={valStyle}>${d.price}</span>
+          </div>
+          {d.quarters?.map((q, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderTop: '1px solid #1e3a5f' }}>
+              <span style={{ fontSize: 12, color: '#7a8ea3' }}>{q.label}</span>
+              <span style={{ fontSize: 12, ...(q.actual >= q.est ? greenStyle : redStyle) }}>
+                ${q.actual} vs ${q.est} ({q.beatPct > 0 ? '+' : ''}{q.beatPct}%)
+              </span>
+            </div>
+          ))}
+          {d.nextEarnings && <div style={{ ...labelStyle, marginTop: 6 }}>Next: {d.nextEarnings}</div>}
+        </div>
+      );
+    }
+    if (d.type === 'price') {
+      const isUp = d.changePct >= 0;
+      return (
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ ...valStyle, color: '#8B5CF6' }}>{d.ticker}</span>
+            <div style={{ textAlign: 'right' }}>
+              <div style={valStyle}>${d.price}</div>
+              <div style={{ fontSize: 12, ...(isUp ? greenStyle : redStyle) }}>{isUp ? '+' : ''}{d.changePct}%</div>
+            </div>
+          </div>
+          {d.volume && <div style={{ ...labelStyle, marginTop: 4 }}>Vol: {d.volume}</div>}
+        </div>
+      );
+    }
+    if (d.type === 'valuation') {
+      return (
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ ...valStyle, color: '#8B5CF6' }}>{d.ticker}</span>
+            <span style={valStyle}>${d.price}</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
+            {d.pe && <div><span style={labelStyle}>P/E </span><span style={{ fontSize: 12, color: '#e8e6e1' }}>{d.pe}</span></div>}
+            {d.peg && <div><span style={labelStyle}>PEG </span><span style={{ fontSize: 12, color: '#e8e6e1' }}>{d.peg}</span></div>}
+            {d.netMargin && <div><span style={labelStyle}>Margin </span><span style={{ fontSize: 12, color: '#e8e6e1' }}>{d.netMargin}%</span></div>}
+            {d.salesGrowth && <div><span style={labelStyle}>Sales </span><span style={{ fontSize: 12, color: '#4CAF50' }}>+{d.salesGrowth}%</span></div>}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <div style={S.ccMsg}>
@@ -1443,9 +1527,8 @@ function ChatBubble({ msg }) {
           <span style={{ ...S.ccName, color }}>{name}</span>
           <span style={S.ccTime}>{timeAgo}</span>
         </div>
-        <div style={S.ccText}>
-          {parts.map((p, i) => p.startsWith('$') ? <span key={i} style={S.ccTk}>{p}</span> : p)}
-        </div>
+        {cardData && renderCard(cardData)}
+        <div style={S.ccText}>{renderProse(prose)}</div>
       </div>
     </div>
   );
