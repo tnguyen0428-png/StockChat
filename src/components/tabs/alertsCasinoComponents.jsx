@@ -134,8 +134,46 @@ export function PokerChip({ alert, isSelected, onTap, size, t }) {
   );
 }
 
+// ── Mystery Chip (Options / Dark Pool) ──
+export function MysteryChip({ type, isSelected, onTap, size, t }) {
+  const isOptions = type === 'options';
+  const borderColor = isOptions ? t.gold : t.amber;
+  const label = isOptions ? 'Options' : <span style={{ textAlign: 'center', lineHeight: 1.1 }}>Dark<br/>Pool</span>;
+  const emoji = isOptions ? '💰' : '🏦';
+  const tickerSize = size >= 68 ? 13 : 12;
+
+  return (
+    <div onClick={() => onTap(type)} style={{
+      width: size, height: size, borderRadius: '50%',
+      border: `${isOptions ? 3 : 2.5}px solid ${borderColor}`,
+      background: `${borderColor}12`,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      cursor: 'pointer', position: 'relative',
+      transform: isSelected ? 'scale(1.1)' : 'scale(1)',
+      transition: 'transform .15s',
+      animation: isSelected ? 'none' : 'chipPulseGold 3s ease-in-out infinite',
+      boxShadow: isSelected ? `0 0 20px ${borderColor}40` : undefined,
+    }}>
+      <div style={{
+        position: 'absolute', width: size - 16, height: size - 16, borderRadius: '50%',
+        border: `1px dashed ${borderColor}45`,
+      }}/>
+      {isOptions && (
+        <div style={{
+          position: 'absolute', top: -5,
+          background: t.gold, color: '#0a1628',
+          fontSize: 6, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
+          fontFamily: "'Outfit', sans-serif", letterSpacing: '0.5px',
+        }}>AOTD</div>
+      )}
+      <span style={{ fontSize: tickerSize, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif", lineHeight: 1, position: 'relative' }}>{label}</span>
+      <span style={{ fontSize: 9, fontWeight: 600, color: borderColor, lineHeight: 1, position: 'relative', marginTop: 2 }}>{emoji}</span>
+    </div>
+  );
+}
+
 // ── Chip Field (gauge background + scattered poker chips) ──
-export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, t, darkMode }) {
+export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, onMysteryTap, mysterySelected, t, darkMode }) {
   // Deduplicate by ticker — keep highest confidence for each
   const uniqueMap = new Map();
   alerts.forEach(a => {
@@ -151,10 +189,9 @@ export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, t
       if (!a.isAlertOfDay && b.isAlertOfDay) return 1;
       return getSortValue(b) - getSortValue(a);
     })
-    .slice(0, 5);
+    .slice(0, 2); // Reduced to 2 scanner chips to make room for mystery chips
 
   const getChipSize = (pct, alert) => {
-    // Flow signals: size by confidence level
     if (alert?.isFlowSignal) {
       const conf = alert.confidence || 0;
       if (conf >= 85) return 82;
@@ -162,7 +199,6 @@ export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, t
       if (conf >= 65) return 60;
       return 52;
     }
-    // Scanner alerts: size by price change
     const abs = Math.abs(pct || 0);
     if (abs >= 4) return 82;
     if (abs >= 2) return 72;
@@ -170,12 +206,12 @@ export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, t
     return 52;
   };
 
+  // 4 slots: Options mystery (top-right), scanner chip 1 (top-left), Dark Pool mystery (mid-left), scanner chip 2 (bottom-left)
   const slots = [
-    { top: '6%', right: '6%' },
-    { top: '10%', left: '5%' },
-    { top: '38%', left: '28%' },
-    { top: '55%', left: '8%' },
-    { top: '42%', right: '12%' },
+    { top: '6%', right: '6%' },   // Options mystery chip
+    { top: '10%', left: '5%' },   // Scanner chip 1
+    { top: '38%', left: '28%' },  // Dark Pool mystery chip
+    { top: '55%', left: '8%' },   // Scanner chip 2
   ];
 
   // Build bead plate dots
@@ -231,15 +267,29 @@ export function ChipField({ alerts, fearScore, history, selectedId, onChipTap, t
       </div>
 
       {/* Poker chips */}
-      {sorted.map((alert, i) => {
-        const slot = slots[i];
-        if (!slot) return null;
-        return (
-          <div key={alert.id} style={{ position: 'absolute', ...slot, animation: `chipFloat${i} ${6 + i * 1.5}s ease-in-out infinite` }}>
-            <PokerChip alert={alert} isSelected={selectedId === alert.id} onTap={onChipTap} size={getChipSize(alert.changePercent, alert)} t={t} />
-          </div>
-        );
-      })}
+      {/* Mystery Options chip — slot 0 (top-right) */}
+      <div style={{ position: 'absolute', ...slots[0], animation: `chipFloat0 6s ease-in-out infinite` }}>
+        <MysteryChip type="options" isSelected={mysterySelected === 'options'} onTap={onMysteryTap} size={82} t={t} />
+      </div>
+
+      {/* Scanner chip 1 — slot 1 (top-left) */}
+      {sorted[0] && (
+        <div style={{ position: 'absolute', ...slots[1], animation: `chipFloat1 7.5s ease-in-out infinite` }}>
+          <PokerChip alert={sorted[0]} isSelected={selectedId === sorted[0].id} onTap={onChipTap} size={getChipSize(sorted[0].changePercent, sorted[0])} t={t} />
+        </div>
+      )}
+
+      {/* Mystery Dark Pool chip — slot 2 (mid-left) */}
+      <div style={{ position: 'absolute', ...slots[2], animation: `chipFloat2 9s ease-in-out infinite` }}>
+        <MysteryChip type="darkpool" isSelected={mysterySelected === 'darkpool'} onTap={onMysteryTap} size={72} t={t} />
+      </div>
+
+      {/* Scanner chip 2 — slot 3 (bottom-left) */}
+      {sorted[1] && (
+        <div style={{ position: 'absolute', ...slots[3], animation: `chipFloat3 7.5s ease-in-out infinite` }}>
+          <PokerChip alert={sorted[1]} isSelected={selectedId === sorted[1].id} onTap={onChipTap} size={getChipSize(sorted[1].changePercent, sorted[1])} t={t} />
+        </div>
+      )}
     </div>
   );
 }
