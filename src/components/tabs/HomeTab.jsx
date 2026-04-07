@@ -226,10 +226,8 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
     setShowOnboarding(false);
     // Batch add all selected tickers to watchlist
     if (tickers.length > 0) {
-      const groupId = activeGroup?.id || publicGroups[0]?.id;
       const inserts = tickers.map(symbol => ({
         user_id: session.user.id,
-        group_id: groupId,
         symbol,
       }));
       const { data } = await supabase.from('user_watchlist').insert(inserts).select();
@@ -718,11 +716,9 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
     if (!upper || watchlist.find(w => w.symbol === upper)) return;
     setAddingTicker(upper);
 
-    // Use first available group, or null
-    const groupId = activeGroup?.id || publicGroups[0]?.id;
     const { data, error } = await supabase
       .from('user_watchlist')
-      .insert({ user_id: session.user.id, group_id: groupId, symbol: upper })
+      .insert({ user_id: session.user.id, symbol: upper })
       .select()
       .single();
 

@@ -41,7 +41,6 @@ export default function ListsTab({ session, profile, group, isAdmin }) {
       .from('user_watchlist')
       .select('*')
       .eq('user_id', session.user.id)
-      .eq('group_id', group.id)
       .order('created_at', { ascending: false });
     if (data) setWatchlist(data);
   };
@@ -130,7 +129,7 @@ export default function ListsTab({ session, profile, group, isAdmin }) {
     if (watchlist.find(w => w.symbol === sym)) return;
     const { data } = await supabase
       .from('user_watchlist')
-      .insert({ user_id: session.user.id, group_id: group.id, symbol: sym })
+      .insert({ user_id: session.user.id, symbol: sym })
       .select()
       .single();
     if (data) {
