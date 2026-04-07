@@ -59,7 +59,7 @@ function mapDbAlert(a, spyData, tagMap) {
   // Signal text
   let signal = a.signal ?? a.notes ?? a.title ?? '';
   if (!signal && type === '52w_high' && a.pct_from_high != null) signal = `Within ${a.pct_from_high}% of 52-week high`;
-  else if (!signal && type === 'gap_up' && a.gap_pct != null) signal = `Gapped up +${a.gap_pct.toFixed(2)}%`;
+  else if (!signal && type === 'gap_up' && a.gap_pct != null) signal = `Gapped up +${Number(a.gap_pct).toFixed(2)}%`;
   else if (!signal && type === 'ma_cross' && a.short_ma != null) signal = `${a.short_ma_period ?? 20}MA crossed above ${a.long_ma_period ?? 50}MA`;
   else if (!signal && type === 'vol_surge' && a.volume_ratio != null) signal = `Volume surging ${a.volume_ratio}x above average`;
 
@@ -416,7 +416,7 @@ function BigMoneyCard({ trade, isExpanded, onToggle, t: theme }) {
         <span style={{ fontSize: 14, fontWeight: 700, color: text1 }}>{formatDollar(trade.dollar_value)}</span>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: text3 }}>
-        <span>{formatShares(trade.shares)} shares{mult > 1 ? ` · ${mult.toFixed(1)}x normal` : ''}</span>
+        <span>{formatShares(trade.shares || trade.size)} shares{mult > 1 ? ` · ${mult.toFixed(1)}x normal` : ''}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: freshDotColor(trade.executed_at || trade.fetched_at), display: "inline-block" }}/>{relTime(trade.executed_at || trade.fetched_at)}</div>
       </div>
       {isExpanded && (
@@ -955,12 +955,14 @@ export default function AlertsTab({ session, group }) {
           {mysterySelected === 'darkpool' && (() => {
             const dpByTicker = {};
             darkpoolTrades.forEach(d => {
-              if (!dpByTicker[d.ticker]) dpByTicker[d.ticker] = { ticker: d.ticker, totalValue: 0, prints: 0, totalShares: 0, price: d.price || 0 };
+              if (!dpByTicker[d.ticker]) dpByTicker[d.ticker] = { ticker: d.ticker, totalValue: 0, prints: 0, totalShares: 0, price: Number(d.price) || 0 };
               const ts = dpByTicker[d.ticker];
               ts.prints++;
-              ts.totalValue += (d.notional_value || d.size * (d.price || 0) || 0);
-              ts.totalShares += (d.size || 0);
-              if (d.price) ts.price = d.price;
+              const shares = Number(d.size || d.shares) || 0;
+              const price = Number(d.price) || 0;
+              ts.totalValue += (Number(d.notional_value) || shares * price || 0);
+              ts.totalShares += shares;
+              if (price) ts.price = price;
             });
             const topDp = Object.values(dpByTicker).sort((a, b) => b.totalValue - a.totalValue)[0];
             if (!topDp) return null;
@@ -975,7 +977,7 @@ export default function AlertsTab({ session, group }) {
                     <span style={{ padding: '2px 8px', borderRadius: 10, background: `rgba(250,199,117,0.1)`, color: t.amber, fontSize: 11, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>DARK POOL</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{topDp.price ? `$${topDp.price.toFixed(2)}` : '—'}</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{topDp.price ? `$${Number(topDp.price).toFixed(2)}` : '—'}</span>
                     <span onClick={() => setMysterySelected(null)} style={{ fontSize: 16, color: t.text3, cursor: 'pointer', padding: '0 2px' }}>▴</span>
                   </div>
                 </div>
