@@ -34,7 +34,7 @@ const ONBOARD_SECTORS = [
   { name: 'Consumer', color: '#9C27B0', tickers: ['DIS', 'NKE', 'SBUX', 'MCD'] },
 ];
 
-export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePress, onTabChange, scrollToChatRef }) {
+export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePress, onTabChange, scrollToChatRef, shouldFocusChatRef }) {
   const { publicGroups, privateGroup, activeGroup, profile, customGroups } = useGroup();
 
   // ── Market data state (kept from original) ──
@@ -149,6 +149,12 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
         chatSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
         chatInputRef.current?.focus();
       };
+    }
+    // If parent flagged that we should focus on mount, do it now
+    if (shouldFocusChatRef?.current) {
+      shouldFocusChatRef.current = false;
+      chatSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+      chatInputRef.current?.focus();
     }
   }, [scrollToChatRef]);
 
