@@ -5,7 +5,7 @@ const MODELS = {
   smart: 'claude-sonnet-4-6',
 };
 
-export async function callClaude(systemPrompt, userMessage, history = [], tier = 'auto') {
+export async function callClaude(systemPrompt, userMessage, history = [], tier = 'auto', maxTokens = null) {
   // Keep more history for natural conversation flow
   const recent = (history || []).slice(-12).map(msg => ({
     role: msg.role === 'assistant' ? 'assistant' : 'user',
@@ -30,7 +30,7 @@ export async function callClaude(systemPrompt, userMessage, history = [], tier =
     },
     body: JSON.stringify({
       model,
-      max_tokens: 500,
+      max_tokens: maxTokens || 500,
       temperature,
       system: systemPrompt,
       messages: [...recent, { role: 'user', content: userMessage }]
@@ -55,7 +55,7 @@ export async function callClaude(systemPrompt, userMessage, history = [], tier =
       },
       body: JSON.stringify({
         model: MODELS.smart,
-        max_tokens: 500,
+        max_tokens: maxTokens || 500,
         temperature,
         system: systemPrompt,
         messages: [...recent, { role: 'user', content: userMessage }]

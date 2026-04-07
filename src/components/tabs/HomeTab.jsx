@@ -1460,28 +1460,28 @@ function ChatBubble({ msg }) {
 
   const renderCard = (d) => {
     if (!d || !d.type) return null;
-    const cardStyle = { background: '#0d1f3c', borderRadius: 10, padding: '10px 12px', marginBottom: 6, border: '1px solid #1e3a5f' };
-    const labelStyle = { fontSize: 10, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: 0.5 };
-    const valStyle = { fontSize: 14, fontWeight: 600, color: '#e8e6e1' };
+    const cardStyle = { background: '#0d1f3c', borderRadius: 8, padding: '8px 10px', marginBottom: 4, border: '1px solid #1e3a5f' };
+    const labelStyle = { fontSize: 9, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: 0.5 };
+    const valStyle = { fontSize: 13, fontWeight: 600, color: '#e8e6e1' };
     const greenStyle = { color: '#4CAF50' };
     const redStyle = { color: '#ef5350' };
 
     if (d.type === 'earnings') {
       return (
         <div style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
             <span style={{ ...valStyle, color: '#8B5CF6' }}>{d.ticker}</span>
             <span style={valStyle}>${d.price}</span>
           </div>
           {d.quarters?.map((q, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderTop: '1px solid #1e3a5f' }}>
-              <span style={{ fontSize: 12, color: '#7a8ea3' }}>{q.label}</span>
-              <span style={{ fontSize: 12, ...(q.actual >= q.est ? greenStyle : redStyle) }}>
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderTop: '1px solid #1e3a5f' }}>
+              <span style={{ fontSize: 11, color: '#7a8ea3' }}>{q.label}</span>
+              <span style={{ fontSize: 11, ...(q.actual >= q.est ? greenStyle : redStyle) }}>
                 ${q.actual} vs ${q.est} ({q.beatPct > 0 ? '+' : ''}{q.beatPct}%)
               </span>
             </div>
           ))}
-          {d.nextEarnings && <div style={{ ...labelStyle, marginTop: 6 }}>Next: {d.nextEarnings}</div>}
+          {d.nextEarnings && <div style={{ ...labelStyle, marginTop: 4 }}>Next: {d.nextEarnings}</div>}
         </div>
       );
     }
@@ -1491,12 +1491,12 @@ function ChatBubble({ msg }) {
         <div style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ ...valStyle, color: '#8B5CF6' }}>{d.ticker}</span>
-            <div style={{ textAlign: 'right' }}>
-              <div style={valStyle}>${d.price}</div>
-              <div style={{ fontSize: 12, ...(isUp ? greenStyle : redStyle) }}>{isUp ? '+' : ''}{d.changePct}%</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={valStyle}>${d.price}</span>
+              <span style={{ fontSize: 11, ...(isUp ? greenStyle : redStyle) }}>{isUp ? '+' : ''}{d.changePct}%</span>
+              {d.volume && <span style={{ ...labelStyle }}>Vol: {d.volume}</span>}
             </div>
           </div>
-          {d.volume && <div style={{ ...labelStyle, marginTop: 4 }}>Vol: {d.volume}</div>}
         </div>
       );
     }
