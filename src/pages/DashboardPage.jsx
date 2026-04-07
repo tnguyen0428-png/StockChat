@@ -110,23 +110,16 @@ export default function DashboardPage({ session }) {
 
   // Ref so HomeTab can expose its scrollToChat function
   const scrollToChatRef = useRef(null);
-  // Flag: when true, HomeTab should focus chat input on mount
-  const shouldFocusChatRef = useRef(false);
 
   const handleTabChange = useCallback((tab) => {
     if (tab === 'chat' || tab === 'home') {
-      if (activeTab === 'home') {
-        // Already on home — focus synchronously (keeps user-gesture context for mobile)
-        scrollToChatRef.current?.();
-      } else {
-        // Switching to home — set flag so HomeTab focuses on mount
-        shouldFocusChatRef.current = true;
-        setActiveTab('home');
-      }
+      // Go to home tab — don't auto-focus input so keyboard stays down on mobile
+      // (user may want to tap AI button before typing)
+      setActiveTab('home');
     } else {
       setActiveTab(tab);
     }
-  }, [activeTab]);
+  }, []);
 
   const handleGroupSelect = (group) => {
     enterGroup(group);
@@ -212,7 +205,6 @@ export default function DashboardPage({ session }) {
             onProfilePress={() => setActiveTab('profile')}
             onTabChange={handleTabChange}
             scrollToChatRef={scrollToChatRef}
-            shouldFocusChatRef={shouldFocusChatRef}
           />
         )}
         {activeTab === 'ai' && <AITab session={session} />}
