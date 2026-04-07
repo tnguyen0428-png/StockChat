@@ -33,11 +33,37 @@ const COMPANY_TO_TICKER = {
   'target': 'TGT', 'home depot': 'HD', 'lowes': 'LOW', "lowe's": 'LOW',
   'chipotle': 'CMG', 'mcdonalds': 'MCD', "mcdonald's": 'MCD',
   'celsius': 'CELH', 'cava': 'CAVA', 'duolingo': 'DUOL',
+  // Consumer staples / industrials
+  'procter': 'PG', 'procter & gamble': 'PG', 'p&g': 'PG', 'pg': 'PG',
+  'coca-cola': 'KO', 'coca cola': 'KO', 'coke': 'KO', 'pepsi': 'PEP', 'pepsico': 'PEP',
+  'colgate': 'CL', 'general mills': 'GIS', 'kellogg': 'K', 'mondelez': 'MDLZ',
+  'kraft': 'KHC', 'kraft heinz': 'KHC', 'hershey': 'HSY',
+  '3m': 'MMM', 'honeywell': 'HON', 'general electric': 'GE', 'ge': 'GE',
+  // Retail / consumer
+  'amazon': 'AMZN', 'kroger': 'KR', 'dollar general': 'DG', 'dollar tree': 'DLTR',
+  'ross': 'ROST', 'tjx': 'TJX', 'tj maxx': 'TJX', 'best buy': 'BBY',
+  // Healthcare
+  'amgen': 'AMGN', 'gilead': 'GILD', 'regeneron': 'REGN', 'vertex': 'VRTX',
+  'bristol myers': 'BMY', 'bristol-myers': 'BMY', 'astrazeneca': 'AZN',
+  'cvs': 'CVS', 'walgreens': 'WBA',
+  // Finance
+  'charles schwab': 'SCHW', 'american express': 'AXP', 'amex': 'AXP',
+  'blackrock': 'BLK', 'goldman sachs': 'GS', 'citi': 'C',
+  // Tech / software
+  'adobe': 'ADBE', 'servicenow': 'NOW', 'workday': 'WDAY',
+  'palo alto': 'PANW', 'palo alto networks': 'PANW', 'fortinet': 'FTNT',
+  'arista': 'ANET', 'dell': 'DELL', 'hp': 'HPQ', 'lenovo': 'LNVGY',
+  // Telecom / media
+  'att': 'T', 'at&t': 'T', 'verizon': 'VZ', 't-mobile': 'TMUS',
+  'comcast': 'CMCSA', 'paramount': 'PARA', 'warner bros': 'WBD',
+  // Energy
+  'marathon': 'MPC', 'pioneer': 'PXD', 'schlumberger': 'SLB',
+  'enphase': 'ENPH', 'first solar': 'FSLR', 'nextera': 'NEE',
 };
 
 const IGNORE_TICKERS = new Set(['AI', 'AM', 'PM', 'OK', 'US', 'CEO', 'IPO', 'ETF', 'GDP', 'FBI', 'USA', 'THE', 'FOR', 'AND', 'CAN', 'YOU', 'ARE', 'HOW', 'WHAT', 'WHY', 'IS', 'AT', 'IN', 'ON', 'TO', 'ME', 'MY', 'NO', 'YES', 'HI', 'HEY', 'UP', 'DO', 'IF', 'OR', 'SO', 'IT', 'BE', 'BY', 'OF', 'AN', 'AS', 'GO', 'IM']);
 
-export async function route(message, history = []) {
+export async function route(message, history = [], lastTicker = null) {
   const lower = message.toLowerCase().trim();
 
   // Check for pronoun references ("it", "that stock", "the same one", "this one")
@@ -57,6 +83,11 @@ export async function route(message, history = []) {
       // Check bare tickers
       const bare = h.match(/\b([A-Z]{2,5})\b/);
       if (bare && !IGNORE_TICKERS.has(bare[1])) return { agent: 'data', params: { ticker: bare[1] } };
+    }
+    // Final fallback: use the last resolved ticker from previous turn
+    if (lastTicker) {
+      console.log('[Router] Pronoun resolved via lastTicker:', lastTicker);
+      return { agent: 'data', params: { ticker: lastTicker } };
     }
   }
 
@@ -101,7 +132,7 @@ export async function route(message, history = []) {
   }
 
   // 6. Data keywords (alerts, trades, specific stock questions)
-  const dataKeywords = ['alert', 'alerts', 'trade', 'pick', 'picks', 'scanner', 'breakout', 'what should', 'best stock', 'portfolio', 'watchlist'];
+  const dataKeywords = ['alert', 'alerts', 'trade', 'pick', 'picks', 'scanner', 'breakout', 'what should', 'best stock', 'portfolio', 'watchlist', 'momentum', 'gainer', 'gainers', 'loser', 'losers', 'mover', 'movers', 'volume surge', 'unusual volume', 'trending', 'top stock', 'top stocks', 'hot stock', 'hot stocks'];
   if (dataKeywords.some(k => lower.includes(k))) {
     return { agent: 'data', params: { ticker: null } };
   }

@@ -177,7 +177,7 @@ export async function askUpTikAI({ userText, history = [], lastTicker = null, us
       uid = session?.user?.id;
     }
 
-    const result = await runPipeline(userText, history, supabase, uid);
+    const result = await runPipeline(userText, history, supabase, uid, lastTicker);
     console.log(`[AI Pipeline] agent=${result.meta.agent} cached=${result.meta.cached} ms=${result.meta.ms}`);
     return { text: result.reply, newLastTicker: result.meta.ticker || newLastTicker };
   } catch (err) {
