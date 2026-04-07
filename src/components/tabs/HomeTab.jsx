@@ -189,6 +189,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   // ── First-login detection: show onboarding if watchlist is empty & never dismissed ──
   useEffect(() => {
     const checkOnboarding = async () => {
+      return; // disabled for now — re-enable by removing this line
       const dismissed = localStorage.getItem('uptik_onboarding_done');
       if (dismissed) return;
       // Check if user has any watchlist items
