@@ -415,6 +415,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
     if (!raw || chatSending || !profile || !homeGroup) return;
     const text = aiMode ? `@AI ${raw}` : raw;
 
+    chatInputRef.current?.blur();
     setChatSending(true);
     try {
       const { data, error } = await supabase.from('chat_messages').insert({
@@ -1600,6 +1601,7 @@ const S = {
 
   fixedChatBar: {
     position: 'sticky', bottom: 0,
+    marginTop: 12,
     padding: '10px 14px', background: '#eef2f7',
     display: 'flex', alignItems: 'center', gap: 8,
     zIndex: 50,
