@@ -764,9 +764,12 @@ export default function AlertsTab({ session }) {
   useEffect(() => {
     const loadAlerts = async () => {
       setLoading(true);
+      // Only show alerts from the last 24h so the feed always reflects "current"
+      const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data } = await supabase
         .from('breakout_alerts')
         .select('*')
+        .gte('created_at', sinceIso)
         .order('created_at', { ascending: false })
         .limit(50);
       if (data) setAlerts(data);

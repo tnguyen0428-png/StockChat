@@ -5,9 +5,9 @@
 
 import { useState, useEffect, memo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { polyFetch } from '../../lib/polygonClient';
 import { isWeekend, isMarketHoliday } from '../../utils/marketUtils';
 
-const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
 const REFRESH_INTERVAL = 60000;
 
 const TickerBanner = memo(({ groupId }) => {
@@ -48,10 +48,9 @@ const TickerBanner = memo(({ groupId }) => {
         const tickers = [...new Set(stocks.map(s => s.ticker))];
         const tickerParam = tickers.join(',');
 
-        const res = await fetch(
-          `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickerParam}&apiKey=${POLYGON_KEY}`
+        const data = await polyFetch(
+          `/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickerParam}`
         );
-        const data = await res.json();
 
         if (!mounted) return;
 
@@ -143,10 +142,9 @@ async function fetchPrevDayQuotes(tickers) {
     if (i > 0) await new Promise(r => setTimeout(r, 1000));
     const batch = tickers.slice(i, i + 20);
     try {
-      const res = await fetch(
-        `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${batch.join(',')}&apiKey=${POLYGON_KEY}`
+      const data = await polyFetch(
+        `/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${batch.join(',')}`
       );
-      const data = await res.json();
       (data.tickers || []).forEach(t => {
         const price = t.day?.c || t.prevDay?.c || 0;
         const change = t.todaysChange || 0;

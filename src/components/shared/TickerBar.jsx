@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { polyFetch } from '../../lib/polygonClient';
 import { isWeekend, isMarketHoliday } from '../../utils/marketUtils';
 
 export default function TickerBar({ isAdmin, groupId }) {
@@ -49,17 +50,15 @@ export default function TickerBar({ isAdmin, groupId }) {
 
     const fetchPrices = async () => {
       if (isWeekend() || isMarketHoliday()) return;
-      const apiKey = import.meta.env.VITE_POLYGON_API_KEY;
       const results = {};
 
       for (let i = 0; i < tickers.length; i += 20) {
         if (i > 0) await new Promise(r => setTimeout(r, 1000));
         const batch = tickers.slice(i, i + 20);
         try {
-          const res = await fetch(
-            `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${batch.join(',')}&apiKey=${apiKey}`
+          const data = await polyFetch(
+            `/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${batch.join(',')}`
           );
-          const data = await res.json();
           (data.tickers || []).forEach(t => {
             results[t.ticker] = {
               price: t.day?.c || t.prevDay?.c || 0,

@@ -17,6 +17,7 @@ import ProfileTab from '../components/tabs/ProfileTab';
 import HelpTab    from '../components/tabs/HelpTab';
 import AITab      from '../components/tabs/AITab';
 import PortfolioTab from '../components/tabs/PortfolioTab';
+import DailyPickCard from '../components/challenge/DailyPickCard';
 // DarkPoolOptionsTab merged into AlertsTabRedesign
 
 // Shared components
@@ -226,7 +227,10 @@ export default function DashboardPage({ session }) {
           </div>
         )}
         {activeTab === 'challenge' && (
-          <PortfolioTab session={session} />
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <DailyPickCard session={session} />
+            <PortfolioTab session={session} />
+          </div>
         )}
         {activeTab === 'help' && <HelpTab />}
         {activeTab === 'profile' && (

@@ -103,37 +103,41 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   useEffect(() => {
     const el = chatStripRef.current;
     if (!el) return;
-    const pin = () => {
-      // Scroll inner container if it's the scroller
-      el.scrollTop = el.scrollHeight + 9999;
-      // Walk up to find ALL scrolling ancestors and pin each to bottom
+    // Find the actual scroller (inner container, ancestor, or window)
+    const findScroller = () => {
+      if (el.scrollHeight > el.clientHeight) return el;
       let p = el.parentElement;
       while (p && p !== document.body) {
         const cs = getComputedStyle(p);
-        if (/(auto|scroll)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight) {
-          p.scrollTop = p.scrollHeight + 9999;
-        }
+        if (/(auto|scroll)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight) return p;
         p = p.parentElement;
       }
-      // Also nudge window/body in case the page itself is the scroller
-      window.scrollTo(0, document.documentElement.scrollHeight + 9999);
+      return document.scrollingElement || document.documentElement;
+    };
+    const scroller = findScroller();
+    const nearBottom = () => {
+      const isWin = scroller === document.scrollingElement || scroller === document.documentElement;
+      const top = isWin ? window.scrollY : scroller.scrollTop;
+      const h = isWin ? document.documentElement.scrollHeight : scroller.scrollHeight;
+      const ch = isWin ? window.innerHeight : scroller.clientHeight;
+      return h - top - ch < 120;
+    };
+    // If the user has scrolled up to read history, don't yank them back
+    if (!nearBottom()) return;
+    const pin = () => {
+      if (!nearBottom()) return; // bail if user scrolled away mid-pin
+      const isWin = scroller === document.scrollingElement || scroller === document.documentElement;
+      if (isWin) window.scrollTo(0, document.documentElement.scrollHeight);
+      else scroller.scrollTop = scroller.scrollHeight;
     };
     const raf = requestAnimationFrame(pin);
     const t1 = setTimeout(pin, 80);
     const t2 = setTimeout(pin, 250);
     const t3 = setTimeout(pin, 600);
     const t4 = setTimeout(pin, 1200);
-    const t5 = setTimeout(pin, 2000);
-    let ro;
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(pin);
-      ro.observe(el);
-      if (el.lastElementChild) ro.observe(el.lastElementChild);
-    }
     return () => {
       cancelAnimationFrame(raf);
-      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); clearTimeout(t5);
-      ro?.disconnect();
+      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4);
     };
   }, [chatMessages.length, aiLoading]);
 
@@ -1420,7 +1424,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                 // No FadingMessage — auto-disappearing messages fight stickiness
                 // and any refetch path resurrects them with fresh timers, looking broken.
                 chatMessages.map((msg, i) => (
-                  <ChatBubble key={msg.id || i} msg={msg} />
+                  <ChatBubble key={msg.id || i} msg={msg} myId={session?.user?.id} />
                 ))
               ) : (
                 <div style={{ padding: 16, textAlign: 'center', color: '#7a8ea3', fontSize: 13 }}>
@@ -1436,6 +1440,41 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
             </div>
           </div>
         </div>
+
+        {/* ═══ SUGGESTION CHIPS — context-aware cold-start prompts ═══ */}
+        {aiMode && !chatInput && (() => {
+          const wl = (watchlist || []).slice(0, 2).map(w => (w.symbol || w.ticker || '').toUpperCase()).filter(Boolean);
+          const chips = [];
+          if (wl[0]) chips.push(`Summarize ${wl[0]}`);
+          chips.push('Top movers today');
+          if (wl[1]) chips.push(`${wl[1]} earnings`);
+          else chips.push('Earnings this week');
+          return (
+            <div style={{
+              display: 'flex', gap: 6, overflowX: 'auto', padding: '6px 12px 0',
+              scrollbarWidth: 'none', msOverflowStyle: 'none',
+            }}>
+              {chips.slice(0, 3).map((c, i) => (
+                <div
+                  key={i}
+                  onClick={() => { setChatInput(c); chatInputRef.current?.focus(); }}
+                  style={{
+                    flexShrink: 0,
+                    padding: '5px 12px',
+                    borderRadius: 14,
+                    background: '#fff',
+                    border: '1px solid #d8e2ed',
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: '#1a2d4a',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >{c}</div>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* ═══ CHAT INPUT — sticky at bottom of scroll ═══ */}
         <div ref={chatBarRef} style={S.fixedChatBar}>
@@ -1499,10 +1538,11 @@ function BriefCard({ article }) {
   );
 }
 
-function ChatBubble({ msg }) {
+function ChatBubble({ msg, myId }) {
   const name = msg.username || msg.profiles?.username || 'User';
   const colors = ['#2a7d4b', '#7B68EE', '#FF7043', '#4CAF50', '#E91E63', '#FF9800'];
   const isAI = msg.user_id === 'user_ai' || msg.type === 'ai';
+  const isMe = !isAI && myId && msg.user_id === myId;
   const color = isAI ? '#8B5CF6' : (msg.user_color || colors[name.charCodeAt(0) % colors.length]);
   const timeAgo = getTimeAgo(msg.created_at);
 
@@ -1531,6 +1571,28 @@ function ChatBubble({ msg }) {
     p.startsWith('$') && /^\$[A-Z]{1,5}$/.test(p) ? <span key={i} style={S.ccTk}>{p}</span> : p
   );
 
+  // iMessage-style right-align for the current user's own messages
+  if (isMe) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '6px 0' }}>
+        <div style={{
+          maxWidth: '78%',
+          background: '#2a7d4b',
+          color: '#fff',
+          padding: '8px 12px',
+          borderRadius: '16px 16px 4px 16px',
+          fontSize: 13,
+          lineHeight: 1.4,
+          fontFamily: 'inherit',
+          wordBreak: 'break-word',
+        }}>
+          {renderInline(proseText)}
+        </div>
+      </div>
+    );
+  }
+
+  // Left-align for AI and other users
   return (
     <div style={S.ccMsg}>
       <div style={{ ...S.ccAv, background: color }}>{name[0].toUpperCase()}</div>
@@ -1740,9 +1802,9 @@ const S = {
 
   fixedChatBar: {
     position: 'sticky', bottom: 0,
-    marginTop: 12,
-    padding: '10px 14px', background: '#eef2f7',
-    display: 'flex', alignItems: 'center', gap: 8,
+    marginTop: 8,
+    padding: '6px 12px', background: '#eef2f7',
+    display: 'flex', alignItems: 'center', gap: 6,
     zIndex: 50,
     borderTop: '1px solid #d8e2ed',
   },
@@ -1886,9 +1948,9 @@ const S = {
   ccTk: { color: '#2a7d4b', fontWeight: 600 },
   // ccFooter replaced by fixedChatBar
   ccAiBtn: {
-    width: 28, height: 28, borderRadius: '50%',
+    width: 24, height: 24, borderRadius: '50%',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 9, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+    fontSize: 8, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
     transition: 'all 0.2s',
   },
   ccAiBtnOff: {
@@ -1899,12 +1961,12 @@ const S = {
     color: '#fff', boxShadow: '0 0 8px rgba(139,92,246,0.4)',
   },
   ccInput: {
-    flex: 1, background: '#fff', border: '1.5px solid #b0bec5',
-    borderRadius: 20, padding: '6px 14px', fontSize: 13, color: '#1a2d4a',
-    fontFamily: 'inherit', outline: 'none',
+    flex: 1, background: '#fff', border: '1px solid #b0bec5',
+    borderRadius: 16, padding: '4px 12px', fontSize: 12, color: '#1a2d4a',
+    fontFamily: 'inherit', outline: 'none', height: 28,
   },
   ccSend: {
-    width: 32, height: 32, borderRadius: '50%', background: '#2a7d4b',
+    width: 26, height: 26, borderRadius: '50%', background: '#2a7d4b',
     border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
     boxShadow: '0 2px 6px rgba(42,125,75,0.3)',
   },

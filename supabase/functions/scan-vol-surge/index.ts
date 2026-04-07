@@ -128,7 +128,7 @@ async function alreadyAlertedToday(
   const { data } = await supabase
     .from('breakout_alerts')
     .select('id')
-    .eq('alert_type', 'vol_surge')
+    .eq('signal_type', 'vol_surge')
     .contains('tickers', [ticker])
     .gte('created_at', utcMidnight.toISOString())
     .limit(1);
@@ -159,9 +159,8 @@ Deno.serve(async (req) => {
       const inserted: string[] = [];
       for (const m of MOCK_ALERTS) {
         const sign = m.changePct >= 0 ? '+' : '';
-        const sign = m.changePct >= 0 ? '+' : '';
         const { error } = await supabase.from('breakout_alerts').insert({
-          alert_type: 'vol_surge',
+          signal_type: 'vol_surge',
           tickers:    [m.ticker],
           title:      `${m.ticker} Volume Surge — ${m.relVolume.toFixed(1)}x avg`,
           body:       `$${m.price} · Vol ${m.relVolume.toFixed(1)}x above 20-day average · ${sign}${m.changePct}%`,
@@ -238,7 +237,7 @@ Deno.serve(async (req) => {
 
         const sign = snap.changePct >= 0 ? '+' : '';
         const { error } = await supabase.from('breakout_alerts').insert({
-          alert_type: 'vol_surge',
+          signal_type: 'vol_surge',
           tickers:    [ticker],
           title:      `${ticker} Volume Surge — ${relVolume.toFixed(1)}x avg`,
           body:       `$${round2(snap.price)} · Vol ${relVolume.toFixed(1)}x above 20-day average · ${sign}${round2(snap.changePct)}%`,

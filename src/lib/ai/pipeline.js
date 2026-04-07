@@ -157,10 +157,19 @@ export async function runPipeline(userMessage, conversationHistory, supabase, us
 
   const context = await agent.fetchContext(supabase, routing.params);
   const rawResponse = await agent.respond(userMessage, conversationHistory, context, memory);
-  let response = stripMarkdown(rawResponse);
 
-  // Post-response: hallucination check
+  // Extract ```uptik card block BEFORE sanitizing so strip/hallucination don't destroy it
+  let cardBlock = '';
+  let bodyText = rawResponse;
+  const cardMatch = rawResponse.match(/```uptik[\s\S]*?```/i);
+  if (cardMatch) {
+    cardBlock = cardMatch[0];
+    bodyText = rawResponse.replace(cardMatch[0], '').trim();
+  }
+
+  let response = stripMarkdown(bodyText);
   response = checkForHallucination(response, context, routing.agent);
+  if (cardBlock) response = `${cardBlock}\n${response}`.trim();
 
   // Cache it, update memory (non-blocking)
   setCache(userMessage, response);
