@@ -16,10 +16,80 @@ const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 
 const EMOJIS = ['🔥','📈','📉','🚀','💪','🎯','👀','💰','⚠️','✅','❌','😎','🤔','👋','🙌','😂','💎','🐂','🐻','⏰'];
 
+// ── UptikCard: renders the ```uptik {json}``` envelope as a clean card ──
+const UptikCard = ({ card }) => {
+  if (!card || !card.type) return null;
+  const wrap = {
+    border: '1px solid rgba(139,92,246,0.25)',
+    background: 'rgba(139,92,246,0.06)',
+    borderRadius: 10,
+    padding: '10px 12px',
+    marginBottom: 8,
+    fontFamily: "'Outfit', sans-serif",
+  };
+  const head = { display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 };
+  const ticker = { fontWeight: 700, fontSize: 14, color: '#8B5CF6', letterSpacing: 0.3 };
+  const price = { fontWeight: 600, fontSize: 13 };
+  const sub = { fontSize: 11, opacity: 0.7 };
+
+  if (card.type === 'earnings') {
+    // Stickiness rule: only show 2 most recent quarters
+    const qs = (card.quarters || []).slice(0, 2);
+    return (
+      <div style={wrap}>
+        <div style={head}>
+          <span style={ticker}>${card.ticker}</span>
+          {card.price != null && <span style={price}>${Number(card.price).toFixed(2)}</span>}
+          <span style={sub}>Earnings beats</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {qs.map((q, i) => {
+            const beat = Number(q.beatPct) >= 0;
+            return (
+              <div key={i} style={{
+                flex: 1,
+                background: 'rgba(255,255,255,0.04)',
+                borderRadius: 8,
+                padding: '6px 8px',
+                border: '1px solid rgba(255,255,255,0.06)',
+              }}>
+                <div style={{ fontSize: 10, opacity: 0.7, marginBottom: 2 }}>{q.label}</div>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>${Number(q.actual).toFixed(2)} <span style={{ opacity: 0.6, fontWeight: 400 }}>vs ${Number(q.est).toFixed(2)}</span></div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: beat ? '#22c55e' : '#ef4444' }}>
+                  {beat ? '▲' : '▼'} {Math.abs(Number(q.beatPct)).toFixed(1)}%
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {card.nextEarnings && (
+          <div style={{ ...sub, marginTop: 6 }}>Next: {card.nextEarnings}</div>
+        )}
+      </div>
+    );
+  }
+
+  if (card.type === 'price') {
+    return (
+      <div style={wrap}>
+        <div style={head}>
+          <span style={ticker}>${card.ticker}</span>
+          {card.price != null && <span style={price}>${Number(card.price).toFixed(2)}</span>}
+          {card.volume && <span style={sub}>Vol {card.volume}</span>}
+          {card.isClosed && <span style={sub}>• Market closed</span>}
+        </div>
+      </div>
+    );
+  }
+
+  // Unknown type — render nothing rather than raw JSON
+  return null;
+};
+
 // ── Message Item ──
 const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven }) => {
   const isAdmin = msg.is_admin;
-  const isAI    = msg.user_id === 'user_ai';
+  const isAI    = msg.user_id === 'user_ai' || msg.type === 'ai';
 
   const formatTime = (ts) => {
     const diff = Date.now() - new Date(ts).getTime();
@@ -38,75 +108,42 @@ const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven }) => 
     );
   };
 
-  // Parse uptik card blocks from AI responses
-  const rawText = msg.text || '';
-  const uptikMatch = rawText.match(/```uptik\s*([\s\S]*?)```/);
-  let cardData = null;
-  let prose = rawText;
-  if (uptikMatch) {
-    try { cardData = JSON.parse(uptikMatch[1].trim()); } catch {}
-    prose = rawText.replace(/```uptik[\s\S]*?```/, '').trim();
-  }
+  // Parse the ```uptik {json}``` envelope into a clean card + prose body
+  const renderAIBody = (raw) => {
+    if (!raw) return null;
 
-  const renderCard = (d) => {
-    if (!d || !d.type) return null;
-    const cs = { background: '#0d1f3c', borderRadius: 10, padding: '10px 12px', marginBottom: 6, border: '1px solid #1e3a5f' };
-    const lb = { fontSize: 10, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: 0.5 };
-    const vl = { fontSize: 14, fontWeight: 600, color: '#e8e6e1' };
-    const gn = { color: '#4CAF50' };
-    const rd = { color: '#ef5350' };
+    // Extract envelope JSON if present
+    let card = null;
+    let clean = raw;
+    const m = raw.match(/`{1,3}\s*uptik\s*([\s\S]*?)`{3}/i);
+    if (m) {
+      try {
+        // Tolerate trailing commas / stray chars
+        const jsonStr = m[1].trim().replace(/,\s*([}\]])/g, '$1');
+        card = JSON.parse(jsonStr);
+      } catch (e) { card = null; }
+      clean = raw.replace(m[0], '').trim();
+    }
+    clean = clean.replace(/^`+\s*/, '').replace(/`+$/, '').trim();
 
-    if (d.type === 'earnings') {
-      return (
-        <div style={cs}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ ...vl, color: '#8B5CF6' }}>{d.ticker}</span>
-            <span style={vl}>${d.price}</span>
-          </div>
-          {d.quarters?.map((q, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderTop: '1px solid #1e3a5f' }}>
-              <span style={{ fontSize: 12, color: '#7a8ea3' }}>{q.label}</span>
-              <span style={{ fontSize: 12, ...(q.actual >= q.est ? gn : rd) }}>
-                ${q.actual} vs ${q.est} ({q.beatPct > 0 ? '+' : ''}{q.beatPct}%)
-              </span>
-            </div>
-          ))}
-          {d.nextEarnings && <div style={{ ...lb, marginTop: 6 }}>Next: {d.nextEarnings}</div>}
-        </div>
-      );
-    }
-    if (d.type === 'price') {
-      const isUp = d.changePct >= 0;
-      return (
-        <div style={cs}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ ...vl, color: '#8B5CF6' }}>{d.ticker}</span>
-            <div style={{ textAlign: 'right' }}>
-              <div style={vl}>${d.price}</div>
-              <div style={{ fontSize: 12, ...(isUp ? gn : rd) }}>{isUp ? '+' : ''}{d.changePct}%</div>
-            </div>
-          </div>
-          {d.volume && <div style={{ ...lb, marginTop: 4 }}>Vol: {d.volume}</div>}
-        </div>
-      );
-    }
-    if (d.type === 'valuation') {
-      return (
-        <div style={cs}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ ...vl, color: '#8B5CF6' }}>{d.ticker}</span>
-            <span style={vl}>${d.price}</span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
-            {d.pe && <div><span style={lb}>P/E </span><span style={{ fontSize: 12, color: '#e8e6e1' }}>{d.pe}</span></div>}
-            {d.peg && <div><span style={lb}>PEG </span><span style={{ fontSize: 12, color: '#e8e6e1' }}>{d.peg}</span></div>}
-            {d.netMargin && <div><span style={lb}>Margin </span><span style={{ fontSize: 12, color: '#e8e6e1' }}>{d.netMargin}%</span></div>}
-            {d.salesGrowth && <div><span style={lb}>Sales </span><span style={{ fontSize: 12, color: '#4CAF50' }}>+{d.salesGrowth}%</span></div>}
-          </div>
-        </div>
-      );
-    }
-    return null;
+    // Split prose on bullet markers
+    const segments = clean.split(/\s*•\s+/);
+    const intro = segments[0]?.trim();
+    const bullets = segments.slice(1).map(s => s.trim()).filter(Boolean);
+
+    return (
+      <>
+        {card && <UptikCard card={card} />}
+        {intro && <div style={{ marginTop: card ? 8 : 0, marginBottom: bullets.length ? 8 : 0 }}>{parseText(intro)}</div>}
+        {bullets.length > 0 && (
+          <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {bullets.map((b, i) => (
+              <li key={i} style={{ lineHeight: 1.5 }}>{parseText(b)}</li>
+            ))}
+          </ul>
+        )}
+      </>
+    );
   };
 
   const bodyStyle = {
@@ -126,8 +163,7 @@ const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven }) => 
           {isAI    && <span style={styles.aiBadge}>AI</span>}
           <span style={styles.msgTime}>{formatTime(msg.created_at)}</span>
         </div>
-        {isAI && cardData && renderCard(cardData)}
-        <div style={styles.msgText}>{parseText(prose)}</div>
+        <div style={styles.msgText}>{isAI ? renderAIBody(msg.text) : parseText(msg.text)}</div>
         {isAI && onFeedback && (
           <div style={styles.feedbackRow}>
             {feedbackGiven ? (
@@ -881,6 +917,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   }, [messages, session, supabase]);
   const [loading, setLoading]       = useState(false);
   const messagesEndRef = useRef(null);
+  const messagesAreaRef = useRef(null);
   const inputRef       = useRef(null);
   const sendingRef     = useRef(false);
 
@@ -928,9 +965,28 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     return () => supabase.removeChannel(channel);
   }, [group?.id]);
 
+  // Hard-pin scroll to bottom on any new message or AI loading state.
+  // Uses the container directly + ResizeObserver so tall AI answers that
+  // grow after mount still get pulled fully into view.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    const el = messagesAreaRef.current;
+    if (!el) return;
+    const pin = () => { el.scrollTop = el.scrollHeight; };
+    const raf = requestAnimationFrame(pin);
+    const t = setTimeout(pin, 120);
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(pin);
+      ro.observe(el);
+      // Observe last child too — its height growing is the real signal
+      if (el.lastElementChild) ro.observe(el.lastElementChild);
+    }
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t);
+      ro?.disconnect();
+    };
+  }, [messages.length, aiLoading]);
 
   const callAI = useCallback(async (query) => {
     setAiLoading(true);
@@ -1066,7 +1122,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
               <div style={styles.spinner} />
             </div>
           ) : (
-            <div style={styles.messagesArea}>
+            <div ref={messagesAreaRef} style={styles.messagesArea}>
               {messages.length === 0 && (
                 <div style={styles.emptyState}>
                   <div style={styles.emptyText}>No messages yet — say hello!</div>

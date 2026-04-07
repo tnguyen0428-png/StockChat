@@ -10,7 +10,6 @@ import { isWeekend, isMarketHoliday, isMarketOpen, isAfterHours } from '../../ut
 import { askUpTikAI } from '../../lib/aiAgent';
 import CreateGroupModal from '../shared/CreateGroupModal';
 import InviteModal from '../shared/InviteModal';
-import FadingMessage from '../shared/FadingMessage';
 
 const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
 const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
@@ -99,7 +98,45 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   const chatSectionRef = useRef(null);
   const chatBarRef = useRef(null);
 
-  // iOS keyboard — no special handling needed with sticky positioning
+  // Pin scroll to the latest chat message — works whether the chat is the scroller
+  // (expanded mode) or the page is the scroller (collapsed mode on Home)
+  useEffect(() => {
+    const el = chatStripRef.current;
+    if (!el) return;
+    const pin = () => {
+      // Scroll inner container if it's the scroller
+      el.scrollTop = el.scrollHeight + 9999;
+      // Walk up to find ALL scrolling ancestors and pin each to bottom
+      let p = el.parentElement;
+      while (p && p !== document.body) {
+        const cs = getComputedStyle(p);
+        if (/(auto|scroll)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight) {
+          p.scrollTop = p.scrollHeight + 9999;
+        }
+        p = p.parentElement;
+      }
+      // Also nudge window/body in case the page itself is the scroller
+      window.scrollTo(0, document.documentElement.scrollHeight + 9999);
+    };
+    const raf = requestAnimationFrame(pin);
+    const t1 = setTimeout(pin, 80);
+    const t2 = setTimeout(pin, 250);
+    const t3 = setTimeout(pin, 600);
+    const t4 = setTimeout(pin, 1200);
+    const t5 = setTimeout(pin, 2000);
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(pin);
+      ro.observe(el);
+      if (el.lastElementChild) ro.observe(el.lastElementChild);
+    }
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); clearTimeout(t5);
+      ro?.disconnect();
+    };
+  }, [chatMessages.length, aiLoading]);
+
 
   // Expose scrollToChat for parent (when Chat bottom nav is tapped)
   useEffect(() => {
@@ -432,7 +469,8 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
         console.error('[Home] Send error:', error);
       } else if (data) {
         setChatInput('');
-        setChatMessages(prev => [...prev.slice(-4), data]);
+        // Append in place — no slicing/truncation (avoids flicker on send)
+        setChatMessages(prev => [...prev, data]);
         // Scroll chat to bottom
         setTimeout(() => {
           if (chatStripRef.current) {
@@ -474,8 +512,8 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
             setAiLoading(false);
           }
         }
-
-        loadChatPreview();
+        // Note: no loadChatPreview() refetch — local state is already up to date,
+        // and refetching would remount FadingMessage and cause a screen flicker.
       }
     } catch (err) {
       console.error('[Home] Send failed:', err.message);
@@ -1347,18 +1385,11 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
           <div style={S.chatCard}>
             <div ref={chatStripRef} style={{ ...S.ccMsgs, ...(chatExpanded ? { maxHeight: 400, overflow: 'hidden auto' } : {}) }}>
               {chatMessages.length > 0 ? (
-                chatMessages.map((msg, i) => {
-                  const isAI = msg.user_id === 'user_ai' || msg.type === 'ai';
-                  const isAIQuestion = msg.type === 'user' && /@AI\b/i.test(msg.text);
-                  if (isAI || isAIQuestion) {
-                    return (
-                      <FadingMessage key={msg.id || i} delay={60000} duration={5000} onRemove={() => setChatMessages(prev => prev.filter(m => m.id !== msg.id))}>
-                        <ChatBubble msg={msg} />
-                      </FadingMessage>
-                    );
-                  }
-                  return <ChatBubble key={msg.id || i} msg={msg} />;
-                })
+                // No FadingMessage — auto-disappearing messages fight stickiness
+                // and any refetch path resurrects them with fresh timers, looking broken.
+                chatMessages.map((msg, i) => (
+                  <ChatBubble key={msg.id || i} msg={msg} />
+                ))
               ) : (
                 <div style={{ padding: 16, textAlign: 'center', color: '#7a8ea3', fontSize: 13 }}>
                   No recent messages
@@ -1439,85 +1470,34 @@ function BriefCard({ article }) {
 function ChatBubble({ msg }) {
   const name = msg.username || msg.profiles?.username || 'User';
   const colors = ['#2a7d4b', '#7B68EE', '#FF7043', '#4CAF50', '#E91E63', '#FF9800'];
-  const color = msg.user_color || colors[name.charCodeAt(0) % colors.length];
+  const isAI = msg.user_id === 'user_ai' || msg.type === 'ai';
+  const color = isAI ? '#8B5CF6' : (msg.user_color || colors[name.charCodeAt(0) % colors.length]);
   const timeAgo = getTimeAgo(msg.created_at);
 
   const rawText = msg.text || msg.content || '';
 
-  // Parse uptik card blocks and separate prose
-  const uptikMatch = rawText.match(/```uptik\s*([\s\S]*?)```/);
-  let cardData = null;
-  let prose = rawText;
-  if (uptikMatch) {
-    try { cardData = JSON.parse(uptikMatch[1].trim()); } catch {}
-    prose = rawText.replace(/```uptik[\s\S]*?```/, '').trim();
+  // For AI messages, parse the ```uptik {json}``` envelope into a clean card + prose
+  let card = null;
+  let proseText = rawText;
+  if (isAI) {
+    const m = rawText.match(/`{1,3}\s*uptik\s*([\s\S]*?)`{3}/i);
+    if (m) {
+      try {
+        const jsonStr = m[1].trim().replace(/,\s*([}\]])/g, '$1');
+        card = JSON.parse(jsonStr);
+      } catch (e) { card = null; }
+      proseText = rawText.replace(m[0], '').trim();
+    }
+    proseText = proseText.replace(/^`+\s*/, '').replace(/`+$/, '').trim();
   }
 
-  const renderProse = (text) => {
-    const parts = text.split(/(\$[A-Z]{1,5})/g);
-    return parts.map((p, i) => p.startsWith('$') ? <span key={i} style={S.ccTk}>{p}</span> : p);
-  };
+  const segments = isAI ? proseText.split(/\s*•\s+/) : [proseText];
+  const intro = segments[0] || '';
+  const bullets = isAI ? segments.slice(1).map(s => s.trim()).filter(Boolean) : [];
 
-  const renderCard = (d) => {
-    if (!d || !d.type) return null;
-    const cardStyle = { background: '#0d1f3c', borderRadius: 8, padding: '8px 10px', marginBottom: 4, border: '1px solid #1e3a5f' };
-    const labelStyle = { fontSize: 9, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: 0.5 };
-    const valStyle = { fontSize: 13, fontWeight: 600, color: '#e8e6e1' };
-    const greenStyle = { color: '#4CAF50' };
-    const redStyle = { color: '#ef5350' };
-
-    if (d.type === 'earnings') {
-      return (
-        <div style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-            <span style={{ ...valStyle, color: '#8B5CF6' }}>{d.ticker}</span>
-            <span style={valStyle}>${d.price}</span>
-          </div>
-          {d.quarters?.map((q, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderTop: '1px solid #1e3a5f' }}>
-              <span style={{ fontSize: 11, color: '#7a8ea3' }}>{q.label}</span>
-              <span style={{ fontSize: 11, ...(q.actual >= q.est ? greenStyle : redStyle) }}>
-                ${q.actual} vs ${q.est} ({q.beatPct > 0 ? '+' : ''}{q.beatPct}%)
-              </span>
-            </div>
-          ))}
-          {d.nextEarnings && <div style={{ ...labelStyle, marginTop: 4 }}>Next: {d.nextEarnings}</div>}
-        </div>
-      );
-    }
-    if (d.type === 'price') {
-      const isUp = d.changePct >= 0;
-      return (
-        <div style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ ...valStyle, color: '#8B5CF6' }}>{d.ticker}</span>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={valStyle}>${d.price}</span>
-              <span style={{ fontSize: 11, ...(isUp ? greenStyle : redStyle) }}>{isUp ? '+' : ''}{d.changePct}%</span>
-              {d.volume && <span style={{ ...labelStyle }}>Vol: {d.volume}</span>}
-            </div>
-          </div>
-        </div>
-      );
-    }
-    if (d.type === 'valuation') {
-      return (
-        <div style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ ...valStyle, color: '#8B5CF6' }}>{d.ticker}</span>
-            <span style={valStyle}>${d.price}</span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
-            {d.pe && <div><span style={labelStyle}>P/E </span><span style={{ fontSize: 12, color: '#e8e6e1' }}>{d.pe}</span></div>}
-            {d.peg && <div><span style={labelStyle}>PEG </span><span style={{ fontSize: 12, color: '#e8e6e1' }}>{d.peg}</span></div>}
-            {d.netMargin && <div><span style={labelStyle}>Margin </span><span style={{ fontSize: 12, color: '#e8e6e1' }}>{d.netMargin}%</span></div>}
-            {d.salesGrowth && <div><span style={labelStyle}>Sales </span><span style={{ fontSize: 12, color: '#4CAF50' }}>+{d.salesGrowth}%</span></div>}
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
+  const renderInline = (txt) => txt.split(/(\$[A-Z]{1,5})/g).map((p, i) =>
+    p.startsWith('$') && /^\$[A-Z]{1,5}$/.test(p) ? <span key={i} style={S.ccTk}>{p}</span> : p
+  );
 
   return (
     <div style={S.ccMsg}>
@@ -1527,11 +1507,138 @@ function ChatBubble({ msg }) {
           <span style={{ ...S.ccName, color }}>{name}</span>
           <span style={S.ccTime}>{timeAgo}</span>
         </div>
-        {cardData && renderCard(cardData)}
-        <div style={S.ccText}>{renderProse(prose)}</div>
+        {card && <UptikCardInline card={card} />}
+        {intro && (
+          <div style={S.ccText}>{renderInline(intro)}</div>
+        )}
+        {bullets.length > 0 && (
+          <ul style={{ margin: '6px 0 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {bullets.map((b, i) => (
+              <li key={i} style={{ ...S.ccText, lineHeight: 1.5 }}>{renderInline(b)}</li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
+}
+
+// Dark navy table card — single mental model, full beat-streak at a glance
+function UptikCardInline({ card }) {
+  if (!card || !card.type) return null;
+  const wrap = {
+    background: '#0f1f3d',
+    borderRadius: 10,
+    margin: '6px 0 8px',
+    fontFamily: "'Outfit', sans-serif",
+    overflow: 'hidden',
+    color: '#e6ecf5',
+    border: '1px solid rgba(255,255,255,0.06)',
+  };
+  const head = {
+    display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+    padding: '10px 14px',
+    borderBottom: '1px solid rgba(255,255,255,0.08)',
+  };
+  const ticker = { fontWeight: 700, fontSize: 15, color: '#8B5CF6', letterSpacing: 0.4 };
+  const price = { fontWeight: 700, fontSize: 14, color: '#e6ecf5' };
+
+  if (card.type === 'earnings') {
+    const qs = card.quarters || [];
+    return (
+      <div style={wrap}>
+        <div style={head}>
+          <span style={ticker}>{card.ticker}</span>
+          {card.price != null && <span style={price}>${Number(card.price).toFixed(3)}</span>}
+        </div>
+        <div>
+          {qs.map((q, i) => {
+            const beat = Number(q.beatPct) >= 0;
+            const sign = beat ? '+' : '';
+            return (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '8px 14px',
+                borderBottom: i < qs.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                fontSize: 13,
+              }}>
+                <span style={{ color: '#9aa9bf', fontWeight: 500 }}>{q.label}</span>
+                <span style={{ color: beat ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
+                  ${Number(q.actual).toFixed(2)} vs ${Number(q.est).toFixed(2)} ({sign}{Number(q.beatPct).toFixed(1)}%)
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        {card.nextEarnings && (
+          <div style={{
+            padding: '8px 14px',
+            fontSize: 11, fontWeight: 600,
+            color: '#9aa9bf',
+            letterSpacing: 0.5,
+            textTransform: 'uppercase',
+            borderTop: '1px solid rgba(255,255,255,0.05)',
+          }}>
+            Next: {card.nextEarnings}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (card.type === 'price') {
+    return (
+      <div style={wrap}>
+        <div style={{ ...head, borderBottom: 'none' }}>
+          <span style={ticker}>{card.ticker}</span>
+          <span style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
+            {card.price != null && <span style={price}>${Number(card.price).toFixed(2)}</span>}
+            {card.volume && <span style={{ fontSize: 11, color: '#9aa9bf' }}>Vol {card.volume}</span>}
+            {card.isClosed && <span style={{ fontSize: 11, color: '#9aa9bf' }}>· Closed</span>}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (card.type === 'valuation') {
+    return (
+      <div style={wrap}>
+        <div style={head}>
+          <span style={ticker}>{card.ticker}</span>
+          {card.price != null && <span style={price}>${Number(card.price).toFixed(2)}</span>}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 14px', padding: '10px 14px' }}>
+          {card.pe != null && (
+            <div style={{ fontSize: 12 }}>
+              <span style={{ color: '#9aa9bf' }}>P/E </span>
+              <span style={{ color: '#e6ecf5', fontWeight: 600 }}>{card.pe}</span>
+            </div>
+          )}
+          {card.peg != null && (
+            <div style={{ fontSize: 12 }}>
+              <span style={{ color: '#9aa9bf' }}>PEG </span>
+              <span style={{ color: '#e6ecf5', fontWeight: 600 }}>{card.peg}</span>
+            </div>
+          )}
+          {card.netMargin != null && (
+            <div style={{ fontSize: 12 }}>
+              <span style={{ color: '#9aa9bf' }}>Margin </span>
+              <span style={{ color: '#e6ecf5', fontWeight: 600 }}>{card.netMargin}%</span>
+            </div>
+          )}
+          {card.salesGrowth != null && (
+            <div style={{ fontSize: 12 }}>
+              <span style={{ color: '#9aa9bf' }}>Sales </span>
+              <span style={{ color: '#22c55e', fontWeight: 600 }}>+{card.salesGrowth}%</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function getTimeAgo(timestamp) {
