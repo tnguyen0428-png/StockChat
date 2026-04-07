@@ -1,5 +1,6 @@
 import { callClaude } from './callClaude';
 import { lookupPrice } from '../tools/priceLookup';
+import { buildFeedbackContext } from '../feedbackContext';
 
 const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 
@@ -147,6 +148,15 @@ EXAMPLES OF BAD VOICE (don't do this):
 "NVDA — $177.39, last close. Earnings: Beat 4 straight. Margins: 71% gross. Still executing at scale." ← sounds like a terminal readout
 "Based on the available data, the stock appears to be..." ← corporate chatbot
 "Worth noting that..." / "From a general standpoint..." / "It's important to remember..." ← filler phrases
+"Great question! Let me break that down for you." ← nobody talks like this
+"Currently, NVDA is trading at..." ← chatbot tell. Just say the price naturally.
+
+ANTI-REPETITION (critical for sounding human):
+- NEVER start two responses the same way. Check history and vary your opener.
+- Don't always lead with the ticker and price. Sometimes lead with the insight: "They just crushed earnings — 4 beats in a row" is better than "NVDA is at $177."
+- NEVER open with "Great question!" or "That's a great question!"
+- Don't end every response with a question. Sometimes just... end.
+- If you used bullets last time, use prose this time. Mix it up.
 
 USER LEVEL: ${level} — ${level === 'beginner' ? 'Keep it simple. Explain terms in parentheses when you use them.' : level === 'intermediate' ? 'Trading terms are fine. Focus on the analysis.' : 'Go deep. Technical language, data-heavy, no hand-holding.'}
 
@@ -224,7 +234,7 @@ Rules for the JSON block (when you DO use one):
 - "comparison" type: use when the question is about peers/competitors/versus. Include 2-4 peers with a 4-8 word note each.
 - Omit any field you don't have (don't invent). \`quarters\` can have 1-4 entries.
 - AFTER the block, write your prose analysis below. KEEP IT SHORT.
-- Never emit the JSON block if you're refusing to answer or saying "I don't have data".`;
+- Never emit the JSON block if you're refusing to answer or saying "I don't have data".${buildFeedbackContext(memory)}`;
 
     return await callClaude(systemPrompt, question, history, 'auto');
   }

@@ -1,4 +1,5 @@
 import { callClaude } from './callClaude';
+import { buildFeedbackContext } from '../feedbackContext';
 
 export const macroAgent = {
   async fetchContext(supabase) {
@@ -83,15 +84,18 @@ EXAMPLES OF GOOD RESPONSES:
 AVOID:
 - Don't just list "SPY — $X. QQQ — $X. VIX — X." like a robot. Weave the numbers into a sentence.
 - Don't say "investors are nervous" or "smart money" — just describe what's happening
-- Don't end with questions like "what are you curious about?"
+- Don't end every response with a question like "what are you curious about?"
 - Say "SPY" not "S&P 500" when quoting the price (you're looking at the ETF)
+- NEVER start with "Great question!" or "Currently, the market..." — just talk.
+- NEVER start two responses in a row the same way. Check history.
+- Don't use filler: "Worth noting", "It's important to remember", "From a general standpoint"
 
 USER LEVEL: ${level} — ${level === 'beginner' ? 'Keep it simple. No jargon.' : level === 'intermediate' ? 'Trading terms fine.' : 'Go technical.'}
 
 RULES:
 - ONLY use numbers from MARKET DATA above. If data is missing, skip it.
 - ${marketClosed ? 'Markets are closed — say "as of last close" not "today"' : 'Markets are open — use current data'}
-- Don't guess at sentiment if VIX data is missing`;
+- Don't guess at sentiment if VIX data is missing${buildFeedbackContext(memory)}`;
 
     return await callClaude(systemPrompt, question, history, 'auto');
   }

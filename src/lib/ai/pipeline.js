@@ -22,9 +22,6 @@ function checkForHallucination(response, context, agentType) {
   // If no specific ticker was requested (general questions like "momentum stocks"),
   // skip single-ticker hallucination checks — let the AI answer from alerts/context
   if (!ticker) {
-    // Still strip trailing questions
-    response = response.replace(/\s*[^.!]*\?\s*$/, '').trim();
-    if (response && !response.endsWith('.') && !response.endsWith('!')) response += '.';
     return response.trim();
   }
 
@@ -35,7 +32,7 @@ function checkForHallucination(response, context, agentType) {
   // No data but response has prices = hallucination
   if (agentType === 'data' && !hasRealData && responsePrices.length > 0) {
     console.warn('[UpTik AI] HALLUCINATION BLOCKED: no price data but response has $amounts');
-    return `I don't have live data for ${ticker} right now. Can't quote prices when the feed is down.`;
+    return `I don't have live data for ${ticker} right now — can't quote you prices when the feed's down.`;
   }
 
   if (agentType === 'data' && hasRealData) {
@@ -48,7 +45,7 @@ function checkForHallucination(response, context, agentType) {
       const priceDiff = Math.abs(mainResponsePrice - realPrice) / realPrice;
       if (priceDiff > 0.05) {
         console.warn('[UpTik AI] HALLUCINATION BLOCKED: price mismatch. Real:', realPrice, 'Response:', mainResponsePrice);
-        return `${ticker} last traded at $${realPrice.toFixed(2)}.`;
+        return `${ticker}'s at $${realPrice.toFixed(2)} as of last close.`;
       }
     }
 
@@ -83,7 +80,7 @@ function checkForHallucination(response, context, agentType) {
       const dailyChangePattern = /\b(up|down|gained|lost|fell|dropped|rose|rallied)\s+\d+\.?\d*%/i;
       if (dailyChangePattern.test(response)) {
         console.warn('[UpTik AI] HALLUCINATION BLOCKED: no change data but response claims daily move');
-        return `${ticker} last closed at $${realPrice.toFixed(2)}. Markets are closed so I don't have today's move.`;
+        return `${ticker}'s at $${realPrice.toFixed(2)} as of last close. Markets are closed so I can't tell you today's move yet.`;
       }
     }
   }
@@ -91,12 +88,8 @@ function checkForHallucination(response, context, agentType) {
   // Macro: no market data but response has prices
   if (agentType === 'macro' && !hasMarketData && responsePrices.length > 0) {
     console.warn('[UpTik AI] HALLUCINATION BLOCKED: no market data but response has $amounts');
-    return "I don't have live market data right now. Check back when markets open.";
+    return "Don't have live market data right now — check back when markets open.";
   }
-
-  // Hard strip: remove any trailing sentence that ends with ?
-  response = response.replace(/\s*[^.!]*\?\s*$/, '').trim();
-  if (response && !response.endsWith('.') && !response.endsWith('!')) response += '.';
 
   return response.trim();
 }
@@ -173,18 +166,53 @@ export async function runPipeline(userMessage, conversationHistory, supabase, us
   setCache(userMessage, response);
   updateMemory(supabase, userId, userMessage, routing, memory).catch(() => {});
 
+  const hallucinationBlocked = response !== stripMarkdown(rawResponse);
+  const ms = Date.now() - start;
+
+  // Log response for learning (non-blocking)
+  logResponse(supabase, {
+    userId,
+    question: userMessage,
+    response,
+    agentType: routing.agent,
+    ticker: routing.params?.ticker || null,
+    cached: false,
+    hallucinationBlocked,
+    processingMs: ms,
+    userLevel: memory.level,
+  }).catch(() => {});
+
   const result = {
     reply: response,
     meta: {
       agent: routing.agent,
       ticker: routing.params?.ticker || null,
       cached: false,
-      ms: Date.now() - start,
+      ms,
       userLevel: memory.level,
     }
   };
 
-  console.log(`[UpTik AI] ${result.meta.agent} agent | ${result.meta.cached ? 'CACHE HIT' : 'fresh'} | ${result.meta.ms}ms | level: ${result.meta.userLevel}`);
+  console.log(`[UpTik AI] ${result.meta.agent} agent | fresh | ${ms}ms | level: ${result.meta.userLevel}`);
 
   return result;
+}
+
+// ── Learning: log every response for analysis ──
+async function logResponse(supabase, data) {
+  try {
+    await supabase.from('ai_response_log').insert({
+      user_id: data.userId,
+      question: data.question,
+      response: data.response,
+      agent_type: data.agentType,
+      ticker: data.ticker,
+      cached: data.cached,
+      hallucination_blocked: data.hallucinationBlocked,
+      processing_ms: data.processingMs,
+      user_level: data.userLevel,
+    });
+  } catch (err) {
+    console.warn('[UpTik AI] Response logging failed:', err.message);
+  }
 }
