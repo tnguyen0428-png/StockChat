@@ -1564,7 +1564,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
           onClick={handleHomeSend}
           disabled={!chatInput.trim() || chatSending}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
       </div>
 
@@ -1869,8 +1869,8 @@ const S = {
 
   fixedChatBar: {
     flexShrink: 0,
-    padding: '10px 14px', background: '#eef2f7',
-    display: 'flex', alignItems: 'center', gap: 8,
+    padding: '12px 14px 14px', background: '#eef2f7',
+    display: 'flex', alignItems: 'center', gap: 10,
     zIndex: 50,
     borderTop: '1px solid #d8e2ed',
   },
@@ -2014,9 +2014,9 @@ const S = {
   ccTk: { color: '#2a7d4b', fontWeight: 600 },
   // ccFooter replaced by fixedChatBar
   ccAiBtn: {
-    width: 24, height: 24, borderRadius: '50%',
+    width: 36, height: 36, borderRadius: '50%',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 8, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+    fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
     transition: 'all 0.2s',
   },
   ccAiBtnOff: {
@@ -2027,12 +2027,12 @@ const S = {
     color: '#fff', boxShadow: '0 0 8px rgba(139,92,246,0.4)',
   },
   ccInput: {
-    flex: 1, background: '#fff', border: '1px solid #b0bec5',
-    borderRadius: 16, padding: '4px 12px', fontSize: 12, color: '#1a2d4a',
-    fontFamily: 'inherit', outline: 'none', height: 28,
+    flex: 1, background: '#fff', border: '1.5px solid #b0bec5',
+    borderRadius: 20, padding: '8px 16px', fontSize: 15, color: '#1a2d4a',
+    fontFamily: 'inherit', outline: 'none', height: 42,
   },
   ccSend: {
-    width: 26, height: 26, borderRadius: '50%', background: '#2a7d4b',
+    width: 38, height: 38, borderRadius: '50%', background: '#2a7d4b',
     border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
     boxShadow: '0 2px 6px rgba(42,125,75,0.3)',
   },
