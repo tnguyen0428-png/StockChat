@@ -1153,7 +1153,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
         <div style={S.hLeft}>
           <div>
             <div style={S.logoRow}>
-              <svg width="22" height="22" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: -2, marginBottom: -3 }}>
+              <svg width="30" height="30" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: -2, marginBottom: -3 }}>
                 <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3.5" />
                 <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.5" opacity="0.6" />
                 <path d="M25 22 L25 30 C25 34 25 34 25 30 L25 22" strokeWidth="1.8" opacity="0.35" />
