@@ -556,12 +556,37 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
 
   const loadFutures = async () => {
     console.log('[Futures] Loading real futures data...');
-    // ── Yahoo Finance batch quote via CORS proxies ──
-    // Use v7 quote endpoint with all symbols in one request (avoids = encoding issues in path)
+
+    // ── PRIMARY: Supabase edge function (server-side Yahoo, no CORS issues) ──
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/fetch-futures`, {
+        headers: { 'Authorization': `Bearer ${SUPABASE_ANON}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok && data.futures?.length > 0) {
+          const pulse = {};
+          const labels = [];
+          data.futures.forEach(f => {
+            pulse[f.symbol] = { price: f.price, change: f.pctChange, label: 'FUT', isFutures: true };
+            labels.push({ key: f.symbol, label: f.label });
+          });
+          console.log(`[Futures] Edge function: ${data.futures.length}/5`, data.futures.map(f => `${f.label} ${f.pctChange.toFixed(2)}%`));
+          setFuturesData(pulse);
+          setFuturesLabels(labels);
+          return; // success
+        }
+      }
+      console.warn('[Futures] Edge function returned no data, trying CORS proxies...');
+    } catch (err) {
+      console.warn('[Futures] Edge function failed:', err.message);
+    }
+
+    // ── FALLBACK: CORS proxies for Yahoo Finance ──
     const symbols = Object.keys(FUTURES_MAP).join(',');
     const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbols)}`;
-    console.log('[Futures] Yahoo URL:', yahooUrl);
-
     const CORS_PROXIES = [
       `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
       `https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`,
@@ -569,17 +594,14 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
 
     for (const proxyUrl of CORS_PROXIES) {
       try {
-        console.log('[Futures] Trying proxy:', proxyUrl.substring(0, 60) + '...');
         const res = await fetch(proxyUrl);
-        if (!res.ok) { console.warn('[Futures] Proxy returned', res.status); continue; }
+        if (!res.ok) continue;
         const data = await res.json();
-        console.log('[Futures] v7 response keys:', Object.keys(data), 'quoteResponse?', !!data.quoteResponse);
         const quotes = data.quoteResponse?.result;
-        if (!quotes || quotes.length === 0) { console.warn('[Futures] No quotes in response'); continue; }
+        if (!quotes || quotes.length === 0) continue;
 
         const pulse = {};
         const labels = [];
-        // Process in original order
         for (const sym of Object.keys(FUTURES_MAP)) {
           const q = quotes.find(r => r.symbol === sym);
           if (!q) continue;
@@ -591,60 +613,13 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
           labels.push({ key: sym, label: FUTURES_MAP[sym] });
         }
 
-        console.log(`[Futures] Yahoo v7 batch: ${labels.length}/${Object.keys(FUTURES_MAP).length}`, labels.map(l => `${l.label} ${pulse[l.key].change.toFixed(2)}%`));
-
         if (labels.length >= 1) {
+          console.log(`[Futures] CORS proxy: ${labels.length}/5`);
           setFuturesData(pulse);
           setFuturesLabels(labels);
-          return; // success
+          return;
         }
-      } catch (err) {
-        console.warn('[Futures] Proxy failed:', err.message);
-      }
-    }
-
-    // ── v7 failed — try v8 chart per-symbol as backup ──
-    console.log('[Futures] v7 batch failed, trying v8 chart per-symbol...');
-    const collected = {};
-    const proxyFns = [
-      (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-      (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    ];
-    for (const proxyFn of proxyFns) {
-      const missing = Object.keys(FUTURES_MAP).filter(s => !collected[s]);
-      if (missing.length === 0) break;
-      const results = await Promise.all(missing.map(async (symbol) => {
-        try {
-          const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`;
-          const res = await fetch(proxyFn(url));
-          if (!res.ok) return null;
-          const data = await res.json();
-          const meta = data.chart?.result?.[0]?.meta;
-          if (!meta) return null;
-          const price = meta.regularMarketPrice;
-          const prev = meta.previousClose || meta.chartPreviousClose;
-          if (!price || !prev) return null;
-          return { symbol, pctChange: ((price - prev) / prev) * 100, price };
-        } catch { return null; }
-      }));
-      results.filter(Boolean).forEach(r => { collected[r.symbol] = r; });
-    }
-
-    const valid = Object.values(collected);
-    if (valid.length >= 1) {
-      const pulse = {};
-      const labels = [];
-      for (const sym of Object.keys(FUTURES_MAP)) {
-        const r = collected[sym];
-        if (r) {
-          pulse[sym] = { price: r.price, change: r.pctChange, label: 'FUT', isFutures: true };
-          labels.push({ key: sym, label: FUTURES_MAP[sym] });
-        }
-      }
-      console.log(`[Futures] v8 per-symbol: ${labels.length}/${Object.keys(FUTURES_MAP).length}`);
-      setFuturesData(pulse);
-      setFuturesLabels(labels);
-      return;
+      } catch {}
     }
 
     // ── All Yahoo methods failed — ETF fallback ──
