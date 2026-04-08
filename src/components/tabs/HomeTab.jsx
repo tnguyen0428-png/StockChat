@@ -1161,7 +1161,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               </svg>
               <span style={S.logoUp}>p</span><span style={S.logoTik}>tik</span>
             </div>
-            <div style={S.logoAlerts}>alerts</div>
+            <div style={S.logoAlerts}>a l e r t s</div>
           </div>
         </div>
         <div style={S.hRight}>
@@ -1887,7 +1887,7 @@ const S = {
   logoRow: { display: 'flex', alignItems: 'baseline' },
   logoUp: { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
   logoTik: { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
-  logoAlerts: { fontSize: 12, fontWeight: 300, color: '#d4e4f2', letterSpacing: 2.5, fontFamily: "'Outfit', sans-serif" },
+  logoAlerts: { fontSize: 9, fontWeight: 400, color: '#d4e4f2', letterSpacing: 1.5, fontFamily: "'Outfit', sans-serif", marginTop: -3, paddingLeft: 26 },
   hRight: { display: 'flex', alignItems: 'center', gap: 8 },
   statusPill: {
     display: 'flex', alignItems: 'center', gap: 4,
