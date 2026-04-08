@@ -457,6 +457,34 @@ function AdminPanel({ session, profile }) {
                     </div>
                   </div>
                 </div>
+                {/* Progress indicator — visible while any scan is running */}
+                {(scanningAll || scanningFlow) && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                      <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>
+                        {scanningAll
+                          ? `Scanning… ${scanAllProgress || '⚡ 52W High…'}`
+                          : 'Scanning… 💰 Flow Data'}
+                      </span>
+                      {scanningAll && (
+                        <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 'auto' }}>
+                          {Math.round((scan52wProgress / 4) + (scanVolProgress / 4) + (scanGapProgress / 4) + (scanMAProgress / 4))}%
+                        </span>
+                      )}
+                    </div>
+                    {scanningAll && (
+                      <div style={adminStyles.progressBar}>
+                        <div style={{ ...adminStyles.progressFill, width: `${Math.round((scan52wProgress / 4) + (scanVolProgress / 4) + (scanGapProgress / 4) + (scanMAProgress / 4))}%` }} />
+                      </div>
+                    )}
+                    {scanningFlow && (
+                      <div style={adminStyles.progressBar}>
+                        <div style={{ ...adminStyles.progressFill, width: '100%', animation: 'flowPulse 2s ease-in-out infinite' }} />
+                      </div>
+                    )}
+                  </div>
+                )}
                 {/* Manual scan results */}
                 {scan52wStatus && <div style={{ fontSize: 12, color: scan52wStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scan52wStatus.error ? `Error: ${scan52wStatus.error}` : scan52wStatus.inserted === 0 ? '⚡ 52W — no new breakouts' : `⚡ 52W — ${scan52wStatus.inserted} alert${scan52wStatus.inserted > 1 ? 's' : ''} added`}</div>}
                 {scanVolStatus && <div style={{ fontSize: 12, color: scanVolStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scanVolStatus.error ? `Error: ${scanVolStatus.error}` : scanVolStatus.inserted === 0 ? '🔥 Vol — no surges found' : `🔥 Vol — ${scanVolStatus.inserted} alert${scanVolStatus.inserted > 1 ? 's' : ''} added`}</div>}
@@ -806,4 +834,6 @@ const adminStyles = {
   listName: { fontSize: 13, fontWeight: 600, color: 'var(--text1)' },
   listSub: { fontSize: 11, color: 'var(--text3)', marginTop: 2 },
   thesisText: { fontSize: 11, color: 'var(--text2)', marginTop: 4, lineHeight: 1.5 },
+  progressBar: { width: '100%', height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden', marginTop: 6 },
+  progressFill: { height: '100%', background: 'var(--green)', borderRadius: 3, transition: 'width 0.3s ease' },
 };
