@@ -3,22 +3,28 @@
 // Main dashboard shell — reads from GroupContext
 // ============================================
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useGroup } from '../context/GroupContext';
 
-// Tab components
-import HomeTab    from '../components/tabs/HomeTab';
-// Original: import AlertsTab from '../components/tabs/AlertsTab';
-import AlertsTab  from '../components/tabs/AlertsTabRedesign';
-import ChatTab    from '../components/tabs/ChatTab';
-import ProfileTab from '../components/tabs/ProfileTab';
-import HelpTab    from '../components/tabs/HelpTab';
-import AITab      from '../components/tabs/AITab';
-import PortfolioTab from '../components/tabs/PortfolioTab';
-import DailyPickCard from '../components/challenge/DailyPickCard';
-// DarkPoolOptionsTab merged into AlertsTabRedesign
+// HomeTab is the default landing tab — load eagerly so first paint is instant
+import HomeTab from '../components/tabs/HomeTab';
+
+// Everything else is lazy — split into separate chunks, fetched on first tab visit
+const AlertsTab     = lazy(() => import('../components/tabs/AlertsTabRedesign'));
+const ChatTab       = lazy(() => import('../components/tabs/ChatTab'));
+const ProfileTab    = lazy(() => import('../components/tabs/ProfileTab'));
+const HelpTab       = lazy(() => import('../components/tabs/HelpTab'));
+const AITab         = lazy(() => import('../components/tabs/AITab'));
+const PortfolioTab  = lazy(() => import('../components/tabs/PortfolioTab'));
+const DailyPickCard = lazy(() => import('../components/challenge/DailyPickCard'));
+
+const TabFallback = () => (
+  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+    <div style={{ fontSize: 12, color: 'var(--text3)' }}>Loading…</div>
+  </div>
+);
 
 // Shared components
 import Header     from '../components/shared/Header';
@@ -196,7 +202,7 @@ export default function DashboardPage({ session }) {
       })()}
 
       {/* Tab Content */}
-      <div style={{ ...styles.content, ...(activeTab === 'home' ? { paddingBottom: 58, overflow: 'hidden' } : {}) }}>
+      <div style={{ ...styles.content, ...(activeTab === 'home' ? { paddingBottom: 58, overflowX: 'hidden', overflowY: 'hidden' } : {}) }}>
         {activeTab === 'home' && (
           <HomeTab
             session={session}
@@ -207,19 +213,27 @@ export default function DashboardPage({ session }) {
             scrollToChatRef={scrollToChatRef}
           />
         )}
-        {activeTab === 'ai' && <AITab session={session} />}
+        {activeTab === 'ai' && (
+          <Suspense fallback={<TabFallback />}>
+            <AITab session={session} />
+          </Suspense>
+        )}
         {activeTab === 'alerts' && (
-          <AlertsTab session={session} group={activeGroup} />
+          <Suspense fallback={<TabFallback />}>
+            <AlertsTab session={session} group={activeGroup} />
+          </Suspense>
         )}
         {activeTab === 'chat' && activeGroup && (
-          <ChatTab
-            session={session}
-            profile={profile}
-            group={activeGroup}
-            isAdmin={isAdmin}
-            isModerator={isModerator}
-            setUnreadChat={setUnreadChat}
-          />
+          <Suspense fallback={<TabFallback />}>
+            <ChatTab
+              session={session}
+              profile={profile}
+              group={activeGroup}
+              isAdmin={isAdmin}
+              isModerator={isModerator}
+              setUnreadChat={setUnreadChat}
+            />
+          </Suspense>
         )}
         {activeTab === 'chat' && !activeGroup && (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -228,19 +242,27 @@ export default function DashboardPage({ session }) {
         )}
         {activeTab === 'challenge' && (
           <div style={{ flex: 1, overflow: 'auto' }}>
-            <DailyPickCard session={session} />
-            <PortfolioTab session={session} />
+            <Suspense fallback={<TabFallback />}>
+              <DailyPickCard session={session} />
+              <PortfolioTab session={session} />
+            </Suspense>
           </div>
         )}
-        {activeTab === 'help' && <HelpTab />}
+        {activeTab === 'help' && (
+          <Suspense fallback={<TabFallback />}>
+            <HelpTab />
+          </Suspense>
+        )}
         {activeTab === 'profile' && (
-          <ProfileTab
-            session={session}
-            profile={profile}
-            group={activeGroup}
-            isAdmin={isAdmin}
-            onSignOut={handleSignOut}
-          />
+          <Suspense fallback={<TabFallback />}>
+            <ProfileTab
+              session={session}
+              profile={profile}
+              group={activeGroup}
+              isAdmin={isAdmin}
+              onSignOut={handleSignOut}
+            />
+          </Suspense>
         )}
       </div>
 

@@ -4,7 +4,7 @@
 // Left: portfolio + buy | Right: game cards
 // ============================================
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
 import SellModal from '../portfolio/SellModal';
@@ -617,11 +617,11 @@ export default function PortfolioTab({ session }) {
     } catch { /* silent */ }
   };
 
-  // ── Calculations ──
-  const totalPositionsValue = trades.reduce((sum, t) => {
+  // ── Calculations (memoized — only recompute when trades/prices/portfolio change) ──
+  const totalPositionsValue = useMemo(() => trades.reduce((sum, t) => {
     const curPrice = prices[t.ticker] || Number(t.entry_price);
     return sum + (Number(t.shares) * curPrice);
-  }, 0);
+  }, 0), [trades, prices]);
   const cashBalance = Number(portfolio?.cash_balance || 0);
   const totalValue = cashBalance + totalPositionsValue;
   const totalReturn = ((totalValue - STARTING_CASH) / STARTING_CASH) * 100;
@@ -642,15 +642,18 @@ export default function PortfolioTab({ session }) {
   const daysLeft = Math.max(0, Math.ceil((seasonEnd - new Date()) / 86400000));
   const seasonProgress = Math.min(100, Math.max(0, ((new Date() - seasonStart) / (seasonEnd - seasonStart)) * 100));
 
-  // Ticker tape text
-  const tapeText = activity.length > 0
-    ? activity.map(a => {
-        const who = a.profiles?.username || 'Someone';
-        const verb = a.status === 'closed' ? 'sold' : 'bought';
-        const amt = a.dollar_amount ? ` $${(Number(a.dollar_amount) / 1000).toFixed(0)}k` : '';
-        return `${who} ${verb} ${a.ticker}${amt}`;
-      }).join(' · ')
-    : 'No recent activity';
+  // Ticker tape text — others only (memoized)
+  const myUid = session?.user?.id;
+  const tapeText = useMemo(() => {
+    const others = activity.filter(a => a.user_id !== myUid);
+    if (others.length === 0) return 'Waiting for group activity…';
+    return others.map(a => {
+      const who = a.profiles?.username || 'Someone';
+      const verb = a.status === 'closed' ? 'sold' : 'bought';
+      const amt = a.dollar_amount ? ` $${(Number(a.dollar_amount) / 1000).toFixed(0)}k` : '';
+      return `${who} ${verb} ${a.ticker}${amt}`;
+    }).join(' · ');
+  }, [activity, myUid]);
 
   const sectorColor = (avg) => {
     if (avg > 1) return { bg: '#EAF3DE', color: '#27500A' };
@@ -711,13 +714,18 @@ export default function PortfolioTab({ session }) {
                   <span style={s.rankSmText}>#{myRank || '-'}</span>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
                     <span style={{ ...s.valSm, color: isPositive ? '#2a7d4b' : '#E24B4A' }}>
                       ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     <span style={{ fontSize: 11, fontWeight: 600, color: isPositive ? '#2a7d4b' : '#E24B4A' }}>
                       {isPositive ? '+' : ''}{totalReturn.toFixed(2)}%
                     </span>
+                    {aheadUser && (
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#B8451F', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                        🎯 {aheadUser.gap}% behind {aheadUser.username}
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>
                     Cash: ${cashBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -734,22 +742,14 @@ export default function PortfolioTab({ session }) {
                 </svg>
               </div>
 
-              {/* Catch-the-leader */}
-              {myRank !== null && (
-                <div style={s.leaderBarSm}>
-                  {aheadUser ? (
-                    <>
-                      <div style={{ fontSize: 10, color: '#633806' }}>
-                        <b>{aheadUser.gap}%</b> behind <b>{aheadUser.username}</b>
-                      </div>
-                      <div style={s.leaderTrackSm}>
-                        <div style={{ ...s.leaderFillSm, width: `${Math.max(5, aheadUser.progress)}%` }} />
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ fontSize: 10, fontWeight: 600, color: '#2a7d4b' }}>You're in the lead!</div>
-                  )}
+              {/* Catch-the-leader progress (text moved up to hero row) */}
+              {myRank !== null && aheadUser && (
+                <div style={s.leaderTrackSm}>
+                  <div style={{ ...s.leaderFillSm, width: `${Math.max(5, aheadUser.progress)}%` }} />
                 </div>
+              )}
+              {myRank !== null && !aheadUser && (
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#2a7d4b', marginTop: 4 }}>👑 You're in the lead!</div>
               )}
 
               {/* Add ticker */}
@@ -956,86 +956,57 @@ export default function PortfolioTab({ session }) {
             {/* ── RIGHT COLUMN ── */}
             <div style={s.rightCol}>
 
-              {/* Card 1: Hot in the group */}
+              {/* Card 1: Hot in the group — tap to buy */}
               <div style={s.cardAmber}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#633806', marginBottom: 4 }}>Hot in the group</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#633806', marginBottom: 4 }}>Hot in the group · tap to buy</div>
                 {hotTickers.length === 0 ? (
                   <div style={{ fontSize: 10, color: '#854F0B' }}>No activity yet</div>
                 ) : (
                   hotTickers.map((h, i) => (
-                    <div key={i} style={{ fontSize: 10, color: '#854F0B', padding: '2px 0' }}>
-                      <b>{h.ticker}</b> — {h.bought > 0 ? `${h.bought} bought` : ''}{h.bought > 0 && h.sold > 0 ? ', ' : ''}{h.sold > 0 ? `${h.sold} sold` : ''}
+                    <div
+                      key={i}
+                      onClick={() => { handleSelectTicker({ symbol: h.ticker, name: h.ticker }); }}
+                      style={{
+                        fontSize: 10, color: '#854F0B', padding: '4px 6px',
+                        margin: '2px -4px', borderRadius: 4, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        background: 'rgba(255,255,255,0.35)',
+                        border: '1px solid rgba(133,79,11,0.15)',
+                      }}
+                    >
+                      <span><b>{h.ticker}</b> — {h.bought > 0 ? `${h.bought} bought` : ''}{h.bought > 0 && h.sold > 0 ? ', ' : ''}{h.sold > 0 ? `${h.sold} sold` : ''}</span>
+                      <span style={{ fontSize: 9, fontWeight: 800, color: '#27500A' }}>BUY ›</span>
                     </div>
                   ))
                 )}
               </div>
 
-              {/* Card 2: Sector heat map */}
-              <div style={s.cardDefault}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text1)', marginBottom: 4 }}>Sector heat map</div>
-                {sectorData.length === 0 ? (
-                  <div style={{ fontSize: 10, color: 'var(--text3)' }}>Loading...</div>
-                ) : (
-                  sectorData.map((sec, i) => {
-                    const sc = sectorColor(sec.avgChange);
+              {/* Card 3: Badges (compact single row) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                <span style={{ fontSize: 9, fontWeight: 800, color: 'var(--text3)', letterSpacing: 0.5 }}>BADGES</span>
+                {(() => {
+                  const allEntries = Object.entries(BADGE_DEFS);
+                  return allEntries.map(([key, def]) => {
+                    const earned = userBadges.includes(key);
                     return (
-                      <div key={i} style={{ ...s.sectorRow, background: sc.bg }}>
-                        <span style={{ fontSize: 9, color: sc.color, flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{sec.name}</span>
-                        <span style={{ fontSize: 9, fontWeight: 600, color: sc.color }}>{sec.avgChange >= 0 ? '+' : ''}{sec.avgChange.toFixed(1)}%</span>
-                      </div>
+                      <span
+                        key={key}
+                        title={earned ? def.label : `Locked: ${def.label}`}
+                        style={{
+                          width: 16, height: 16, borderRadius: '50%',
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 9,
+                          background: earned ? def.bg : 'transparent',
+                          border: `1px solid ${earned ? def.border : 'var(--border)'}`,
+                          color: earned ? def.color : 'var(--text3)',
+                          opacity: earned ? 1 : 0.5,
+                        }}
+                      >
+                        {earned ? '★' : '·'}
+                      </span>
                     );
-                  })
-                )}
-              </div>
-
-              {/* Card 3: Badges */}
-              <div style={s.cardDefault}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text1)', marginBottom: 6 }}>Badges</div>
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-                  {(() => {
-                    const earnedEntries = Object.entries(BADGE_DEFS).filter(([key]) => userBadges.includes(key));
-                    const lockedCount = Object.keys(BADGE_DEFS).filter(key => !userBadges.includes(key)).length;
-                    const pillStyle = (bg, border, color) => ({
-                      display: 'inline-flex', alignItems: 'center', gap: 3,
-                      padding: '2px 6px', borderRadius: 10,
-                      fontSize: 8, fontWeight: 700,
-                      background: bg, border: `1px solid ${border}`, color,
-                    });
-                    return (
-                      <>
-                        {earnedEntries.map(([key, def]) => (
-                          <span key={key} style={pillStyle(def.bg, def.border, def.color)}>
-                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: def.border, flexShrink: 0 }} />
-                            {def.label}
-                          </span>
-                        ))}
-                        {lockedCount > 0 && (
-                          <span style={pillStyle('transparent', 'var(--border)', 'var(--text3)')}>
-                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--border)', flexShrink: 0 }} />
-                            {lockedCount} locked
-                          </span>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* Card 4: Risk meter */}
-              <div style={s.cardBorder}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text1)' }}>Risk meter</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: riskLevel.color }}>{riskLevel.level}</span>
-                </div>
-                <div style={{ display: 'flex', gap: 2 }}>
-                  {[1, 2, 3, 4, 5].map(i => (
-                    <div key={i} style={{
-                      flex: 1, height: 4, borderRadius: 2,
-                      background: i <= riskLevel.bars ? riskLevel.color : '#EDD9A3',
-                    }} />
-                  ))}
-                </div>
-                {riskLevel.note && <div style={{ fontSize: 9, color: 'var(--text3)', marginTop: 4 }}>{riskLevel.note}</div>}
+                  });
+                })()}
               </div>
 
               {/* Card 5: Trash talk */}
@@ -1385,7 +1356,7 @@ const s = {
   },
   tapeInner: {
     display: 'flex', whiteSpace: 'nowrap',
-    animation: 'tickerScroll 30s linear infinite',
+    animation: 'tickerScroll 75s linear infinite',
   },
   tapeText: { fontSize: 10, color: '#8cd9a0', fontFamily: 'var(--font)', paddingRight: 40 },
 

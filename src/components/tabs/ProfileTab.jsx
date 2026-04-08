@@ -10,6 +10,7 @@ import { useGroup } from '../../context/GroupContext';
 import { runScreener, SECTOR_MAP } from '../../lib/screener';
 import { run52wHighScan, DEFAULT_THRESHOLD, runVolSurgeScan, DEFAULT_VOL_MULTIPLIER, runGapUpScan, DEFAULT_GAP_THRESHOLD, runMACrossScan, DEFAULT_SHORT_MA, DEFAULT_LONG_MA } from '../../lib/breakoutScanner';
 import { runFlowScan } from '../../lib/institutionalFlow';
+import RiskMeter from '../profile/RiskMeter';
 
 // ── Admin Panel ──
 function AdminPanel({ session, profile }) {
@@ -713,6 +714,8 @@ export default function ProfileTab({ session, profile, group, isAdmin, onSignOut
           </div>
         </div>
       </div>
+
+      <RiskMeter session={session} />
 
       {isAdmin && <AdminPanel session={session} profile={profile} />}
 
