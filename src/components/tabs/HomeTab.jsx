@@ -543,57 +543,123 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   // ═══════════════════════════════════════
   // MARKET PULSE (kept from original)
   // ═══════════════════════════════════════
-  // ── Futures / off-hours ticker: Polygon primary, FMP fallback ──
-  // Uses ETF proxies (SPY→S&P Fut, QQQ→Nas Fut, etc.) and shows
-  // point change + percentage instead of full price.
-  const FUTURES_ETF_MAP = {
-    SPY: 'S&P Fut', QQQ: 'Nas Fut', DIA: 'Dow Fut', GLD: 'Gold', USO: 'Oil',
+  // ── Futures / off-hours ticker ──
+  // Uses FMP real index + commodity quotes (^GSPC, ^IXIC, ^DJI, GCUSD, CLUSD)
+  // Shows percentage only — no full price (these are index levels, not tradeable prices)
+  const FUTURES_MAP = {
+    'ES=F':  'S&P Fut',
+    'NQ=F':  'Nas Fut',
+    'YM=F':  'Dow Fut',
+    'GC=F':  'Gold',
+    'CL=F':  'Oil',
   };
-  const FUTURES_ETF_TICKERS = Object.keys(FUTURES_ETF_MAP);
 
   const loadFutures = async () => {
-    let loaded = false;
+    console.log('[Futures] Loading real futures data...');
+    // ── Yahoo Finance batch quote via CORS proxies ──
+    // Use v7 quote endpoint with all symbols in one request (avoids = encoding issues in path)
+    const symbols = Object.keys(FUTURES_MAP).join(',');
+    const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbols)}`;
+    console.log('[Futures] Yahoo URL:', yahooUrl);
 
-    // ── Try Polygon first (reliable, no CORS proxy needed) ──
-    if (POLYGON_KEY) {
+    const CORS_PROXIES = [
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
+      `https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`,
+    ];
+
+    for (const proxyUrl of CORS_PROXIES) {
       try {
-        const res = await fetch(
-          `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${FUTURES_ETF_TICKERS.join(',')}&apiKey=${POLYGON_KEY}`
-        );
+        console.log('[Futures] Trying proxy:', proxyUrl.substring(0, 60) + '...');
+        const res = await fetch(proxyUrl);
+        if (!res.ok) { console.warn('[Futures] Proxy returned', res.status); continue; }
         const data = await res.json();
-        if (data.tickers && data.tickers.length > 0) {
-          const pulse = {};
-          const labels = [];
-          data.tickers.forEach(t => {
-            const label = FUTURES_ETF_MAP[t.ticker];
-            if (!label) return;
-            const price = t.day?.c || t.prevDay?.c || 0;
-            const prevClose = t.prevDay?.c || 0;
-            const pointChange = prevClose ? price - prevClose : (t.todaysChange || 0);
-            const pctChange = t.todaysChangePerc || (prevClose ? ((price - prevClose) / prevClose) * 100 : 0);
-            pulse[t.ticker] = { price, change: pctChange, pointChange, label: 'FUT', isFutures: true };
-            labels.push({ key: t.ticker, label });
-          });
-          if (labels.length > 0) {
-            setFuturesData(pulse);
-            setFuturesLabels(labels);
-            loaded = true;
-          }
+        console.log('[Futures] v7 response keys:', Object.keys(data), 'quoteResponse?', !!data.quoteResponse);
+        const quotes = data.quoteResponse?.result;
+        if (!quotes || quotes.length === 0) { console.warn('[Futures] No quotes in response'); continue; }
+
+        const pulse = {};
+        const labels = [];
+        // Process in original order
+        for (const sym of Object.keys(FUTURES_MAP)) {
+          const q = quotes.find(r => r.symbol === sym);
+          if (!q) continue;
+          const price = q.regularMarketPrice;
+          const prev = q.regularMarketPreviousClose || q.previousClose;
+          if (!price || !prev) continue;
+          const pctChange = ((price - prev) / prev) * 100;
+          pulse[sym] = { price, change: pctChange, label: 'FUT', isFutures: true };
+          labels.push({ key: sym, label: FUTURES_MAP[sym] });
+        }
+
+        console.log(`[Futures] Yahoo v7 batch: ${labels.length}/${Object.keys(FUTURES_MAP).length}`, labels.map(l => `${l.label} ${pulse[l.key].change.toFixed(2)}%`));
+
+        if (labels.length >= 1) {
+          setFuturesData(pulse);
+          setFuturesLabels(labels);
+          return; // success
         }
       } catch (err) {
-        console.error('[Futures Polygon] Error:', err.message);
+        console.warn('[Futures] Proxy failed:', err.message);
       }
     }
 
-    // ── FMP fallback ──
-    if (!loaded) await loadFuturesFMPFallback();
+    // ── v7 failed — try v8 chart per-symbol as backup ──
+    console.log('[Futures] v7 batch failed, trying v8 chart per-symbol...');
+    const collected = {};
+    const proxyFns = [
+      (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    ];
+    for (const proxyFn of proxyFns) {
+      const missing = Object.keys(FUTURES_MAP).filter(s => !collected[s]);
+      if (missing.length === 0) break;
+      const results = await Promise.all(missing.map(async (symbol) => {
+        try {
+          const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`;
+          const res = await fetch(proxyFn(url));
+          if (!res.ok) return null;
+          const data = await res.json();
+          const meta = data.chart?.result?.[0]?.meta;
+          if (!meta) return null;
+          const price = meta.regularMarketPrice;
+          const prev = meta.previousClose || meta.chartPreviousClose;
+          if (!price || !prev) return null;
+          return { symbol, pctChange: ((price - prev) / prev) * 100, price };
+        } catch { return null; }
+      }));
+      results.filter(Boolean).forEach(r => { collected[r.symbol] = r; });
+    }
+
+    const valid = Object.values(collected);
+    if (valid.length >= 1) {
+      const pulse = {};
+      const labels = [];
+      for (const sym of Object.keys(FUTURES_MAP)) {
+        const r = collected[sym];
+        if (r) {
+          pulse[sym] = { price: r.price, change: r.pctChange, label: 'FUT', isFutures: true };
+          labels.push({ key: sym, label: FUTURES_MAP[sym] });
+        }
+      }
+      console.log(`[Futures] v8 per-symbol: ${labels.length}/${Object.keys(FUTURES_MAP).length}`);
+      setFuturesData(pulse);
+      setFuturesLabels(labels);
+      return;
+    }
+
+    // ── All Yahoo methods failed — ETF fallback ──
+    console.log('[Futures] All Yahoo failed, falling back to ETFs');
+    await loadFuturesETFFallback();
   };
 
-  const loadFuturesFMPFallback = async () => {
+  // ETF fallback: use SPY/QQQ/DIA if FMP index quotes don't work
+  const loadFuturesETFFallback = async () => {
     if (!FMP_KEY) return;
+    const etfMap = { SPY: 'S&P 500', QQQ: 'Nasdaq', DIA: 'Dow', GLD: 'Gold', USO: 'Oil' };
+    const tickers = Object.keys(etfMap);
     try {
       const results = await Promise.allSettled(
-        FUTURES_ETF_TICKERS.map(t =>
+        tickers.map(t =>
           fetch(`https://financialmodelingprep.com/stable/quote?symbol=${t}&apikey=${FMP_KEY}`)
             .then(r => r.json())
         )
@@ -603,13 +669,11 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
       results.forEach((r, idx) => {
         if (r.status === 'fulfilled' && Array.isArray(r.value) && r.value[0]) {
           const q = r.value[0];
-          const ticker = FUTURES_ETF_TICKERS[idx];
-          const label = FUTURES_ETF_MAP[ticker];
-          if (q.price && label) {
+          const ticker = tickers[idx];
+          if (q.price) {
             const pctChange = q.changesPercentage ?? q.changePercentage ?? 0;
-            const pointChange = q.change ?? (q.price * pctChange / 100) ?? 0;
-            pulse[ticker] = { price: q.price, change: pctChange, pointChange, label: 'FUT', isFutures: true };
-            futLabels.push({ key: ticker, label });
+            pulse[ticker] = { price: q.price, change: pctChange, label: 'FUT', isFutures: true };
+            futLabels.push({ key: ticker, label: etfMap[ticker] });
           }
         }
       });
@@ -618,7 +682,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
         setFuturesLabels(futLabels);
       }
     } catch (err) {
-      console.error('[Futures FMP Fallback] Error:', err.message);
+      console.error('[Futures ETF Fallback] Error:', err.message);
     }
   };
 
@@ -1122,9 +1186,12 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                   <span key={i} style={S.pulseItem}>
                     <span style={S.pulseName}>{item.label}</span>
                     {isFut ? (
-                      /* Futures: show point change + percentage only */
-                      <span style={{ ...S.pulseVal, color }}>
-                        {d ? `${arrow}${Math.abs(pts ?? (price * chg / 100)).toFixed(2)} (${Math.abs(chg).toFixed(2)}%)` : '--'}
+                      /* Futures: show points + percentage */
+                      <span style={{ ...S.pulseVal, color, fontSize: 14, fontWeight: 600 }}>
+                        {d ? (() => {
+                          const points = Math.abs((chg / 100) * price);
+                          return `${arrow}${points.toFixed(2)} (${Math.abs(chg).toFixed(2)}%)`;
+                        })() : '--'}
                       </span>
                     ) : (
                       /* Stocks: show full price + percentage */
