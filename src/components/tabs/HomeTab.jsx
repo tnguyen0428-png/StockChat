@@ -1887,7 +1887,7 @@ const S = {
   logoRow: { display: 'flex', alignItems: 'baseline' },
   logoUp: { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
   logoTik: { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
-  logoAlerts: { fontSize: 9, fontWeight: 400, color: '#d4e4f2', letterSpacing: 1.5, fontFamily: "'Outfit', sans-serif", marginTop: -3, paddingLeft: 26 },
+  logoAlerts: { fontSize: 11, fontWeight: 400, color: '#d4e4f2', letterSpacing: 1.5, fontFamily: "'Outfit', sans-serif", marginTop: -3, paddingLeft: 26 },
   hRight: { display: 'flex', alignItems: 'center', gap: 8 },
   statusPill: {
     display: 'flex', alignItems: 'center', gap: 4,
