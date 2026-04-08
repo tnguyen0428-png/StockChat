@@ -313,9 +313,14 @@ function AdminPanel({ session, profile }) {
       list = newList;
     }
     if (!list) { alert('Could not create list.'); return; }
-    await supabase.from('curated_stocks').delete().eq('list_id', list.id);
+    const { error: delErr } = await supabase.from('curated_stocks').delete().eq('list_id', list.id);
+    if (delErr) {
+      console.error('[Screener] Delete error:', delErr.message);
+      alert('Failed to clear old data: ' + delErr.message);
+      return;
+    }
     const rows = screenerResults.map((r, i) => ({
-      list_id: list.id, ticker: r.symbol, ranking: i + 1, score: r.score, sector: r.sector,
+      list_id: list.id, ticker: r.symbol, ranking: i + 1, score: r.score, sector: screenerSector,
       thesis: r.thesis,
       notes: `P/E: ${r.pe?.toFixed(1) || 'N/A'} · PEG: ${r.peg?.toFixed(2) || 'N/A'} · Net Margin: ${r.netMargin ? (r.netMargin * 100).toFixed(1) + '%' : 'N/A'} · Sales Growth: ${r.salesGrowth != null ? r.salesGrowth + '%' : 'N/A'} · EPS Growth: ${r.epsGrowth != null ? r.epsGrowth + '%' : 'N/A'} · Beat Rate: ${r.beatRate != null ? r.beatRate + '%' : 'N/A'}`,
     }));
@@ -326,7 +331,7 @@ function AdminPanel({ session, profile }) {
       return;
     }
     setScreenerSaved(true);
-    alert(`Saved top 15 ${screenerSector} stocks!`);
+    setActiveSection(null);
   };
 
   const fetchNews = async () => {
