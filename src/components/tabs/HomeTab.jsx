@@ -95,10 +95,43 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   const [chatExpanded, setChatExpanded]          = useState(false);
   const [aiLoading, setAiLoading]               = useState(false);
   const [aiLastTicker, setAiLastTicker]         = useState(null);
+  const [isListening, setIsListening]           = useState(false);
+  const recognitionRef = useRef(null);
   const chatInputRef = useRef(null);
   const chatStripRef = useRef(null);
   const chatSectionRef = useRef(null);
   const chatBarRef = useRef(null);
+
+  // ── Voice input (Web Speech API) ──
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) { showToast('Voice input not supported on this browser'); return; }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    let finalTranscript = '';
+    recognition.onresult = (e) => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
+        else interim += e.results[i][0].transcript;
+      }
+      setChatInput(chatInput + finalTranscript + interim);
+    };
+    recognition.onend = () => { setIsListening(false); recognitionRef.current = null; };
+    recognition.onerror = () => { setIsListening(false); recognitionRef.current = null; };
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => () => { recognitionRef.current?.stop(); }, []);
 
   // Pin scroll to the latest chat message — works whether the chat is the scroller
   // (expanded mode) or the page is the scroller (collapsed mode on Home)
@@ -1561,6 +1594,14 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
           onChange={(e) => setChatInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleHomeSend(); } }}
         />
+        <div
+          style={{ ...S.ccMic, ...(isListening ? S.ccMicActive : {}) }}
+          onClick={toggleListening}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={isListening ? '#fff' : '#7a8ea3'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="1" width="6" height="11" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </div>
         <button
           style={{ ...S.ccSend, opacity: chatInput.trim() ? 1 : 0.4, ...(aiMode ? { background: '#8B5CF6' } : {}) }}
           onClick={handleHomeSend}
@@ -2032,6 +2073,17 @@ const S = {
     flex: 1, background: '#fff', border: '1.5px solid #b0bec5',
     borderRadius: 20, padding: '8px 16px', fontSize: 15, color: '#1a2d4a',
     fontFamily: 'inherit', outline: 'none', height: 42,
+  },
+  ccMic: {
+    width: 36, height: 36, borderRadius: '50%', background: '#fff',
+    border: '1.5px solid #d8e2ed', cursor: 'pointer', flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'all 0.2s',
+  },
+  ccMicActive: {
+    background: '#EF4444', borderColor: '#EF4444',
+    boxShadow: '0 0 10px rgba(239,68,68,0.4)',
+    animation: 'pulse 1.2s ease-in-out infinite',
   },
   ccSend: {
     width: 38, height: 38, borderRadius: '50%', background: '#2a7d4b',
