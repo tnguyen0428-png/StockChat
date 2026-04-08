@@ -1030,7 +1030,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
 
           {/* Progress */}
           <div style={OB.progress}>
-            <span style={OB.count}><span style={{ color: '#2a7d4b' }}>{onboardSelected.size}</span> selected</span>
+            <span style={OB.count}><span style={{ color: '#1AAD5E' }}>{onboardSelected.size}</span> selected</span>
             <div style={OB.barTrack}>
               <div style={{ ...OB.barFill, width: `${Math.min((onboardSelected.size / 5) * 100, 100)}%` }} />
             </div>
@@ -1061,7 +1061,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                     <div style={{ fontSize: 10, color: '#7a8ea3' }}>{r.name}</div>
                   </div>
                   {onboardSelected.has(r.symbol) ? (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#2a7d4b', padding: '4px 12px' }}>Added ✓</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#1AAD5E', padding: '4px 12px' }}>Added ✓</span>
                   ) : (
                     <button style={OB.searchAddBtn} onClick={() => toggleOnboardTicker(r.symbol)}>+ Add</button>
                   )}
@@ -1091,11 +1091,11 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                     >
                       <span style={OB.tcTicker}>{t.symbol}</span>
                       {chg != null && (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: chg >= 0 ? '#2a7d4b' : '#e05252' }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: chg >= 0 ? '#1AAD5E' : '#e05252' }}>
                           {chg >= 0 ? '+' : ''}{chg.toFixed(2)}%
                         </span>
                       )}
-                      <span style={{ fontSize: sel ? 13 : 16, color: sel ? '#2a7d4b' : '#b0bec5' }}>
+                      <span style={{ fontSize: sel ? 13 : 16, color: sel ? '#1AAD5E' : '#7a8ea3' }}>
                         {sel ? '✓' : '+'}
                       </span>
                     </div>
@@ -1124,7 +1124,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                           style={{ ...OB.sectorStock, ...(sel ? OB.sectorStockSel : {}) }}
                           onClick={() => toggleOnboardTicker(t)}
                         >
-                          {t} <span style={{ fontSize: 13, color: sel ? '#2a7d4b' : '#c0c8d0' }}>{sel ? '✓' : '+'}</span>
+                          {t} <span style={{ fontSize: 13, color: sel ? '#1AAD5E' : '#c0c8d0' }}>{sel ? '✓' : '+'}</span>
                         </div>
                       );
                     })}
@@ -1309,9 +1309,9 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               My List{hasWatchlist ? ` (${watchlist.length})` : ''}
             </div>
             {(() => {
-              const SHORT = { 'Communication Services': 'Comms', 'Communication': 'Comms', 'Consumer Discretionary': 'Consumer', 'Consumer Cyclical': 'Consumer', 'Consumer Defensive': 'Consumer', 'Consumer Staples': 'Staples', 'Information Technology': 'Tech', 'Technology': 'Tech', 'Industrials': 'Indust.', 'Financial Services': 'Finance', 'Real Estate': 'RE' };
+              const SHORT = { 'Communication Services': 'Communication', 'Communication': 'Communication', 'Consumer Discretionary': 'Consumer', 'Consumer Cyclical': 'Consumer', 'Consumer Defensive': 'Consumer', 'Consumer Staples': 'Consumer', 'Information Technology': 'Tech', 'Technology': 'Tech', 'Industrials': 'Industrial', 'Industrial': 'Industrial', 'Financial Services': 'Finance', 'Finance': 'Finance', 'Real Estate': 'Real Estate', 'RealEstate': 'Real Estate', 'Basic Materials': 'Materials', 'Materials': 'Materials' };
               const seen = new Set();
-              return researchSectors.filter(sec => sec !== 'Auto').filter(sec => {
+              return researchSectors.filter(sec => sec !== 'Auto' && sec !== 'ETF').filter(sec => {
                 const label = SHORT[sec] || sec;
                 if (seen.has(label)) return false;
                 seen.add(label);
@@ -1392,7 +1392,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                                 {priceData ? (
                                   <span style={{
                                     fontSize: 12, fontWeight: 600,
-                                    color: isUp ? '#2a7d4b' : chg < 0 ? '#e05252' : '#5a7080',
+                                    color: isUp ? '#1AAD5E' : chg < 0 ? '#e05252' : '#5a7080',
                                   }}>
                                     {isUp ? '▲' : chg < 0 ? '▼' : ''}{chg != null ? `${isUp ? '+' : ''}${chg.toFixed(2)}%` : '—'}
                                   </span>
@@ -1405,7 +1405,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                                 onClick={(e) => { e.stopPropagation(); removeFromWatchlist(stock.id, stock.ticker); }}
                                 title="Remove"
                               >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2a7d4b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1AAD5E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                   <path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
                                 </svg>
                               </span>
@@ -1420,7 +1420,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                                   <span style={{
                                     ...S.resScoreBadge,
                                     background: stock.score >= 70 ? 'rgba(140,217,160,0.15)' : stock.score >= 50 ? 'rgba(255,193,7,0.15)' : 'rgba(224,82,82,0.1)',
-                                    color: stock.score >= 70 ? '#2a7d4b' : stock.score >= 50 ? '#b8860b' : '#e05252',
+                                    color: stock.score >= 70 ? '#1AAD5E' : stock.score >= 50 ? '#b8860b' : '#e05252',
                                   }}>{stock.score}</span>
                                 )}
                               </span>
@@ -1610,7 +1610,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
             style={{ ...S.ccMic, ...(isListening ? S.ccMicActive : {}) }}
             onClick={toggleListening}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isListening ? '#fff' : '#b0bec5'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isListening ? '#fff' : '#7a8ea3'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="9" y="1" width="6" height="11" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
             </svg>
           </div>
@@ -1663,7 +1663,7 @@ function BriefCard({ article }) {
 
 function ChatBubble({ msg, myId }) {
   const name = msg.username || msg.profiles?.username || 'User';
-  const colors = ['#2a7d4b', '#7B68EE', '#FF7043', '#4CAF50', '#E91E63', '#FF9800'];
+  const colors = ['#1AAD5E', '#7B68EE', '#FF7043', '#4CAF50', '#E91E63', '#FF9800'];
   const isAI = msg.user_id === 'user_ai' || msg.type === 'ai';
   const isMe = !isAI && myId && msg.user_id === myId;
   const color = isAI ? '#8B5CF6' : (msg.user_color || colors[name.charCodeAt(0) % colors.length]);
@@ -1697,10 +1697,10 @@ function ChatBubble({ msg, myId }) {
   // iMessage-style right-align for the current user's own messages
   if (isMe) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '6px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 12px', background: '#f8fafc', borderRadius: 10, margin: '0 6px' }}>
         <div style={{
           maxWidth: '78%',
-          background: '#2a7d4b',
+          background: '#1AAD5E',
           color: '#fff',
           padding: '8px 12px',
           borderRadius: '16px 16px 4px 16px',
@@ -1744,21 +1744,21 @@ function ChatBubble({ msg, myId }) {
 function UptikCardInline({ card }) {
   if (!card || !card.type) return null;
   const wrap = {
-    background: '#0f1f3d',
+    background: '#eef2f7',
     borderRadius: 10,
     margin: '6px 0 8px',
     fontFamily: "'Outfit', sans-serif",
     overflow: 'hidden',
-    color: '#e6ecf5',
-    border: '1px solid rgba(255,255,255,0.06)',
+    color: '#1a2d4a',
+    border: '1px solid #d8e2ed',
   };
   const head = {
     display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
     padding: '10px 14px',
-    borderBottom: '1px solid rgba(255,255,255,0.08)',
+    borderBottom: '1px solid #d8e2ed',
   };
   const ticker = { fontWeight: 700, fontSize: 15, color: '#8B5CF6', letterSpacing: 0.4 };
-  const price = { fontWeight: 700, fontSize: 14, color: '#e6ecf5' };
+  const price = { fontWeight: 700, fontSize: 14, color: '#1a2d4a' };
 
   if (card.type === 'earnings') {
     const qs = card.quarters || [];
@@ -1776,11 +1776,11 @@ function UptikCardInline({ card }) {
               <div key={i} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '8px 14px',
-                borderBottom: i < qs.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                borderBottom: i < qs.length - 1 ? '1px solid #d8e2ed' : 'none',
                 fontSize: 13,
               }}>
-                <span style={{ color: '#9aa9bf', fontWeight: 500 }}>{q.label}</span>
-                <span style={{ color: beat ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
+                <span style={{ color: '#7a8ea3', fontWeight: 500 }}>{q.label}</span>
+                <span style={{ color: beat ? '#1AAD5E' : '#e05252', fontWeight: 600 }}>
                   ${Number(q.actual).toFixed(2)} vs ${Number(q.est).toFixed(2)} ({sign}{Number(q.beatPct).toFixed(1)}%)
                 </span>
               </div>
@@ -1791,10 +1791,10 @@ function UptikCardInline({ card }) {
           <div style={{
             padding: '8px 14px',
             fontSize: 11, fontWeight: 600,
-            color: '#9aa9bf',
+            color: '#7a8ea3',
             letterSpacing: 0.5,
             textTransform: 'uppercase',
-            borderTop: '1px solid rgba(255,255,255,0.05)',
+            borderTop: '1px solid #d8e2ed',
           }}>
             Next: {card.nextEarnings}
           </div>
@@ -1810,8 +1810,8 @@ function UptikCardInline({ card }) {
           <span style={ticker}>{card.ticker}</span>
           <span style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
             {card.price != null && <span style={price}>${Number(card.price).toFixed(2)}</span>}
-            {card.volume && <span style={{ fontSize: 11, color: '#9aa9bf' }}>Vol {card.volume}</span>}
-            {card.isClosed && <span style={{ fontSize: 11, color: '#9aa9bf' }}>· Closed</span>}
+            {card.volume && <span style={{ fontSize: 11, color: '#7a8ea3' }}>Vol {card.volume}</span>}
+            {card.isClosed && <span style={{ fontSize: 11, color: '#7a8ea3' }}>· Closed</span>}
           </span>
         </div>
       </div>
@@ -1828,25 +1828,25 @@ function UptikCardInline({ card }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 14px', padding: '10px 14px' }}>
           {card.pe != null && (
             <div style={{ fontSize: 12 }}>
-              <span style={{ color: '#9aa9bf' }}>P/E </span>
+              <span style={{ color: '#7a8ea3' }}>P/E </span>
               <span style={{ color: '#e6ecf5', fontWeight: 600 }}>{card.pe}</span>
             </div>
           )}
           {card.peg != null && (
             <div style={{ fontSize: 12 }}>
-              <span style={{ color: '#9aa9bf' }}>PEG </span>
+              <span style={{ color: '#7a8ea3' }}>PEG </span>
               <span style={{ color: '#e6ecf5', fontWeight: 600 }}>{card.peg}</span>
             </div>
           )}
           {card.netMargin != null && (
             <div style={{ fontSize: 12 }}>
-              <span style={{ color: '#9aa9bf' }}>Margin </span>
+              <span style={{ color: '#7a8ea3' }}>Margin </span>
               <span style={{ color: '#e6ecf5', fontWeight: 600 }}>{card.netMargin}%</span>
             </div>
           )}
           {card.salesGrowth != null && (
             <div style={{ fontSize: 12 }}>
-              <span style={{ color: '#9aa9bf' }}>Sales </span>
+              <span style={{ color: '#7a8ea3' }}>Sales </span>
               <span style={{ color: '#22c55e', fontWeight: 600 }}>+{card.salesGrowth}%</span>
             </div>
           )}
@@ -1875,8 +1875,8 @@ const S = {
   // ── Toast ──
   toast: {
     position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)',
-    background: '#2a7d4b', color: '#fff', fontSize: 13, fontWeight: 600,
-    padding: '8px 16px', borderRadius: 20, boxShadow: '0 4px 12px rgba(42,125,75,0.3)',
+    background: '#1AAD5E', color: '#fff', fontSize: 13, fontWeight: 600,
+    padding: '8px 16px', borderRadius: 20, boxShadow: '0 4px 12px rgba(26,173,94,0.3)',
     display: 'flex', alignItems: 'center', gap: 6, zIndex: 10000,
   },
 
@@ -1909,7 +1909,7 @@ const S = {
     borderRadius: 12, boxShadow: '0 6px 24px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden',
   },
   pmName: { fontSize: 13, fontWeight: 600, color: '#e0e0e0', padding: '9px 12px 8px', borderBottom: '1px solid rgba(255,255,255,0.1)' },
-  pmItem: { fontSize: 13, fontWeight: 500, color: '#2a7d4b', padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)' },
+  pmItem: { fontSize: 13, fontWeight: 500, color: '#1AAD5E', padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)' },
 
   // ── Market Ticker Bar ──
   combinedBar: { background: '#1a3a5e', flexShrink: 0 },
@@ -1936,8 +1936,8 @@ const S = {
   wlPopRow: { display: 'flex', gap: 5, justifyContent: 'center', flexWrap: 'wrap' },
   wlPopLabel: { fontSize: 11, color: '#3e5568', marginRight: 2, alignSelf: 'center' },
   wlPopChip: {
-    fontSize: 12, fontWeight: 600, color: '#2a7d4b',
-    background: 'rgba(42,125,75,0.08)', border: '1px solid rgba(42,125,75,0.2)',
+    fontSize: 12, fontWeight: 600, color: '#1AAD5E',
+    background: 'rgba(26,173,94,0.08)', border: '1px solid rgba(26,173,94,0.2)',
     borderRadius: 8, padding: '4px 10px', cursor: 'pointer',
   },
 
@@ -1947,14 +1947,14 @@ const S = {
   briefHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   briefTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', letterSpacing: '-0.01em' },
   briefTime: { fontSize: 11, color: '#7a8ea3' },
-  briefToggle: { fontSize: 12, color: '#2a7d4b', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' },
+  briefToggle: { fontSize: 12, color: '#1AAD5E', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' },
   briefCard: {
     background: '#fff', border: '1px solid #d8e2ed', borderRadius: 12,
     padding: '10px 12px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10,
   },
-  bfTickers: { fontSize: 11, fontWeight: 700, color: '#2a7d4b', marginBottom: 2 },
+  bfTickers: { fontSize: 11, fontWeight: 700, color: '#1AAD5E', marginBottom: 2 },
   bfTitle: { fontSize: 13, color: '#1a2d4a', fontWeight: 500, lineHeight: 1.3 },
-  bfLink: { color: '#2a7d4b', fontSize: 12, fontWeight: 600, textDecoration: 'none', flexShrink: 0 },
+  bfLink: { color: '#1AAD5E', fontSize: 12, fontWeight: 600, textDecoration: 'none', flexShrink: 0 },
   briefEmpty: { background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 12, padding: 16, textAlign: 'center', fontSize: 13, color: '#7a8ea3' },
 
   // ── Research section ──
@@ -1962,12 +1962,12 @@ const S = {
   resHeader: { display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 },
   resTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', letterSpacing: '-0.01em' },
   resSub: { fontSize: 11, color: '#7a8ea3', fontWeight: 500 },
-  resPills: { display: 'flex', gap: 6, marginBottom: 8, overflowX: 'auto', scrollbarWidth: 'none' },
+  resPills: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   resPill: {
-    flexShrink: 0, padding: '5px 14px', borderRadius: 14, fontSize: 13, fontWeight: 500,
-    cursor: 'pointer', border: '1px solid #d8e2ed', background: '#fff', color: '#2a7d4b',
+    padding: '5px 12px', borderRadius: 14, fontSize: 12, fontWeight: 500,
+    cursor: 'pointer', border: '1px solid #d8e2ed', background: '#fff', color: '#1AAD5E',
   },
-  resPillActive: { background: '#132d52', color: '#fff', borderColor: '#132d52' },
+  resPillActive: { background: '#1AAD5E', color: '#fff', borderColor: '#1AAD5E' },
   resCard: {
     background: '#fff', border: '1px solid #d8e2ed', borderRadius: 12,
     maxHeight: 260, overflowY: 'auto',
@@ -1993,12 +1993,12 @@ const S = {
   resColTicker: { fontSize: 11, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: '0.05em', flex: 1 },
   resColScore: { fontSize: 11, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 36, textAlign: 'center', flex: 1 },
   resColPrice: { fontSize: 11, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 70, textAlign: 'right' },
-  resChev: { fontSize: 10, color: '#2a7d4b' },
+  resChev: { fontSize: 10, color: '#1AAD5E' },
   resExpandedBody: {
     padding: '6px 12px 8px 36px', background: '#f8fafc', borderTop: '1px solid #eef2f7',
   },
   resMetrics: {
-    fontSize: 12, color: '#2a7d4b', fontWeight: 600, lineHeight: 1.5, marginBottom: 4,
+    fontSize: 12, color: '#1AAD5E', fontWeight: 600, lineHeight: 1.5, marginBottom: 4,
   },
   resThesis: {
     fontSize: 13, color: '#4a6178', lineHeight: 1.4,
@@ -2008,23 +2008,22 @@ const S = {
   chatSection: { padding: '12px 14px 8px' },
   csHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   csTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 6 },
-  csLive: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#2a7d4b', fontWeight: 500 },
-  csLiveDot: { width: 5, height: 5, borderRadius: '50%', background: '#2a7d4b', animation: 'pulse 1.5s ease-in-out infinite' },
+  csLive: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#1AAD5E', fontWeight: 500 },
+  csLiveDot: { width: 5, height: 5, borderRadius: '50%', background: '#1AAD5E', animation: 'pulse 1.5s ease-in-out infinite' },
   privateChatBtn: {
     display: 'flex', alignItems: 'center', gap: 5,
     fontSize: 12, fontWeight: 600, color: '#fff',
-    background: '#2a7d4b', border: 'none', borderRadius: 12,
+    background: '#1AAD5E', border: 'none', borderRadius: 14,
     padding: '5px 12px', cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(42,125,75,0.3)',
     fontFamily: 'inherit',
   },
 
   // ── My Groups section ──
   groupSection: { padding: '12px 14px 16px' },
   groupSectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  groupSectionTitle: { fontSize: 15, fontWeight: 700, color: '#132d52', letterSpacing: '-0.01em' },
+  groupSectionTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', letterSpacing: '-0.01em' },
   groupCreateBtn: {
-    fontSize: 13, fontWeight: 600, color: '#2a7d4b', background: 'none', border: 'none',
+    fontSize: 13, fontWeight: 600, color: '#1AAD5E', background: 'none', border: 'none',
     cursor: 'pointer', padding: '4px 0',
   },
   myGroupsPills: { display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2, justifyContent: 'center', flexWrap: 'wrap' },
@@ -2044,15 +2043,17 @@ const S = {
     border: '1px solid #c8e6d0',
   },
   groupCtaText: { flex: 1 },
-  groupCtaTitle: { fontSize: 15, fontWeight: 700, color: '#132d52', marginBottom: 2 },
+  groupCtaTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', marginBottom: 2 },
   groupCtaSub: { fontSize: 12, color: '#5a8a6a', lineHeight: 1.3 },
 
   chatCard: {
     background: '#fff', border: '1px solid #d8e2ed', borderRadius: 12, overflow: 'hidden',
   },
-  ccMsgs: { padding: 0 },
+  ccMsgs: { padding: 6, display: 'flex', flexDirection: 'column', gap: 6 },
   ccMsg: {
-    padding: '8px 12px', borderBottom: '1px solid #f5f7fa',
+    padding: '10px 12px',
+    background: '#f8fafc',
+    borderRadius: 10,
     display: 'flex', gap: 8, alignItems: 'flex-start',
   },
   ccFooter: {
@@ -2068,7 +2069,7 @@ const S = {
   ccName: { fontSize: 13, fontWeight: 600 },
   ccTime: { fontSize: 11, color: '#7a8ea3', marginLeft: 'auto' },
   ccText: { fontSize: 13, color: '#4a6178', lineHeight: 1.4 },
-  ccTk: { color: '#2a7d4b', fontWeight: 600 },
+  ccTk: { color: '#1AAD5E', fontWeight: 600 },
   // ccFooter replaced by fixedChatBar
   ccAiBtn: {
     width: 36, height: 36, borderRadius: '50%',
@@ -2077,7 +2078,7 @@ const S = {
     transition: 'all 0.2s',
   },
   ccAiBtnOff: {
-    background: '#8a9bb0', color: '#fff',
+    background: '#7a8ea3', color: '#fff',
   },
   ccAiBtnActive: {
     background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)',
@@ -2085,7 +2086,7 @@ const S = {
   },
   ccInputWrap: {
     flex: 1, display: 'flex', alignItems: 'center',
-    background: '#fff', border: '1.5px solid #b0bec5',
+    background: '#fff', border: '1.5px solid #d8e2ed',
     borderRadius: 20, height: 42, paddingRight: 4,
   },
   ccInput: {
@@ -2105,9 +2106,8 @@ const S = {
     animation: 'pulse 1.2s ease-in-out infinite',
   },
   ccSend: {
-    width: 38, height: 38, borderRadius: '50%', background: '#2a7d4b',
+    width: 38, height: 38, borderRadius: '50%', background: '#1AAD5E',
     border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    boxShadow: '0 2px 6px rgba(42,125,75,0.3)',
   },
 
   // ── My List styles ──
@@ -2128,10 +2128,9 @@ const S = {
   },
   wlAddBtn: {
     flexShrink: 0, marginLeft: 'auto',
-    fontSize: 12, fontWeight: 700, color: '#fff',
-    background: '#2a7d4b', border: 'none',
-    borderRadius: 12, padding: '5px 12px', cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(42,125,75,0.3)',
+    fontSize: 12, fontWeight: 600, color: '#fff',
+    background: '#1AAD5E', border: 'none',
+    borderRadius: 14, padding: '5px 12px', cursor: 'pointer',
   },
 
   // ── Search overlay (light theme) ──
@@ -2157,8 +2156,8 @@ const S = {
     borderBottom: '1px solid #f0f3f6', cursor: 'pointer',
   },
   siAddBtnLight: {
-    fontSize: 12, fontWeight: 600, color: '#2a7d4b', background: 'rgba(42,125,75,0.08)',
-    border: '1px solid rgba(42,125,75,0.2)', borderRadius: 12, padding: '4px 12px', cursor: 'pointer',
+    fontSize: 12, fontWeight: 600, color: '#1AAD5E', background: 'rgba(26,173,94,0.08)',
+    border: '1px solid rgba(26,173,94,0.2)', borderRadius: 12, padding: '4px 12px', cursor: 'pointer',
     fontFamily: 'inherit',
   },
 };
@@ -2183,7 +2182,7 @@ const OB = {
   },
   count: { fontSize: 12, fontWeight: 600, color: '#132d52' },
   barTrack: { flex: 1, maxWidth: 180, height: 4, background: '#d8e2ed', borderRadius: 4, overflow: 'hidden' },
-  barFill: { height: '100%', background: '#2a7d4b', borderRadius: 4, transition: 'width 0.4s ease' },
+  barFill: { height: '100%', background: '#1AAD5E', borderRadius: 4, transition: 'width 0.4s ease' },
 
   search: {
     margin: '8px 20px 0', display: 'flex', alignItems: 'center', gap: 8,
@@ -2202,8 +2201,8 @@ const OB = {
     borderBottom: '1px solid #f0f3f6',
   },
   searchAddBtn: {
-    fontSize: 11, fontWeight: 600, color: '#2a7d4b', background: 'rgba(42,125,75,0.08)',
-    border: '1px solid rgba(42,125,75,0.2)', borderRadius: 8, padding: '4px 12px',
+    fontSize: 11, fontWeight: 600, color: '#1AAD5E', background: 'rgba(26,173,94,0.08)',
+    border: '1px solid rgba(26,173,94,0.2)', borderRadius: 8, padding: '4px 12px',
     cursor: 'pointer', fontFamily: 'inherit',
   },
 
@@ -2220,7 +2219,7 @@ const OB = {
     display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 12,
     background: '#fff', border: '1.5px solid #d8e2ed', cursor: 'pointer', transition: 'all 0.2s',
   },
-  trendingChipSel: { borderColor: '#2a7d4b', background: 'rgba(42,125,75,0.06)' },
+  trendingChipSel: { borderColor: '#1AAD5E', background: 'rgba(26,173,94,0.06)' },
   tcTicker: { fontSize: 13, fontWeight: 700, color: '#132d52' },
 
   sectorGroup: { marginBottom: 14 },
@@ -2234,13 +2233,13 @@ const OB = {
     fontSize: 12, fontWeight: 600, color: '#1a2d4a', cursor: 'pointer', transition: 'all 0.2s',
     display: 'flex', alignItems: 'center', gap: 5,
   },
-  sectorStockSel: { borderColor: '#2a7d4b', background: 'rgba(42,125,75,0.08)', color: '#2a7d4b' },
+  sectorStockSel: { borderColor: '#1AAD5E', background: 'rgba(26,173,94,0.08)', color: '#1AAD5E' },
 
   footer: { padding: '12px 20px 20px', display: 'flex', flexDirection: 'column', gap: 8 },
   cta: {
     width: '100%', padding: 14, border: 'none', borderRadius: 14,
     fontFamily: 'inherit', fontSize: 15, fontWeight: 700, cursor: 'pointer',
-    background: '#2a7d4b', color: '#fff', boxShadow: '0 4px 16px rgba(42,125,75,0.25)',
+    background: '#1AAD5E', color: '#fff', boxShadow: '0 4px 16px rgba(26,173,94,0.25)',
     transition: 'all 0.2s',
   },
   skip: {
