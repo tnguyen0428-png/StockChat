@@ -1151,9 +1151,12 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
       {/* ═══ SLIM HEADER ═══ */}
       <div style={S.header}>
         <div style={S.hLeft}>
-          <div style={S.logoRow}>
-            <span style={S.logoUp}>Up</span>
-            <span style={S.logoTik}>Tik</span>
+          <div>
+            <div style={S.logoRow}>
+              <span style={S.logoUp}>Up</span>
+              <span style={S.logoTik}>tik</span>
+            </div>
+            <div style={S.logoAlerts}>alerts</div>
           </div>
         </div>
         <div style={S.hRight}>
@@ -1869,16 +1872,17 @@ const S = {
     display: 'flex', alignItems: 'center', gap: 6, zIndex: 10000,
   },
 
-  // ── Header (40px) ──
+  // ── Header ──
   header: {
-    background: '#132d52', padding: '8px 14px',
+    background: '#132d52', padding: '10px 16px 8px',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     flexShrink: 0,
   },
   hLeft: { display: 'flex', alignItems: 'center', gap: 5 },
   logoRow: { display: 'flex', alignItems: 'baseline' },
-  logoUp: { fontSize: 18, fontWeight: 500, color: '#f0ede8' },
-  logoTik: { fontSize: 18, fontWeight: 500, color: '#8cd9a0' },
+  logoUp: { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
+  logoTik: { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
+  logoAlerts: { fontSize: 12, fontWeight: 300, color: '#d4e4f2', letterSpacing: 2.5, fontFamily: "'Outfit', sans-serif" },
   hRight: { display: 'flex', alignItems: 'center', gap: 8 },
   statusPill: {
     display: 'flex', alignItems: 'center', gap: 4,
