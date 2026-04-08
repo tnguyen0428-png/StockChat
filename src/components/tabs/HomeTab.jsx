@@ -1151,12 +1151,19 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
       {/* ═══ SLIM HEADER ═══ */}
       <div style={S.header}>
         <div style={S.hLeft}>
-          <div>
-            <div style={S.logoRow}>
-              <span style={S.logoUp}>Up</span>
-              <span style={S.logoTik}>tik</span>
+          <div style={S.logoRow}>
+            <svg width="28" height="28" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3" />
+              <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.2" opacity="0.6" />
+              <path d="M25 22 L25 30 C25 34 25 34 25 30 L25 22" strokeWidth="1.5" opacity="0.35" />
+              <path d="M35 8 L29 14 M35 8 L41 14" strokeWidth="3" />
+            </svg>
+            <div>
+              <div style={S.logoText}>
+                <span style={S.logoTik}>ptik</span>
+              </div>
+              <div style={S.logoAlerts}>alerts</div>
             </div>
-            <div style={S.logoAlerts}>alerts</div>
           </div>
         </div>
         <div style={S.hRight}>
@@ -1879,8 +1886,8 @@ const S = {
     flexShrink: 0,
   },
   hLeft: { display: 'flex', alignItems: 'center', gap: 5 },
-  logoRow: { display: 'flex', alignItems: 'baseline' },
-  logoUp: { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
+  logoRow: { display: 'flex', alignItems: 'center', gap: 2 },
+  logoText: { display: 'flex', alignItems: 'baseline' },
   logoTik: { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
   logoAlerts: { fontSize: 12, fontWeight: 300, color: '#d4e4f2', letterSpacing: 2.5, fontFamily: "'Outfit', sans-serif" },
   hRight: { display: 'flex', alignItems: 'center', gap: 8 },
