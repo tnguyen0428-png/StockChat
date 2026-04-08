@@ -58,10 +58,16 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
     return (
       <div style={styles.page}>
         <div style={styles.logoWrap}>
-          <div style={styles.logoText}>
-            <span style={styles.logoUp}>UpTik</span>
-            <span style={styles.logoTik}>Alerts</span>
+          <div style={styles.logoRow}>
+            <svg width="52" height="52" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: -8, verticalAlign: 'bottom', position: 'relative', top: 8 }}>
+              <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3.5" />
+              <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.5" opacity="0.6" />
+              <path d="M25 22 L25 30 C25 34 25 34 25 30 L25 22" strokeWidth="1.8" opacity="0.35" />
+              <path d="M35 8 L29 14 M35 8 L41 14" strokeWidth="3.5" />
+            </svg>
+            <span style={styles.logoUp}>p</span><span style={styles.logoTik}>tik</span>
           </div>
+          <div style={styles.logoAlerts}>a l e r t s</div>
           <div style={styles.logoSub}>Private Trader Community</div>
         </div>
 
@@ -172,10 +178,16 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
 
       {/* Logo */}
       <div style={styles.logoWrap}>
-        <div style={styles.logoText}>
-          <span style={styles.logoUp}>UpTik</span>
-          <span style={styles.logoTik}>Alerts</span>
+        <div style={styles.logoRow}>
+          <svg width="52" height="52" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: -8, verticalAlign: 'bottom', position: 'relative', top: 8 }}>
+            <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3.5" />
+            <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.5" opacity="0.6" />
+            <path d="M25 22 L25 30 C25 34 25 34 25 30 L25 22" strokeWidth="1.8" opacity="0.35" />
+            <path d="M35 8 L29 14 M35 8 L41 14" strokeWidth="3.5" />
+          </svg>
+          <span style={styles.logoUp}>p</span><span style={styles.logoTik}>tik</span>
         </div>
+        <div style={styles.logoAlerts}>a l e r t s</div>
         <div style={styles.logoSub}>Private Trader Community</div>
       </div>
 
@@ -312,22 +324,26 @@ const styles = {
   logoWrap: {
     textAlign: 'center',
     marginBottom: 32,
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
   },
-  logoText: {
-    fontSize: 36,
-    fontWeight: 700,
-    letterSpacing: '-0.5px',
+  logoRow: {
+    display: 'flex', alignItems: 'baseline',
   },
   logoUp: {
-    color: 'var(--green)',
+    fontSize: 36, fontWeight: 700, color: '#8cd9a0',
   },
   logoTik: {
-    color: 'var(--text1)',
+    fontSize: 36, fontWeight: 700, color: '#f0ede8',
+  },
+  logoAlerts: {
+    fontSize: 14, fontWeight: 400, color: '#d4e4f2', letterSpacing: 2,
+    fontFamily: "'Outfit', sans-serif",
+    marginTop: -4, paddingLeft: 44,
   },
   logoSub: {
     fontSize: 13,
     color: 'var(--text2)',
-    marginTop: 4,
+    marginTop: 6,
     letterSpacing: '0.5px',
   },
   card: {

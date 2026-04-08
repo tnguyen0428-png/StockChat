@@ -131,18 +131,17 @@ export default function LandingPage() {
         {/* ── Nav ── */}
         <nav style={styles.nav}>
           <div style={styles.navLogo}>
-            <svg width="32" height="32" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3" />
-              <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.2" opacity="0.6" />
-              <path d="M25 22 L25 30 C25 34 25 34 25 30 L25 22" strokeWidth="1.5" opacity="0.35" />
-              <path d="M35 8 L29 14 M35 8 L41 14" strokeWidth="3" />
-            </svg>
-            <div style={{ borderLeft: '1px solid rgba(140,217,160,0.25)', paddingLeft: 4, marginLeft: -3, lineHeight: 0.9 }}>
+            <div>
               <div style={styles.logoRow}>
-                <span style={styles.logoUp}>Up</span>
-                <span style={styles.logoTik}>tik</span>
+                <svg width="30" height="30" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: -5, verticalAlign: 'bottom', position: 'relative', top: 6 }}>
+                  <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3.5" />
+                  <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.5" opacity="0.6" />
+                  <path d="M25 22 L25 30 C25 34 25 34 25 30 L25 22" strokeWidth="1.8" opacity="0.35" />
+                  <path d="M35 8 L29 14 M35 8 L41 14" strokeWidth="3.5" />
+                </svg>
+                <span style={styles.logoUp}>p</span><span style={styles.logoTik}>tik</span>
               </div>
-              <div style={styles.logoAlerts}>alerts</div>
+              <div style={styles.logoAlerts}>a l e r t s</div>
             </div>
           </div>
           <div style={styles.navRight}>
@@ -323,12 +322,12 @@ const styles = {
     alignItems: 'center',
   },
   logoRow: { display: 'flex', alignItems: 'baseline' },
-  logoUp: { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
-  logoTik: { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
+  logoUp: { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
+  logoTik: { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
   logoAlerts: {
-    fontSize: 12, fontWeight: 300, color: '#d4e4f2', letterSpacing: 2.5,
+    fontSize: 11, fontWeight: 400, color: '#d4e4f2', letterSpacing: 1.5,
     fontFamily: "'Outfit', sans-serif",
-    marginTop: 0, paddingLeft: 0,
+    marginTop: -3, paddingLeft: 26,
   },
   logoSlogan: {
     fontSize: 12, fontWeight: 300, fontStyle: 'italic',

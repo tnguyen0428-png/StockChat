@@ -68,9 +68,17 @@ export default function JoinGroupPage({ session }) {
     <div style={styles.page}>
       <div style={styles.card}>
         <div style={styles.logo}>
-          <span style={{ color: '#f0f0f0' }}>Up</span>
-          <span style={{ color: '#4CAF50' }}>Tik</span>
-          <span style={{ color: '#f0f0f0' }}>Alerts</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center' }}>
+            <svg width="36" height="36" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: -6, verticalAlign: 'bottom', position: 'relative', top: 7 }}>
+              <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3.5" />
+              <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.5" opacity="0.6" />
+              <path d="M25 22 L25 30 C25 34 25 34 25 30 L25 22" strokeWidth="1.8" opacity="0.35" />
+              <path d="M35 8 L29 14 M35 8 L41 14" strokeWidth="3.5" />
+            </svg>
+            <span style={{ color: '#8cd9a0', fontSize: 24, fontWeight: 700 }}>p</span>
+            <span style={{ color: '#f0f0f0', fontSize: 24, fontWeight: 700 }}>tik</span>
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 400, color: '#d4e4f2', letterSpacing: 1.5, marginTop: -2, paddingLeft: 30, fontFamily: "'Outfit', sans-serif" }}>a l e r t s</div>
         </div>
 
         {status === 'loading' && (

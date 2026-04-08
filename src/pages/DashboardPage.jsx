@@ -143,9 +143,18 @@ export default function DashboardPage({ session }) {
         display: 'flex', alignItems: 'center',
         justifyContent: 'center', flexDirection: 'column', gap: 12,
       }}>
-        <div style={{ fontSize: 28, fontWeight: 700 }}>
-          <span style={{ color: '#f0ede8' }}>Up</span>
-          <span style={{ color: '#8cd9a0' }}>tik</span>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center' }}>
+            <svg width="40" height="40" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: -6, verticalAlign: 'bottom', position: 'relative', top: 7 }}>
+              <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3.5" />
+              <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.5" opacity="0.6" />
+              <path d="M25 22 L25 30 C25 34 25 34 25 30 L25 22" strokeWidth="1.8" opacity="0.35" />
+              <path d="M35 8 L29 14 M35 8 L41 14" strokeWidth="3.5" />
+            </svg>
+            <span style={{ fontSize: 28, fontWeight: 700, color: '#8cd9a0' }}>p</span>
+            <span style={{ fontSize: 28, fontWeight: 700, color: '#f0ede8' }}>tik</span>
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 400, color: '#d4e4f2', letterSpacing: 1.5, marginTop: -3, paddingLeft: 34, fontFamily: "'Outfit', sans-serif" }}>a l e r t s</div>
         </div>
         <div style={{
           width: 24, height: 24,
