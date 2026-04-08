@@ -87,9 +87,11 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   const onboardSearchTimeout = useRef(null);
 
   // ── Chat input state (sends from Home page) ──
-  const [chatInput, setChatInput]               = useState('');
+  const [chatInput, setChatInputRaw]            = useState(() => localStorage.getItem('uptik_chat_draft') || '');
+  const setChatInput = (val) => { setChatInputRaw(val); if (val) localStorage.setItem('uptik_chat_draft', val); else localStorage.removeItem('uptik_chat_draft'); };
   const [chatSending, setChatSending]           = useState(false);
-  const [aiMode, setAiMode]                     = useState(false);
+  const [aiMode, setAiMode]                     = useState(() => localStorage.getItem('uptik_ai_mode') === '1');
+  useEffect(() => { localStorage.setItem('uptik_ai_mode', aiMode ? '1' : '0'); }, [aiMode]);
   const [chatExpanded, setChatExpanded]          = useState(false);
   const [aiLoading, setAiLoading]               = useState(false);
   const [aiLastTicker, setAiLastTicker]         = useState(null);
