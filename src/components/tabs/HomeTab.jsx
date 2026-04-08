@@ -1586,21 +1586,23 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
           style={{ ...S.ccAiBtn, ...(aiMode ? S.ccAiBtnActive : S.ccAiBtnOff) }}
           onClick={() => setAiMode(prev => !prev)}
         >AI</div>
-        <input
-          ref={chatInputRef}
-          style={{ ...S.ccInput, ...(aiMode ? { border: '1.5px solid #8B5CF6' } : {}) }}
-          placeholder={aiMode ? 'Ask AI anything...' : 'Message UpTik Public...'}
-          value={chatInput}
-          onChange={(e) => setChatInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleHomeSend(); } }}
-        />
-        <div
-          style={{ ...S.ccMic, ...(isListening ? S.ccMicActive : {}) }}
-          onClick={toggleListening}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={isListening ? '#fff' : '#7a8ea3'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="9" y="1" width="6" height="11" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
-          </svg>
+        <div style={{ ...S.ccInputWrap, ...(aiMode ? { border: '1.5px solid #8B5CF6' } : {}) }}>
+          <input
+            ref={chatInputRef}
+            style={S.ccInput}
+            placeholder={aiMode ? 'Ask AI anything...' : 'Message UpTik Public...'}
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleHomeSend(); } }}
+          />
+          <div
+            style={{ ...S.ccMic, ...(isListening ? S.ccMicActive : {}) }}
+            onClick={toggleListening}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isListening ? '#fff' : '#b0bec5'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="1" width="6" height="11" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+          </div>
         </div>
         <button
           style={{ ...S.ccSend, opacity: chatInput.trim() ? 1 : 0.4, ...(aiMode ? { background: '#8B5CF6' } : {}) }}
@@ -2069,19 +2071,24 @@ const S = {
     background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)',
     color: '#fff', boxShadow: '0 0 8px rgba(139,92,246,0.4)',
   },
+  ccInputWrap: {
+    flex: 1, display: 'flex', alignItems: 'center',
+    background: '#fff', border: '1.5px solid #b0bec5',
+    borderRadius: 20, height: 42, paddingRight: 4,
+  },
   ccInput: {
-    flex: 1, background: '#fff', border: '1.5px solid #b0bec5',
-    borderRadius: 20, padding: '8px 16px', fontSize: 15, color: '#1a2d4a',
-    fontFamily: 'inherit', outline: 'none', height: 42,
+    flex: 1, background: 'transparent', border: 'none',
+    padding: '8px 0 8px 16px', fontSize: 15, color: '#1a2d4a',
+    fontFamily: 'inherit', outline: 'none', height: '100%',
   },
   ccMic: {
-    width: 36, height: 36, borderRadius: '50%', background: '#fff',
-    border: '1.5px solid #d8e2ed', cursor: 'pointer', flexShrink: 0,
+    width: 32, height: 32, borderRadius: '50%', background: 'transparent',
+    border: 'none', cursor: 'pointer', flexShrink: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     transition: 'all 0.2s',
   },
   ccMicActive: {
-    background: '#EF4444', borderColor: '#EF4444',
+    background: '#EF4444',
     boxShadow: '0 0 10px rgba(239,68,68,0.4)',
     animation: 'pulse 1.2s ease-in-out infinite',
   },
