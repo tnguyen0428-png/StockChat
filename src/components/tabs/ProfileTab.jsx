@@ -9,6 +9,7 @@ import { polyFetch } from '../../lib/polygonClient';
 import { useGroup } from '../../context/GroupContext';
 import { runScreener, SECTOR_MAP } from '../../lib/screener';
 import { run52wHighScan, DEFAULT_THRESHOLD, runVolSurgeScan, DEFAULT_VOL_MULTIPLIER, runGapUpScan, DEFAULT_GAP_THRESHOLD, runMACrossScan, DEFAULT_SHORT_MA, DEFAULT_LONG_MA } from '../../lib/breakoutScanner';
+import { runFlowScan } from '../../lib/institutionalFlow';
 
 // ── Admin Panel ──
 function AdminPanel({ session, profile }) {
@@ -94,16 +95,13 @@ function AdminPanel({ session, profile }) {
   const handleFlowScan = async () => {
     setScanningFlow(true); setScanFlowStatus(null);
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-flow-data', {
-        body: { force: true },
-      });
-      if (error) throw error;
-      const inserted = data?.inserted ?? data?.alerts_inserted ?? 0;
+      const result = await runFlowScan();
+      const inserted = result?.inserted ?? 0;
       setScanFlowStatus({ inserted });
       // Re-flag featured after flow data comes in
       await flagFeaturedAlerts();
     } catch (e) {
-      setScanFlowStatus({ error: e.message || 'Edge function failed' });
+      setScanFlowStatus({ error: e.message || 'Flow scan failed' });
     } finally {
       setScanningFlow(false);
     }
@@ -428,7 +426,7 @@ function AdminPanel({ session, profile }) {
                   Scans S&P 500 + Nasdaq 100 for breakout signals. Results appear in the Alerts tab.
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
-                  {/* Manual — runs all 4 client-side scanners */}
+                  {/* Manual — runs all 4 client-side scanners (admin on-demand only) */}
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <button
                       style={{ ...adminStyles.btn, width: '100%', fontSize: 14, background: scanningAll ? 'var(--border)' : '#1a3c2a', opacity: isAnyScanRunning && !scanningAll ? 0.4 : 1 }}
@@ -443,7 +441,7 @@ function AdminPanel({ session, profile }) {
                       🔀 MA Cross (9/21)
                     </div>
                   </div>
-                  {/* Auto — triggers the server-side flow scanner */}
+                  {/* Auto — UW flow scanner (scheduled 3x/day + on-demand) */}
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <button
                       style={{ ...adminStyles.btn, width: '100%', fontSize: 14, background: scanningFlow ? 'var(--border)' : '#4a3520', opacity: isAnyScanRunning && !scanningFlow ? 0.4 : 1 }}
@@ -455,7 +453,7 @@ function AdminPanel({ session, profile }) {
                       🐋 Dark Pool Trades<br/>
                       📊 Options Flow<br/>
                       🏦 $3B+ Market Cap<br/>
-                      🔁 Runs every 30 min
+                      🔁 8am · 10am · 1pm PT
                     </div>
                   </div>
                 </div>

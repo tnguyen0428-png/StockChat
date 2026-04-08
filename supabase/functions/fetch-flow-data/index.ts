@@ -542,7 +542,8 @@ function scoreAndRank(
     .filter(ts => {
       if (ts.score <= 0) return false;
       if (EXCLUDED_TICKERS.has(ts.ticker)) return false;
-      if (ts.optionsCount < 1) return false;
+      // Require options flow OR significant dark pool activity
+      if (ts.optionsCount < 1 && ts.darkpoolCount < 1) return false;
       // Market cap filter: if we have data and it's below $3B, skip
       if (ts.marketCapB !== null && ts.marketCapB < MIN_MARKET_CAP_B) {
         console.log(`[flow-data] ${ts.ticker}: filtered out (market cap $${ts.marketCapB}B < $${MIN_MARKET_CAP_B}B)`);

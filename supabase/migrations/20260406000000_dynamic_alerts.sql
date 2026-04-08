@@ -22,11 +22,11 @@ CREATE TABLE IF NOT EXISTS alert_types (
 
 -- Seed with existing scanner types
 INSERT INTO alert_types (type_key, label, color, icon, position) VALUES
-  ('52w_high',   'Yearly High',   '#D97706', '🏔️', 1),
-  ('vol_surge',  'Volume Spike',  '#7C3AED', '🔥', 2),
-  ('gap_up',     'Gap Up',        '#16A34A', '📈', 3),
-  ('ma_cross',   'Trend Change',  '#2563EB', '🔄', 4),
-  ('vcp',        'VCP Pattern',   '#EC4899', '📐', 5)
+  ('52w_high',   '52W High (5%)',       '#D97706', '⚡', 1),
+  ('vol_surge',  'Vol Surge (2x Avg)',  '#7C3AED', '🔥', 2),
+  ('gap_up',     'Gap Up (1.5%)',       '#16A34A', '📈', 3),
+  ('ma_cross',   'MA Cross (9/21)',     '#2563EB', '🔀', 4),
+  ('vcp',        'VCP Pattern',         '#EC4899', '📐', 5)
 ON CONFLICT (type_key) DO NOTHING;
 
 ALTER TABLE alert_types ENABLE ROW LEVEL SECURITY;
