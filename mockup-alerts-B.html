@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Alerts Redesign — Mockup B: The Fast Table</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #0a0f1a;
+    color: #e2e8f0;
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .felt-bg {
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(16, 85, 55, 0.2) 0%, transparent 50%),
+      #0a0f1a;
+    min-height: 100vh;
+    padding: 0 0 40px;
+  }
+
+  /* Header */
+  .header {
+    padding: 16px 20px 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .header h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #d4a853, #f0d78c, #d4a853);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Top strip: mood + filter in one line */
+  .top-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px 14px;
+    gap: 12px;
+  }
+  .mood-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    background: rgba(249, 115, 22, 0.1);
+    border: 1px solid rgba(249, 115, 22, 0.2);
+  }
+  .mood-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f97316;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+  .mood-pill span {
+    font-size: 12px;
+    font-weight: 700;
+    color: #f97316;
+    font-family: 'Outfit', sans-serif;
+  }
+  .mood-tip {
+    font-size: 11px;
+    color: #64748b;
+    flex: 1;
+    text-align: right;
+    line-height: 1.3;
+  }
+
+  /* AOTD hero strip */
+  .aotd-hero {
+    margin: 0 16px 12px;
+    padding: 14px 18px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(42, 35, 20, 0.9), rgba(30, 25, 15, 0.95));
+    border: 1px solid rgba(212, 168, 83, 0.35);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .aotd-hero::after {
+    content: '♠';
+    position: absolute;
+    right: -5px;
+    top: -15px;
+    font-size: 80px;
+    color: rgba(212, 168, 83, 0.05);
+    pointer-events: none;
+  }
+  .aotd-chip {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #f0d78c, #d4a853 50%, #b8942e);
+    border: 2.5px solid #f0d78c;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 0 20px rgba(212, 168, 83, 0.3);
+    position: relative;
+  }
+  .aotd-chip .ticker {
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px;
+    font-weight: 800;
+    color: #1a1207;
+    line-height: 1;
+  }
+  .aotd-chip .crown {
+    position: absolute;
+    top: -12px;
+    font-size: 14px;
+  }
+  .aotd-info { flex: 1; min-width: 0; }
+  .aotd-top-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .aotd-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    color: #d4a853;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .aotd-ticker-name {
+    font-family: 'Outfit', sans-serif;
+    font-size: 17px;
+    font-weight: 800;
+    color: #f1f5f9;
+  }
+  .aotd-price {
+    font-size: 13px;
+    color: #94a3b8;
+    margin-left: 8px;
+  }
+  .aotd-story {
+    font-size: 13px;
+    color: #cbd5e1;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .aotd-conf {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .aotd-conf-bar {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(100, 116, 139, 0.2);
+    overflow: hidden;
+  }
+  .aotd-conf-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #d4a853, #f0d78c);
+  }
+  .aotd-conf-text {
+    font-size: 11px;
+    font-weight: 700;
+    color: #f0d78c;
+    font-family: 'Outfit', sans-serif;
+  }
+
+  /* Toggle */
+  .toggle-bar {
+    display: flex;
+    gap: 0;
+    margin: 4px 16px 14px;
+    background: rgba(30, 41, 59, 0.5);
+    border-radius: 10px;
+    padding: 3px;
+    border: 1px solid rgba(100, 116, 139, 0.12);
+  }
+  .toggle-btn {
+    flex: 1;
+    padding: 8px 0;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #64748b;
+    background: transparent;
+  }
+  .toggle-btn.active {
+    background: rgba(212, 168, 83, 0.12);
+    color: #f0d78c;
+  }
+
+  /* Compact alert rows */
+  .alert-list {
+    padding: 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .alert-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: rgba(30, 41, 59, 0.5);
+    border-radius: 12px;
+    border: 1px solid rgba(100, 116, 139, 0.08);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .alert-row:hover, .alert-row:active {
+    background: rgba(30, 41, 59, 0.8);
+    border-color: rgba(212, 168, 83, 0.2);
+  }
+
+  /* Mini chip indicator */
+  .row-chip {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .row-chip.green {
+    background: radial-gradient(circle at 30% 30%, #1a3a2a, #0f2a1d);
+    border: 2px solid #22c55e;
+    color: #4ade80;
+  }
+  .row-chip.red {
+    background: radial-gradient(circle at 30% 30%, #3a1a1a, #2a0f0f);
+    border: 2px solid #ef4444;
+    color: #f87171;
+  }
+  .row-chip.gold {
+    background: radial-gradient(circle at 30% 30%, #3a3020, #2a2510);
+    border: 2px solid #d4a853;
+    color: #f0d78c;
+  }
+
+  .row-info { flex: 1; min-width: 0; }
+  .row-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 2px;
+  }
+  .row-ticker {
+    font-family: 'Outfit', sans-serif;
+    font-size: 15px;
+    font-weight: 800;
+    color: #f1f5f9;
+  }
+  .row-type {
+    font-size: 10px;
+    font-weight: 700;
+    font-family: 'Outfit', sans-serif;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .row-type.money {
+    background: rgba(34, 197, 94, 0.1);
+    color: #4ade80;
+  }
+  .row-type.price {
+    background: rgba(59, 130, 246, 0.1);
+    color: #60a5fa;
+  }
+  .row-type.volume {
+    background: rgba(249, 115, 22, 0.1);
+    color: #fb923c;
+  }
+
+  .row-story {
+    font-size: 12px;
+    color: #94a3b8;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .row-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .row-price {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #e2e8f0;
+  }
+  .row-conf {
+    font-size: 10px;
+    font-weight: 700;
+    font-family: 'Outfit', sans-serif;
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+  .row-conf.high { background: rgba(34, 197, 94, 0.12); color: #4ade80; }
+  .row-conf.med { background: rgba(234, 179, 8, 0.12); color: #facc15; }
+  .row-conf.low { background: rgba(249, 115, 22, 0.12); color: #fb923c; }
+
+  /* Expanded detail (appears when row tapped) */
+  .row-detail {
+    margin: -2px 16px 4px;
+    padding: 14px 16px;
+    background: rgba(30, 41, 59, 0.7);
+    border-radius: 0 0 14px 14px;
+    border: 1px solid rgba(212, 168, 83, 0.15);
+    border-top: none;
+  }
+  .detail-story {
+    font-size: 13px;
+    color: #cbd5e1;
+    line-height: 1.5;
+    margin-bottom: 10px;
+  }
+  .detail-story strong { color: #f1f5f9; font-weight: 600; }
+  .detail-stats {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .detail-stat {
+    flex: 1;
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: 8px;
+    padding: 8px 6px;
+    text-align: center;
+  }
+  .detail-stat-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-family: 'Outfit', sans-serif;
+  }
+  .detail-stat-value {
+    font-size: 15px;
+    font-weight: 800;
+    color: #e2e8f0;
+    margin-top: 2px;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .detail-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .detail-btn {
+    flex: 1;
+    padding: 8px 0;
+    border-radius: 8px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    text-align: center;
+  }
+  .detail-btn.primary {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: #fff;
+  }
+  .detail-btn.secondary {
+    background: transparent;
+    color: #94a3b8;
+    border: 1.5px solid rgba(100, 116, 139, 0.2);
+  }
+
+  /* Scoreboard */
+  .scoreboard {
+    margin: 20px 16px 0;
+    padding: 14px 16px;
+    background: rgba(30, 41, 59, 0.4);
+    border-radius: 14px;
+    border: 1px solid rgba(100, 116, 139, 0.1);
+  }
+  .scoreboard-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .scoreboard-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .scoreboard-record {
+    font-size: 12px;
+    color: #4ade80;
+    font-weight: 600;
+  }
+  .score-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+  }
+  .score-row + .score-row {
+    border-top: 1px solid rgba(100, 116, 139, 0.06);
+  }
+  .score-chip {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .score-chip.w { background: #22c55e; }
+  .score-chip.l { background: #ef4444; }
+  .score-ticker {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    color: #e2e8f0;
+    width: 50px;
+  }
+  .score-when {
+    flex: 1;
+    font-size: 11px;
+    color: #64748b;
+  }
+  .score-result {
+    font-size: 13px;
+    font-weight: 700;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .score-result.w { color: #4ade80; }
+  .score-result.l { color: #f87171; }
+</style>
+</head>
+<body>
+<div class="felt-bg">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Breakout Alerts</h1>
+    <span style="font-size:20px;opacity:0.6">🌙</span>
+  </div>
+
+  <!-- Mood + hint in one strip -->
+  <div class="top-strip">
+    <div class="mood-pill">
+      <div class="mood-dot"></div>
+      <span>Fearful</span>
+    </div>
+    <span class="mood-tip">Breakouts may fade faster today</span>
+  </div>
+
+  <!-- AOTD compact hero -->
+  <div class="aotd-hero">
+    <div class="aotd-chip">
+      <span class="crown">👑</span>
+      <span class="ticker">AMD</span>
+    </div>
+    <div class="aotd-info">
+      <div class="aotd-top-row">
+        <span class="aotd-label">Top Pick</span>
+      </div>
+      <div style="display:flex;align-items:baseline;gap:4px;">
+        <span class="aotd-ticker-name">AMD</span>
+        <span class="aotd-price">$162.45</span>
+      </div>
+      <div class="aotd-story">$2.3M in call bets with 3 aggressive sweeps — institutions are making a move</div>
+      <div class="aotd-conf">
+        <div class="aotd-conf-bar"><div class="aotd-conf-fill" style="width:88%"></div></div>
+        <span class="aotd-conf-text">Strong</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toggle -->
+  <div class="toggle-bar">
+    <button class="toggle-btn active">All</button>
+    <button class="toggle-btn">Big Money</button>
+    <button class="toggle-btn">Price Action</button>
+  </div>
+
+  <!-- Alert list -->
+  <div class="alert-list">
+
+    <div class="alert-row">
+      <div class="row-chip green">SMCI</div>
+      <div class="row-info">
+        <div class="row-top">
+          <span class="row-ticker">SMCI</span>
+          <span class="row-type money">Big Money</span>
+        </div>
+        <div class="row-story">$1.8M in options bets + $4.2M dark pool block</div>
+      </div>
+      <div class="row-right">
+        <span class="row-price">$43.28</span>
+        <span class="row-conf high">Strong</span>
+      </div>
+    </div>
+
+    <!-- Expanded example -->
+    <div class="alert-row" style="border-radius: 12px 12px 0 0; border-color: rgba(212,168,83,0.2); background: rgba(30,41,59,0.8);">
+      <div class="row-chip gold">QCOM</div>
+      <div class="row-info">
+        <div class="row-top">
+          <span class="row-ticker">QCOM</span>
+          <span class="row-type money">Big Money</span>
+        </div>
+        <div class="row-story">$950K in call options with 2 bullish sweeps</div>
+      </div>
+      <div class="row-right">
+        <span class="row-price">$164.80</span>
+        <span class="row-conf med">Watch</span>
+      </div>
+    </div>
+    <div class="row-detail">
+      <div class="detail-story">
+        Someone put down <strong>$950K in call options</strong> with <strong>2 aggressive sweeps</strong> — they're betting Qualcomm moves up soon. Dark pool activity adds confirmation.
+      </div>
+      <div class="detail-stats">
+        <div class="detail-stat">
+          <div class="detail-stat-label">Premium</div>
+          <div class="detail-stat-value">$950K</div>
+        </div>
+        <div class="detail-stat">
+          <div class="detail-stat-label">Sweeps</div>
+          <div class="detail-stat-value">2</div>
+        </div>
+        <div class="detail-stat">
+          <div class="detail-stat-label">Score</div>
+          <div class="detail-stat-value" style="color:#facc15">78</div>
+        </div>
+        <div class="detail-stat">
+          <div class="detail-stat-label">Confidence</div>
+          <div class="detail-stat-value" style="color:#facc15">78%</div>
+        </div>
+      </div>
+      <div class="detail-actions">
+        <button class="detail-btn primary">+ Watchlist</button>
+        <button class="detail-btn secondary">Discuss</button>
+      </div>
+    </div>
+
+    <div class="alert-row">
+      <div class="row-chip green">FE</div>
+      <div class="row-info">
+        <div class="row-top">
+          <span class="row-ticker">FE</span>
+          <span class="row-type price">Near High</span>
+        </div>
+        <div class="row-story">Within 1.2% of all-time high on 4x volume</div>
+      </div>
+      <div class="row-right">
+        <span class="row-price">$44.12</span>
+        <span class="row-conf med">Watch</span>
+      </div>
+    </div>
+
+    <div class="alert-row">
+      <div class="row-chip green">ROST</div>
+      <div class="row-info">
+        <div class="row-top">
+          <span class="row-ticker">ROST</span>
+          <span class="row-type price">Gap Up</span>
+        </div>
+        <div class="row-story">Gapped up +2.8% at open, holding above gap</div>
+      </div>
+      <div class="row-right">
+        <span class="row-price">$156.30</span>
+        <span class="row-conf med">Watch</span>
+      </div>
+    </div>
+
+    <div class="alert-row">
+      <div class="row-chip red">CNP</div>
+      <div class="row-info">
+        <div class="row-top">
+          <span class="row-ticker">CNP</span>
+          <span class="row-type volume">Volume Spike</span>
+        </div>
+        <div class="row-story">3.8x normal volume with selling pressure</div>
+      </div>
+      <div class="row-right">
+        <span class="row-price">$38.45</span>
+        <span class="row-conf low">Early</span>
+      </div>
+    </div>
+
+    <div class="alert-row">
+      <div class="row-chip green">SNDK</div>
+      <div class="row-info">
+        <div class="row-top">
+          <span class="row-ticker">SNDK</span>
+          <span class="row-type money">Big Money</span>
+        </div>
+        <div class="row-story">$680K options premium, bullish call flow</div>
+      </div>
+      <div class="row-right">
+        <span class="row-price">$58.90</span>
+        <span class="row-conf med">Watch</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Scoreboard -->
+  <div class="scoreboard">
+    <div class="scoreboard-header">
+      <span class="scoreboard-title">Scoreboard</span>
+      <span class="scoreboard-record">W:11 L:5 · 68%</span>
+    </div>
+    <div class="score-row">
+      <div class="score-chip w"></div>
+      <span class="score-ticker">NVDA</span>
+      <span class="score-when">Big Money · 3d ago</span>
+      <span class="score-result w">+8.4%</span>
+    </div>
+    <div class="score-row">
+      <div class="score-chip w"></div>
+      <span class="score-ticker">PLTR</span>
+      <span class="score-when">Near High · 5d ago</span>
+      <span class="score-result w">+3.1%</span>
+    </div>
+    <div class="score-row">
+      <div class="score-chip l"></div>
+      <span class="score-ticker">MARA</span>
+      <span class="score-when">Vol Spike · 4d ago</span>
+      <span class="score-result l">-2.7%</span>
+    </div>
+    <div class="score-row">
+      <div class="score-chip w"></div>
+      <span class="score-ticker">ANET</span>
+      <span class="score-when">Big Money · 6d ago</span>
+      <span class="score-result w">+5.9%</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

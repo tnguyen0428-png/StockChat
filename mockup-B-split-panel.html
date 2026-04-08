@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup B — Split Panel Layout</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #0a1929;
+      display: flex; flex-direction: column;
+      align-items: center; min-height: 100vh; padding: 20px;
+    }
+    .design-label {
+      color: #FF7043; font-size: 14px; font-weight: 600;
+      margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase;
+    }
+    .design-desc {
+      color: #7a8ea3; font-size: 13px; max-width: 480px;
+      text-align: center; margin-bottom: 16px; line-height: 1.5;
+    }
+    .phone {
+      width: 480px; height: 900px; background: #eef2f7;
+      border-radius: 32px; overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 2px rgba(255,255,255,0.08);
+      display: flex; flex-direction: column; position: relative;
+    }
+
+    /* Header */
+    .header {
+      background: #132d52;
+      padding: 8px 14px 6px;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-shrink: 0;
+    }
+    .h-left { display: flex; align-items: center; gap: 6px; }
+    .logo-row { display: flex; align-items: baseline; }
+    .logo-up { font-size: 18px; font-weight: 500; color: #f0ede8; }
+    .logo-tik { font-size: 18px; font-weight: 500; color: #8cd9a0; }
+    .h-right { display: flex; align-items: center; gap: 8px; }
+    .status-pill {
+      display: flex; align-items: center; gap: 4px;
+      background: rgba(255,255,255,0.1); padding: 2px 7px; border-radius: 8px;
+    }
+    .status-dot { width: 5px; height: 5px; border-radius: 50%; background: #8cd9a0; }
+    .status-text { font-size: 9px; font-weight: 600; color: #8cd9a0; letter-spacing: 0.04em; }
+    .avatar-sm {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 600; color: #f0ede8;
+    }
+
+    /* Pulse */
+    .pulse {
+      background: #0f2440; height: 36px;
+      display: flex; align-items: center; overflow: hidden; flex-shrink: 0;
+    }
+    @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+    .pulse-track {
+      display: inline-flex; align-items: center; white-space: nowrap;
+      animation: scroll 20s linear infinite;
+    }
+    .p-item { display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; }
+    .p-name { font-size: 12px; font-weight: 500; color: #5a7080; }
+    .p-val { font-size: 12px; font-weight: 700; }
+    .p-val.up { color: #8cd9a0; }
+    .p-val.down { color: #e05252; }
+
+    .content { flex: 1; overflow-y: auto; padding: 0 0 80px; background: #eef2f7; }
+
+    /* ─── WATCHLIST: Horizontal scroll row ─── */
+    .wl-section { background: #132d52; padding: 8px 0 10px; }
+    .wl-top {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0 12px 6px;
+    }
+    .wl-title { font-size: 13px; font-weight: 600; color: #d4e4f2; }
+    .wl-manage { font-size: 11px; font-weight: 500; color: #8cd9a0; background: none; border: none; cursor: pointer; }
+    .wl-scroll {
+      display: flex; gap: 8px; overflow-x: auto; padding: 0 12px;
+      scrollbar-width: none;
+    }
+    .wl-scroll::-webkit-scrollbar { display: none; }
+    .wl-item {
+      flex-shrink: 0; width: 120px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px; padding: 10px;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .wl-item:hover { background: rgba(255,255,255,0.1); }
+    .wl-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .wl-ticker { font-size: 14px; font-weight: 700; color: #f0ede8; }
+    .wl-badge {
+      font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 3px;
+    }
+    .wl-badge.up { background: rgba(140,217,160,0.2); color: #8cd9a0; }
+    .wl-badge.down { background: rgba(224,82,82,0.2); color: #e05252; }
+    .wl-price { font-size: 16px; font-weight: 700; color: #e8e0d8; margin-bottom: 2px; }
+    .wl-change { font-size: 11px; font-weight: 600; }
+    .wl-change.up { color: #8cd9a0; }
+    .wl-change.down { color: #e05252; }
+    /* Mini sparkline placeholder */
+    .wl-spark {
+      height: 24px; margin-top: 6px; border-radius: 4px;
+      background: linear-gradient(90deg, transparent, rgba(140,217,160,0.15), transparent);
+      position: relative; overflow: hidden;
+    }
+    .wl-spark svg { width: 100%; height: 100%; }
+    .wl-add-card {
+      flex-shrink: 0; width: 64px;
+      background: rgba(140,217,160,0.06);
+      border: 1.5px dashed rgba(140,217,160,0.25);
+      border-radius: 10px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 4px; cursor: pointer;
+    }
+    .wl-add-icon { font-size: 20px; color: #8cd9a0; }
+    .wl-add-text { font-size: 9px; color: rgba(140,217,160,0.6); font-weight: 500; }
+
+    /* ─── SPLIT ZONE: Briefing left, Chat right ─── */
+    .split-zone {
+      display: flex; gap: 8px; padding: 8px 10px 0;
+      min-height: 320px;
+    }
+    .split-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+    .split-right { width: 200px; flex-shrink: 0; display: flex; flex-direction: column; }
+
+    /* Briefing cards */
+    .sl-label {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.8px; color: #7a8ea3; margin-bottom: 4px;
+    }
+    .b-card {
+      background: #fff; border: 1px solid #d8e2ed;
+      border-radius: 8px; padding: 8px 10px;
+    }
+    .b-tickers { font-size: 10px; font-weight: 700; color: #2a7d4b; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
+    .b-title { font-size: 13px; font-weight: 600; color: #1a2d4a; line-height: 1.3; }
+    .b-link { font-size: 11px; color: #2a7d4b; font-weight: 600; text-decoration: none; margin-top: 4px; display: inline-block; }
+
+    /* AI mini */
+    .ai-mini {
+      background: #F5F3FF; border: 1.5px solid rgba(139,92,246,0.25);
+      border-radius: 8px; padding: 8px 10px;
+      display: flex; align-items: center; gap: 8px; cursor: pointer;
+    }
+    .ai-icon {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: linear-gradient(135deg, #8B5CF6, #6D28D9);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .ai-cta { font-size: 13px; font-weight: 500; color: #6D28D9; }
+
+    /* Chat panel */
+    .chat-panel {
+      flex: 1; background: #fff; border: 1px solid #d8e2ed;
+      border-radius: 10px; display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .cp-head {
+      padding: 8px 10px; border-bottom: 1px solid #eef2f7;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .cp-title { font-size: 12px; font-weight: 600; color: #1a2d4a; }
+    .cp-online { font-size: 10px; color: #8cd9a0; display: flex; align-items: center; gap: 4px; }
+    @keyframes pulse2 { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .cp-online-dot { width: 5px; height: 5px; border-radius: 50%; background: #8cd9a0; animation: pulse2 1.5s ease-in-out infinite; }
+    .cp-msgs { flex: 1; overflow-y: auto; padding: 6px 8px; display: flex; flex-direction: column; gap: 6px; }
+    .cp-m {
+      display: flex; gap: 6px; align-items: flex-start;
+    }
+    .cp-av {
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 600; color: #fff; flex-shrink: 0;
+    }
+    .cp-m-body { flex: 1; min-width: 0; }
+    .cp-m-name { font-size: 10px; font-weight: 600; margin-bottom: 1px; }
+    .cp-m-text { font-size: 11px; color: #4a6178; line-height: 1.35; }
+    .cp-m-text .tk { color: #2a7d4b; font-weight: 600; }
+    .cp-input-row {
+      padding: 6px 8px; border-top: 1px solid #eef2f7;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .cp-input {
+      flex: 1; background: #eef2f7; border: 1px solid #d8e2ed;
+      border-radius: 16px; padding: 5px 10px; font-size: 11px;
+      color: #7a8ea3; font-family: inherit; outline: none;
+    }
+    .cp-send-btn {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: #2a7d4b; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* Group selector tabs in chat panel */
+    .cp-tabs {
+      display: flex; border-bottom: 1px solid #eef2f7;
+      overflow-x: auto; scrollbar-width: none;
+    }
+    .cp-tabs::-webkit-scrollbar { display: none; }
+    .cp-tab {
+      padding: 6px 10px; font-size: 10px; font-weight: 500;
+      color: #7a8ea3; cursor: pointer; white-space: nowrap;
+      border-bottom: 2px solid transparent;
+      flex-shrink: 0;
+    }
+    .cp-tab.active { color: #2a7d4b; border-bottom-color: #2a7d4b; font-weight: 600; }
+
+    /* BOTTOM NAV */
+    .bnav {
+      height: 56px; background: #f8fafc;
+      border-top: 0.5px solid #d8e2ed;
+      display: flex; justify-content: space-around; align-items: center;
+      padding-bottom: 4px;
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 100;
+    }
+    .bn-item {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 2px; cursor: pointer; flex: 1;
+    }
+    .bn-item.chat-el { margin-top: -20px; }
+    .bn-label { font-size: 10px; font-weight: 500; color: #7a8ea3; }
+    .bn-label.active { color: #132d52; }
+    .bn-label.chat-l { color: #2a7d4b; font-weight: 600; }
+    .chat-circ {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: #2a7d4b; border: 3px solid #f8fafc;
+      box-shadow: 0 4px 14px rgba(42,125,75,0.3);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .unread-dot {
+      position: absolute; top: -2px; right: -4px;
+      width: 7px; height: 7px; background: #e05252;
+      border-radius: 50%; border: 1.5px solid #f8fafc;
+    }
+  </style>
+</head>
+<body>
+  <div class="design-label">Mockup B — Split Panel</div>
+  <div class="design-desc">
+    Horizontal watchlist with sparklines. Briefing & AI stacked left, live group chat panel pinned right. Maximizes info density.
+  </div>
+
+  <div class="phone">
+
+    <!-- HEADER -->
+    <div class="header">
+      <div class="h-left">
+        <svg width="30" height="30" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" stroke-width="3"/>
+          <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" stroke-width="2.2" opacity="0.6"/>
+          <path d="M35 8 L29 14 M35 8 L41 14" stroke-width="3"/>
+        </svg>
+        <div><div class="logo-row"><span class="logo-up">Up</span><span class="logo-tik">tik</span></div></div>
+      </div>
+      <div class="h-right">
+        <div class="status-pill">
+          <div class="status-dot"></div>
+          <span class="status-text">LIVE</span>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <div class="avatar-sm">T</div>
+      </div>
+    </div>
+
+    <!-- PULSE -->
+    <div class="pulse">
+      <div class="pulse-track">
+        <span class="p-item"><span class="p-name">SPY</span><span class="p-val up">▲0.23%</span></span>
+        <span class="p-item"><span class="p-name">QQQ</span><span class="p-val up">▲0.45%</span></span>
+        <span class="p-item"><span class="p-name">DIA</span><span class="p-val down">▼0.10%</span></span>
+        <span class="p-item"><span class="p-name">VIXY</span><span class="p-val down">▼1.82%</span></span>
+        <span class="p-item"><span class="p-name">GLD</span><span class="p-val up">▲0.35%</span></span>
+        <span class="p-item"><span class="p-name">SPY</span><span class="p-val up">▲0.23%</span></span>
+        <span class="p-item"><span class="p-name">QQQ</span><span class="p-val up">▲0.45%</span></span>
+        <span class="p-item"><span class="p-name">DIA</span><span class="p-val down">▼0.10%</span></span>
+        <span class="p-item"><span class="p-name">VIXY</span><span class="p-val down">▼1.82%</span></span>
+        <span class="p-item"><span class="p-name">GLD</span><span class="p-val up">▲0.35%</span></span>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ★ WATCHLIST: Horizontal scroll with sparklines -->
+      <div class="wl-section">
+        <div class="wl-top">
+          <span class="wl-title">My Watchlist</span>
+          <button class="wl-manage">Manage</button>
+        </div>
+        <div class="wl-scroll">
+          <div class="wl-item">
+            <div class="wl-row">
+              <span class="wl-ticker">NVDA</span>
+              <span class="wl-badge up">▲</span>
+            </div>
+            <div class="wl-price">$148.32</div>
+            <div class="wl-change up">+$3.50 (+2.41%)</div>
+            <div class="wl-spark">
+              <svg viewBox="0 0 120 24" preserveAspectRatio="none"><polyline points="0,20 15,18 30,14 45,16 60,10 75,8 90,12 105,6 120,4" fill="none" stroke="#8cd9a0" stroke-width="1.5"/></svg>
+            </div>
+          </div>
+          <div class="wl-item">
+            <div class="wl-row">
+              <span class="wl-ticker">AAPL</span>
+              <span class="wl-badge up">▲</span>
+            </div>
+            <div class="wl-price">$198.50</div>
+            <div class="wl-change up">+$1.72 (+0.87%)</div>
+            <div class="wl-spark">
+              <svg viewBox="0 0 120 24" preserveAspectRatio="none"><polyline points="0,16 15,14 30,12 45,15 60,10 75,11 90,8 105,9 120,6" fill="none" stroke="#8cd9a0" stroke-width="1.5"/></svg>
+            </div>
+          </div>
+          <div class="wl-item">
+            <div class="wl-row">
+              <span class="wl-ticker">TSLA</span>
+              <span class="wl-badge down">▼</span>
+            </div>
+            <div class="wl-price">$245.10</div>
+            <div class="wl-change down">-$3.27 (-1.32%)</div>
+            <div class="wl-spark">
+              <svg viewBox="0 0 120 24" preserveAspectRatio="none"><polyline points="0,6 15,8 30,10 45,7 60,12 75,15 90,14 105,18 120,20" fill="none" stroke="#e05252" stroke-width="1.5"/></svg>
+            </div>
+          </div>
+          <div class="wl-item">
+            <div class="wl-row">
+              <span class="wl-ticker">AMD</span>
+              <span class="wl-badge up">▲</span>
+            </div>
+            <div class="wl-price">$167.88</div>
+            <div class="wl-change up">+$2.56 (+1.55%)</div>
+            <div class="wl-spark">
+              <svg viewBox="0 0 120 24" preserveAspectRatio="none"><polyline points="0,18 15,16 30,20 45,14 60,12 75,10 90,8 105,6 120,4" fill="none" stroke="#8cd9a0" stroke-width="1.5"/></svg>
+            </div>
+          </div>
+          <div class="wl-add-card">
+            <span class="wl-add-icon">+</span>
+            <span class="wl-add-text">Add</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ★ SPLIT: Briefing + Chat side by side -->
+      <div class="split-zone">
+        <!-- LEFT: Briefing + AI -->
+        <div class="split-left">
+          <div class="sl-label">Daily Briefing</div>
+          <div class="b-card">
+            <div class="b-tickers">NVDA · AMD</div>
+            <div class="b-title">Nvidia surges on AI chip demand, AMD follows with new GPU lineup</div>
+            <a href="#" class="b-link">Read →</a>
+          </div>
+          <div class="b-card">
+            <div class="b-tickers">AAPL</div>
+            <div class="b-title">Apple announces OpenAI partnership for Siri overhaul</div>
+            <a href="#" class="b-link">Read →</a>
+          </div>
+          <div class="b-card">
+            <div class="b-tickers">SPY · QQQ</div>
+            <div class="b-title">Fed signals June rate cut as inflation cools to 2.1%</div>
+            <a href="#" class="b-link">Read →</a>
+          </div>
+          <div style="font-size:10px;color:#7a8ea3;padding:2px 0;">Updated 8:32 AM EST</div>
+          <div class="ai-mini">
+            <div class="ai-icon">AI</div>
+            <span class="ai-cta">Ask UpTik AI</span>
+          </div>
+        </div>
+
+        <!-- RIGHT: Chat panel -->
+        <div class="split-right">
+          <div class="chat-panel">
+            <div class="cp-head">
+              <span class="cp-title">Group Chat</span>
+              <div class="cp-online"><div class="cp-online-dot"></div> 142</div>
+            </div>
+            <div class="cp-tabs">
+              <div class="cp-tab active">Public</div>
+              <div class="cp-tab">Tech</div>
+              <div class="cp-tab">Energy</div>
+              <div class="cp-tab">Crypto</div>
+            </div>
+            <div class="cp-msgs">
+              <div class="cp-m">
+                <div class="cp-av" style="background:#2a7d4b;">M</div>
+                <div class="cp-m-body">
+                  <div class="cp-m-name" style="color:#2a7d4b;">Mike</div>
+                  <div class="cp-m-text"><span class="tk">$NVDA</span> breaking 148! 🔥</div>
+                </div>
+              </div>
+              <div class="cp-m">
+                <div class="cp-av" style="background:#7B68EE;">S</div>
+                <div class="cp-m-body">
+                  <div class="cp-m-name" style="color:#7B68EE;">Sarah</div>
+                  <div class="cp-m-text">Watching <span class="tk">$TSLA</span> 250 bounce</div>
+                </div>
+              </div>
+              <div class="cp-m">
+                <div class="cp-av" style="background:#FF7043;">D</div>
+                <div class="cp-m-body">
+                  <div class="cp-m-name" style="color:#FF7043;">DayTrader</div>
+                  <div class="cp-m-text">Closed <span class="tk">$AMD</span> calls +35% 🚀</div>
+                </div>
+              </div>
+              <div class="cp-m">
+                <div class="cp-av" style="background:#42A5F5;">R</div>
+                <div class="cp-m-body">
+                  <div class="cp-m-name" style="color:#42A5F5;">Raj</div>
+                  <div class="cp-m-text">Anyone watching Fed speech?</div>
+                </div>
+              </div>
+              <div class="cp-m">
+                <div class="cp-av" style="background:#FFB300;">L</div>
+                <div class="cp-m-body">
+                  <div class="cp-m-name" style="color:#FFB300;">Luna</div>
+                  <div class="cp-m-text"><span class="tk">$AAPL</span> heading to 200 🎯</div>
+                </div>
+              </div>
+            </div>
+            <div class="cp-input-row">
+              <input class="cp-input" placeholder="Message..." readonly>
+              <button class="cp-send-btn">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:16px;"></div>
+    </div>
+
+    <!-- BOTTOM NAV -->
+    <div class="bnav">
+      <div class="bn-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 9.5L12 3L21 9.5V20C21 20.55 20.55 21 20 21H15V15H9V21H4C3.45 21 3 20.55 3 20V9.5Z" fill="#132d52"/></svg>
+        <span class="bn-label active">Home</span>
+      </div>
+      <div class="bn-item">
+        <div style="position:relative;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z" fill="#7a8ea3"/></svg>
+          <div class="unread-dot"></div>
+        </div>
+        <span class="bn-label">Alerts</span>
+      </div>
+      <div class="bn-item chat-el">
+        <div class="chat-circ">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" fill="#fff"/></svg>
+        </div>
+        <span class="bn-label chat-l">Chat</span>
+      </div>
+      <div class="bn-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#7a8ea3"/></svg>
+        <span class="bn-label">Challenge</span>
+      </div>
+      <div class="bn-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="#7a8ea3"/></svg>
+        <span class="bn-label">Profile</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

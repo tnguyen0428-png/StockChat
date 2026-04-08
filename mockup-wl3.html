@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>Watchlist Mockup 3 — Merged into Ticker Bar</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #eef2f7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; }
+  .phone { width: 390px; min-height: 780px; background: #eef2f7; overflow-y: auto; padding-bottom: 20px; }
+
+  .header { background: #132d52; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .logo { font-size: 20px; font-weight: 500; }
+  .logo-up { color: #f0ede8; }
+  .logo-tik { color: #8cd9a0; }
+  .status { display: flex; align-items: center; gap: 8px; }
+  .pre-badge { background: #e05252; color: #fff; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 10px; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: #2a7d4b; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 700; }
+
+  .label { text-align: center; padding: 10px; font-size: 11px; color: #fff; background: #2a7d4b; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+  .desc { text-align: center; padding: 10px 16px; font-size: 12px; color: #5a7080; background: #fff; border-bottom: 1px solid #e2e8f0; line-height: 1.5; }
+
+  /* Combined ticker bar — market + watchlist tabs */
+  .combined-bar { background: #1a3a5e; }
+  .bar-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .bar-tab { flex: 1; text-align: center; padding: 7px 0; font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.5); cursor: pointer; position: relative; }
+  .bar-tab.active { color: #8cd9a0; }
+  .bar-tab.active::after { content: ''; position: absolute; bottom: 0; left: 20%; right: 20%; height: 2px; background: #8cd9a0; border-radius: 1px; }
+  .bar-content { padding: 8px 12px; }
+  .market-scroll { display: flex; gap: 14px; overflow-x: auto; scrollbar-width: none; font-size: 12px; color: #b0c4d8; }
+  .market-scroll::-webkit-scrollbar { display: none; }
+  .ticker-red { color: #e05252; }
+  .ticker-green { color: #8cd9a0; }
+
+  /* Watchlist in bar */
+  .wl-bar-scroll { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; }
+  .wl-bar-scroll::-webkit-scrollbar { display: none; }
+  .wl-bar-item { flex-shrink: 0; text-align: center; min-width: 56px; }
+  .wl-bar-ticker { font-size: 12px; font-weight: 700; color: #fff; }
+  .wl-bar-price { font-size: 10px; color: #b0c4d8; margin-top: 1px; }
+  .wl-bar-change { font-size: 10px; font-weight: 600; margin-top: 1px; }
+  .wl-bar-change.up { color: #8cd9a0; }
+  .wl-bar-change.down { color: #e05252; }
+  .wl-bar-change.flat { color: #7a8ea3; }
+
+  /* Sections */
+  .section { margin: 12px; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .section-title { font-size: 15px; font-weight: 700; color: #132d52; }
+  .section-meta { font-size: 11px; color: #7a8ea3; }
+  .brief-card { background: #fff; border: 1px solid #d8e2ed; border-radius: 12px; padding: 12px; }
+  .brief-tickers { font-size: 11px; font-weight: 600; color: #2a7d4b; margin-bottom: 4px; }
+  .brief-title { font-size: 13px; color: #1a2d4a; line-height: 1.4; }
+
+  .pills { display: flex; gap: 6px; margin-bottom: 8px; overflow-x: auto; scrollbar-width: none; }
+  .pills::-webkit-scrollbar { display: none; }
+  .pill { flex-shrink: 0; padding: 5px 14px; border-radius: 14px; font-size: 12px; font-weight: 500; border: 1px solid #d8e2ed; background: #fff; color: #4a6178; }
+  .pill.active { background: #132d52; color: #fff; border-color: #132d52; }
+  .res-card { background: #fff; border: 1px solid #d8e2ed; border-radius: 12px; overflow: hidden; }
+  .res-header { display: flex; padding: 6px 12px; font-size: 10px; font-weight: 600; color: #7a8ea3; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #f0f4f8; }
+  .res-row { display: flex; align-items: center; padding: 8px 12px; border-bottom: 1px solid #f5f7fa; }
+  .res-rank { font-size: 11px; font-weight: 700; color: #7a8ea3; min-width: 32px; }
+  .res-ticker { font-size: 13px; font-weight: 700; color: #1a2d4a; flex: 1; }
+  .res-score { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 8px; background: rgba(140,217,160,0.15); color: #2a7d4b; }
+
+  .chat-section { margin: 12px; }
+  .chat-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .chat-title { font-size: 15px; font-weight: 700; color: #132d52; display: flex; align-items: center; gap: 8px; }
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #2a7d4b; }
+  .live-text { font-size: 11px; color: #2a7d4b; font-weight: 500; }
+  .view-all { font-size: 11px; color: #2a7d4b; font-weight: 600; }
+  .chat-card { background: #fff; border: 1px solid #d8e2ed; border-radius: 12px; overflow: hidden; }
+  .chat-msg { padding: 8px 12px; border-bottom: 1px solid #f5f7fa; }
+  .chat-user { font-size: 12px; font-weight: 700; color: #132d52; }
+  .chat-text { font-size: 12px; color: #4a6178; margin-top: 2px; line-height: 1.4; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="label">Option 3 — Merged into Ticker Bar</div>
+  <div class="desc">Watchlist lives <b>inside the ticker bar</b> as a second tab. Toggle between Market data and your Watchlist. Zero extra vertical space — it shares the same bar.</div>
+
+  <div class="header">
+    <div class="logo"><span class="logo-up">Up</span><span class="logo-tik">Tik</span></div>
+    <div class="status"><span class="pre-badge">PRE</span><div class="avatar">A</div></div>
+  </div>
+
+  <!-- Combined bar — Market tab active -->
+  <div class="combined-bar">
+    <div class="bar-tabs">
+      <div class="bar-tab active">Market</div>
+      <div class="bar-tab">Watchlist (8)</div>
+    </div>
+    <div class="bar-content">
+      <div class="market-scroll">
+        <span>S&P Fut <span class="ticker-red">▼0.04%</span></span>
+        <span>Nas Fut <span class="ticker-green">▲0.11%</span></span>
+        <span>Dow Fut <span class="ticker-red">▼0.22%</span></span>
+        <span>Gold <span class="ticker-red">▼0.12%</span></span>
+        <span>Oil <span class="ticker-red">▼0.28%</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content starts right away -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Daily Briefing</span>
+      <span class="section-meta">9:07 AM EST</span>
+    </div>
+    <div class="brief-card">
+      <div class="brief-tickers">MRVL · MU · SNDK</div>
+      <div class="brief-title">Prediction: 1 AI Stock Will Quietly Double While the Market Panics</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Sector Research</span>
+      <span class="section-meta">Top 15 Ranked</span>
+    </div>
+    <div class="pills">
+      <div class="pill active">Tech</div>
+      <div class="pill">Healthcare</div>
+      <div class="pill">Finance</div>
+      <div class="pill">Energy</div>
+      <div class="pill">Industrial</div>
+    </div>
+    <div class="res-card">
+      <div class="res-header">
+        <span style="min-width:32px">Rank</span><span style="flex:1">Ticker</span><span>Score</span>
+      </div>
+      <div class="res-row"><span class="res-rank">#1</span><span class="res-ticker">ABBV</span><span class="res-score">99</span></div>
+      <div class="res-row"><span class="res-rank">#2</span><span class="res-ticker">STX</span><span class="res-score">96</span></div>
+      <div class="res-row"><span class="res-rank">#3</span><span class="res-ticker">MU</span><span class="res-score">93</span></div>
+      <div class="res-row"><span class="res-rank">#4</span><span class="res-ticker">NVDA</span><span class="res-score">92</span></div>
+      <div class="res-row"><span class="res-rank">#5</span><span class="res-ticker">MSFT</span><span class="res-score">88</span></div>
+    </div>
+  </div>
+
+  <div class="chat-section">
+    <div class="chat-header">
+      <div class="chat-title">Live Chat <div class="live-dot"></div> <span class="live-text">live</span></div>
+      <span class="view-all">View all ›</span>
+    </div>
+    <div class="chat-card">
+      <div class="chat-msg">
+        <span class="chat-user">TraderMike</span>
+        <div class="chat-text">NVDA looking strong into earnings. Loading calls.</div>
+      </div>
+      <div class="chat-msg">
+        <span class="chat-user">AlphaWolf</span>
+        <div class="chat-text">AMD breaking out of the channel. Watch $165.</div>
+      </div>
+      <div class="chat-msg">
+        <span class="chat-user">BullishSarah</span>
+        <div class="chat-text">Anyone else in AVGO? Semis on fire today.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Show watchlist tab active version below -->
+<div class="phone" style="margin-left: 20px;">
+  <div class="label" style="background: #132d52;">↓ Watchlist tab active ↓</div>
+
+  <div class="header">
+    <div class="logo"><span class="logo-up">Up</span><span class="logo-tik">Tik</span></div>
+    <div class="status"><span class="pre-badge">PRE</span><div class="avatar">A</div></div>
+  </div>
+
+  <!-- Combined bar — Watchlist tab active -->
+  <div class="combined-bar">
+    <div class="bar-tabs">
+      <div class="bar-tab">Market</div>
+      <div class="bar-tab active">Watchlist (8)</div>
+    </div>
+    <div class="bar-content">
+      <div class="wl-bar-scroll">
+        <div class="wl-bar-item">
+          <div class="wl-bar-ticker">NVDA</div>
+          <div class="wl-bar-price">$131.42</div>
+          <div class="wl-bar-change up">+2.1%</div>
+        </div>
+        <div class="wl-bar-item">
+          <div class="wl-bar-ticker">FSLY</div>
+          <div class="wl-bar-price">$8.23</div>
+          <div class="wl-bar-change down">-1.4%</div>
+        </div>
+        <div class="wl-bar-item">
+          <div class="wl-bar-ticker">COHR</div>
+          <div class="wl-bar-price">$72.50</div>
+          <div class="wl-bar-change up">+0.8%</div>
+        </div>
+        <div class="wl-bar-item">
+          <div class="wl-bar-ticker">BE</div>
+          <div class="wl-bar-price">$22.10</div>
+          <div class="wl-bar-change up">+3.2%</div>
+        </div>
+        <div class="wl-bar-item">
+          <div class="wl-bar-ticker">LITE</div>
+          <div class="wl-bar-price">$45.67</div>
+          <div class="wl-bar-change down">-0.5%</div>
+        </div>
+        <div class="wl-bar-item">
+          <div class="wl-bar-ticker">AAOI</div>
+          <div class="wl-bar-price">$18.90</div>
+          <div class="wl-bar-change flat">—</div>
+        </div>
+        <div class="wl-bar-item">
+          <div class="wl-bar-ticker">STX</div>
+          <div class="wl-bar-price">$96.20</div>
+          <div class="wl-bar-change up">+1.5%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Daily Briefing</span>
+      <span class="section-meta">9:07 AM EST</span>
+    </div>
+    <div class="brief-card">
+      <div class="brief-tickers">MRVL · MU · SNDK</div>
+      <div class="brief-title">Prediction: 1 AI Stock Will Quietly Double While the Market Panics</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Sector Research</span>
+      <span class="section-meta">Top 15 Ranked</span>
+    </div>
+    <div class="pills">
+      <div class="pill active">Tech</div>
+      <div class="pill">Healthcare</div>
+      <div class="pill">Finance</div>
+      <div class="pill">Energy</div>
+    </div>
+    <div class="res-card">
+      <div class="res-header">
+        <span style="min-width:32px">Rank</span><span style="flex:1">Ticker</span><span>Score</span>
+      </div>
+      <div class="res-row"><span class="res-rank">#1</span><span class="res-ticker">ABBV</span><span class="res-score">99</span></div>
+      <div class="res-row"><span class="res-rank">#2</span><span class="res-ticker">STX</span><span class="res-score">96</span></div>
+      <div class="res-row"><span class="res-rank">#3</span><span class="res-ticker">MU</span><span class="res-score">93</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

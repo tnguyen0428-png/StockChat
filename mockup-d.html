@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>Mockup D — Research Pills + Unified Chat</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #eef2f7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; }
+  .phone { width: 390px; min-height: 780px; background: #eef2f7; overflow-y: auto; padding-bottom: 20px; }
+  .label { text-align: center; padding: 12px; font-size: 11px; color: #fff; background: #132d52; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+  .desc { text-align: center; padding: 10px 16px; font-size: 12px; color: #5a7080; background: #fff; border-bottom: 1px solid #e2e8f0; line-height: 1.5; }
+
+  /* Cards */
+  .section { margin: 12px; background: #fff; border-radius: 14px; border: 1px solid #d8e2ed; overflow: hidden; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 0; }
+  .section-title { font-size: 15px; font-weight: 700; color: #132d52; letter-spacing: -0.01em; }
+  .sub { font-size: 10px; color: #7a8ea3; font-weight: 500; }
+
+  /* Sector pills */
+  .pills { display: flex; gap: 6px; padding: 10px 14px; overflow-x: auto; scrollbar-width: none; }
+  .pills::-webkit-scrollbar { display: none; }
+  .pill { flex-shrink: 0; padding: 5px 14px; border-radius: 14px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid #d8e2ed; background: #fff; color: #4a6178; transition: all 0.2s; }
+  .pill.active { background: #132d52; color: #fff; border-color: #132d52; }
+
+  /* Research rows */
+  .res-header-row { display: flex; padding: 6px 14px; font-size: 10px; font-weight: 600; color: #7a8ea3; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #f0f4f8; }
+  .res-row { display: flex; align-items: center; padding: 8px 14px; border-bottom: 1px solid #f5f7fa; cursor: pointer; }
+  .res-row:last-child { border-bottom: none; }
+  .res-rank { font-size: 11px; font-weight: 700; color: #7a8ea3; min-width: 32px; }
+  .res-ticker { font-size: 13px; font-weight: 700; color: #1a2d4a; flex: 1; }
+  .res-score { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 8px; }
+  .score-green { background: rgba(140,217,160,0.15); color: #2a7d4b; }
+  .score-yellow { background: rgba(255,193,7,0.15); color: #b8860b; }
+  .res-chev { font-size: 10px; color: #b0bec5; margin-left: 6px; }
+  .res-scroll { max-height: 260px; overflow-y: auto; }
+
+  /* Divider */
+  .divider { height: 2px; background: linear-gradient(90deg, transparent 5%, #d8e2ed 50%, transparent 95%); margin: 0 12px; }
+
+  /* Live Chat — single room */
+  .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 8px; }
+  .chat-title-row { display: flex; align-items: center; gap: 8px; }
+  .chat-title { font-size: 15px; font-weight: 700; color: #132d52; }
+  .live-badge { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #2a7d4b; font-weight: 500; }
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #2a7d4b; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .view-all { font-size: 11px; color: #2a7d4b; font-weight: 600; cursor: pointer; background: none; border: none; }
+
+  .chat-scroll { max-height: 220px; overflow-y: auto; }
+  .chat-msg { padding: 8px 14px; border-bottom: 1px solid #f5f7fa; }
+  .chat-msg:last-child { border-bottom: none; }
+  .chat-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+  .chat-user { font-size: 12px; font-weight: 700; color: #132d52; }
+  .chat-badge { font-size: 9px; padding: 1px 6px; border-radius: 6px; font-weight: 600; }
+  .badge-mod { background: rgba(140,217,160,0.2); color: #2a7d4b; }
+  .badge-new { background: rgba(59,130,246,0.1); color: #3b82f6; }
+  .chat-time { font-size: 10px; color: #7a8ea3; margin-left: auto; }
+  .chat-text { font-size: 12px; color: #4a6178; line-height: 1.4; }
+
+  /* AI toggle + input */
+  .input-section { border-top: 1px solid #e2e8f0; padding: 8px 14px; }
+  .input-row { display: flex; align-items: center; gap: 8px; }
+  .ai-btn { padding: 5px 10px; border-radius: 14px; font-size: 11px; font-weight: 600; cursor: pointer; border: none; }
+  .ai-on { background: #2a7d4b; color: #fff; }
+  .ai-off { background: #8a9bb0; color: #fff; }
+  .chat-input { flex: 1; background: #fff; border: 1.5px solid #b0bec5; border-radius: 20px; padding: 6px 14px; font-size: 13px; color: #1a2d4a; outline: none; }
+  .chat-send { width: 32px; height: 32px; border-radius: 50%; background: #2a7d4b; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .chat-send svg { fill: #fff; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="label">Mockup D — Sector Research + Unified Chat</div>
+  <div class="desc">Sector pills are <b>research only</b>. Chat is one unified <b>UpTik Public</b> room — no per-sector chat channels. Clean separation of research vs. conversation.</div>
+
+  <!-- ── SECTOR RESEARCH ── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Sector Research</span>
+      <span class="sub">Top 15 Ranked</span>
+    </div>
+
+    <div class="pills">
+      <div class="pill active">Tech</div>
+      <div class="pill">Healthcare</div>
+      <div class="pill">Finance</div>
+      <div class="pill">Energy</div>
+      <div class="pill">Industrial</div>
+      <div class="pill">Consumer</div>
+      <div class="pill">Comms</div>
+    </div>
+
+    <div class="res-scroll">
+      <div class="res-header-row">
+        <span style="min-width:32px">Rank</span>
+        <span style="flex:1">Ticker</span>
+        <span>Score</span>
+      </div>
+      <div class="res-row"><span class="res-rank">#1</span><span class="res-ticker">NVDA</span><span class="res-score score-green">92</span><span class="res-chev">▼</span></div>
+      <div class="res-row"><span class="res-rank">#2</span><span class="res-ticker">AAPL</span><span class="res-score score-green">88</span><span class="res-chev">▼</span></div>
+      <div class="res-row"><span class="res-rank">#3</span><span class="res-ticker">MSFT</span><span class="res-score score-green">85</span><span class="res-chev">▼</span></div>
+      <div class="res-row"><span class="res-rank">#4</span><span class="res-ticker">AMD</span><span class="res-score score-green">81</span><span class="res-chev">▼</span></div>
+      <div class="res-row"><span class="res-rank">#5</span><span class="res-ticker">AVGO</span><span class="res-score score-green">78</span><span class="res-chev">▼</span></div>
+      <div class="res-row"><span class="res-rank">#6</span><span class="res-ticker">TSM</span><span class="res-score score-green">74</span><span class="res-chev">▼</span></div>
+      <div class="res-row"><span class="res-rank">#7</span><span class="res-ticker">CRM</span><span class="res-score score-green">71</span><span class="res-chev">▼</span></div>
+      <div class="res-row"><span class="res-rank">#8</span><span class="res-ticker">QCOM</span><span class="res-score score-yellow">68</span><span class="res-chev">▼</span></div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ── LIVE CHAT — Single unified room ── -->
+  <div class="section">
+    <div class="chat-header">
+      <div class="chat-title-row">
+        <span class="chat-title">Live Chat</span>
+        <div class="live-badge"><div class="live-dot"></div> 30 online</div>
+      </div>
+      <button class="view-all">View all ›</button>
+    </div>
+
+    <div class="chat-scroll">
+      <div class="chat-msg">
+        <div class="chat-meta">
+          <span class="chat-user">TraderMike</span>
+          <span class="chat-badge badge-mod">MOD</span>
+          <span class="chat-time">2m ago</span>
+        </div>
+        <div class="chat-text">NVDA looking strong into earnings. Loading calls on any dip.</div>
+      </div>
+      <div class="chat-msg">
+        <div class="chat-meta">
+          <span class="chat-user">AlphaWolf</span>
+          <span class="chat-time">5m ago</span>
+        </div>
+        <div class="chat-text">AMD breaking out of the channel. Watch $165 level for confirmation.</div>
+      </div>
+      <div class="chat-msg">
+        <div class="chat-meta">
+          <span class="chat-user">BullishSarah</span>
+          <span class="chat-badge badge-new">NEW</span>
+          <span class="chat-time">8m ago</span>
+        </div>
+        <div class="chat-text">Anyone else in AVGO? Semis are on fire today.</div>
+      </div>
+      <div class="chat-msg">
+        <div class="chat-meta">
+          <span class="chat-user">ChartKing</span>
+          <span class="chat-time">12m ago</span>
+        </div>
+        <div class="chat-text">XOM pulling back to support. Energy looking weak this week.</div>
+      </div>
+      <div class="chat-msg">
+        <div class="chat-meta">
+          <span class="chat-user">DipBuyer99</span>
+          <span class="chat-time">15m ago</span>
+        </div>
+        <div class="chat-text">Just added MSFT to my watchlist. Gap fill at $420 is the play.</div>
+      </div>
+    </div>
+
+    <div class="input-section">
+      <div class="input-row">
+        <button class="ai-btn ai-on">AI</button>
+        <input class="chat-input" placeholder="Message UpTik Public..." />
+        <button class="chat-send"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

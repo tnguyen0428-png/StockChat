@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UpTikAlerts — Watchlist Onboarding Flow</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #0a1929;
+      display: flex; flex-direction: column;
+      align-items: center; min-height: 100vh; padding: 20px 20px 40px;
+      gap: 30px;
+    }
+
+    .page-title {
+      text-align: center; max-width: 600px;
+    }
+    .page-title h1 {
+      color: #8cd9a0; font-size: 20px; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px;
+    }
+    .page-title p {
+      color: #5a7080; font-size: 13px; line-height: 1.5;
+    }
+
+    /* Step selector */
+    .step-row {
+      display: flex; gap: 6px; justify-content: center;
+      flex-wrap: wrap; max-width: 600px;
+    }
+    .step-btn {
+      padding: 8px 16px; border-radius: 20px;
+      font-family: inherit; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1.5px solid rgba(140,217,160,0.3);
+      background: transparent; color: #5a7080;
+      transition: all 0.2s;
+    }
+    .step-btn.active {
+      background: #2a7d4b; color: #fff; border-color: #2a7d4b;
+    }
+    .step-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); font-size: 10px;
+      margin-right: 5px;
+    }
+    .step-btn.active .step-num { background: rgba(255,255,255,0.25); }
+
+    /* Phone frame */
+    .phone {
+      width: 480px; height: 900px; background: #eef2f7;
+      border-radius: 32px; overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 2px rgba(255,255,255,0.08);
+      display: flex; flex-direction: column; position: relative;
+    }
+    .phone.hidden { display: none; }
+
+    /* ═══ HEADER ═══ */
+    .header {
+      background: #132d52;
+      padding: 8px 14px;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-shrink: 0;
+    }
+    .h-left { display: flex; align-items: center; gap: 5px; }
+    .logo-row { display: flex; align-items: baseline; }
+    .logo-up { font-size: 18px; font-weight: 500; color: #f0ede8; }
+    .logo-tik { font-size: 18px; font-weight: 500; color: #8cd9a0; }
+    .h-right { display: flex; align-items: center; gap: 8px; }
+    .status-pill {
+      display: flex; align-items: center; gap: 4px;
+      background: rgba(255,255,255,0.1); padding: 2px 7px; border-radius: 8px;
+    }
+    .status-dot { width: 5px; height: 5px; border-radius: 50%; background: #8cd9a0; }
+    .status-text { font-size: 9px; font-weight: 600; letter-spacing: 0.04em; color: #8cd9a0; }
+    .avatar-sm {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 600; color: #f0ede8;
+    }
+
+    /* ═══ PULSE ═══ */
+    .pulse {
+      background: #0f2440; height: 32px;
+      display: flex; align-items: center; overflow: hidden; flex-shrink: 0;
+      border-bottom: 1px solid #1a3a5a;
+    }
+    @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+    .pulse-track {
+      display: inline-flex; align-items: center; white-space: nowrap;
+      animation: scroll 22s linear infinite;
+    }
+    .p-item { display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; }
+    .p-name { font-size: 11px; font-weight: 500; color: #4a6178; }
+    .p-val { font-size: 11px; font-weight: 700; }
+    .p-val.up { color: #8cd9a0; }
+    .p-val.down { color: #e05252; }
+
+    /* ═══ CONTENT ═══ */
+    .content { flex: 1; overflow-y: auto; padding-bottom: 76px; }
+
+    /* ═══ WATCHLIST SECTION ═══ */
+    .wl-section { padding: 12px 14px 6px; }
+    .wl-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .wl-title {
+      font-size: 14px; font-weight: 600; color: #d4e4f2;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .wl-count {
+      font-size: 10px; font-weight: 500; color: #5a7080;
+      background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 8px;
+    }
+    .wl-actions { display: flex; gap: 8px; }
+    .wl-btn {
+      font-size: 11px; font-weight: 500; color: #8cd9a0;
+      background: none; border: none; cursor: pointer; font-family: inherit;
+    }
+
+    /* Horizontal scroll strip */
+    .wl-grid {
+      display: flex; gap: 8px; overflow-x: auto;
+      scrollbar-width: none; padding-bottom: 2px;
+    }
+    .wl-grid::-webkit-scrollbar { display: none; }
+    .wl-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px; padding: 8px 12px;
+      text-align: center; cursor: pointer;
+      transition: all 0.3s; position: relative;
+      flex-shrink: 0; min-width: 80px;
+    }
+    .wl-card:hover { background: rgba(255,255,255,0.09); border-color: rgba(140,217,160,0.2); }
+    .wl-card.highlight { border-color: rgba(140,217,160,0.35); }
+    .wl-card.just-added {
+      animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      border-color: rgba(140,217,160,0.5);
+      background: rgba(140,217,160,0.08);
+    }
+    @keyframes popIn {
+      0% { transform: scale(0.5); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .wl-ticker { font-size: 13px; font-weight: 700; color: #f0ede8; margin-bottom: 1px; }
+    .wl-price { font-size: 10px; color: #5a7080; margin-bottom: 2px; }
+    .wl-change-pill {
+      font-size: 10px; font-weight: 600; border-radius: 6px;
+      padding: 1px 5px; display: inline-block;
+    }
+    .wl-change-pill.up { background: rgba(140,217,160,0.12); color: #8cd9a0; }
+    .wl-change-pill.down { background: rgba(224,82,82,0.12); color: #e05252; }
+
+    /* Add card in strip */
+    .wl-add {
+      background: rgba(140,217,160,0.04);
+      border: 1.5px dashed rgba(140,217,160,0.2);
+      border-radius: 10px; padding: 8px 14px;
+      text-align: center; cursor: pointer;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 1px;
+      transition: all 0.15s; flex-shrink: 0; min-width: 56px;
+    }
+    .wl-add:hover { border-color: rgba(140,217,160,0.4); background: rgba(140,217,160,0.08); }
+    .wl-add-icon { font-size: 18px; color: #8cd9a0; line-height: 1; }
+    .wl-add-text { font-size: 9px; color: rgba(140,217,160,0.5); font-weight: 500; }
+
+    /* ═══ EMPTY STATE ═══ */
+    .wl-empty {
+      background: rgba(140,217,160,0.04);
+      border: 1.5px dashed rgba(140,217,160,0.2);
+      border-radius: 12px; padding: 14px 14px;
+      text-align: center;
+    }
+    .wl-empty-icon {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: rgba(140,217,160,0.1);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 8px;
+    }
+    .wl-empty-title { font-size: 13px; font-weight: 600; color: #d4e4f2; margin-bottom: 2px; }
+    .wl-empty-sub { font-size: 11px; color: #5a7080; line-height: 1.3; margin-bottom: 10px; }
+    .wl-empty-btn {
+      background: #2a7d4b; color: #fff; border: none;
+      border-radius: 8px; padding: 8px 20px;
+      font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+    }
+    .wl-empty-popular {
+      margin-top: 10px; display: flex; gap: 5px;
+      justify-content: center; flex-wrap: wrap;
+    }
+    .wl-pop-chip {
+      font-size: 11px; font-weight: 600; color: #8cd9a0;
+      background: rgba(140,217,160,0.1);
+      border: 1px solid rgba(140,217,160,0.2);
+      border-radius: 8px; padding: 4px 10px; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .wl-pop-chip:hover { background: rgba(140,217,160,0.2); }
+    .wl-pop-chip.selected {
+      background: #2a7d4b; color: #fff; border-color: #2a7d4b;
+    }
+
+    /* ═══ SEARCH BAR (inline) ═══ */
+    .wl-search {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(140,217,160,0.2);
+      border-radius: 10px; padding: 7px 12px; margin-top: 8px;
+    }
+    .wl-search-icon { color: #5a7080; flex-shrink: 0; }
+    .wl-search-input {
+      flex: 1; background: none; border: none; outline: none;
+      font-family: inherit; font-size: 12px; color: #d4e4f2;
+    }
+    .wl-search-input::placeholder { color: #3e5568; }
+    .wl-search-results {
+      margin-top: 6px; background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px; overflow: hidden;
+    }
+    .wl-search-item {
+      padding: 8px 12px; display: flex; align-items: center;
+      justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.04);
+      cursor: pointer; transition: background 0.15s;
+    }
+    .wl-search-item:hover { background: rgba(140,217,160,0.06); }
+    .wl-search-item:last-child { border-bottom: none; }
+    .wl-si-left { display: flex; flex-direction: column; }
+    .wl-si-ticker { font-size: 13px; font-weight: 700; color: #f0ede8; }
+    .wl-si-name { font-size: 10px; color: #5a7080; }
+    .wl-si-add {
+      font-size: 11px; font-weight: 600; color: #8cd9a0;
+      background: rgba(140,217,160,0.1); border: 1px solid rgba(140,217,160,0.2);
+      border-radius: 8px; padding: 4px 12px; cursor: pointer;
+    }
+    .wl-si-added {
+      font-size: 11px; font-weight: 600; color: #5a7080;
+      padding: 4px 12px;
+    }
+
+    /* ═══ BRIEFING ═══ */
+    .brief-section { padding: 12px 14px 0; }
+    .brief-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .brief-title { font-size: 13px; font-weight: 600; color: #1a2d4a; }
+    .brief-time { font-size: 10px; color: #7a8ea3; }
+    .brief-toggle {
+      font-size: 11px; color: #2a7d4b; font-weight: 600;
+      background: none; border: none; cursor: pointer; font-family: inherit;
+    }
+    .brief-card {
+      background: #fff; border: 1px solid #e2e8f0;
+      border-radius: 10px; padding: 10px 12px;
+      margin-bottom: 6px; display: flex; align-items: center; gap: 10px;
+    }
+    .bf-tickers { font-size: 10px; font-weight: 700; color: #2a7d4b; margin-bottom: 2px; }
+    .bf-title { font-size: 12px; color: #1a2d4a; font-weight: 500; line-height: 1.3; }
+    .bf-link {
+      color: #2a7d4b; font-size: 11px; font-weight: 600;
+      text-decoration: none; flex-shrink: 0;
+    }
+
+    /* ═══ CHAT SECTION ═══ */
+    .chat-section { padding: 10px 14px 0; }
+    .cs-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .cs-title {
+      font-size: 13px; font-weight: 600; color: #1a2d4a;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .cs-live {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 10px; color: #2a7d4b; font-weight: 500;
+    }
+    @keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .cs-live-dot {
+      width: 5px; height: 5px; border-radius: 50%; background: #2a7d4b;
+      animation: livePulse 1.5s ease-in-out infinite;
+    }
+    .cs-viewall {
+      font-size: 12px; color: #2a7d4b; font-weight: 600;
+      background: none; border: none; cursor: pointer; font-family: inherit;
+    }
+    .group-pills {
+      display: flex; gap: 6px; margin-bottom: 8px;
+      overflow-x: auto; scrollbar-width: none;
+    }
+    .group-pills::-webkit-scrollbar { display: none; }
+    .gp {
+      flex-shrink: 0; padding: 4px 12px; border-radius: 14px;
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      border: 1px solid #d8e2ed; background: #fff; color: #4a6178;
+      display: flex; align-items: center; gap: 5px;
+      transition: all 0.15s;
+    }
+    .gp.active { background: #2a7d4b; color: #fff; border-color: #2a7d4b; }
+    .gp .gp-dot { width: 5px; height: 5px; border-radius: 50%; background: #b0bec5; }
+    .gp.active .gp-dot { background: #8cd9a0; }
+    .gp-count { font-size: 10px; opacity: 0.7; }
+
+    .chat-card {
+      background: #fff; border: 1px solid #d8e2ed;
+      border-radius: 12px; overflow: hidden;
+    }
+    .cc-msgs { padding: 0; }
+    .cc-msg {
+      padding: 8px 12px; border-bottom: 1px solid #f5f7fa;
+      display: flex; gap: 8px; align-items: flex-start;
+    }
+    .cc-msg:last-child { border-bottom: none; }
+    .cc-av {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 600; color: #fff; flex-shrink: 0;
+    }
+    .cc-body { flex: 1; min-width: 0; }
+    .cc-top { display: flex; align-items: baseline; gap: 6px; margin-bottom: 1px; }
+    .cc-name { font-size: 12px; font-weight: 600; }
+    .cc-badge {
+      font-size: 8px; font-weight: 700; padding: 1px 4px;
+      border-radius: 3px; text-transform: uppercase;
+    }
+    .cc-time { font-size: 10px; color: #7a8ea3; margin-left: auto; }
+    .cc-text { font-size: 13px; color: #4a6178; line-height: 1.4; }
+    .cc-text .tk { color: #2a7d4b; font-weight: 600; }
+    .cc-footer {
+      padding: 8px 12px; background: #f8fafc;
+      display: flex; align-items: center; gap: 8px;
+      border-top: 1px solid #eef2f7;
+    }
+    .cc-input {
+      flex: 1; background: #eef2f7; border: 1px solid #d8e2ed;
+      border-radius: 20px; padding: 6px 14px; font-size: 12px;
+      color: #7a8ea3; font-family: inherit; outline: none;
+    }
+    .cc-send {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: #2a7d4b; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cc-ai-btn {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: linear-gradient(135deg, #8B5CF6, #6D28D9);
+      border: none; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 700; color: #fff;
+    }
+
+    /* ═══ BOTTOM NAV ═══ */
+    .bnav {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 62px; background: #f8fafc;
+      border-top: 1px solid #d8e2ed;
+      display: flex; align-items: center; justify-content: space-around;
+      padding: 0 6px;
+    }
+    .bn-item {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 2px; cursor: pointer; flex: 1;
+    }
+    .bn-label { font-size: 10px; font-weight: 500; color: #7a8ea3; }
+    .bn-label.active { color: #132d52; }
+    .unread-dot {
+      position: absolute; top: -2px; right: -4px;
+      width: 7px; height: 7px; background: #e05252;
+      border-radius: 50%; border: 1.5px solid #f8fafc;
+    }
+
+    /* ═══ STEP DESCRIPTION ═══ */
+    .step-desc {
+      text-align: center; max-width: 480px;
+      background: rgba(140,217,160,0.06);
+      border: 1px solid rgba(140,217,160,0.15);
+      border-radius: 12px; padding: 12px 16px;
+    }
+    .step-desc-title {
+      font-size: 13px; font-weight: 600; color: #8cd9a0; margin-bottom: 4px;
+    }
+    .step-desc-text {
+      font-size: 12px; color: #5a7080; line-height: 1.5;
+    }
+    .step-desc.hidden { display: none; }
+
+    /* ═══ TOAST ═══ */
+    .toast {
+      position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+      background: #2a7d4b; color: #fff; font-size: 12px; font-weight: 600;
+      padding: 8px 16px; border-radius: 20px;
+      box-shadow: 0 4px 12px rgba(42,125,75,0.3);
+      display: flex; align-items: center; gap: 6px;
+      z-index: 10;
+    }
+    .toast-check { font-size: 14px; }
+  </style>
+</head>
+<body>
+
+  <div class="page-title">
+    <h1>Watchlist Onboarding Flow</h1>
+    <p>What new users see as they build their watchlist — from empty state to fully populated.</p>
+  </div>
+
+  <div class="step-row">
+    <button class="step-btn active" onclick="showStep(1)"><span class="step-num">1</span> Empty State</button>
+    <button class="step-btn" onclick="showStep(2)"><span class="step-num">2</span> Chip Tapped</button>
+    <button class="step-btn" onclick="showStep(3)"><span class="step-num">3</span> Adding More</button>
+    <button class="step-btn" onclick="showStep(4)"><span class="step-num">4</span> Watchlist Built</button>
+  </div>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- STEP 1: EMPTY STATE                         -->
+  <!-- ════════════════════════════════════════════ -->
+  <div class="step-desc" id="desc-1">
+    <div class="step-desc-title">Fresh signup — no tickers yet</div>
+    <div class="step-desc-text">User sees the empty watchlist with a CTA button and popular ticker chips for quick adds. Tapping a chip instantly adds it.</div>
+  </div>
+
+  <div class="phone" id="phone-1">
+    <div class="header">
+      <div class="h-left">
+        <div class="logo-row"><span class="logo-up">Up</span><span class="logo-tik">Tik</span></div>
+      </div>
+      <div class="h-right">
+        <div class="status-pill">
+          <div class="status-dot live"></div>
+          <span class="status-text" style="color:#8cd9a0;">LIVE</span>
+        </div>
+        <div class="avatar-sm">T</div>
+      </div>
+    </div>
+    <div class="pulse">
+      <div class="pulse-track">
+        <span class="p-item"><span class="p-name">S&P</span><span class="p-val up">▲0.23%</span></span>
+        <span class="p-item"><span class="p-name">NAS</span><span class="p-val up">▲0.28%</span></span>
+        <span class="p-item"><span class="p-name">DOW</span><span class="p-val down">▼0.10%</span></span>
+        <span class="p-item"><span class="p-name">GOLD</span><span class="p-val up">▲0.35%</span></span>
+        <span class="p-item"><span class="p-name">OIL</span><span class="p-val down">▼0.55%</span></span>
+        <span class="p-item"><span class="p-name">VIX</span><span class="p-val down">▼1.82%</span></span>
+        <span class="p-item"><span class="p-name">S&P</span><span class="p-val up">▲0.23%</span></span>
+        <span class="p-item"><span class="p-name">NAS</span><span class="p-val up">▲0.28%</span></span>
+        <span class="p-item"><span class="p-name">DOW</span><span class="p-val down">▼0.10%</span></span>
+      </div>
+    </div>
+    <div class="content">
+      <div class="wl-section">
+        <div class="wl-header">
+          <span class="wl-title">My Watchlist</span>
+        </div>
+        <div class="wl-empty">
+          <div class="wl-empty-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8cd9a0" stroke-width="1.5" stroke-linecap="round">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </div>
+          <div class="wl-empty-title">Track the tickers that matter to you</div>
+          <div class="wl-empty-sub">Add stocks to see live prices, alerts, and what the community is saying about them.</div>
+          <button class="wl-empty-btn">+ Add Your First Ticker</button>
+          <div class="wl-empty-popular">
+            <span style="font-size:10px;color:#3e5568;margin-right:2px;">Popular:</span>
+            <span class="wl-pop-chip">NVDA</span>
+            <span class="wl-pop-chip">AAPL</span>
+            <span class="wl-pop-chip">TSLA</span>
+            <span class="wl-pop-chip">AMD</span>
+            <span class="wl-pop-chip">SPY</span>
+            <span class="wl-pop-chip">META</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Briefing -->
+      <div class="brief-section">
+        <div class="brief-header">
+          <div>
+            <span class="brief-title">Daily Briefing</span>
+            <span class="brief-time" style="margin-left:6px;">8:32 AM EST</span>
+          </div>
+          <button class="brief-toggle">Show ▼</button>
+        </div>
+        <div class="brief-card">
+          <div style="flex:1;min-width:0;">
+            <div class="bf-tickers">NVDA · AMD</div>
+            <div class="bf-title">Nvidia surges on AI chip demand, AMD follows suit</div>
+          </div>
+          <a href="#" class="bf-link">Read →</a>
+        </div>
+      </div>
+
+      <!-- Chat -->
+      <div class="chat-section">
+        <div class="cs-header">
+          <div class="cs-title">
+            Live Chat
+            <div class="cs-live"><div class="cs-live-dot"></div> 142 online</div>
+          </div>
+          <button class="cs-viewall">View all ›</button>
+        </div>
+        <div class="group-pills">
+          <div class="gp active"><div class="gp-dot"></div> UpTik Public <span class="gp-count">142</span></div>
+          <div class="gp"><div class="gp-dot"></div> Tech <span class="gp-count">87</span></div>
+          <div class="gp"><div class="gp-dot"></div> Energy <span class="gp-count">34</span></div>
+        </div>
+        <div class="chat-card">
+          <div class="cc-msgs">
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#2a7d4b;">M</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#2a7d4b;">Mike_Trades</span><span class="cc-time">2m ago</span></div>
+                <div class="cc-text"><span class="tk">$NVDA</span> breaking out above 148, volume is insane 🔥</div>
+              </div>
+            </div>
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#7B68EE;">S</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#7B68EE;">Sarah_K</span><span class="cc-time">5m ago</span></div>
+                <div class="cc-text">Watching <span class="tk">$TSLA</span> for that 250 bounce. Anyone else in?</div>
+              </div>
+            </div>
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#FF7043;">D</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#FF7043;">DayTrader_J</span><span class="cc-badge" style="background:rgba(255,179,0,0.15);color:#FFB300;">HOT STREAK</span><span class="cc-time">8m ago</span></div>
+                <div class="cc-text">Closed <span class="tk">$AMD</span> calls for +35%. That setup was textbook 🚀</div>
+              </div>
+            </div>
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#4CAF50;">A</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#4CAF50;">AlphaFlow</span><span class="cc-time">12m ago</span></div>
+                <div class="cc-text"><span class="tk">$META</span> earnings run-up looking strong. Calls loaded for next week</div>
+              </div>
+            </div>
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#E91E63;">R</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#E91E63;">Rachel_Inv</span><span class="cc-time">15m ago</span></div>
+                <div class="cc-text">Anyone watching <span class="tk">$SPY</span> 520 level? That's the key support imo</div>
+              </div>
+            </div>
+          </div>
+          <div class="cc-footer">
+            <button class="cc-ai-btn" title="Ask AI">AI</button>
+            <input class="cc-input" placeholder="Ask AI or chat with the group..." readonly>
+            <button class="cc-send"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bnav">
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 9.5L12 3L21 9.5V20C21 20.55 20.55 21 20 21H15V15H9V21H4C3.45 21 3 20.55 3 20V9.5Z" fill="#132d52"/></svg><span class="bn-label active">Home</span></div>
+      <div class="bn-item"><div style="position:relative;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z" fill="#7a8ea3"/></svg><div class="unread-dot"></div></div><span class="bn-label">Alerts</span></div>
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" fill="#7a8ea3"/></svg><span class="bn-label">Chat</span></div>
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#7a8ea3"/></svg><span class="bn-label">Challenge</span></div>
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="#7a8ea3"/></svg><span class="bn-label">Profile</span></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- STEP 2: CHIP TAPPED — first ticker added    -->
+  <!-- ════════════════════════════════════════════ -->
+  <div class="step-desc hidden" id="desc-2">
+    <div class="step-desc-title">User taps "NVDA" chip — instant add</div>
+    <div class="step-desc-text">The chip highlights as selected, and the watchlist transforms from empty state to the strip with NVDA as the first card (animated pop-in). A toast confirms the add. Other chips remain for quick follow-up taps.</div>
+  </div>
+
+  <div class="phone hidden" id="phone-2">
+    <div class="header">
+      <div class="h-left"><div class="logo-row"><span class="logo-up">Up</span><span class="logo-tik">Tik</span></div></div>
+      <div class="h-right">
+        <div class="status-pill"><div class="status-dot live"></div><span class="status-text" style="color:#8cd9a0;">LIVE</span></div>
+        <div class="avatar-sm">T</div>
+      </div>
+    </div>
+    <div class="pulse">
+      <div class="pulse-track">
+        <span class="p-item"><span class="p-name">S&P</span><span class="p-val up">▲0.23%</span></span>
+        <span class="p-item"><span class="p-name">NAS</span><span class="p-val up">▲0.28%</span></span>
+        <span class="p-item"><span class="p-name">DOW</span><span class="p-val down">▼0.10%</span></span>
+        <span class="p-item"><span class="p-name">GOLD</span><span class="p-val up">▲0.35%</span></span>
+        <span class="p-item"><span class="p-name">OIL</span><span class="p-val down">▼0.55%</span></span>
+        <span class="p-item"><span class="p-name">VIX</span><span class="p-val down">▼1.82%</span></span>
+        <span class="p-item"><span class="p-name">S&P</span><span class="p-val up">▲0.23%</span></span>
+        <span class="p-item"><span class="p-name">NAS</span><span class="p-val up">▲0.28%</span></span>
+        <span class="p-item"><span class="p-name">DOW</span><span class="p-val down">▼0.10%</span></span>
+      </div>
+    </div>
+    <div class="content">
+      <!-- Toast -->
+      <div class="toast"><span class="toast-check">✓</span> NVDA added to watchlist</div>
+
+      <div class="wl-section">
+        <div class="wl-header">
+          <span class="wl-title">My Watchlist <span class="wl-count">1</span></span>
+        </div>
+        <!-- Strip with first card -->
+        <div class="wl-grid">
+          <div class="wl-card just-added highlight">
+            <div class="wl-ticker">NVDA</div>
+            <div class="wl-price">$148.32</div>
+            <span class="wl-change-pill up">+2.41%</span>
+          </div>
+          <div class="wl-add">
+            <span class="wl-add-icon">+</span>
+            <span class="wl-add-text">Add</span>
+          </div>
+        </div>
+        <!-- Popular chips still showing for quick follow-up -->
+        <div class="wl-empty-popular" style="margin-top:10px;">
+          <span style="font-size:10px;color:#3e5568;margin-right:2px;">Add more:</span>
+          <span class="wl-pop-chip selected">NVDA</span>
+          <span class="wl-pop-chip">AAPL</span>
+          <span class="wl-pop-chip">TSLA</span>
+          <span class="wl-pop-chip">AMD</span>
+          <span class="wl-pop-chip">SPY</span>
+          <span class="wl-pop-chip">META</span>
+        </div>
+      </div>
+
+      <!-- Briefing -->
+      <div class="brief-section">
+        <div class="brief-header">
+          <div>
+            <span class="brief-title">Daily Briefing</span>
+            <span class="brief-time" style="margin-left:6px;">8:32 AM EST</span>
+          </div>
+          <button class="brief-toggle">Show ▼</button>
+        </div>
+        <div class="brief-card">
+          <div style="flex:1;min-width:0;">
+            <div class="bf-tickers">NVDA · AMD</div>
+            <div class="bf-title">Nvidia surges on AI chip demand, AMD follows suit</div>
+          </div>
+          <a href="#" class="bf-link">Read →</a>
+        </div>
+      </div>
+
+      <!-- Chat -->
+      <div class="chat-section">
+        <div class="cs-header">
+          <div class="cs-title">Live Chat<div class="cs-live"><div class="cs-live-dot"></div> 142 online</div></div>
+          <button class="cs-viewall">View all ›</button>
+        </div>
+        <div class="group-pills">
+          <div class="gp active"><div class="gp-dot"></div> UpTik Public <span class="gp-count">142</span></div>
+          <div class="gp"><div class="gp-dot"></div> Tech <span class="gp-count">87</span></div>
+          <div class="gp"><div class="gp-dot"></div> Energy <span class="gp-count">34</span></div>
+        </div>
+        <div class="chat-card">
+          <div class="cc-msgs">
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#2a7d4b;">M</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#2a7d4b;">Mike_Trades</span><span class="cc-time">2m ago</span></div>
+                <div class="cc-text"><span class="tk">$NVDA</span> breaking out above 148, volume is insane 🔥</div>
+              </div>
+            </div>
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#7B68EE;">S</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#7B68EE;">Sarah_K</span><span class="cc-time">5m ago</span></div>
+                <div class="cc-text">Watching <span class="tk">$TSLA</span> for that 250 bounce. Anyone else in?</div>
+              </div>
+            </div>
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#FF7043;">D</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#FF7043;">DayTrader_J</span><span class="cc-badge" style="background:rgba(255,179,0,0.15);color:#FFB300;">HOT STREAK</span><span class="cc-time">8m ago</span></div>
+                <div class="cc-text">Closed <span class="tk">$AMD</span> calls for +35%. That setup was textbook 🚀</div>
+              </div>
+            </div>
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#4CAF50;">A</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#4CAF50;">AlphaFlow</span><span class="cc-time">12m ago</span></div>
+                <div class="cc-text"><span class="tk">$META</span> earnings run-up looking strong. Calls loaded for next week</div>
+              </div>
+            </div>
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#E91E63;">R</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#E91E63;">Rachel_Inv</span><span class="cc-time">15m ago</span></div>
+                <div class="cc-text">Anyone watching <span class="tk">$SPY</span> 520 level? That's the key support imo</div>
+              </div>
+            </div>
+          </div>
+          <div class="cc-footer">
+            <button class="cc-ai-btn" title="Ask AI">AI</button>
+            <input class="cc-input" placeholder="Ask AI or chat with the group..." readonly>
+            <button class="cc-send"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bnav">
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 9.5L12 3L21 9.5V20C21 20.55 20.55 21 20 21H15V15H9V21H4C3.45 21 3 20.55 3 20V9.5Z" fill="#132d52"/></svg><span class="bn-label active">Home</span></div>
+      <div class="bn-item"><div style="position:relative;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z" fill="#7a8ea3"/></svg><div class="unread-dot"></div></div><span class="bn-label">Alerts</span></div>
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" fill="#7a8ea3"/></svg><span class="bn-label">Chat</span></div>
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#7a8ea3"/></svg><span class="bn-label">Challenge</span></div>
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="#7a8ea3"/></svg><span class="bn-label">Profile</span></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- STEP 3: ADDING MORE — search + chips         -->
+  <!-- ════════════════════════════════════════════ -->
+  <div class="step-desc hidden" id="desc-3">
+    <div class="step-desc-title">User taps "+ Add" or wants a custom ticker</div>
+    <div class="step-desc-text">An inline search bar appears below the strip. User types "GO" and sees matching results. They've already added NVDA, AAPL, TSLA via chips. Now searching for GOOG to add manually.</div>
+  </div>
+
+  <div class="phone hidden" id="phone-3">
+    <div class="header">
+      <div class="h-left"><div class="logo-row"><span class="logo-up">Up</span><span class="logo-tik">Tik</span></div></div>
+      <div class="h-right">
+        <div class="status-pill"><div class="status-dot live"></div><span class="status-text" style="color:#8cd9a0;">LIVE</span></div>
+        <div class="avatar-sm">T</div>
+      </div>
+    </div>
+    <div class="pulse">
+      <div class="pulse-track">
+        <span class="p-item"><span class="p-name">S&P</span><span class="p-val up">▲0.23%</span></span>
+        <span class="p-item"><span class="p-name">NAS</span><span class="p-val up">▲0.28%</span></span>
+        <span class="p-item"><span class="p-name">DOW</span><span class="p-val down">▼0.10%</span></span>
+        <span class="p-item"><span class="p-name">GOLD</span><span class="p-val up">▲0.35%</span></span>
+        <span class="p-item"><span class="p-name">OIL</span><span class="p-val down">▼0.55%</span></span>
+        <span class="p-item"><span class="p-name">VIX</span><span class="p-val down">▼1.82%</span></span>
+        <span class="p-item"><span class="p-name">S&P</span><span class="p-val up">▲0.23%</span></span>
+        <span class="p-item"><span class="p-name">NAS</span><span class="p-val up">▲0.28%</span></span>
+        <span class="p-item"><span class="p-name">DOW</span><span class="p-val down">▼0.10%</span></span>
+      </div>
+    </div>
+    <div class="content">
+      <div class="wl-section">
+        <div class="wl-header">
+          <span class="wl-title">My Watchlist <span class="wl-count">3</span></span>
+          <div class="wl-actions"><button class="wl-btn">Done</button></div>
+        </div>
+        <div class="wl-grid">
+          <div class="wl-card highlight">
+            <div class="wl-ticker">NVDA</div>
+            <div class="wl-price">$148.32</div>
+            <span class="wl-change-pill up">+2.41%</span>
+          </div>
+          <div class="wl-card">
+            <div class="wl-ticker">AAPL</div>
+            <div class="wl-price">$198.50</div>
+            <span class="wl-change-pill up">+0.87%</span>
+          </div>
+          <div class="wl-card">
+            <div class="wl-ticker">TSLA</div>
+            <div class="wl-price">$245.10</div>
+            <span class="wl-change-pill down">-1.32%</span>
+          </div>
+          <div class="wl-add">
+            <span class="wl-add-icon">+</span>
+            <span class="wl-add-text">Add</span>
+          </div>
+        </div>
+        <!-- Inline search -->
+        <div class="wl-search">
+          <div class="wl-search-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5a7080" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          </div>
+          <input class="wl-search-input" value="GO" placeholder="Search ticker or company...">
+        </div>
+        <div class="wl-search-results">
+          <div class="wl-search-item">
+            <div class="wl-si-left">
+              <span class="wl-si-ticker">GOOG</span>
+              <span class="wl-si-name">Alphabet Inc. Class C</span>
+            </div>
+            <button class="wl-si-add">+ Add</button>
+          </div>
+          <div class="wl-search-item">
+            <div class="wl-si-left">
+              <span class="wl-si-ticker">GOOGL</span>
+              <span class="wl-si-name">Alphabet Inc. Class A</span>
+            </div>
+            <button class="wl-si-add">+ Add</button>
+          </div>
+          <div class="wl-search-item">
+            <div class="wl-si-left">
+              <span class="wl-si-ticker">GOLD</span>
+              <span class="wl-si-name">Barrick Gold Corporation</span>
+            </div>
+            <button class="wl-si-add">+ Add</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Briefing -->
+      <div class="brief-section">
+        <div class="brief-header">
+          <div>
+            <span class="brief-title">Daily Briefing</span>
+            <span class="brief-time" style="margin-left:6px;">8:32 AM EST</span>
+          </div>
+          <button class="brief-toggle">Show ▼</button>
+        </div>
+        <div class="brief-card">
+          <div style="flex:1;min-width:0;">
+            <div class="bf-tickers">NVDA · AMD</div>
+            <div class="bf-title">Nvidia surges on AI chip demand, AMD follows suit</div>
+          </div>
+          <a href="#" class="bf-link">Read →</a>
+        </div>
+      </div>
+
+      <!-- Chat -->
+      <div class="chat-section">
+        <div class="cs-header">
+          <div class="cs-title">Live Chat<div class="cs-live"><div class="cs-live-dot"></div> 142 online</div></div>
+          <button class="cs-viewall">View all ›</button>
+        </div>
+        <div class="group-pills">
+          <div class="gp active"><div class="gp-dot"></div> UpTik Public <span class="gp-count">142</span></div>
+          <div class="gp"><div class="gp-dot"></div> Tech <span class="gp-count">87</span></div>
+          <div class="gp"><div class="gp-dot"></div> Energy <span class="gp-count">34</span></div>
+        </div>
+        <div class="chat-card">
+          <div class="cc-msgs">
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#2a7d4b;">M</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#2a7d4b;">Mike_Trades</span><span class="cc-time">2m ago</span></div>
+                <div class="cc-text"><span class="tk">$NVDA</span> breaking out above 148, volume is insane 🔥</div>
+              </div>
+            </div>
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#7B68EE;">S</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#7B68EE;">Sarah_K</span><span class="cc-time">5m ago</span></div>
+                <div class="cc-text">Watching <span class="tk">$TSLA</span> for that 250 bounce. Anyone else in?</div>
+              </div>
+            </div>
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#FF7043;">D</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#FF7043;">DayTrader_J</span><span class="cc-badge" style="background:rgba(255,179,0,0.15);color:#FFB300;">HOT STREAK</span><span class="cc-time">8m ago</span></div>
+                <div class="cc-text">Closed <span class="tk">$AMD</span> calls for +35%. That setup was textbook 🚀</div>
+              </div>
+            </div>
+          </div>
+          <div class="cc-footer">
+            <button class="cc-ai-btn" title="Ask AI">AI</button>
+            <input class="cc-input" placeholder="Ask AI or chat with the group..." readonly>
+            <button class="cc-send"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bnav">
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 9.5L12 3L21 9.5V20C21 20.55 20.55 21 20 21H15V15H9V21H4C3.45 21 3 20.55 3 20V9.5Z" fill="#132d52"/></svg><span class="bn-label active">Home</span></div>
+      <div class="bn-item"><div style="position:relative;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z" fill="#7a8ea3"/></svg><div class="unread-dot"></div></div><span class="bn-label">Alerts</span></div>
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" fill="#7a8ea3"/></svg><span class="bn-label">Chat</span></div>
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#7a8ea3"/></svg><span class="bn-label">Challenge</span></div>
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="#7a8ea3"/></svg><span class="bn-label">Profile</span></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- STEP 4: WATCHLIST BUILT — final state        -->
+  <!-- ════════════════════════════════════════════ -->
+  <div class="step-desc hidden" id="desc-4">
+    <div class="step-desc-title">Watchlist complete — back to normal Home</div>
+    <div class="step-desc-text">Search and chips dismiss. The strip now scrolls with all their picks. The popular chips and search are gone — just a clean "+ Add" card at the end for future adds. This matches the returning user V1 design.</div>
+  </div>
+
+  <div class="phone hidden" id="phone-4">
+    <div class="header">
+      <div class="h-left"><div class="logo-row"><span class="logo-up">Up</span><span class="logo-tik">Tik</span></div></div>
+      <div class="h-right">
+        <div class="status-pill"><div class="status-dot live"></div><span class="status-text" style="color:#8cd9a0;">LIVE</span></div>
+        <div class="avatar-sm">T</div>
+      </div>
+    </div>
+    <div class="pulse">
+      <div class="pulse-track">
+        <span class="p-item"><span class="p-name">S&P</span><span class="p-val up">▲0.23%</span></span>
+        <span class="p-item"><span class="p-name">NAS</span><span class="p-val up">▲0.28%</span></span>
+        <span class="p-item"><span class="p-name">DOW</span><span class="p-val down">▼0.10%</span></span>
+        <span class="p-item"><span class="p-name">GOLD</span><span class="p-val up">▲0.35%</span></span>
+        <span class="p-item"><span class="p-name">OIL</span><span class="p-val down">▼0.55%</span></span>
+        <span class="p-item"><span class="p-name">VIX</span><span class="p-val down">▼1.82%</span></span>
+        <span class="p-item"><span class="p-name">S&P</span><span class="p-val up">▲0.23%</span></span>
+        <span class="p-item"><span class="p-name">NAS</span><span class="p-val up">▲0.28%</span></span>
+        <span class="p-item"><span class="p-name">DOW</span><span class="p-val down">▼0.10%</span></span>
+      </div>
+    </div>
+    <div class="content">
+      <div class="wl-section">
+        <div class="wl-header">
+          <span class="wl-title">My Watchlist <span class="wl-count">5</span></span>
+          <div class="wl-actions"><button class="wl-btn">Edit</button></div>
+        </div>
+        <div class="wl-grid">
+          <div class="wl-card highlight">
+            <div class="wl-ticker">NVDA</div>
+            <div class="wl-price">$148.32</div>
+            <span class="wl-change-pill up">+2.41%</span>
+          </div>
+          <div class="wl-card">
+            <div class="wl-ticker">AAPL</div>
+            <div class="wl-price">$198.50</div>
+            <span class="wl-change-pill up">+0.87%</span>
+          </div>
+          <div class="wl-card">
+            <div class="wl-ticker">TSLA</div>
+            <div class="wl-price">$245.10</div>
+            <span class="wl-change-pill down">-1.32%</span>
+          </div>
+          <div class="wl-card">
+            <div class="wl-ticker">GOOG</div>
+            <div class="wl-price">$176.88</div>
+            <span class="wl-change-pill up">+1.05%</span>
+          </div>
+          <div class="wl-card">
+            <div class="wl-ticker">AMD</div>
+            <div class="wl-price">$167.88</div>
+            <span class="wl-change-pill up">+1.55%</span>
+          </div>
+          <div class="wl-add">
+            <span class="wl-add-icon">+</span>
+            <span class="wl-add-text">Add</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Briefing -->
+      <div class="brief-section">
+        <div class="brief-header">
+          <div>
+            <span class="brief-title">Daily Briefing</span>
+            <span class="brief-time" style="margin-left:6px;">8:32 AM EST</span>
+          </div>
+          <button class="brief-toggle">+2 more ▼</button>
+        </div>
+        <div class="brief-card">
+          <div style="flex:1;min-width:0;">
+            <div class="bf-tickers">NVDA · AMD</div>
+            <div class="bf-title">Nvidia surges on AI chip demand, AMD follows suit</div>
+          </div>
+          <a href="#" class="bf-link">Read →</a>
+        </div>
+        <div class="brief-card">
+          <div style="flex:1;min-width:0;">
+            <div class="bf-tickers">AAPL</div>
+            <div class="bf-title">Apple announces OpenAI partnership for Siri overhaul</div>
+          </div>
+          <a href="#" class="bf-link">Read →</a>
+        </div>
+      </div>
+
+      <!-- Chat -->
+      <div class="chat-section">
+        <div class="cs-header">
+          <div class="cs-title">Live Chat<div class="cs-live"><div class="cs-live-dot"></div> 142 online</div></div>
+          <button class="cs-viewall">View all ›</button>
+        </div>
+        <div class="group-pills">
+          <div class="gp active"><div class="gp-dot"></div> UpTik Public <span class="gp-count">142</span></div>
+          <div class="gp"><div class="gp-dot"></div> Tech <span class="gp-count">87</span></div>
+          <div class="gp"><div class="gp-dot"></div> Energy <span class="gp-count">34</span></div>
+        </div>
+        <div class="chat-card">
+          <div class="cc-msgs">
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#2a7d4b;">M</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#2a7d4b;">Mike_Trades</span><span class="cc-time">2m ago</span></div>
+                <div class="cc-text"><span class="tk">$NVDA</span> breaking out above 148, volume is insane 🔥</div>
+              </div>
+            </div>
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#7B68EE;">S</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#7B68EE;">Sarah_K</span><span class="cc-time">5m ago</span></div>
+                <div class="cc-text">Watching <span class="tk">$TSLA</span> for that 250 bounce. Anyone else in?</div>
+              </div>
+            </div>
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#FF7043;">D</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#FF7043;">DayTrader_J</span><span class="cc-badge" style="background:rgba(255,179,0,0.15);color:#FFB300;">HOT STREAK</span><span class="cc-time">8m ago</span></div>
+                <div class="cc-text">Closed <span class="tk">$AMD</span> calls for +35%. That setup was textbook 🚀</div>
+              </div>
+            </div>
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#4CAF50;">A</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#4CAF50;">AlphaFlow</span><span class="cc-time">12m ago</span></div>
+                <div class="cc-text"><span class="tk">$META</span> earnings run-up looking strong. Calls loaded for next week</div>
+              </div>
+            </div>
+            <div class="cc-msg">
+              <div class="cc-av" style="background:#E91E63;">R</div>
+              <div class="cc-body">
+                <div class="cc-top"><span class="cc-name" style="color:#E91E63;">Rachel_Inv</span><span class="cc-time">15m ago</span></div>
+                <div class="cc-text">Anyone watching <span class="tk">$SPY</span> 520 level? That's the key support imo</div>
+              </div>
+            </div>
+          </div>
+          <div class="cc-footer">
+            <button class="cc-ai-btn" title="Ask AI">AI</button>
+            <input class="cc-input" placeholder="Ask AI or chat with the group..." readonly>
+            <button class="cc-send"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bnav">
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 9.5L12 3L21 9.5V20C21 20.55 20.55 21 20 21H15V15H9V21H4C3.45 21 3 20.55 3 20V9.5Z" fill="#132d52"/></svg><span class="bn-label active">Home</span></div>
+      <div class="bn-item"><div style="position:relative;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z" fill="#7a8ea3"/></svg><div class="unread-dot"></div></div><span class="bn-label">Alerts</span></div>
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" fill="#7a8ea3"/></svg><span class="bn-label">Chat</span></div>
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#7a8ea3"/></svg><span class="bn-label">Challenge</span></div>
+      <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="#7a8ea3"/></svg><span class="bn-label">Profile</span></div>
+    </div>
+  </div>
+
+  <script>
+    function showStep(n) {
+      document.querySelectorAll('.step-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.step-btn')[n-1].classList.add('active');
+      for (let i = 1; i <= 4; i++) {
+        document.getElementById('phone-' + i).classList.toggle('hidden', i !== n);
+        document.getElementById('desc-' + i).classList.toggle('hidden', i !== n);
+      }
+    }
+  </script>
+
+</body>
+</html>

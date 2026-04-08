@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Alerts Redesign — Mockup A: The Dealer's Table</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #0a0f1a;
+    color: #e2e8f0;
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Casino felt background */
+  .felt-bg {
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(16, 85, 55, 0.25) 0%, transparent 60%),
+      radial-gradient(circle at 20% 80%, rgba(16, 85, 55, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 80% 60%, rgba(16, 85, 55, 0.08) 0%, transparent 40%),
+      #0a0f1a;
+    min-height: 100vh;
+    padding: 0 0 40px;
+  }
+
+  /* Subtle suit pattern overlay */
+  .felt-bg::before {
+    content: '♠ ♣ ♦ ♥';
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 200px;
+    letter-spacing: 40px;
+    color: rgba(255,255,255,0.012);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Header */
+  .header {
+    padding: 16px 20px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+  .header h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #d4a853, #f0d78c, #d4a853);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.3px;
+  }
+
+  /* Mood gauge — roulette style */
+  .mood-strip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 20px 14px;
+    position: relative;
+    z-index: 1;
+  }
+  .mood-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-family: 'Outfit', sans-serif;
+  }
+  .mood-bar {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #22c55e 0%, #eab308 40%, #f97316 65%, #ef4444 100%);
+    position: relative;
+  }
+  .mood-needle {
+    position: absolute;
+    top: -4px;
+    width: 3px;
+    height: 14px;
+    background: #fff;
+    border-radius: 2px;
+    box-shadow: 0 0 6px rgba(255,255,255,0.5);
+    transition: left 0.5s ease;
+  }
+  .mood-text {
+    font-size: 12px;
+    font-weight: 700;
+    color: #f97316;
+    min-width: 60px;
+    text-align: right;
+  }
+  .mood-hint {
+    font-size: 11px;
+    color: #64748b;
+    padding: 0 20px 16px;
+    line-height: 1.4;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Hero chip area */
+  .chip-arena {
+    position: relative;
+    height: 240px;
+    margin: 0 16px 8px;
+    border-radius: 20px;
+    background:
+      radial-gradient(ellipse at 50% 100%, rgba(16, 85, 55, 0.3) 0%, transparent 70%),
+      linear-gradient(180deg, rgba(15, 23, 42, 0.3) 0%, rgba(15, 23, 42, 0.6) 100%);
+    border: 1px solid rgba(212, 168, 83, 0.15);
+    overflow: hidden;
+    z-index: 1;
+  }
+  /* Felt texture on chip arena */
+  .chip-arena::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.015'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    pointer-events: none;
+  }
+
+  .chip {
+    position: absolute;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    z-index: 2;
+  }
+  .chip:hover { transform: scale(1.08); }
+  .chip-inner {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px dashed;
+    opacity: 0.3;
+  }
+  .chip .ticker {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 800;
+    line-height: 1;
+    z-index: 1;
+  }
+  .chip .pct {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 700;
+    z-index: 1;
+  }
+
+  /* Gold AOTD chip */
+  .chip.aotd {
+    width: 90px;
+    height: 90px;
+    background: radial-gradient(circle at 30% 30%, #f0d78c, #d4a853 50%, #b8942e);
+    border: 3px solid #f0d78c;
+    box-shadow: 0 0 30px rgba(212, 168, 83, 0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+    top: 30%;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #1a1207;
+    animation: floatAOTD 6s ease-in-out infinite;
+  }
+  .chip.aotd .ticker { font-size: 16px; }
+  .chip.aotd .pct { font-size: 11px; margin-top: 2px; }
+  .chip.aotd .crown {
+    position: absolute;
+    top: -14px;
+    font-size: 16px;
+  }
+
+  /* Regular chips */
+  .chip.green {
+    background: radial-gradient(circle at 30% 30%, #1a3a2a, #0f2a1d 60%);
+    border: 2.5px solid #22c55e;
+    color: #4ade80;
+    box-shadow: 0 0 15px rgba(34, 197, 94, 0.2);
+  }
+  .chip.red {
+    background: radial-gradient(circle at 30% 30%, #3a1a1a, #2a0f0f 60%);
+    border: 2.5px solid #ef4444;
+    color: #f87171;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+  }
+
+  .chip.c1 { width: 72px; height: 72px; top: 8%; right: 12%; animation: floatC1 7s ease-in-out infinite; }
+  .chip.c1 .ticker { font-size: 13px; }
+  .chip.c1 .pct { font-size: 10px; margin-top: 1px; }
+
+  .chip.c2 { width: 64px; height: 64px; top: 12%; left: 8%; animation: floatC2 8s ease-in-out infinite; }
+  .chip.c2 .ticker { font-size: 12px; }
+  .chip.c2 .pct { font-size: 9px; margin-top: 1px; }
+
+  .chip.c3 { width: 58px; height: 58px; bottom: 15%; left: 14%; animation: floatC3 6.5s ease-in-out infinite; }
+  .chip.c3 .ticker { font-size: 11px; }
+  .chip.c3 .pct { font-size: 9px; }
+
+  .chip.c4 { width: 54px; height: 54px; bottom: 20%; right: 10%; animation: floatC4 7.5s ease-in-out infinite; }
+  .chip.c4 .ticker { font-size: 11px; }
+  .chip.c4 .pct { font-size: 8px; }
+
+  @keyframes floatAOTD { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-8px); } }
+  @keyframes floatC1 { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  @keyframes floatC2 { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+  @keyframes floatC3 { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+  @keyframes floatC4 { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+  /* Toggle bar */
+  .toggle-bar {
+    display: flex;
+    gap: 0;
+    margin: 12px 16px 16px;
+    background: rgba(30, 41, 59, 0.6);
+    border-radius: 12px;
+    padding: 3px;
+    border: 1px solid rgba(100, 116, 139, 0.15);
+    position: relative;
+    z-index: 1;
+  }
+  .toggle-btn {
+    flex: 1;
+    padding: 10px 0;
+    border: none;
+    border-radius: 10px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #94a3b8;
+    background: transparent;
+  }
+  .toggle-btn.active {
+    background: linear-gradient(135deg, rgba(212, 168, 83, 0.2), rgba(212, 168, 83, 0.08));
+    color: #f0d78c;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  /* Alert cards — the "hand" */
+  .card-feed {
+    padding: 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .alert-card {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+    border: 1px solid rgba(100, 116, 139, 0.15);
+    border-radius: 16px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .alert-card:hover {
+    border-color: rgba(212, 168, 83, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .alert-card.aotd-card {
+    border-color: rgba(212, 168, 83, 0.4);
+    background: linear-gradient(135deg, rgba(42, 35, 20, 0.8), rgba(15, 23, 42, 0.9));
+  }
+  .alert-card.aotd-card::before {
+    content: '♠';
+    position: absolute;
+    top: -20px;
+    right: -10px;
+    font-size: 100px;
+    color: rgba(212, 168, 83, 0.04);
+    pointer-events: none;
+  }
+
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+  .card-ticker {
+    font-family: 'Outfit', sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    color: #f1f5f9;
+  }
+  .card-price {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    color: #94a3b8;
+    margin-top: 2px;
+  }
+  .card-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'Outfit', sans-serif;
+  }
+  .badge-gold {
+    background: linear-gradient(135deg, rgba(212, 168, 83, 0.2), rgba(212, 168, 83, 0.08));
+    color: #f0d78c;
+    border: 1px solid rgba(212, 168, 83, 0.3);
+  }
+  .badge-green {
+    background: rgba(34, 197, 94, 0.12);
+    color: #4ade80;
+  }
+  .badge-blue {
+    background: rgba(59, 130, 246, 0.12);
+    color: #60a5fa;
+  }
+
+  /* The story line — plain English explanation */
+  .card-story {
+    font-size: 14px;
+    line-height: 1.5;
+    color: #cbd5e1;
+    margin-bottom: 12px;
+  }
+  .card-story strong {
+    color: #f1f5f9;
+    font-weight: 600;
+  }
+
+  /* Confidence bar */
+  .confidence-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .conf-bar-track {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(100, 116, 139, 0.2);
+    overflow: hidden;
+  }
+  .conf-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease;
+  }
+  .conf-bar-fill.high { background: linear-gradient(90deg, #22c55e, #4ade80); }
+  .conf-bar-fill.med { background: linear-gradient(90deg, #eab308, #facc15); }
+  .conf-bar-fill.low { background: linear-gradient(90deg, #f97316, #fb923c); }
+  .conf-label {
+    font-size: 12px;
+    font-weight: 700;
+    font-family: 'Outfit', sans-serif;
+    min-width: 85px;
+    text-align: right;
+  }
+  .conf-label.high { color: #4ade80; }
+  .conf-label.med { color: #facc15; }
+  .conf-label.low { color: #fb923c; }
+
+  /* Signal tags row */
+  .signal-tags {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .signal-tag {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    background: rgba(100, 116, 139, 0.1);
+    color: #94a3b8;
+    border: 1px solid rgba(100, 116, 139, 0.1);
+  }
+
+  /* History section */
+  .history-section {
+    margin: 24px 16px 0;
+    padding: 16px;
+    background: rgba(30, 41, 59, 0.4);
+    border-radius: 14px;
+    border: 1px solid rgba(100, 116, 139, 0.1);
+    position: relative;
+    z-index: 1;
+  }
+  .history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .history-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .history-stat {
+    font-size: 12px;
+    font-weight: 600;
+    color: #4ade80;
+  }
+  .history-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(100, 116, 139, 0.08);
+  }
+  .history-row:last-child { border-bottom: none; }
+  .history-ticker {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: #e2e8f0;
+    width: 60px;
+  }
+  .history-signal {
+    font-size: 11px;
+    color: #64748b;
+    flex: 1;
+  }
+  .history-result {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+  .history-result.win { color: #4ade80; background: rgba(34, 197, 94, 0.1); }
+  .history-result.loss { color: #f87171; background: rgba(239, 68, 68, 0.1); }
+
+  /* Section label */
+  .section-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(212, 168, 83, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 0 20px;
+    margin-bottom: 10px;
+    position: relative;
+    z-index: 1;
+  }
+</style>
+</head>
+<body>
+<div class="felt-bg">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Breakout Alerts</h1>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:20px;opacity:0.6">🌙</span>
+    </div>
+  </div>
+
+  <!-- Mood gauge -->
+  <div class="mood-strip">
+    <span class="mood-label">Market Mood</span>
+    <div class="mood-bar">
+      <div class="mood-needle" style="left: 66%;"></div>
+    </div>
+    <span class="mood-text">Fearful</span>
+  </div>
+  <div class="mood-hint">Traders are nervous — breakouts may fade faster than usual today.</div>
+
+  <!-- Chip arena -->
+  <div class="chip-arena">
+    <div class="chip aotd">
+      <span class="crown">👑</span>
+      <span class="ticker">AMD</span>
+      <span class="pct">Strong</span>
+    </div>
+    <div class="chip green c1">
+      <span class="ticker">SMCI</span>
+      <span class="pct">85%</span>
+    </div>
+    <div class="chip green c2">
+      <span class="ticker">QCOM</span>
+      <span class="pct">78%</span>
+    </div>
+    <div class="chip green c3">
+      <span class="ticker">FE</span>
+      <span class="pct">+3.2%</span>
+    </div>
+    <div class="chip red c4">
+      <span class="ticker">CNP</span>
+      <span class="pct">-1.9%</span>
+    </div>
+  </div>
+
+  <!-- Toggle -->
+  <div class="toggle-bar">
+    <button class="toggle-btn active">All Hands</button>
+    <button class="toggle-btn">Big Money</button>
+    <button class="toggle-btn">Price Action</button>
+  </div>
+
+  <!-- Cards -->
+  <div class="section-label">Today's Plays</div>
+  <div class="card-feed">
+
+    <!-- AOTD Card -->
+    <div class="alert-card aotd-card">
+      <div class="card-top">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="card-ticker">AMD</span>
+            <span class="card-badge badge-gold">👑 TOP PICK</span>
+          </div>
+          <div class="card-price">$162.45</div>
+        </div>
+        <span class="card-badge badge-green">Big Money</span>
+      </div>
+      <div class="card-story">
+        Institutions just bet <strong>$2.3M in call options</strong> that AMD goes higher by mid-May. <strong>3 aggressive sweeps</strong> in the last hour — someone's in a hurry.
+      </div>
+      <div class="confidence-row">
+        <div class="conf-bar-track"><div class="conf-bar-fill high" style="width:88%"></div></div>
+        <span class="conf-label high">Strong Signal</span>
+      </div>
+      <div class="signal-tags">
+        <span class="signal-tag">💰 $2.3M Premium</span>
+        <span class="signal-tag">🔥 3 Sweeps</span>
+        <span class="signal-tag">🏦 $840K Dark Pool</span>
+      </div>
+    </div>
+
+    <!-- Card 2 -->
+    <div class="alert-card">
+      <div class="card-top">
+        <div>
+          <span class="card-ticker">SMCI</span>
+          <div class="card-price">$43.28</div>
+        </div>
+        <span class="card-badge badge-green">Big Money</span>
+      </div>
+      <div class="card-story">
+        <strong>$1.8M in bullish options bets</strong> placed today with a $4.2M dark pool block print. Multiple signals converging on one stock.
+      </div>
+      <div class="confidence-row">
+        <div class="conf-bar-track"><div class="conf-bar-fill high" style="width:85%"></div></div>
+        <span class="conf-label high">Strong Signal</span>
+      </div>
+      <div class="signal-tags">
+        <span class="signal-tag">💰 $1.8M Premium</span>
+        <span class="signal-tag">🏦 $4.2M Dark Pool</span>
+        <span class="signal-tag">🎯 Converging</span>
+      </div>
+    </div>
+
+    <!-- Card 3 — scanner alert -->
+    <div class="alert-card">
+      <div class="card-top">
+        <div>
+          <span class="card-ticker">FE</span>
+          <div class="card-price">$44.12 · <span style="color:#4ade80">+3.15%</span></div>
+        </div>
+        <span class="card-badge badge-blue">Near High</span>
+      </div>
+      <div class="card-story">
+        Trading within <strong>1.2% of its all-time high</strong> on <strong>4x normal volume</strong>. When stocks push past this level, they often run.
+      </div>
+      <div class="confidence-row">
+        <div class="conf-bar-track"><div class="conf-bar-fill med" style="width:72%"></div></div>
+        <span class="conf-label med">Worth Watching</span>
+      </div>
+      <div class="signal-tags">
+        <span class="signal-tag">📈 Near 52wk High</span>
+        <span class="signal-tag">🔥 4.1x Volume</span>
+      </div>
+    </div>
+
+    <!-- Card 4 -->
+    <div class="alert-card">
+      <div class="card-top">
+        <div>
+          <span class="card-ticker">QCOM</span>
+          <div class="card-price">$164.80</div>
+        </div>
+        <span class="card-badge badge-green">Big Money</span>
+      </div>
+      <div class="card-story">
+        <strong>$950K in call options</strong> with 2 bullish sweeps. Someone's betting Qualcomm moves up before earnings.
+      </div>
+      <div class="confidence-row">
+        <div class="conf-bar-track"><div class="conf-bar-fill med" style="width:78%"></div></div>
+        <span class="conf-label med">Worth Watching</span>
+      </div>
+      <div class="signal-tags">
+        <span class="signal-tag">💰 $950K Premium</span>
+        <span class="signal-tag">🔥 2 Sweeps</span>
+      </div>
+    </div>
+
+    <!-- Card 5 — bearish caution -->
+    <div class="alert-card">
+      <div class="card-top">
+        <div>
+          <span class="card-ticker">CNP</span>
+          <div class="card-price">$38.45 · <span style="color:#f87171">-1.92%</span></div>
+        </div>
+        <span class="card-badge badge-blue">Volume Spike</span>
+      </div>
+      <div class="card-story">
+        Unusual selling pressure — volume is <strong>3.8x higher than normal</strong> with the price dropping. Could be a warning sign or a shakeout.
+      </div>
+      <div class="confidence-row">
+        <div class="conf-bar-track"><div class="conf-bar-fill low" style="width:62%"></div></div>
+        <span class="conf-label low">Early Sign</span>
+      </div>
+      <div class="signal-tags">
+        <span class="signal-tag">📉 3.8x Volume</span>
+        <span class="signal-tag">⚠️ Selling Pressure</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- History -->
+  <div class="history-section">
+    <div class="history-header">
+      <span class="history-title">Past Calls</span>
+      <span class="history-stat">68% hit rate · avg +4.2%</span>
+    </div>
+    <div class="history-row">
+      <span class="history-ticker">NVDA</span>
+      <span class="history-signal">Big Money · 3 days ago</span>
+      <span class="history-result win">+8.4%</span>
+    </div>
+    <div class="history-row">
+      <span class="history-ticker">PLTR</span>
+      <span class="history-signal">Near High · 5 days ago</span>
+      <span class="history-result win">+3.1%</span>
+    </div>
+    <div class="history-row">
+      <span class="history-ticker">MARA</span>
+      <span class="history-signal">Volume Spike · 4 days ago</span>
+      <span class="history-result loss">-2.7%</span>
+    </div>
+    <div class="history-row">
+      <span class="history-ticker">ANET</span>
+      <span class="history-signal">Big Money · 6 days ago</span>
+      <span class="history-result win">+5.9%</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

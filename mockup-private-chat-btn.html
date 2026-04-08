@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UpTik — Private Chat Button Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #eef2f7; display: flex; justify-content: center; gap: 24px; padding: 24px; flex-wrap: wrap; }
+  .phone { width: 390px; height: 844px; background: #eef2f7; position: relative; overflow: hidden; display: flex; flex-direction: column; border-radius: 20px; box-shadow: 0 8px 40px rgba(0,0,0,0.15); }
+  .scroll { flex: 1; overflow-y: auto; padding-bottom: 62px; }
+  .label-tag { position: absolute; top: 8px; right: 12px; background: #2a7d4b; color: #fff; font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 8px; z-index: 10; letter-spacing: 0.05em; }
+
+  /* Header */
+  .header { background: #132d52; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
+  .logo span:first-child { font-size: 18px; font-weight: 500; color: #f0ede8; }
+  .logo span:last-child { font-size: 18px; font-weight: 500; color: #8cd9a0; }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .status-pill { display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.1); padding: 2px 7px; border-radius: 8px; }
+  .status-dot { width: 5px; height: 5px; border-radius: 50%; background: #4ade80; }
+  .status-text { font-size: 10px; font-weight: 600; color: #4ade80; }
+  .avatar { width: 26px; height: 26px; border-radius: 50%; background: rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #f0ede8; }
+
+  /* Ticker bar */
+  .ticker-bar { background: #1a3a5e; padding: 8px 0; }
+  .ticker-scroll { display: flex; align-items: center; padding: 0 12px; }
+  .ticker-item { display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; }
+  .ticker-name { font-size: 12px; font-weight: 500; color: #4a6178; }
+  .ticker-val { font-size: 12px; font-weight: 700; }
+  .up { color: #4ade80; }
+  .down { color: #ef4444; }
+
+  .divider { height: 1px; background: #dce4ed; margin: 0 14px; }
+
+  /* Briefing */
+  .brief-section { padding: 12px 14px 8px; }
+  .brief-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .brief-title { font-size: 15px; font-weight: 700; color: #1a2d4a; }
+  .brief-toggle { font-size: 12px; color: #2a7d4b; font-weight: 600; background: none; border: none; cursor: pointer; }
+  .brief-card { background: #fff; border: 1px solid #d8e2ed; border-radius: 12px; padding: 10px 12px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
+  .brief-icon { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #e8f5e9, #c8e6c9); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .bf-tickers { font-size: 11px; font-weight: 700; color: #2a7d4b; margin-bottom: 2px; }
+  .bf-title { font-size: 13px; color: #1a2d4a; font-weight: 500; line-height: 1.3; }
+  .bf-link { color: #2a7d4b; font-size: 12px; font-weight: 600; text-decoration: none; flex-shrink: 0; }
+
+  /* Sector Research */
+  .res-section { padding: 12px 14px 8px; }
+  .res-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+  .res-title { font-size: 15px; font-weight: 700; color: #1a2d4a; }
+  .res-sub { font-size: 11px; color: #7a8ea3; }
+  .res-pills { display: flex; gap: 6px; margin-bottom: 8px; }
+  .res-pill { padding: 5px 14px; border-radius: 14px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid #d8e2ed; background: #fff; color: #2a7d4b; }
+  .res-pill.active { background: #132d52; color: #fff; border-color: #132d52; }
+  .res-card { background: #fff; border: 1px solid #d8e2ed; border-radius: 12px; }
+  .res-header-row { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1.5px solid #d8e2ed; background: #f8fafc; border-radius: 12px 12px 0 0; }
+  .res-col { font-size: 11px; font-weight: 700; color: #7a8ea3; text-transform: uppercase; letter-spacing: 0.05em; }
+  .res-row { padding: 8px 12px; border-bottom: 1px solid #f5f7fa; display: flex; align-items: center; gap: 8px; }
+  .res-ticker { font-size: 13px; font-weight: 700; color: #1a2d4a; flex: 1; }
+  .res-price { font-size: 13px; font-weight: 600; color: #3a5068; min-width: 70px; text-align: right; }
+  .res-chg { font-size: 13px; font-weight: 600; min-width: 80px; text-align: right; }
+  .res-chev { font-size: 10px; color: #2a7d4b; }
+
+  /* ── CHAT SECTION — the key area ── */
+  .chat-section { padding: 12px 14px 8px; }
+  .chat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .chat-title-area { display: flex; align-items: center; gap: 6px; }
+  .chat-title { font-size: 15px; font-weight: 700; color: #1a2d4a; }
+  .live-badge { display: flex; align-items: center; gap: 4px; }
+  .live-dot { width: 5px; height: 5px; border-radius: 50%; background: #2a7d4b; animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .live-text { font-size: 11px; color: #2a7d4b; font-weight: 500; }
+
+  .chat-right-btns { display: flex; align-items: center; gap: 10px; }
+  .private-chat-btn {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 600; color: #fff;
+    background: #2a7d4b; border: none; border-radius: 12px;
+    padding: 5px 12px; cursor: pointer;
+    box-shadow: 0 2px 6px rgba(42,125,75,0.3);
+    transition: all 0.2s;
+  }
+  .private-chat-btn:hover { background: #237a42; transform: scale(1.03); }
+  .chat-viewall { font-size: 13px; color: #2a7d4b; font-weight: 600; background: none; border: none; cursor: pointer; }
+
+  .chat-card { background: #fff; border: 1px solid #d8e2ed; border-radius: 12px; overflow: hidden; }
+  .chat-msg { padding: 8px 12px; border-bottom: 1px solid #f5f7fa; display: flex; gap: 8px; align-items: flex-start; }
+  .chat-av { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #fff; flex-shrink: 0; }
+  .chat-name { font-size: 13px; font-weight: 600; }
+  .chat-time { font-size: 11px; color: #7a8ea3; margin-left: auto; }
+  .chat-text { font-size: 13px; color: #4a6178; line-height: 1.4; }
+  .chat-ticker { color: #2a7d4b; font-weight: 600; }
+
+  /* Private chat dropdown panel */
+  .private-panel {
+    background: #fff; border: 1px solid #d8e2ed; border-radius: 12px;
+    margin-top: 8px; overflow: hidden;
+    box-shadow: 0 4px 16px rgba(19,45,82,0.08);
+  }
+  .pp-header { padding: 10px 12px; border-bottom: 1px solid #d8e2ed; display: flex; justify-content: space-between; align-items: center; }
+  .pp-title { font-size: 14px; font-weight: 700; color: #132d52; }
+  .pp-create { font-size: 12px; font-weight: 600; color: #2a7d4b; background: none; border: none; cursor: pointer; }
+  .pp-group { padding: 10px 12px; border-bottom: 1px solid #f5f7fa; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .pp-group:hover { background: #f8fafc; }
+  .pp-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .pp-name { font-size: 14px; font-weight: 600; color: #1a2d4a; flex: 1; }
+  .pp-members { font-size: 11px; color: #7a8ea3; }
+  .pp-chev { font-size: 12px; color: #2a7d4b; }
+  .pp-empty { padding: 20px; text-align: center; }
+  .pp-empty-text { font-size: 13px; color: #7a8ea3; margin-bottom: 10px; }
+  .pp-empty-btn {
+    font-size: 13px; font-weight: 600; color: #fff;
+    background: #2a7d4b; border: none; border-radius: 12px;
+    padding: 8px 20px; cursor: pointer;
+    box-shadow: 0 2px 8px rgba(42,125,75,0.3);
+  }
+
+  /* Bottom nav */
+  .bottom-nav { height: 58px; background: #f8fafc; border-top: 0.5px solid #d8e2ed; display: flex; justify-content: space-around; align-items: center; position: absolute; bottom: 0; left: 0; right: 0; }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; flex: 1; }
+  .nav-label { font-size: 11px; font-weight: 500; color: #7a8ea3; }
+  .nav-label.active { color: #132d52; font-weight: 600; }
+
+  .highlight { border: 2px solid #2a7d4b; border-radius: 14px; padding: 2px; margin: 0 6px; animation: pulse-border 2s ease-in-out infinite; }
+  @keyframes pulse-border { 0%, 100% { border-color: #2a7d4b; } 50% { border-color: rgba(42,125,75,0.3); } }
+
+  .phone-label { text-align: center; font-size: 13px; font-weight: 600; color: #132d52; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<!-- ═══ SCREEN A: Button on Chat header row ═══ -->
+<div>
+  <div class="phone-label">A: Collapsed (default view)</div>
+  <div class="phone" style="position: relative;">
+    <div class="label-tag">PROPOSED</div>
+    <div class="header">
+      <div class="logo"><span>Up</span><span>Tik</span></div>
+      <div class="header-right">
+        <div class="status-pill"><div class="status-dot"></div><span class="status-text">OPEN</span></div>
+        <div class="avatar">T</div>
+      </div>
+    </div>
+    <div class="ticker-bar">
+      <div class="ticker-scroll">
+        <div class="ticker-item"><span class="ticker-name">SPY</span><span class="ticker-val up">+0.82%</span></div>
+        <div class="ticker-item"><span class="ticker-name">QQQ</span><span class="ticker-val up">+1.14%</span></div>
+        <div class="ticker-item"><span class="ticker-name">DIA</span><span class="ticker-val down">-0.23%</span></div>
+        <div class="ticker-item"><span class="ticker-name">VIX</span><span class="ticker-val down">-3.41%</span></div>
+      </div>
+    </div>
+    <div class="scroll">
+      <div class="brief-section">
+        <div class="brief-header">
+          <span class="brief-title">Daily Briefing</span>
+          <button class="brief-toggle">Show ▼</button>
+        </div>
+        <div class="brief-card">
+          <div class="brief-icon">📊</div>
+          <div style="flex:1;"><div class="bf-tickers">$NVDA $AMD</div><div class="bf-title">Nvidia beats estimates, raises guidance on AI demand</div></div>
+          <a class="bf-link" href="#">Read →</a>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="res-section">
+        <div class="res-header"><span class="res-title">Sector Research</span><span class="res-sub">curated picks</span></div>
+        <div class="res-pills">
+          <div class="res-pill active">My List</div>
+          <div class="res-pill">Tech</div>
+          <div class="res-pill">Energy</div>
+          <div class="res-pill">Healthcare</div>
+        </div>
+        <div class="res-card">
+          <div class="res-header-row">
+            <span class="res-col" style="flex:1;">Ticker</span>
+            <span class="res-col" style="min-width:70px; text-align:right;">Price</span>
+            <span class="res-col" style="min-width:80px; text-align:right;">CHG%</span>
+            <span style="min-width:28px;"></span>
+          </div>
+          <div class="res-row"><span class="res-ticker">NVDA</span><span class="res-price">$131.28</span><span class="res-chg up">▲ +2.34%</span><span class="res-chev">▼</span></div>
+          <div class="res-row"><span class="res-ticker">TSLA</span><span class="res-price">$254.11</span><span class="res-chg down">▼ -1.02%</span><span class="res-chev">▼</span></div>
+          <div class="res-row"><span class="res-ticker">AAPL</span><span class="res-price">$198.50</span><span class="res-chg up">▲ +0.67%</span><span class="res-chev">▼</span></div>
+        </div>
+      </div>
+      <div class="divider"></div>
+
+      <!-- ★ THE KEY CHANGE: Private Chat btn next to Live Chat ★ -->
+      <div class="chat-section">
+        <div class="highlight">
+          <div class="chat-header">
+            <div class="chat-title-area">
+              <span class="chat-title">Live Chat</span>
+              <div class="live-badge"><span class="live-dot"></span><span class="live-text">Live</span></div>
+            </div>
+            <div class="chat-right-btns">
+              <button class="private-chat-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                Private Chat
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="chat-card">
+          <div class="chat-msg">
+            <div class="chat-av" style="background:#5B8DEF;">M</div>
+            <div style="flex:1;">
+              <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:1px;">
+                <span class="chat-name" style="color:#5B8DEF;">Mike</span><span class="chat-time">2:14 PM</span>
+              </div>
+              <div class="chat-text">Anyone watching <span class="chat-ticker">$NVDA</span> after hours? Volume is insane</div>
+            </div>
+          </div>
+          <div class="chat-msg">
+            <div class="chat-av" style="background:#E57373;">S</div>
+            <div style="flex:1;">
+              <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:1px;">
+                <span class="chat-name" style="color:#E57373;">Sarah</span><span class="chat-time">2:15 PM</span>
+              </div>
+              <div class="chat-text">Grabbed some <span class="chat-ticker">$AMD</span> calls at the dip 🔥</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="#132d52"><path d="M3 9.5L12 3L21 9.5V20C21 20.55 20.55 21 20 21H15V15H9V21H4C3.45 21 3 20.55 3 20V9.5Z"/></svg><span class="nav-label active">Home</span></div>
+      <div class="nav-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="#7a8ea3"><path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z"/></svg><span class="nav-label">Alerts</span></div>
+      <div class="nav-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="#7a8ea3"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"/></svg><span class="nav-label">Chat</span></div>
+      <div class="nav-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="#7a8ea3"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg><span class="nav-label">Challenge</span></div>
+      <div class="nav-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="#7a8ea3"><path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z"/></svg><span class="nav-label">Profile</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SCREEN B: After tapping "Private Chat" ═══ -->
+<div>
+  <div class="phone-label">B: After tapping "Private Chat"</div>
+  <div class="phone" style="position: relative;">
+    <div class="label-tag">EXPANDED</div>
+    <div class="header">
+      <div class="logo"><span>Up</span><span>Tik</span></div>
+      <div class="header-right">
+        <div class="status-pill"><div class="status-dot"></div><span class="status-text">OPEN</span></div>
+        <div class="avatar">T</div>
+      </div>
+    </div>
+    <div class="ticker-bar">
+      <div class="ticker-scroll">
+        <div class="ticker-item"><span class="ticker-name">SPY</span><span class="ticker-val up">+0.82%</span></div>
+        <div class="ticker-item"><span class="ticker-name">QQQ</span><span class="ticker-val up">+1.14%</span></div>
+        <div class="ticker-item"><span class="ticker-name">DIA</span><span class="ticker-val down">-0.23%</span></div>
+        <div class="ticker-item"><span class="ticker-name">VIX</span><span class="ticker-val down">-3.41%</span></div>
+      </div>
+    </div>
+    <div class="scroll">
+      <div class="brief-section">
+        <div class="brief-header">
+          <span class="brief-title">Daily Briefing</span>
+          <button class="brief-toggle">Show ▼</button>
+        </div>
+        <div class="brief-card">
+          <div class="brief-icon">📊</div>
+          <div style="flex:1;"><div class="bf-tickers">$NVDA $AMD</div><div class="bf-title">Nvidia beats estimates, raises guidance on AI demand</div></div>
+          <a class="bf-link" href="#">Read →</a>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="res-section">
+        <div class="res-header"><span class="res-title">Sector Research</span><span class="res-sub">curated picks</span></div>
+        <div class="res-pills">
+          <div class="res-pill active">My List</div>
+          <div class="res-pill">Tech</div>
+          <div class="res-pill">Energy</div>
+          <div class="res-pill">Healthcare</div>
+        </div>
+        <div class="res-card">
+          <div class="res-header-row">
+            <span class="res-col" style="flex:1;">Ticker</span>
+            <span class="res-col" style="min-width:70px; text-align:right;">Price</span>
+            <span class="res-col" style="min-width:80px; text-align:right;">CHG%</span>
+            <span style="min-width:28px;"></span>
+          </div>
+          <div class="res-row"><span class="res-ticker">NVDA</span><span class="res-price">$131.28</span><span class="res-chg up">▲ +2.34%</span><span class="res-chev">▼</span></div>
+          <div class="res-row"><span class="res-ticker">TSLA</span><span class="res-price">$254.11</span><span class="res-chg down">▼ -1.02%</span><span class="res-chev">▼</span></div>
+          <div class="res-row"><span class="res-ticker">AAPL</span><span class="res-price">$198.50</span><span class="res-chg up">▲ +0.67%</span><span class="res-chev">▼</span></div>
+        </div>
+      </div>
+      <div class="divider"></div>
+
+      <!-- ★ Chat section with Private Chat expanded ★ -->
+      <div class="chat-section">
+        <div class="chat-header">
+          <div class="chat-title-area">
+            <span class="chat-title">Live Chat</span>
+            <div class="live-badge"><span class="live-dot"></span><span class="live-text">Live</span></div>
+          </div>
+          <div class="chat-right-btns">
+            <button class="private-chat-btn" style="background: #1a5c36;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              Private Chat ▲
+            </button>
+          </div>
+        </div>
+
+        <!-- Expanded private groups panel -->
+        <div class="highlight">
+          <div class="private-panel">
+            <div class="pp-header">
+              <span class="pp-title">Your Private Groups</span>
+              <button class="pp-create">+ Create New</button>
+            </div>
+            <div class="pp-group">
+              <div class="pp-dot" style="background: #7B68EE;"></div>
+              <span class="pp-name">Options Gang</span>
+              <span class="pp-members">4 members</span>
+              <span class="pp-chev">›</span>
+            </div>
+            <div class="pp-group">
+              <div class="pp-dot" style="background: #FF6B6B;"></div>
+              <span class="pp-name">Swing Traders</span>
+              <span class="pp-members">7 members</span>
+              <span class="pp-chev">›</span>
+            </div>
+            <div class="pp-group">
+              <div class="pp-dot" style="background: #4FC3F7;"></div>
+              <span class="pp-name">Crypto Alerts</span>
+              <span class="pp-members">12 members</span>
+              <span class="pp-chev">›</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="height: 8px;"></div>
+        <div class="chat-card">
+          <div class="chat-msg">
+            <div class="chat-av" style="background:#5B8DEF;">M</div>
+            <div style="flex:1;">
+              <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:1px;">
+                <span class="chat-name" style="color:#5B8DEF;">Mike</span><span class="chat-time">2:14 PM</span>
+              </div>
+              <div class="chat-text">Anyone watching <span class="chat-ticker">$NVDA</span> after hours?</div>
+            </div>
+          </div>
+          <div class="chat-msg">
+            <div class="chat-av" style="background:#E57373;">S</div>
+            <div style="flex:1;">
+              <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:1px;">
+                <span class="chat-name" style="color:#E57373;">Sarah</span><span class="chat-time">2:15 PM</span>
+              </div>
+              <div class="chat-text">Grabbed some <span class="chat-ticker">$AMD</span> calls 🔥</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="#132d52"><path d="M3 9.5L12 3L21 9.5V20C21 20.55 20.55 21 20 21H15V15H9V21H4C3.45 21 3 20.55 3 20V9.5Z"/></svg><span class="nav-label active">Home</span></div>
+      <div class="nav-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="#7a8ea3"><path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z"/></svg><span class="nav-label">Alerts</span></div>
+      <div class="nav-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="#7a8ea3"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"/></svg><span class="nav-label">Chat</span></div>
+      <div class="nav-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="#7a8ea3"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg><span class="nav-label">Challenge</span></div>
+      <div class="nav-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="#7a8ea3"><path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z"/></svg><span class="nav-label">Profile</span></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

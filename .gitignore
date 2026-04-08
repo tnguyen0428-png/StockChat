@@ -8,6 +8,11 @@ node_modules/
 
 # Build output
 dist/
+dist-test/
+dist-check-*/
+
+# Vite temp files
+vite.config.js.timestamp-*
 
 # Claude Code session data
 .claude/

@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UpTikAlerts — Dashboard Mockup</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #eef2f7;
+      --card: #f8fafc;
+      --card2: #eef2f7;
+      --border: #d8e2ed;
+      --text1: #1a2d4a;
+      --text2: #4a6178;
+      --text3: #7a8ea3;
+      --green: #2a7d4b;
+      --green-bg: rgba(42,125,75,0.1);
+      --red: #e05252;
+      --font: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    body {
+      font-family: var(--font);
+      background: #0a1929;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    /* Phone frame */
+    .phone-frame {
+      width: 480px;
+      height: 880px;
+      background: var(--bg);
+      border-radius: 32px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 2px rgba(255,255,255,0.08);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* ─── HEADER ─── */
+    .header {
+      background: #132d52;
+      padding: 12px 14px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-shrink: 0;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .logo-text .logo-row {
+      display: flex;
+      align-items: baseline;
+    }
+    .logo-up { font-size: 20px; font-weight: 500; color: #f0ede8; }
+    .logo-tik { font-size: 20px; font-weight: 500; color: #8cd9a0; }
+    .logo-alerts {
+      font-size: 14px; font-weight: 300; color: #d4e4f2;
+      letter-spacing: 2px; margin-top: -4px; padding-left: 18px;
+    }
+    .header-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .market-badge {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(255,255,255,0.12);
+      padding: 3px 8px;
+      border-radius: 10px;
+    }
+    .market-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: #ef5350;
+    }
+    .market-dot.live { background: #8cd9a0; }
+    .market-label {
+      font-size: 9px; font-weight: 600;
+      color: #ef5350; letter-spacing: 0.04em;
+    }
+    .market-label.live { color: #8cd9a0; }
+    .avatar-btn {
+      width: 27px; height: 27px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .slogan {
+      font-size: 10px; font-weight: 300;
+      font-style: italic; color: #d4e4f2;
+      letter-spacing: 1px;
+    }
+
+    /* ─── MARKET PULSE ─── */
+    .market-pulse {
+      overflow: hidden;
+      background: #0f2440;
+      border-bottom: 1px solid #1a3a5a;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    @keyframes pulseScroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .pulse-track {
+      display: inline-flex;
+      align-items: center;
+      white-space: nowrap;
+      animation: pulseScroll 25s linear infinite;
+    }
+    .pulse-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 18px;
+      margin: 0 4px;
+      border-radius: 10px;
+    }
+    .pulse-item.up { background: rgba(140,217,160,0.12); }
+    .pulse-item.down { background: rgba(162,45,45,0.15); }
+    .pulse-label { font-size: 16px; font-weight: 500; color: #7a8ea3; }
+    .pulse-value { font-size: 16px; font-weight: 700; }
+    .pulse-value.up { color: #8cd9a0; }
+    .pulse-value.down { color: var(--red); }
+
+    /* ─── GROUP CHAT STRIP ─── */
+    .groups-section {
+      background: #0f2440;
+      padding-bottom: 10px;
+      flex-shrink: 0;
+    }
+    .section-label {
+      font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 1px;
+      color: #7a8ea3; padding: 8px 12px 4px;
+    }
+    .groups-scroll {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 0 12px;
+      scrollbar-width: none;
+    }
+    .groups-scroll::-webkit-scrollbar { display: none; }
+    .group-card {
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.06);
+      border: 1.5px solid rgba(140,217,160,0.3);
+      border-radius: 10px;
+      padding: 8px 12px;
+      text-align: center;
+      cursor: pointer;
+      min-width: 80px;
+    }
+    .group-card.sector {
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .group-type {
+      font-size: 9px; font-weight: 700;
+      color: #8cd9a0; letter-spacing: 0.5px;
+      margin-bottom: 3px;
+    }
+    .group-name {
+      font-size: 13px; color: #ddd;
+      font-weight: 500; margin-bottom: 3px;
+    }
+    .group-members {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .online-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: #8cd9a0;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .member-count { font-size: 11px; color: #8cd9a0; }
+    .group-divider {
+      width: 1px;
+      background: rgba(255,255,255,0.1);
+      margin: 6px 2px;
+      flex-shrink: 0;
+    }
+
+    /* ─── CONTENT AREA ─── */
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      background: #eef2f7;
+      padding-bottom: 90px;
+    }
+
+    /* ─── DAILY BRIEFING ─── */
+    .briefing-card {
+      background: #f8fafc;
+      border: 1px solid #d8e2ed;
+      border-radius: 10px;
+      padding: 9px 12px;
+      margin: 0 12px 6px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .briefing-tickers {
+      font-size: 12px; font-weight: 700;
+      color: #2a7d4b; margin-bottom: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .briefing-title {
+      font-size: 15px; font-weight: 600;
+      color: #1a2d4a; line-height: 1.35;
+    }
+    .briefing-link {
+      font-size: 13px; color: #2a7d4b;
+      font-weight: 600; text-decoration: none;
+      flex-shrink: 0; margin-top: 2px;
+    }
+    .briefing-meta {
+      padding: 4px 14px 8px;
+      font-size: 12px; color: #7a8ea3;
+      margin-left: 12px;
+    }
+
+    /* ─── AI BUTTON ─── */
+    .ai-button {
+      background: #F5F3FF;
+      border: 1.5px solid rgba(139,92,246,0.35);
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      margin: 14px 12px 4px;
+    }
+    .ai-circle {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #8B5CF6, #6D28D9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px; font-weight: 700;
+      color: #fff; flex-shrink: 0;
+    }
+    .ai-label { font-size: 15px; font-weight: 500; color: #6D28D9; }
+    .ai-sub { font-size: 11px; color: rgba(109,40,217,0.6); margin-top: 2px; }
+
+    /* ─── BROADCAST BANNER ─── */
+    @keyframes bcScroll { 0% { left: 100%; } 100% { left: -200%; } }
+    @keyframes bcBgPulse { 0%, 100% { opacity: 0.88; } 50% { opacity: 1; } }
+    @keyframes bcTextFlash { 0%, 49% { color: #ffffff; } 50%, 100% { color: rgba(255,255,255,0.3); } }
+    .broadcast {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      padding: 0 12px;
+      height: 44px;
+      overflow: hidden;
+      background: #1AAD5E;
+      animation: bcBgPulse 3.5s ease-in-out infinite;
+    }
+    .bc-label {
+      font-size: 10px; font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #fff; flex-shrink: 0;
+      background: rgba(0,0,0,0.22);
+      padding: 3px 8px; border-radius: 4px;
+    }
+    .bc-scroll-wrap {
+      flex: 1; overflow: hidden;
+      position: relative; height: 100%;
+      display: flex; align-items: center;
+    }
+    .bc-scroll-text {
+      position: absolute; white-space: nowrap;
+      font-weight: 700; font-size: 14px; color: #fff;
+      animation: bcScroll 25s linear infinite, bcTextFlash 2.5s step-end infinite;
+    }
+    .bc-dismiss {
+      background: rgba(0,0,0,0.2);
+      border: none; color: #fff;
+      font-size: 12px; cursor: pointer;
+      flex-shrink: 0; width: 22px; height: 22px;
+      border-radius: 50%;
+      display: flex; align-items: center;
+      justify-content: center; line-height: 1;
+    }
+
+    /* ─── BOTTOM NAV ─── */
+    .bottom-nav {
+      height: 58px;
+      background: #f8fafc;
+      border-top: 0.5px solid #d8e2ed;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding-bottom: 4px;
+      box-shadow: 0 -1px 4px rgba(19,45,82,0.04);
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      z-index: 100;
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+      padding: 4px 0;
+      flex: 1;
+    }
+    .nav-item.chat-item { margin-top: -22px; }
+    .nav-label {
+      font-size: 11px; font-weight: 500;
+      color: #7a8ea3;
+    }
+    .nav-label.active { color: #132d52; }
+    .nav-label.chat { color: #2a7d4b; font-weight: 600; }
+    .chat-circle {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: #2a7d4b;
+      border: 3px solid #f8fafc;
+      box-shadow: 0 4px 14px rgba(42,125,75,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .nav-icon { opacity: 0.6; }
+    .nav-icon.active { opacity: 1; }
+
+    /* Annotation labels */
+    .annotation {
+      position: absolute;
+      font-size: 11px;
+      font-weight: 600;
+      color: #8B5CF6;
+      background: rgba(139,92,246,0.1);
+      border: 1px solid rgba(139,92,246,0.3);
+      padding: 2px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      z-index: 200;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="phone-frame">
+
+    <!-- ═══ HEADER ═══ -->
+    <div class="header">
+      <div class="header-left">
+        <!-- U-arrow SVG logo -->
+        <svg width="38" height="38" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" stroke-width="3" />
+          <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" stroke-width="2.2" opacity="0.6" />
+          <path d="M25 22 L25 30 C25 34 25 34 25 30 L25 22" stroke-width="1.5" opacity="0.35" />
+          <path d="M35 8 L29 14 M35 8 L41 14" stroke-width="3" />
+        </svg>
+        <div class="logo-text">
+          <div class="logo-row">
+            <span class="logo-up">Up</span><span class="logo-tik">tik</span>
+          </div>
+          <div class="logo-alerts">alerts</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="header-actions">
+          <div class="market-badge">
+            <div class="market-dot"></div>
+            <span class="market-label">CLOSED</span>
+          </div>
+          <!-- Bell icon -->
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <!-- Avatar -->
+          <div class="avatar-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+        </div>
+        <span class="slogan">"ONE TEAM, ONE TRADE"</span>
+      </div>
+    </div>
+
+    <!-- ═══ BROADCAST BANNER ═══ -->
+    <div class="broadcast">
+      <span class="bc-label">BULLISH</span>
+      <div class="bc-scroll-wrap">
+        <span class="bc-scroll-text">NVDA breakout above $145 resistance — volume surging 3x average. Eyes on $150 next target.</span>
+      </div>
+      <button class="bc-dismiss">✕</button>
+    </div>
+
+    <!-- ═══ MARKET PULSE STRIP ═══ -->
+    <div class="market-pulse">
+      <div class="pulse-track">
+        <!-- First set -->
+        <span class="pulse-item up">
+          <span class="pulse-label">S&P Futures</span>
+          <span class="pulse-value up">▲ +12.50 (+0.23%)</span>
+        </span>
+        <span class="pulse-item up">
+          <span class="pulse-label">Nas Futures</span>
+          <span class="pulse-value up">▲ +45.75 (+0.28%)</span>
+        </span>
+        <span class="pulse-item down">
+          <span class="pulse-label">Dow Futures</span>
+          <span class="pulse-value down">▼ -38.00 (-0.10%)</span>
+        </span>
+        <span class="pulse-item up">
+          <span class="pulse-label">Gold</span>
+          <span class="pulse-value up">▲ +8.20 (+0.35%)</span>
+        </span>
+        <span class="pulse-item down">
+          <span class="pulse-label">Oil</span>
+          <span class="pulse-value down">▼ -0.42 (-0.55%)</span>
+        </span>
+        <!-- Duplicate for infinite scroll -->
+        <span class="pulse-item up">
+          <span class="pulse-label">S&P Futures</span>
+          <span class="pulse-value up">▲ +12.50 (+0.23%)</span>
+        </span>
+        <span class="pulse-item up">
+          <span class="pulse-label">Nas Futures</span>
+          <span class="pulse-value up">▲ +45.75 (+0.28%)</span>
+        </span>
+        <span class="pulse-item down">
+          <span class="pulse-label">Dow Futures</span>
+          <span class="pulse-value down">▼ -38.00 (-0.10%)</span>
+        </span>
+        <span class="pulse-item up">
+          <span class="pulse-label">Gold</span>
+          <span class="pulse-value up">▲ +8.20 (+0.35%)</span>
+        </span>
+        <span class="pulse-item down">
+          <span class="pulse-label">Oil</span>
+          <span class="pulse-value down">▼ -0.42 (-0.55%)</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- ═══ GROUP CHAT STRIP ═══ -->
+    <div class="groups-section">
+      <div class="section-label">Group Chat</div>
+      <div class="groups-scroll">
+        <!-- Public -->
+        <div class="group-card">
+          <div class="group-type">PUBLIC</div>
+          <div class="group-name">UpTik Public</div>
+          <div class="group-members">
+            <div class="online-dot"></div>
+            <span class="member-count">142</span>
+          </div>
+        </div>
+        <!-- Private -->
+        <div class="group-card">
+          <div class="group-type">PRIVATE</div>
+          <div class="group-name">VIP Room</div>
+          <div class="group-members">
+            <div class="online-dot"></div>
+            <span class="member-count">28</span>
+          </div>
+        </div>
+        <!-- Divider -->
+        <div class="group-divider"></div>
+        <!-- Sector groups -->
+        <div class="group-card sector">
+          <div style="display:flex;align-items:center;justify-content:center;gap:3px;margin-bottom:2px;">
+            <div class="online-dot"></div>
+            <span style="font-size:13px;color:#ccc;font-weight:500;">Tech</span>
+          </div>
+          <span class="member-count">87</span>
+        </div>
+        <div class="group-card sector">
+          <div style="display:flex;align-items:center;justify-content:center;gap:3px;margin-bottom:2px;">
+            <div class="online-dot"></div>
+            <span style="font-size:13px;color:#ccc;font-weight:500;">Energy</span>
+          </div>
+          <span class="member-count">34</span>
+        </div>
+        <div class="group-card sector">
+          <div style="display:flex;align-items:center;justify-content:center;gap:3px;margin-bottom:2px;">
+            <div class="online-dot"></div>
+            <span style="font-size:13px;color:#ccc;font-weight:500;">Finance</span>
+          </div>
+          <span class="member-count">56</span>
+        </div>
+        <div class="group-card sector">
+          <div style="display:flex;align-items:center;justify-content:center;gap:3px;margin-bottom:2px;">
+            <div class="online-dot"></div>
+            <span style="font-size:13px;color:#ccc;font-weight:500;">Crypto</span>
+          </div>
+          <span class="member-count">93</span>
+        </div>
+        <div class="group-card sector">
+          <div style="display:flex;align-items:center;justify-content:center;gap:3px;margin-bottom:2px;">
+            <div class="online-dot"></div>
+            <span style="font-size:13px;color:#ccc;font-weight:500;">Health</span>
+          </div>
+          <span class="member-count">21</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ LIGHT CONTENT AREA ═══ -->
+    <div class="content-area">
+
+      <!-- Daily Briefing -->
+      <div class="section-label" style="color:#7a8ea3;">Daily Briefing</div>
+
+      <div class="briefing-card">
+        <div style="flex:1;min-width:0;">
+          <div class="briefing-tickers">NVDA · AMD</div>
+          <div class="briefing-title">Nvidia surges on AI chip demand, AMD follows suit with new GPU lineup</div>
+        </div>
+        <a href="#" class="briefing-link">Read →</a>
+      </div>
+
+      <div class="briefing-card">
+        <div style="flex:1;min-width:0;">
+          <div class="briefing-tickers">AAPL</div>
+          <div class="briefing-title">Apple announces partnership with OpenAI for Siri overhaul in iOS 20</div>
+        </div>
+        <a href="#" class="briefing-link">Read →</a>
+      </div>
+
+      <div class="briefing-card">
+        <div style="flex:1;min-width:0;">
+          <div class="briefing-tickers">TSLA · RIVN</div>
+          <div class="briefing-title">EV stocks rally after new federal charging infrastructure bill passes Senate</div>
+        </div>
+        <a href="#" class="briefing-link">Read →</a>
+      </div>
+
+      <div class="briefing-card">
+        <div style="flex:1;min-width:0;">
+          <div class="briefing-tickers">SPY · QQQ</div>
+          <div class="briefing-title">Fed signals potential rate cut in June as inflation cools to 2.1%</div>
+        </div>
+        <a href="#" class="briefing-link">Read →</a>
+      </div>
+
+      <div class="briefing-meta">Updated 8:32 AM EST · selected by Admin</div>
+
+      <!-- AI Button -->
+      <div class="ai-button">
+        <div class="ai-circle">AI</div>
+        <div>
+          <div class="ai-label">Ask UpTik AI</div>
+          <div class="ai-sub">Filter out the noise.</div>
+        </div>
+      </div>
+
+      <div style="height:24px;"></div>
+    </div>
+
+    <!-- ═══ BOTTOM NAV ═══ -->
+    <div class="bottom-nav">
+      <!-- Home (active) -->
+      <div class="nav-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M3 9.5L12 3L21 9.5V20C21 20.55 20.55 21 20 21H15V15H9V21H4C3.45 21 3 20.55 3 20V9.5Z" fill="#132d52"/>
+        </svg>
+        <span class="nav-label active">Home</span>
+      </div>
+      <!-- Alerts -->
+      <div class="nav-item">
+        <div style="position:relative;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z" fill="#7a8ea3"/>
+          </svg>
+          <!-- Unread badge -->
+          <div style="position:absolute;top:-2px;right:-4px;width:7px;height:7px;background:#e05252;border-radius:50%;border:1.5px solid #f8fafc;"></div>
+        </div>
+        <span class="nav-label">Alerts</span>
+      </div>
+      <!-- Chat (center, elevated) -->
+      <div class="nav-item chat-item">
+        <div class="chat-circle">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" fill="#fff"/>
+          </svg>
+        </div>
+        <span class="nav-label chat">Chat</span>
+      </div>
+      <!-- Challenge -->
+      <div class="nav-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#7a8ea3"/>
+        </svg>
+        <span class="nav-label">Challenge</span>
+      </div>
+      <!-- Profile -->
+      <div class="nav-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="#7a8ea3"/>
+        </svg>
+        <span class="nav-label">Profile</span>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

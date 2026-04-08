@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UpTikAlerts — New User Onboarding (Full Screen)</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: #0a1929;
+    display: flex; flex-direction: column;
+    align-items: center; min-height: 100vh; padding: 20px 20px 40px;
+    gap: 20px;
+  }
+
+  .page-title { text-align: center; max-width: 600px; }
+  .page-title h1 { color: #8cd9a0; font-size: 20px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+  .page-title p { color: #5a7080; font-size: 13px; line-height: 1.5; }
+
+  /* Phone frame */
+  .phone {
+    width: 480px; min-height: 860px; background: #eef2f7;
+    border-radius: 32px; overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 2px rgba(255,255,255,0.08);
+    display: flex; flex-direction: column; position: relative;
+  }
+
+  /* Header */
+  .header {
+    background: #132d52; padding: 8px 14px;
+    display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+  }
+  .logo-row { display: flex; align-items: baseline; }
+  .logo-up { font-size: 18px; font-weight: 500; color: #f0ede8; }
+  .logo-tik { font-size: 18px; font-weight: 500; color: #8cd9a0; }
+  .h-right { display: flex; align-items: center; gap: 8; }
+  .status-pill { display: flex; align-items: center; gap: 4; background: rgba(255,255,255,0.1); padding: 2px 7px; border-radius: 8px; }
+  .status-dot { width: 5px; height: 5px; border-radius: 50%; background: #8cd9a0; }
+  .status-text { font-size: 9px; font-weight: 600; letter-spacing: 0.04em; color: #8cd9a0; }
+  .avatar-sm { width: 26px; height: 26px; border-radius: 50%; background: rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #f0ede8; }
+
+  /* Pulse */
+  .pulse { background: #1a3a5e; height: 32px; display: flex; align-items: center; overflow: hidden; flex-shrink: 0; }
+  @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+  .pulse-track { display: inline-flex; align-items: center; white-space: nowrap; animation: scroll 22s linear infinite; }
+  .p-item { display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; }
+  .p-name { font-size: 11px; font-weight: 500; color: #4a6178; }
+  .p-val { font-size: 11px; font-weight: 700; }
+  .p-val.up { color: #8cd9a0; }
+  .p-val.down { color: #e05252; }
+
+  /* Content */
+  .content { flex: 1; overflow-y: auto; background: #eef2f7; }
+
+  /* ═══ ONBOARDING OVERLAY ═══ */
+  .onboard-overlay {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(238,242,247,0.97);
+    z-index: 100;
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .onboard-header {
+    text-align: center; padding: 32px 20px 8px;
+  }
+  .onboard-wave { font-size: 32px; margin-bottom: 6px; }
+  .onboard-title {
+    font-size: 22px; font-weight: 700; color: #132d52; margin-bottom: 4px;
+    letter-spacing: -0.02em;
+  }
+  .onboard-sub {
+    font-size: 13px; color: #5a7080; line-height: 1.5; max-width: 320px; margin: 0 auto;
+  }
+
+  /* Progress indicator */
+  .onboard-progress {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 20px 4px;
+  }
+  .onboard-count {
+    font-size: 12px; font-weight: 600; color: #132d52;
+  }
+  .onboard-count span { color: #2a7d4b; }
+  .onboard-bar-track {
+    flex: 1; max-width: 180px; height: 4px; background: #d8e2ed; border-radius: 4px; overflow: hidden;
+  }
+  .onboard-bar-fill {
+    height: 100%; background: #2a7d4b; border-radius: 4px;
+    transition: width 0.4s ease;
+  }
+
+  /* Trending section */
+  .onboard-section {
+    padding: 16px 20px 8px;
+  }
+  .onboard-section-title {
+    font-size: 12px; font-weight: 700; color: #7a8ea3; text-transform: uppercase;
+    letter-spacing: 0.08em; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .onboard-section-title .icon { font-size: 14px; }
+
+  .trending-chips {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .trending-chip {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: 12px;
+    background: #fff; border: 1.5px solid #d8e2ed;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .trending-chip:hover { border-color: rgba(42,125,75,0.3); background: #f0f7f3; }
+  .trending-chip.selected {
+    border-color: #2a7d4b; background: rgba(42,125,75,0.06);
+  }
+  .trending-chip.selected .tc-add { color: #2a7d4b; }
+  .tc-ticker { font-size: 13px; font-weight: 700; color: #132d52; }
+  .tc-change { font-size: 11px; font-weight: 600; }
+  .tc-change.up { color: #2a7d4b; }
+  .tc-change.down { color: #e05252; }
+  .tc-add { font-size: 16px; color: #b0bec5; transition: color 0.2s; }
+  .tc-check { font-size: 13px; color: #2a7d4b; font-weight: 700; }
+
+  /* Sector groups */
+  .sector-group { margin-bottom: 14px; }
+  .sector-label {
+    font-size: 11px; font-weight: 600; color: #5a7080;
+    margin-bottom: 6px; padding-left: 2px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .sector-label .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+  .sector-stocks {
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .sector-stock {
+    padding: 6px 12px; border-radius: 10px;
+    background: #fff; border: 1px solid #e2e8f0;
+    font-size: 12px; font-weight: 600; color: #1a2d4a;
+    cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .sector-stock:hover { border-color: rgba(42,125,75,0.3); background: #f0f7f3; }
+  .sector-stock.selected {
+    border-color: #2a7d4b; background: rgba(42,125,75,0.08); color: #2a7d4b;
+  }
+  .ss-add { font-size: 13px; color: #c0c8d0; }
+  .sector-stock.selected .ss-add { color: #2a7d4b; }
+
+  /* Search bar */
+  .onboard-search {
+    margin: 4px 20px 0;
+    display: flex; align-items: center; gap: 8px;
+    background: #fff; border: 1.5px solid #d8e2ed;
+    border-radius: 12px; padding: 10px 14px;
+  }
+  .onboard-search svg { flex-shrink: 0; }
+  .onboard-search input {
+    flex: 1; background: none; border: none; outline: none;
+    font-family: inherit; font-size: 13px; color: #1a2d4a;
+  }
+  .onboard-search input::placeholder { color: #7a8ea3; }
+
+  /* Bottom CTA */
+  .onboard-footer {
+    padding: 16px 20px 24px;
+    display: flex; flex-direction: column; gap: 8px;
+    margin-top: auto;
+  }
+  .onboard-cta {
+    width: 100%; padding: 14px; border: none; border-radius: 14px;
+    font-family: inherit; font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s;
+    background: #2a7d4b; color: #fff;
+    box-shadow: 0 4px 16px rgba(42,125,75,0.25);
+  }
+  .onboard-cta:hover { background: #238542; }
+  .onboard-cta:disabled { opacity: 0.5; cursor: not-allowed; }
+  .onboard-skip {
+    text-align: center; font-size: 13px; color: #7a8ea3;
+    cursor: pointer; padding: 4px; font-weight: 500;
+  }
+  .onboard-skip:hover { color: #5a7080; }
+
+  /* Selected count badge */
+  .selected-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(42,125,75,0.1); color: #2a7d4b;
+    padding: 2px 8px; border-radius: 8px;
+    font-size: 11px; font-weight: 600;
+  }
+
+  /* Toast */
+  @keyframes slideIn { 0% { transform: translate(-50%, -20px); opacity: 0; } 100% { transform: translate(-50%, 0); opacity: 1; } }
+  .toast {
+    position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+    background: #2a7d4b; color: #fff; font-size: 12px; font-weight: 600;
+    padding: 8px 16px; border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(42,125,75,0.3);
+    display: flex; align-items: center; gap: 6px;
+    z-index: 110; animation: slideIn 0.3s ease;
+  }
+
+  /* Bottom nav */
+  .bnav {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 58px;
+    background: #f8fafc; border-top: 1px solid #d8e2ed;
+    display: flex; align-items: center; justify-content: space-around; padding: 0 6px;
+    z-index: 50;
+  }
+  .bn-item { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; flex: 1; }
+  .bn-label { font-size: 10px; font-weight: 500; color: #7a8ea3; }
+  .bn-label.active { color: #132d52; }
+</style>
+</head>
+<body>
+
+<div class="page-title">
+  <h1>New User Onboarding — Full Screen</h1>
+  <p>First login experience: pick stocks to build your watchlist before seeing the Home feed.</p>
+</div>
+
+<div class="phone">
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-row"><span class="logo-up">Up</span><span class="logo-tik">Tik</span></div>
+    <div class="h-right">
+      <div class="status-pill"><div class="status-dot"></div><span class="status-text">LIVE</span></div>
+      <div class="avatar-sm">T</div>
+    </div>
+  </div>
+
+  <!-- Pulse -->
+  <div class="pulse">
+    <div class="pulse-track">
+      <span class="p-item"><span class="p-name">S&P</span><span class="p-val up">▲0.23%</span></span>
+      <span class="p-item"><span class="p-name">NAS</span><span class="p-val up">▲0.28%</span></span>
+      <span class="p-item"><span class="p-name">DOW</span><span class="p-val down">▼0.10%</span></span>
+      <span class="p-item"><span class="p-name">GOLD</span><span class="p-val up">▲0.35%</span></span>
+      <span class="p-item"><span class="p-name">OIL</span><span class="p-val down">▼0.55%</span></span>
+      <span class="p-item"><span class="p-name">VIX</span><span class="p-val down">▼1.82%</span></span>
+      <span class="p-item"><span class="p-name">S&P</span><span class="p-val up">▲0.23%</span></span>
+      <span class="p-item"><span class="p-name">NAS</span><span class="p-val up">▲0.28%</span></span>
+    </div>
+  </div>
+
+  <!-- Normal content (dimmed behind overlay) -->
+  <div class="content" style="filter: blur(2px); opacity: 0.3;">
+    <div style="padding: 20px; text-align: center; color: #7a8ea3; font-size: 13px;">
+      Home feed content loads here after onboarding...
+    </div>
+  </div>
+
+  <!-- ═══ ONBOARDING OVERLAY ═══ -->
+  <div class="onboard-overlay">
+
+    <!-- Welcome -->
+    <div class="onboard-header">
+      <div class="onboard-wave">👋</div>
+      <div class="onboard-title">Welcome to UpTik!</div>
+      <div class="onboard-sub">Pick some stocks to watch. You'll get live prices, alerts, and see what the community says about them.</div>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="onboard-progress">
+      <span class="onboard-count"><span>3</span> selected</span>
+      <div class="onboard-bar-track">
+        <div class="onboard-bar-fill" style="width: 60%;"></div>
+      </div>
+      <span style="font-size: 11px; color: #7a8ea3;">min 1</span>
+    </div>
+
+    <!-- Search -->
+    <div class="onboard-search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7a8ea3" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input placeholder="Search any ticker or company..." readonly>
+    </div>
+
+    <!-- Trending -->
+    <div class="onboard-section">
+      <div class="onboard-section-title"><span class="icon">🔥</span> Trending Now</div>
+      <div class="trending-chips">
+        <div class="trending-chip selected">
+          <span class="tc-ticker">NVDA</span>
+          <span class="tc-change up">+2.41%</span>
+          <span class="tc-check">✓</span>
+        </div>
+        <div class="trending-chip selected">
+          <span class="tc-ticker">TSLA</span>
+          <span class="tc-change up">+1.87%</span>
+          <span class="tc-check">✓</span>
+        </div>
+        <div class="trending-chip">
+          <span class="tc-ticker">AAPL</span>
+          <span class="tc-change down">-0.32%</span>
+          <span class="tc-add">+</span>
+        </div>
+        <div class="trending-chip selected">
+          <span class="tc-ticker">AMD</span>
+          <span class="tc-change up">+3.12%</span>
+          <span class="tc-check">✓</span>
+        </div>
+        <div class="trending-chip">
+          <span class="tc-ticker">SPY</span>
+          <span class="tc-change up">+0.23%</span>
+          <span class="tc-add">+</span>
+        </div>
+        <div class="trending-chip">
+          <span class="tc-ticker">META</span>
+          <span class="tc-change up">+1.05%</span>
+          <span class="tc-add">+</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- By Sector -->
+    <div class="onboard-section">
+      <div class="onboard-section-title"><span class="icon">📊</span> Browse by Sector</div>
+
+      <div class="sector-group">
+        <div class="sector-label"><span class="dot" style="background:#4CAF50;"></span> Technology</div>
+        <div class="sector-stocks">
+          <div class="sector-stock selected">MSFT <span class="ss-add">✓</span></div>
+          <div class="sector-stock">GOOG <span class="ss-add">+</span></div>
+          <div class="sector-stock">AMZN <span class="ss-add">+</span></div>
+          <div class="sector-stock">CRM <span class="ss-add">+</span></div>
+          <div class="sector-stock">INTC <span class="ss-add">+</span></div>
+        </div>
+      </div>
+
+      <div class="sector-group">
+        <div class="sector-label"><span class="dot" style="background:#FF9800;"></span> Energy</div>
+        <div class="sector-stocks">
+          <div class="sector-stock">XOM <span class="ss-add">+</span></div>
+          <div class="sector-stock">CVX <span class="ss-add">+</span></div>
+          <div class="sector-stock">OXY <span class="ss-add">+</span></div>
+          <div class="sector-stock">SLB <span class="ss-add">+</span></div>
+        </div>
+      </div>
+
+      <div class="sector-group">
+        <div class="sector-label"><span class="dot" style="background:#E91E63;"></span> Healthcare</div>
+        <div class="sector-stocks">
+          <div class="sector-stock">JNJ <span class="ss-add">+</span></div>
+          <div class="sector-stock">UNH <span class="ss-add">+</span></div>
+          <div class="sector-stock">PFE <span class="ss-add">+</span></div>
+          <div class="sector-stock">ABBV <span class="ss-add">+</span></div>
+        </div>
+      </div>
+
+      <div class="sector-group">
+        <div class="sector-label"><span class="dot" style="background:#2196F3;"></span> Finance</div>
+        <div class="sector-stocks">
+          <div class="sector-stock">JPM <span class="ss-add">+</span></div>
+          <div class="sector-stock">BAC <span class="ss-add">+</span></div>
+          <div class="sector-stock">GS <span class="ss-add">+</span></div>
+          <div class="sector-stock">V <span class="ss-add">+</span></div>
+        </div>
+      </div>
+
+      <div class="sector-group">
+        <div class="sector-label"><span class="dot" style="background:#9C27B0;"></span> Consumer</div>
+        <div class="sector-stocks">
+          <div class="sector-stock">DIS <span class="ss-add">+</span></div>
+          <div class="sector-stock">NKE <span class="ss-add">+</span></div>
+          <div class="sector-stock">SBUX <span class="ss-add">+</span></div>
+          <div class="sector-stock">MCD <span class="ss-add">+</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="onboard-footer">
+      <button class="onboard-cta">Build My Watchlist (3) →</button>
+      <div class="onboard-skip">Skip for now</div>
+    </div>
+  </div>
+
+  <!-- Toast example -->
+  <div class="toast" style="z-index: 120;"><span>✓</span> NVDA added to your list</div>
+
+  <!-- Bottom Nav (behind overlay) -->
+  <div class="bnav">
+    <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 9.5L12 3L21 9.5V20C21 20.55 20.55 21 20 21H15V15H9V21H4C3.45 21 3 20.55 3 20V9.5Z" fill="#132d52"/></svg><span class="bn-label active">Home</span></div>
+    <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z" fill="#7a8ea3"/></svg><span class="bn-label">Alerts</span></div>
+    <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" fill="#7a8ea3"/></svg><span class="bn-label">Chat</span></div>
+    <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#7a8ea3"/></svg><span class="bn-label">Challenge</span></div>
+    <div class="bn-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="#7a8ea3"/></svg><span class="bn-label">Profile</span></div>
+  </div>
+</div>
+
+</body>
+</html>
