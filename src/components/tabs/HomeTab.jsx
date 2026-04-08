@@ -1921,14 +1921,14 @@ const S = {
   pulseVal: { fontSize: 12, fontWeight: 600 },
 
   // ── Content (scrollable area) ──
-  content: { flex: 1, overflowY: 'auto', paddingBottom: 8, background: '#eef2f7', WebkitOverflowScrolling: 'touch' },
+  content: { flex: 1, overflowY: 'auto', paddingBottom: 8, background: '#eef2f7', position: 'relative', zIndex: 1 },
   sectionDivider: { height: 1, background: '#dce4ed', margin: '0 14px' },
 
   fixedChatBar: {
     flexShrink: 0,
     padding: '12px 14px 14px', background: '#eef2f7',
     display: 'flex', alignItems: 'center', gap: 10,
-    zIndex: 50,
+    position: 'relative', zIndex: 50,
     borderTop: '1px solid #d8e2ed',
   },
 
