@@ -1309,22 +1309,25 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               My List{hasWatchlist ? ` (${watchlist.length})` : ''}
             </div>
             {(() => {
-              const SHORT = { 'Communication Services': 'Comms', 'Communication': 'Comms', 'Consumer Discretionary': 'Consumer', 'Consumer Cyclical': 'Consumer', 'Consumer Staples': 'Staples', 'Information Technology': 'Tech', 'Technology': 'Tech', 'Industrials': 'Indust.', 'Financial Services': 'Finance', 'Real Estate': 'RE' };
+              const SHORT = { 'Communication Services': 'Comms', 'Communication': 'Comms', 'Consumer Discretionary': 'Consumer', 'Consumer Cyclical': 'Consumer', 'Consumer Defensive': 'Consumer', 'Consumer Staples': 'Staples', 'Information Technology': 'Tech', 'Technology': 'Tech', 'Industrials': 'Indust.', 'Financial Services': 'Finance', 'Real Estate': 'RE' };
               const seen = new Set();
               return researchSectors.filter(sec => sec !== 'Auto').filter(sec => {
                 const label = SHORT[sec] || sec;
                 if (seen.has(label)) return false;
                 seen.add(label);
                 return true;
-              }).map(sec => (
+              }).map(sec => {
+                const label = SHORT[sec] || sec;
+                return (
                 <div
                   key={sec}
-                  style={{ ...S.resPill, ...(researchSector === sec ? S.resPillActive : {}) }}
-                  onClick={() => researchSector === sec ? (setResearchSector(null), setResearchStocks([])) : loadResearch(sec)}
+                  style={{ ...S.resPill, ...(researchSector === label ? S.resPillActive : {}) }}
+                  onClick={() => researchSector === label ? (setResearchSector(null), setResearchStocks([])) : loadResearch(label)}
                 >
-                  {SHORT[sec] || sec}
+                  {label}
                 </div>
-              ));
+              );
+              })
             })()}
           </div>
 
