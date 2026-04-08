@@ -543,46 +543,57 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   // ═══════════════════════════════════════
   // MARKET PULSE (kept from original)
   // ═══════════════════════════════════════
+  // ── Futures / off-hours ticker: Polygon primary, FMP fallback ──
+  // Uses ETF proxies (SPY→S&P Fut, QQQ→Nas Fut, etc.) and shows
+  // point change + percentage instead of full price.
+  const FUTURES_ETF_MAP = {
+    SPY: 'S&P Fut', QQQ: 'Nas Fut', DIA: 'Dow Fut', GLD: 'Gold', USO: 'Oil',
+  };
+  const FUTURES_ETF_TICKERS = Object.keys(FUTURES_ETF_MAP);
+
   const loadFutures = async () => {
-    try {
-      const futureSymbols = ['ES=F', 'NQ=F', 'YM=F', 'GC=F', 'CL=F'];
-      const futuresMap = { 'ES=F': 'S&P Fut', 'NQ=F': 'Nas Fut', 'YM=F': 'Dow Fut', 'GC=F': 'Gold', 'CL=F': 'Oil' };
-      const results = await Promise.all(futureSymbols.map(async (symbol) => {
-        try {
-          const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`)}`);
-          const data = await res.json();
-          const meta = data.chart?.result?.[0]?.meta;
-          if (!meta) return null;
-          const price = meta.regularMarketPrice;
-          const prev = meta.previousClose;
-          const change = ((price - prev) / prev) * 100;
-          return { symbol, price, change, label: futuresMap[symbol] };
-        } catch { return null; }
-      }));
-      const valid = results.filter(Boolean);
-      if (valid.length > 0) {
-        const pulse = {};
-        valid.forEach(r => { pulse[r.symbol] = { price: r.price, change: r.change, label: 'FUT' }; });
-        setFuturesData(pulse);
-        setFuturesLabels(valid.map(r => ({ key: r.symbol, label: r.label })));
-      } else {
-        // Yahoo proxy failed — fall back to FMP as futures-style display
-        await loadFuturesFMPFallback();
+    let loaded = false;
+
+    // ── Try Polygon first (reliable, no CORS proxy needed) ──
+    if (POLYGON_KEY) {
+      try {
+        const res = await fetch(
+          `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${FUTURES_ETF_TICKERS.join(',')}&apiKey=${POLYGON_KEY}`
+        );
+        const data = await res.json();
+        if (data.tickers && data.tickers.length > 0) {
+          const pulse = {};
+          const labels = [];
+          data.tickers.forEach(t => {
+            const label = FUTURES_ETF_MAP[t.ticker];
+            if (!label) return;
+            const price = t.day?.c || t.prevDay?.c || 0;
+            const prevClose = t.prevDay?.c || 0;
+            const pointChange = prevClose ? price - prevClose : (t.todaysChange || 0);
+            const pctChange = t.todaysChangePerc || (prevClose ? ((price - prevClose) / prevClose) * 100 : 0);
+            pulse[t.ticker] = { price, change: pctChange, pointChange, label: 'FUT', isFutures: true };
+            labels.push({ key: t.ticker, label });
+          });
+          if (labels.length > 0) {
+            setFuturesData(pulse);
+            setFuturesLabels(labels);
+            loaded = true;
+          }
+        }
+      } catch (err) {
+        console.error('[Futures Polygon] Error:', err.message);
       }
-    } catch {
-      // Full failure — fall back to FMP as futures-style display
-      await loadFuturesFMPFallback();
     }
+
+    // ── FMP fallback ──
+    if (!loaded) await loadFuturesFMPFallback();
   };
 
-  // ── FMP fallback specifically for the futures/off-hours ticker bar ──
   const loadFuturesFMPFallback = async () => {
     if (!FMP_KEY) return;
-    const tickers = ['SPY', 'QQQ', 'DIA', 'IWM', 'AAPL'];
-    const labels = { SPY: 'S&P 500', QQQ: 'Nasdaq', DIA: 'Dow', IWM: 'Russell', AAPL: 'Apple' };
     try {
       const results = await Promise.allSettled(
-        tickers.map(t =>
+        FUTURES_ETF_TICKERS.map(t =>
           fetch(`https://financialmodelingprep.com/stable/quote?symbol=${t}&apikey=${FMP_KEY}`)
             .then(r => r.json())
         )
@@ -592,10 +603,13 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
       results.forEach((r, idx) => {
         if (r.status === 'fulfilled' && Array.isArray(r.value) && r.value[0]) {
           const q = r.value[0];
-          const ticker = tickers[idx];
-          if (q.price) {
-            pulse[ticker] = { price: q.price, change: q.changesPercentage ?? q.changePercentage ?? 0, label: '' };
-            futLabels.push({ key: ticker, label: labels[ticker] || ticker });
+          const ticker = FUTURES_ETF_TICKERS[idx];
+          const label = FUTURES_ETF_MAP[ticker];
+          if (q.price && label) {
+            const pctChange = q.changesPercentage ?? q.changePercentage ?? 0;
+            const pointChange = q.change ?? (q.price * pctChange / 100) ?? 0;
+            pulse[ticker] = { price: q.price, change: pctChange, pointChange, label: 'FUT', isFutures: true };
+            futLabels.push({ key: ticker, label });
           }
         }
       });
@@ -1100,17 +1114,29 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                 const d = activePulse[item.key];
                 const chg = d?.change;
                 const price = d?.price;
+                const pts = d?.pointChange;
+                const isFut = d?.isFutures || isFuturesItem(item);
                 const arrow = chg > 0 ? '▲' : chg < 0 ? '▼' : '';
                 const color = chg > 0 ? '#5eed8a' : chg < 0 ? '#ff6b6b' : '#8a9bb0';
                 return (
                   <span key={i} style={S.pulseItem}>
                     <span style={S.pulseName}>{item.label}</span>
-                    <span style={{ ...S.pulsePrice, color: '#dbe6f0' }}>
-                      {price ? price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}
-                    </span>
-                    <span style={{ ...S.pulseVal, color }}>
-                      {d ? `${arrow}${Math.abs(chg).toFixed(2)}%` : ''}
-                    </span>
+                    {isFut ? (
+                      /* Futures: show point change + percentage only */
+                      <span style={{ ...S.pulseVal, color }}>
+                        {d ? `${arrow}${Math.abs(pts ?? (price * chg / 100)).toFixed(2)} (${Math.abs(chg).toFixed(2)}%)` : '--'}
+                      </span>
+                    ) : (
+                      /* Stocks: show full price + percentage */
+                      <>
+                        <span style={{ ...S.pulsePrice, color: '#dbe6f0' }}>
+                          {price ? price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}
+                        </span>
+                        <span style={{ ...S.pulseVal, color }}>
+                          {d ? `${arrow}${Math.abs(chg).toFixed(2)}%` : ''}
+                        </span>
+                      </>
+                    )}
                   </span>
                 );
               })}
