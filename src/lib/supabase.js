@@ -50,8 +50,9 @@ export const signOut = async () => {
 };
 
 export const getSession = async () => {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session;
+  const { data, error } = await supabase.auth.getSession();
+  if (error) { console.error('[Supabase] getSession failed:', error.message); return null; }
+  return data?.session ?? null;
 };
 
 // ── TIER HELPERS ──

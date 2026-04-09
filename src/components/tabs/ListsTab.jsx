@@ -92,17 +92,21 @@ export default function ListsTab({ session, profile, group, isAdmin }) {
 
   const handleDeleteStock = async (stock) => {
     if (!window.confirm(`Remove ${stock.ticker} from this list?`)) return;
-    await supabase.from('curated_stocks').delete().eq('id', stock.id);
+    const { error: delErr } = await supabase.from('curated_stocks').delete().eq('id', stock.id);
+    if (delErr) { console.error('[ListsTab] Delete stock failed:', delErr.message); return; }
     const list = lists.find(l => l.curated_stocks?.some(s => s.id === stock.id));
     const remaining = (list?.curated_stocks || [])
       .filter(s => s.id !== stock.id)
       .sort((a, b) => a.ranking - b.ranking);
     if (remaining.length) {
-      await Promise.all(
+      const results = await Promise.all(
         remaining.map((s, i) =>
           supabase.from('curated_stocks').update({ ranking: i + 1 }).eq('id', s.id)
         )
       );
+      results.forEach((r, i) => {
+        if (r.error) console.error(`[ListsTab] Re-rank stock ${remaining[i].id} failed:`, r.error.message);
+      });
     }
     if (expanded === stock.id) setExpanded(null);
     await loadLists();
@@ -111,13 +115,14 @@ export default function ListsTab({ session, profile, group, isAdmin }) {
   const handleSaveStock = async (stockId) => {
     if (savingStock) return;
     setSavingStock(true);
-    await supabase
+    const { error } = await supabase
       .from('curated_stocks')
       .update({
         notes:      notesDraft || null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', stockId);
+    if (error) console.error('[ListsTab] Save stock failed:', error.message);
     setSavingStock(false);
     await loadLists();
   };
@@ -158,7 +163,8 @@ export default function ListsTab({ session, profile, group, isAdmin }) {
   };
 
   const removeFromWatchlist = async (id) => {
-    await supabase.from('user_watchlist').delete().eq('id', id);
+    const { error } = await supabase.from('user_watchlist').delete().eq('id', id);
+    if (error) { console.error('[ListsTab] Remove watchlist failed:', error.message); return; }
     setWatchlist(prev => prev.filter(w => w.id !== id));
   };
 

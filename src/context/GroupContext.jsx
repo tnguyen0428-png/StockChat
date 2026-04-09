@@ -75,12 +75,13 @@ export function GroupProvider({ session, children }) {
     // Auto-join public group if not already a member
     const isMember = allGroups.some(g => g.id === group.id);
     if (!isMember && group.is_public) {
-      await supabase.from('group_members').insert({
+      const { error } = await supabase.from('group_members').insert({
         group_id: group.id,
         user_id: session.user.id,
         role: 'member',
       });
-      await loadProfile();
+      if (error) console.error('[GroupContext] Auto-join failed:', error.message);
+      else await loadProfile();
     }
     setActiveGroup(group);
     localStorage.setItem('uptik_active_group', group.id);
@@ -115,7 +116,11 @@ export function GroupProvider({ session, children }) {
         role: 'creator',
       });
 
-    if (memberError) return { error: memberError.message };
+    if (memberError) {
+      // Rollback: delete the orphaned group
+      await supabase.from('groups').delete().eq('id', newGroup.id);
+      return { error: memberError.message };
+    }
 
     // 3. Refresh groups so it appears in the switcher
     await loadProfile();

@@ -379,7 +379,21 @@ export default function PortfolioTab({ session }) {
     setBuyError('');
     const shares = dollarAmount / selectedTicker.price;
     try {
-      const { error: insertErr } = await supabase.from('paper_trades').insert({
+      // Fetch fresh cash balance to prevent race condition (stale React state)
+      const { data: pf, error: pfErr } = await supabase
+        .from('paper_portfolios')
+        .select('cash_balance')
+        .eq('user_id', session.user.id)
+        .single();
+      if (pfErr) throw pfErr;
+      const freshCash = Number(pf.cash_balance);
+      if (dollarAmount > freshCash) {
+        setBuyError(`Insufficient funds ($${freshCash.toLocaleString()} available)`);
+        setBuying(false);
+        return;
+      }
+
+      const { data: trade, error: insertErr } = await supabase.from('paper_trades').insert({
         user_id: session.user.id,
         ticker: selectedTicker.symbol,
         shares,
@@ -387,13 +401,17 @@ export default function PortfolioTab({ session }) {
         entry_price: selectedTicker.price,
         status: 'open',
         bought_at: new Date().toISOString(),
-      });
+      }).select('id').single();
       if (insertErr) throw insertErr;
       const { error: updateErr } = await supabase
         .from('paper_portfolios')
-        .update({ cash_balance: cashBalance - dollarAmount })
+        .update({ cash_balance: freshCash - dollarAmount })
         .eq('user_id', session.user.id);
-      if (updateErr) throw updateErr;
+      if (updateErr) {
+        // Rollback: delete the trade if cash update failed
+        await supabase.from('paper_trades').delete().eq('id', trade.id);
+        throw updateErr;
+      }
       setSelectedTicker(null);
       setShowPresets(false);
       setShowCustom(false);
@@ -592,10 +610,11 @@ export default function PortfolioTab({ session }) {
 
   const sendTrashTalk = async () => {
     if (!trashTalkInput.trim() || !session?.user?.id) return;
-    await supabase.from('challenge_chat').insert({
+    const { error } = await supabase.from('challenge_chat').insert({
       user_id: session.user.id,
       message: trashTalkInput.trim(),
     });
+    if (error) { console.error('[PortfolioTab] Send message failed:', error.message); return; }
     setTrashTalkInput('');
     document.activeElement?.blur();
   };

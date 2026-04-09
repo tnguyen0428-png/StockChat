@@ -102,7 +102,8 @@ export default function App() {
             localStorage.removeItem('uptik_pending_invite');
             // Join the group in the background
             supabase.rpc('join_custom_group', { p_invite_code: pendingCode })
-              .then(({ data }) => {
+              .then(({ data, error }) => {
+                if (error) { console.error('[App] Pending invite join failed:', error.message); return; }
                 if (data?.success && data.group_id) {
                   localStorage.setItem('uptik_active_group', data.group_id);
                 }

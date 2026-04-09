@@ -80,14 +80,16 @@ export default function TickerBar({ isAdmin, groupId }) {
   const addTicker = async () => {
     const sym = newTicker.trim().toUpperCase().replace(/[^A-Z]/g, '');
     if (!sym || sym.length > 5 || tickers.includes(sym)) return;
-    await supabase.from('group_tickers').insert({ group_id: groupId, symbol: sym });
+    const { error } = await supabase.from('group_tickers').insert({ group_id: groupId, symbol: sym });
+    if (error) { console.error('[TickerBar] Add ticker failed:', error.message); return; }
     setNewTicker('');
   };
 
   const removeTicker = async (sym) => {
-    await supabase.from('group_tickers').delete()
+    const { error } = await supabase.from('group_tickers').delete()
       .eq('group_id', groupId)
       .eq('symbol', sym);
+    if (error) console.error('[TickerBar] Remove ticker failed:', error.message);
   };
 
   if (!tickers.length && !isAdmin) return null;

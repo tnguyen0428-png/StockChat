@@ -887,7 +887,8 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   };
 
   const removeFromWatchlist = async (id, symbol) => {
-    await supabase.from('user_watchlist').delete().eq('id', id);
+    const { error } = await supabase.from('user_watchlist').delete().eq('id', id);
+    if (error) { console.error('[HomeTab] Remove watchlist failed:', error.message); return; }
     const newList = watchlist.filter(w => w.id !== id);
     setWatchlist(newList);
     showToast(`${symbol} removed`);

@@ -301,7 +301,8 @@ function ListsView({ group, isAdmin, isModerator, isOpenList, onAskAI }) {
 
   const handleDeleteStock = async (stock) => {
     if (!window.confirm(`Remove ${stock.ticker}?`)) return;
-    await supabase.from('curated_stocks').delete().eq('id', stock.id);
+    const { error } = await supabase.from('curated_stocks').delete().eq('id', stock.id);
+    if (error) { console.error('[ChatTab] Delete stock failed:', error.message); return; }
     if (expanded === stock.id) setExpanded(null);
     await loadLists();
   };
@@ -309,7 +310,8 @@ function ListsView({ group, isAdmin, isModerator, isOpenList, onAskAI }) {
   const handleSaveStock = async (stockId) => {
     if (savingStock) return;
     setSavingStock(true);
-    await supabase.from('curated_stocks').update({ notes: notesDraft || null, updated_at: new Date().toISOString() }).eq('id', stockId);
+    const { error } = await supabase.from('curated_stocks').update({ notes: notesDraft || null, updated_at: new Date().toISOString() }).eq('id', stockId);
+    if (error) console.error('[ChatTab] Save stock failed:', error.message);
     setSavingStock(false);
     await loadLists();
   };
@@ -1008,19 +1010,21 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
         watchlist,
       });
       setAiLastTicker(newLastTicker);
-      await supabase.from('chat_messages').insert({
+      const { error: aiInsertErr } = await supabase.from('chat_messages').insert({
         group_id: group.id, user_id: 'user_ai',
         username: 'UpTik', user_color: '#8B5CF6',
         text, type: 'ai', is_admin: false,
       });
+      if (aiInsertErr) console.error('[ChatTab] AI message insert failed:', aiInsertErr.message);
     } catch(err) {
       console.error('UpTik AI error:', err.message, err);
-      await supabase.from('chat_messages').insert({
+      const { error: errInsertErr } = await supabase.from('chat_messages').insert({
         group_id: group.id, user_id: 'user_ai',
         username: 'UpTik', user_color: '#8B5CF6',
         text: `Error: ${err.message}`,
         type: 'ai', is_admin: false,
       });
+      if (errInsertErr) console.error('[ChatTab] Error message insert failed:', errInsertErr.message);
     } finally {
       setAiLoading(false);
     }
@@ -1053,15 +1057,14 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const sendBroadcast = async () => {
     if (!broadcastText.trim() || sendingBroadcast) return;
     setSendingBroadcast(true);
-    if (isAdmin) {
-      await supabase.from('breakout_alerts').insert({
-        alert_type: 'INFO', title: broadcastText.trim(), sent_by: profile.username,
-      });
-    } else {
-      const type = detectBroadcastType(broadcastText);
-      await supabase.from('breakout_alerts').insert({
-        alert_type: type, title: broadcastText.trim(), sent_by: profile.username,
-      });
+    const alertType = isAdmin ? 'INFO' : detectBroadcastType(broadcastText);
+    const { error } = await supabase.from('breakout_alerts').insert({
+      alert_type: alertType, title: broadcastText.trim(), sent_by: profile.username,
+    });
+    if (error) {
+      console.error('[ChatTab] Broadcast insert failed:', error.message);
+      setSendingBroadcast(false);
+      return;
     }
     setBroadcastText('');
     setSendingBroadcast(false);

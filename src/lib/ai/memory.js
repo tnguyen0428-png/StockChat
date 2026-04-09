@@ -98,7 +98,7 @@ export async function updateMemory(supabase, userId, message, routing, current) 
       topics_of_interest: topics,
       last_question_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-    });
+    }, { onConflict: 'user_id' });
   } catch (err) {
     console.warn('[Memory] Update failed:', err.message);
   }

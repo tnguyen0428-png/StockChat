@@ -130,7 +130,8 @@ export default function MarketIndicators({ isAdmin }) {
 
     try {
       // Clear existing rows then insert fresh set
-      await supabase.from('market_indicators').delete().gte('position', 0);
+      const { error: delErr } = await supabase.from('market_indicators').delete().gte('position', 0);
+      if (delErr) throw delErr;
       const { data, error } = await supabase
         .from('market_indicators')
         .insert(valid)

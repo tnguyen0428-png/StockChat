@@ -159,12 +159,14 @@ function AdminPanel({ session, profile }) {
 
       if (allToday && allToday.length > 0) {
         const clearIds = allToday.map(a => a.id);
-        await supabase.from('breakout_alerts').update({ featured: false }).in('id', clearIds);
+        const { error: clearErr } = await supabase.from('breakout_alerts').update({ featured: false }).in('id', clearIds);
+        if (clearErr) console.error('[Featured] Clear featured failed:', clearErr.message);
       }
 
       // Flag the top 4
       if (topIds.length > 0) {
-        await supabase.from('breakout_alerts').update({ featured: true }).in('id', topIds);
+        const { error: flagErr } = await supabase.from('breakout_alerts').update({ featured: true }).in('id', topIds);
+        if (flagErr) console.error('[Featured] Flag featured failed:', flagErr.message);
       }
 
       console.log(`[Featured] Flagged ${topIds.length} alerts:`, unique.slice(0, 4).map(a => a.ticker));
@@ -239,42 +241,48 @@ function AdminPanel({ session, profile }) {
 
   const createGroup = async () => {
     if (!newGroupName.trim()) return;
-    await supabase.from('groups').insert({
+    const { error } = await supabase.from('groups').insert({
       name: newGroupName.trim(), is_public: newGroupPublic,
       sector: newGroupSector.trim() || null,
     });
+    if (error) { console.error('[ProfileTab] Create group failed:', error.message); alert('Failed to create group: ' + error.message); return; }
     setNewGroupName(''); setNewGroupSector('');
     await loadGroups();
   };
 
   const deleteGroup = async (id) => {
     if (!window.confirm('Delete this group?')) return;
-    await supabase.from('groups').delete().eq('id', id);
+    const { error } = await supabase.from('groups').delete().eq('id', id);
+    if (error) { console.error('[ProfileTab] Delete group failed:', error.message); alert('Failed to delete group.'); return; }
     await loadGroups();
   };
 
   const promoteUser = async (userId, groupId) => {
-    await supabase.from('group_members').update({ role: 'moderator' }).eq('user_id', userId).eq('group_id', groupId);
+    const { error } = await supabase.from('group_members').update({ role: 'moderator' }).eq('user_id', userId).eq('group_id', groupId);
+    if (error) { console.error('[ProfileTab] Promote user failed:', error.message); return; }
     await loadUsers();
   };
 
   const removeUser = async (userId, groupId) => {
     if (!window.confirm('Remove this user?')) return;
-    await supabase.from('group_members').delete().eq('user_id', userId).eq('group_id', groupId);
+    const { error } = await supabase.from('group_members').delete().eq('user_id', userId).eq('group_id', groupId);
+    if (error) { console.error('[ProfileTab] Remove user failed:', error.message); return; }
     await loadUsers();
   };
 
   const postBriefing = async () => {
     if (!briefingText.trim() || postingBriefing) return;
     setPostingBriefing(true);
-    await supabase.from('daily_briefings').insert({ content: briefingText.trim(), mood: briefingMood, tags: [] });
+    const { error } = await supabase.from('daily_briefings').insert({ content: briefingText.trim(), mood: briefingMood, tags: [] });
+    if (error) { console.error('[ProfileTab] Post briefing failed:', error.message); setPostingBriefing(false); alert('Failed to post briefing.'); return; }
     setBriefingText(''); setPostingBriefing(false);
     alert('Briefing posted!');
   };
 
   const createCuratedList = async () => {
     if (!selectedGroup || !listName.trim()) return;
-    await supabase.from('curated_lists').insert({ group_id: selectedGroup, name: listName.trim() });
+    const { error } = await supabase.from('curated_lists').insert({ group_id: selectedGroup, name: listName.trim() });
+    if (error) { console.error('[ProfileTab] Create list failed:', error.message); alert('Failed to create list.'); return; }
     setListName('');
     alert('Curated list created!');
   };
@@ -395,11 +403,12 @@ function AdminPanel({ session, profile }) {
 
     const content = articles.map(a => `• ${a.title} (${a.tickers.join(', ')})`).join('\n');
 
-    await supabase.from('daily_briefings').insert({
+    const { error } = await supabase.from('daily_briefings').insert({
       content,
       mood: 'neutral',
       tags: articles.map(a => ({ title: a.title, url: a.url, tickers: a.tickers, publisher: a.publisher, time: a.time })),
     });
+    if (error) { console.error('[ProfileTab] News briefing failed:', error.message); setPostingNews(false); alert('Failed to post briefing.'); return; }
     setSelectedNews([]);
     setPostingNews(false);
     alert('Briefing posted!');
@@ -678,10 +687,14 @@ export default function ProfileTab({ session, profile, group, isAdmin, onSignOut
   const handleToggle = async (key) => {
     const updated = { ...notifications, [key]: !notifications[key] };
     setNotifications(updated);
-    await supabase
+    const { error } = await supabase
       .from('profiles')
       .update({ notif_prefs: updated })
       .eq('id', session.user.id);
+    if (error) {
+      console.error('[ProfileTab] Toggle notification failed:', error.message);
+      setNotifications(notifications); // revert on failure
+    }
   };
 
   const saveUsername = async () => {

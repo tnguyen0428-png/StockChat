@@ -77,7 +77,21 @@ export default function BuyModal({ session, cashBalance, onClose, onComplete }) 
     setError('');
 
     try {
-      const { error: insertErr } = await supabase.from('paper_trades').insert({
+      // Fetch fresh cash balance to prevent race condition (stale React state)
+      const { data: pf, error: pfErr } = await supabase
+        .from('paper_portfolios')
+        .select('cash_balance')
+        .eq('user_id', session.user.id)
+        .single();
+      if (pfErr) throw pfErr;
+      const freshCash = Number(pf.cash_balance);
+      if (dollarAmount > freshCash) {
+        setError(`Insufficient funds ($${freshCash.toFixed(2)} available)`);
+        setBuying(false);
+        return;
+      }
+
+      const { data: trade, error: insertErr } = await supabase.from('paper_trades').insert({
         user_id: session.user.id,
         ticker: selected.symbol,
         shares: shares,
@@ -85,14 +99,18 @@ export default function BuyModal({ session, cashBalance, onClose, onComplete }) 
         entry_price: selected.price,
         status: 'open',
         bought_at: new Date().toISOString(),
-      });
+      }).select('id').single();
       if (insertErr) throw insertErr;
 
       const { error: updateErr } = await supabase
         .from('paper_portfolios')
-        .update({ cash_balance: cashBalance - dollarAmount })
+        .update({ cash_balance: freshCash - dollarAmount })
         .eq('user_id', session.user.id);
-      if (updateErr) throw updateErr;
+      if (updateErr) {
+        // Rollback: delete the trade if cash update failed
+        await supabase.from('paper_trades').delete().eq('id', trade.id);
+        throw updateErr;
+      }
 
       onComplete();
     } catch (err) {
