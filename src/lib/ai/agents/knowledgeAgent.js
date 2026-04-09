@@ -48,6 +48,6 @@ EXAMPLES OF BAD RESPONSES:
 
 USER LEVEL: ${level} — ${level === 'beginner' ? 'Keep it simple. Define financial terms when you use them.' : level === 'intermediate' ? 'Standard financial terms are fine, no need to over-explain.' : 'Technical language, data-heavy, no hand-holding.'}${buildFeedbackContext(memory)}`;
 
-    return await callClaude(systemPrompt, question, history, 'auto');
+    return await callClaude(systemPrompt, question, history, 'auto', null, 0.5);
   }
 };

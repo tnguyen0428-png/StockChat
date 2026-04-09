@@ -15,7 +15,7 @@ export function buildFeedbackContext(memory) {
 
   // Satisfaction signal
   if (memory.satisfaction === 'unhappy') {
-    parts.push('NOTE: This user has been rating your responses poorly. Step up your game — be more helpful, more accurate, and more conversational. Give them a reason to rate you well.');
+    parts.push('NOTE: This user has been rating your responses poorly. Be more precise, more helpful, and make sure you answer exactly what was asked. Lead with the most relevant information.');
   } else if (memory.satisfaction === 'mixed') {
     parts.push('NOTE: This user has given mixed feedback. Pay extra attention to answering exactly what they asked.');
   }

@@ -5,7 +5,7 @@ const MODELS = {
   smart: 'claude-sonnet-4-6',
 };
 
-export async function callClaude(systemPrompt, userMessage, history = [], tier = 'auto', maxTokens = null) {
+export async function callClaude(systemPrompt, userMessage, history = [], tier = 'auto', maxTokens = null, temp = null) {
   // Keep more history for natural conversation flow
   const recent = (history || []).slice(-12).map(msg => ({
     role: msg.role === 'assistant' ? 'assistant' : 'user',
@@ -17,8 +17,8 @@ export async function callClaude(systemPrompt, userMessage, history = [], tier =
   else if (tier === 'smart') model = MODELS.smart;
   else model = needsSonnet(userMessage) ? MODELS.smart : MODELS.fast;
 
-  // Slightly warmer temperature for more natural voice
-  const temperature = 0.7;
+  // Lower temperature = better instruction following. Agents can override.
+  const temperature = temp ?? 0.4;
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',

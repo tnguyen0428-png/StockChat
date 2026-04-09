@@ -102,6 +102,6 @@ RULES:
 - ${marketClosed ? 'Markets are closed — say "as of last close" not "today"' : 'Markets are open — use current data'}
 - Don't guess at sentiment if VIX data is missing${buildFeedbackContext(memory)}`;
 
-    return await callClaude(systemPrompt, question, history, 'auto');
+    return await callClaude(systemPrompt, question, history, 'auto', null, 0.4);
   }
 };
