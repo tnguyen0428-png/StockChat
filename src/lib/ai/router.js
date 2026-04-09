@@ -40,7 +40,7 @@ const COMPANY_TO_TICKER = {
   'kraft': 'KHC', 'kraft heinz': 'KHC', 'hershey': 'HSY',
   '3m': 'MMM', 'honeywell': 'HON', 'general electric': 'GE', 'ge': 'GE',
   // Retail / consumer
-  'amazon': 'AMZN', 'kroger': 'KR', 'dollar general': 'DG', 'dollar tree': 'DLTR',
+  'kroger': 'KR', 'dollar general': 'DG', 'dollar tree': 'DLTR',
   'ross': 'ROST', 'tjx': 'TJX', 'tj maxx': 'TJX', 'best buy': 'BBY',
   // Healthcare
   'amgen': 'AMGN', 'gilead': 'GILD', 'regeneron': 'REGN', 'vertex': 'VRTX',
@@ -59,9 +59,28 @@ const COMPANY_TO_TICKER = {
   // Energy
   'marathon': 'MPC', 'pioneer': 'PXD', 'schlumberger': 'SLB',
   'enphase': 'ENPH', 'first solar': 'FSLR', 'nextera': 'NEE',
+  'bloom energy': 'BE', 'bloom': 'BE',
 };
 
-const IGNORE_TICKERS = new Set(['AI', 'AM', 'PM', 'OK', 'US', 'CEO', 'IPO', 'ETF', 'GDP', 'FBI', 'USA', 'THE', 'FOR', 'AND', 'CAN', 'YOU', 'ARE', 'HOW', 'WHAT', 'WHY', 'IS', 'AT', 'IN', 'ON', 'TO', 'ME', 'MY', 'NO', 'YES', 'HI', 'HEY', 'UP', 'DO', 'IF', 'OR', 'SO', 'IT', 'BE', 'BY', 'OF', 'AN', 'AS', 'GO', 'IM']);
+// Words that look like tickers but aren't — with exceptions for stock context
+const IGNORE_TICKERS = new Set(['AI', 'AM', 'PM', 'OK', 'US', 'CEO', 'IPO', 'ETF', 'GDP', 'FBI', 'USA', 'THE', 'FOR', 'AND', 'CAN', 'YOU', 'ARE', 'HOW', 'WHAT', 'WHY', 'IS', 'AT', 'IN', 'ON', 'TO', 'ME', 'MY', 'NO', 'YES', 'HI', 'HEY', 'UP', 'DO', 'IF', 'OR', 'SO', 'IT', 'BY', 'OF', 'AN', 'AS', 'GO', 'IM']);
+
+// These are real tickers that overlap with common words — allow when stock context is present
+const CONTEXT_TICKERS = new Set(['BE', 'IT', 'AI', 'ON', 'GO']);
+
+// Detect if message has stock-related context around a word
+function hasStockContext(message, word) {
+  const lower = message.toLowerCase();
+  const stockSignals = ['stock', 'ticker', 'share', 'price', 'earnings', 'buy', 'sell', 'trade',
+    'analyze', 'analysis', 'tell me about', 'what about', 'how is', "how's", 'look at',
+    'check', 'guidance', 'outlook', 'forecast', 'revenue', 'eps', 'valuation'];
+  return stockSignals.some(s => lower.includes(s));
+}
+
+// Detect if user is asking about guidance/outlook (needs transcript)
+function needsTranscript(message) {
+  return /\b(guidance|outlook|forecast|forward.?looking|what did (they|management|the company|ceo|cfo) (say|guide|expect)|company guidance|revenue (target|range|outlook)|eps (target|range|outlook)|next quarter.*(expect|guide|outlook)|full.?year.*(expect|guide|outlook))\b/i.test(message);
+}
 
 export async function route(message, history = [], lastTicker = null) {
   const lower = message.toLowerCase().trim();
@@ -70,46 +89,45 @@ export async function route(message, history = [], lastTicker = null) {
   const pronouns = /\b(it|its|that stock|this stock|that one|this one|the same|same stock|same ticker)\b/i;
 
   // Also catch follow-up queries that imply "the stock we were just talking about"
-  // e.g. "pull up last earnings", "what about the chart", "show me technicals"
   const followUpPatterns = /^(pull up|show me|what about|how about|and |also |check |look at |give me )/i;
   const stockDataWords = /\b(earnings|revenue|chart|technicals|options|calls|puts|valuation|price target|dividend|insider|guidance|forecast|financials|balance sheet|income statement|cash flow|eps|p\/e|margin|volume|float)\b/i;
   const isFollowUp = pronouns.test(message) || (followUpPatterns.test(lower) && stockDataWords.test(lower));
 
   if (isFollowUp) {
+    const transcript = needsTranscript(message);
     // Look backwards through history for the last mentioned ticker
     for (let i = history.length - 1; i >= 0; i--) {
       const h = history[i]?.content || '';
-      // Check for $SYMBOL
       const tickerInHistory = h.match(/\$([A-Z]{1,5})\b/);
-      if (tickerInHistory) return { agent: 'data', params: { ticker: tickerInHistory[1] } };
-      // Check company names
+      if (tickerInHistory) return { agent: 'data', params: { ticker: tickerInHistory[1], needsTranscript: transcript } };
       const hLower = h.toLowerCase();
       for (const [name, ticker] of Object.entries(COMPANY_TO_TICKER)) {
-        if (hLower.includes(name)) return { agent: 'data', params: { ticker } };
+        if (hLower.includes(name)) return { agent: 'data', params: { ticker, needsTranscript: transcript } };
       }
-      // Check bare tickers
       const bare = h.match(/\b([A-Z]{2,5})\b/);
-      if (bare && !IGNORE_TICKERS.has(bare[1])) return { agent: 'data', params: { ticker: bare[1] } };
+      if (bare && !IGNORE_TICKERS.has(bare[1])) return { agent: 'data', params: { ticker: bare[1], needsTranscript: transcript } };
     }
-    // Final fallback: use the last resolved ticker from previous turn
     if (lastTicker) {
       console.log('[Router] Follow-up resolved via lastTicker:', lastTicker);
-      return { agent: 'data', params: { ticker: lastTicker } };
+      return { agent: 'data', params: { ticker: lastTicker, needsTranscript: transcript } };
     }
   }
+
+  // Check if this question needs transcript data
+  const transcript = needsTranscript(message);
 
   // === TICKER CHECKS FIRST (always take priority) ===
 
   // 1. Check $SYMBOL format
   const tickerMatch = message.match(/\$([A-Z]{1,5})\b/);
   if (tickerMatch) {
-    return { agent: 'data', params: { ticker: tickerMatch[1] } };
+    return { agent: 'data', params: { ticker: tickerMatch[1], needsTranscript: transcript } };
   }
 
   // 2. Check multi-word company names first (before single words)
   for (const [name, ticker] of Object.entries(COMPANY_TO_TICKER)) {
     if (name.includes(' ') && lower.includes(name)) {
-      return { agent: 'data', params: { ticker } };
+      return { agent: 'data', params: { ticker, needsTranscript: transcript } };
     }
   }
 
@@ -117,14 +135,21 @@ export async function route(message, history = [], lastTicker = null) {
   const words = lower.split(/\s+/);
   for (const word of words) {
     if (COMPANY_TO_TICKER[word]) {
-      return { agent: 'data', params: { ticker: COMPANY_TO_TICKER[word] } };
+      return { agent: 'data', params: { ticker: COMPANY_TO_TICKER[word], needsTranscript: transcript } };
     }
   }
 
   // 4. Check for uppercase ticker-like words (2-5 capital letters)
   const possibleTicker = message.match(/\b([A-Z]{2,5})\b/);
-  if (possibleTicker && !IGNORE_TICKERS.has(possibleTicker[1])) {
-    return { agent: 'data', params: { ticker: possibleTicker[1] } };
+  if (possibleTicker) {
+    const candidate = possibleTicker[1];
+    // Allow context-dependent tickers (BE, AI, etc.) when stock context is present
+    if (CONTEXT_TICKERS.has(candidate) && hasStockContext(message, candidate)) {
+      return { agent: 'data', params: { ticker: candidate, needsTranscript: transcript } };
+    }
+    if (!IGNORE_TICKERS.has(candidate) && !CONTEXT_TICKERS.has(candidate)) {
+      return { agent: 'data', params: { ticker: candidate, needsTranscript: transcript } };
+    }
   }
 
   // 5. Macro / market-wide questions
@@ -146,20 +171,20 @@ export async function route(message, history = [], lastTicker = null) {
 
   // === ONLY check greetings/education if NO ticker was found ===
 
-  // 6. Pure greetings (message is ONLY a greeting, nothing else)
+  // 7. Pure greetings (message is ONLY a greeting, nothing else)
   const pureGreetings = ['hello', 'hi', 'hey', 'sup', 'yo', 'good morning', 'good afternoon', "what's up", 'whats up'];
   if (pureGreetings.some(g => lower === g || lower === g + '!')) {
     return { agent: 'knowledge', params: { ticker: null } };
   }
 
-  // 7. Education keywords
+  // 8. Education keywords
   const eduKeywords = ['what is', 'what are', 'what does', 'explain', 'define', 'meaning of', 'how does', 'difference between', 'teach me'];
   const eduTopics = ['support', 'resistance', 'volume', 'gap up', 'sma', 'rsi', 'macd', 'options', 'calls', 'puts', 'dark pool', 'market cap', 'p/e', 'dividend', 'short selling', 'margin', 'stop loss', 'limit order', 'bull', 'bear', 'candlestick', 'moving average'];
   if (eduKeywords.some(k => lower.includes(k)) && eduTopics.some(t => lower.includes(t))) {
     return { agent: 'knowledge', params: { ticker: null } };
   }
 
-  // === 8. FALLBACK: use Haiku to classify ===
+  // === 9. FALLBACK: use Haiku to classify ===
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -174,11 +199,11 @@ export async function route(message, history = [], lastTicker = null) {
         max_tokens: 150,
         system: `Classify this stock trading app question. Respond ONLY with JSON.
 
-"data" = needs live stock data (price, alerts, specific ticker analysis, today's picks, what to trade)
+"data" = needs live stock data (price, alerts, specific ticker analysis, today's picks, what to trade, guidance, outlook)
 "macro" = broad market questions, economy, Fed, inflation, interest rates, sectors, market direction, tariffs, recession
 "knowledge" = education, concepts, definitions, how things work, greetings, general chat
 
-Extract ticker if mentioned (company names too: "Tesla"="TSLA", "SoFi"="SOFI", "Trade Desk"="TTD", etc).
+Extract ticker if mentioned (company names too: "Tesla"="TSLA", "Bloom Energy"="BE", "SoFi"="SOFI", "Trade Desk"="TTD", etc).
 
 Respond: {"agent":"data or macro or knowledge","params":{"ticker":"SYMBOL or null"}}`,
         messages: [{ role: 'user', content: message }]
@@ -187,7 +212,12 @@ Respond: {"agent":"data or macro or knowledge","params":{"ticker":"SYMBOL or nul
 
     const data = await response.json();
     const text = data.content[0].text.replace(/```json|```/g, '').trim();
-    return JSON.parse(text);
+    const parsed = JSON.parse(text);
+    // Add transcript flag if needed
+    if (parsed.params?.ticker && transcript) {
+      parsed.params.needsTranscript = true;
+    }
+    return parsed;
   } catch {
     return { agent: 'knowledge', params: { ticker: null } };
   }
