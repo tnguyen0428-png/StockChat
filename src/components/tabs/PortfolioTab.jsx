@@ -747,7 +747,7 @@ export default function PortfolioTab({ session }) {
   };
 
   const s = {
-    scroll: { flex: 1, overflowY: 'auto', background: t.bg },
+    scroll: { flex: 1, overflowY: 'auto', background: t.bg, minHeight: '100%' },
     barNew: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: t.card, border: `1px solid ${t.green}25`, borderRadius: 12, marginBottom: 8 },
     barNewText: { flex: 1 },
     barNewTitle: { fontSize: 12, fontWeight: 700, color: t.text1 },
@@ -837,7 +837,7 @@ export default function PortfolioTab({ session }) {
 
   return (
     <div style={s.scroll}>
-      <div style={{ padding: '0 12px 12px' }}>
+      <div style={{ padding: '8px 12px 80px' }}>
 
         {/* HEADER ROW */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
