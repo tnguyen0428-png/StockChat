@@ -78,7 +78,7 @@ function detectBehaviorBadges(userId, allTrades) {
 
 export default function PortfolioTab({ session }) {
   const { profile } = useGroup();
-  const [view, setView] = useState('portfolio');
+
   const [portfolio, setPortfolio] = useState(null);
   const [trades, setTrades] = useState([]);
   const [prices, setPrices] = useState({});
@@ -118,6 +118,7 @@ export default function PortfolioTab({ session }) {
   const [trashTalkInput, setTrashTalkInput] = useState('');
   const [riskLevel, setRiskLevel] = useState({ level: 'Low', bars: 2, color: '#2a7d4b', note: '' });
   const [showPortfolio, setShowPortfolio] = useState(false);
+  const [showAllRankings, setShowAllRankings] = useState(false);
 
   // Leaderboard v2 state
   const [chatReactions, setChatReactions] = useState({});
@@ -700,382 +701,190 @@ export default function PortfolioTab({ session }) {
     );
   }
 
-  // ═══════════════════════════════════════════
-  // RENDER
-  // ═══════════════════════════════════════════
   return (
     <div style={s.scroll}>
-      <style>{`
-        @keyframes tickerScroll {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-      `}</style>
+      <div style={{ padding: '0 12px 12px' }}>
 
-      {/* ZONE 1: Segmented control */}
-      <div style={s.segWrap}>
-        <div style={s.segBar}>
-          <button style={{ ...s.segBtn, ...(view === 'portfolio' ? s.segActive : {}) }} onClick={() => setView('portfolio')}>My Portfolio</button>
-          <button style={{ ...s.segBtn, ...(view === 'leaderboard' ? s.segActive : {}) }} onClick={() => setView('leaderboard')}>Leaderboard</button>
-        </div>
-      </div>
-
-      {view === 'portfolio' ? (
-        <div style={{ padding: '0 12px 12px' }}>
-
-          {/* TOP BAR */}
-          {trades.length === 0 ? (
-            <div style={s.barNew}>
-              <span style={{ fontSize: 20, flexShrink: 0 }}>🏆</span>
-              <div style={s.barNewText}>
-                <div style={s.barNewTitle}>Paper Trading Challenge</div>
-                <div style={s.barNewSub}><b style={{ color: 'var(--green-btn)' }}>$50K fake money</b> · compete with your crew</div>
-              </div>
-              <div style={s.barNewBtn} onClick={() => setShowPortfolio(true)}>Join →</div>
+        {/* TOP BAR */}
+        {trades.length === 0 ? (
+          <div style={s.barNew}>
+            <span style={{ fontSize: 20, flexShrink: 0 }}>🏆</span>
+            <div style={s.barNewText}>
+              <div style={s.barNewTitle}>Paper Trading Challenge</div>
+              <div style={s.barNewSub}><b style={{ color: 'var(--green-btn)' }}>$50K fake money</b> · compete with your crew</div>
             </div>
-          ) : (
-            <div style={s.barActive}>
-              <div style={s.barRank}><span style={s.barRankText}>#{myRank || '-'}</span></div>
-              <div style={s.barStats}>
-                <div style={s.barStatsTop}>
-                  <span style={{ fontSize: 16, fontWeight: 700, color: isPositive ? 'var(--green-btn)' : 'var(--red)' }}>{isPositive ? '+' : ''}{totalReturn.toFixed(1)}%</span>
-                  {userBadges.length > 0 && <span style={{ display: 'flex', gap: 2 }}>{userBadges.slice(0, 3).map(key => { const def = BADGE_DEFS[key]; return def ? <span key={key} style={{ fontSize: 12 }} title={def.label}>{def.emoji}</span> : null; })}</span>}
-                </div>
-                <div style={s.barStatsBottom}>
-                  {aheadUser ? <span>🎯 {aheadUser.gap}% behind {aheadUser.username}</span> : myRank !== null ? <span style={{ color: 'var(--green-btn)' }}>👑 In the lead!</span> : null}
-                  <span style={{ color: 'var(--green-btn)', fontWeight: 600 }}>Cash ${cashBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
-                </div>
-              </div>
-              <div style={{ ...s.barPortBtn, ...(showPortfolio ? s.barPortBtnOpen : {}) }} onClick={() => setShowPortfolio(p => !p)}>Portfolio {showPortfolio ? '▲' : '▼'}</div>
-            </div>
-          )}
-
-          {/* PORTFOLIO DROPDOWN */}
-          {showPortfolio && (
-            <div style={s.portDrop}>
-              <div style={s.portCash}>
-                <div style={s.portCashItem}><div style={s.portCashLabel}>Total</div><div style={{ ...s.portCashVal, color: 'var(--green-btn)' }}>${totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
-                <div style={{ ...s.portCashItem, borderLeft: '1px solid var(--border)' }}><div style={s.portCashLabel}>Cash</div><div style={s.portCashVal}>${cashBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
-                <div style={{ ...s.portCashItem, borderLeft: '1px solid var(--border)' }}><div style={s.portCashLabel}>Invested</div><div style={s.portCashVal}>${totalPositionsValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
-              </div>
-              <div style={s.portSecLabel}>Positions · {trades.length}</div>
-              {trades.length === 0 ? (
-                <div style={{ fontSize: 11, color: 'var(--text3)', padding: '8px 12px' }}>No positions yet — add a ticker below</div>
-              ) : trades.map(trade => {
-                const curPrice = prices[trade.ticker] || Number(trade.entry_price);
-                const entryPrice = Number(trade.entry_price);
-                const pctGain = ((curPrice - entryPrice) / entryPrice) * 100;
-                const isUp = pctGain >= 0;
-                return (
-                  <div key={trade.id} style={s.portPos}>
-                    <span style={s.portPosTk}>{trade.ticker}</span>
-                    <span style={s.portPosInfo}>{Number(trade.shares).toFixed(1)} · avg ${entryPrice.toFixed(2)}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: isUp ? 'var(--green-btn)' : 'var(--red)', minWidth: 45, textAlign: 'right', marginRight: 6 }}>{isUp ? '+' : ''}{pctGain.toFixed(1)}%</span>
-                    <div onClick={(e) => { e.stopPropagation(); setSellTrade({ ...trade, currentPrice: curPrice }); }} style={s.portPosSell}>Sell</div>
-                  </div>
-                );
-              })}
-              <div style={s.portBuyRow}>
-                <input style={s.portBuyInput} value={searchQuery} onChange={e => setSearchQuery(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))} placeholder="ADD TICKER" maxLength={5} />
-                <button style={s.portBuyBtn} onClick={() => { if (searchResults.length > 0) handleSelectTicker(searchResults[0]); }}>Buy</button>
-              </div>
-              {searchResults.length > 0 && (
-                <div style={{ borderTop: '1px solid var(--border)' }}>
-                  {searchResults.map(r => (
-                    <div key={r.symbol} style={s.portSearchRow} onClick={() => handleSelectTicker(r)}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text1)' }}>{r.symbol}</span>
-                      <span style={{ fontSize: 10, color: 'var(--text3)', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{r.name}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {searching && <div style={{ fontSize: 10, color: 'var(--text3)', padding: '6px 12px' }}>Searching...</div>}
-              {showPresets && selectedTicker && (
-                <div style={{ padding: '8px 12px', borderTop: '1px solid var(--border)', background: 'var(--green-bg)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <div><b style={{ fontSize: 12, color: 'var(--green-btn)' }}>{selectedTicker.symbol}</b> <span style={{ fontSize: 10, color: 'var(--green-btn)' }}>${selectedTicker.price.toFixed(2)}</span></div>
-                    <button style={{ background: 'none', border: 'none', fontSize: 14, color: 'var(--green-btn)', cursor: 'pointer' }} onClick={clearSelection}>×</button>
-                  </div>
-                  {!showCustom ? (
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      {[1000, 5000, 10000].map(amt => (<button key={amt} style={s.presetBtnSm} onClick={() => executeBuy(amt)}>{buying ? '..' : `$${amt / 1000}K`}</button>))}
-                      <button style={s.otherBtnSm} onClick={() => setShowCustom(true)}>Other</button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <div style={s.customWrapSm}><span style={{ fontSize: 12, fontWeight: 600, color: 'var(--green-btn)' }}>$</span><input style={s.customInputSm} type="number" inputMode="decimal" value={customAmount} onChange={e => setCustomAmount(e.target.value)} placeholder="Amt" autoFocus /></div>
-                      <button style={{ ...s.customBuySm, opacity: (parseFloat(customAmount) > 0 && !buying) ? 1 : 0.4 }} onClick={() => executeBuy(parseFloat(customAmount) || 0)} disabled={!(parseFloat(customAmount) > 0) || buying}>{buying ? '..' : 'Buy'}</button>
-                    </div>
-                  )}
-                  {buyError && <div style={{ fontSize: 10, color: '#E24B4A', marginTop: 3 }}>{buyError}</div>}
-                </div>
-              )}
-              <div onClick={() => setShowHistory(!showHistory)} style={s.portHistToggle}>{showHistory ? 'Hide History ▲' : `Trade History (${closedTrades.length}) ▼`}</div>
-              {showHistory && (
-                <div style={{ padding: '0 12px 8px' }}>
-                  {closedTrades.length > 0 && (() => {
-                    const wins = closedTrades.filter(t => Number(t.exit_price) > Number(t.entry_price)).length;
-                    const totalPL = closedTrades.reduce((sum, t) => sum + (Number(t.exit_price) - Number(t.entry_price)) * Number(t.shares), 0);
-                    const avgHold = closedTrades.reduce((sum, t) => { if (!t.sold_at || !t.bought_at) return sum; return sum + (new Date(t.sold_at) - new Date(t.bought_at)) / 86400000; }, 0) / closedTrades.length;
-                    const winRate = Math.round((wins / closedTrades.length) * 100);
-                    return (
-                      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                        <div style={{ flex: 1, background: 'var(--card2)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: 'var(--text3)' }}>Win rate</div><div style={{ fontSize: 14, fontWeight: 700, color: winRate >= 50 ? 'var(--green-btn)' : 'var(--red)' }}>{winRate}%</div></div>
-                        <div style={{ flex: 1, background: 'var(--card2)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: 'var(--text3)' }}>Avg hold</div><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text1)' }}>{avgHold.toFixed(1)}d</div></div>
-                        <div style={{ flex: 1, background: 'var(--card2)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: 'var(--text3)' }}>Total P&L</div><div style={{ fontSize: 14, fontWeight: 700, color: totalPL >= 0 ? 'var(--green-btn)' : 'var(--red)' }}>{totalPL >= 0 ? '+' : '-'}${Math.abs(totalPL).toFixed(0)}</div></div>
-                      </div>
-                    );
-                  })()}
-                  {closedTrades.map(trade => {
-                    const entry = Number(trade.entry_price); const exit = Number(trade.exit_price); const pl = (exit - entry) * Number(trade.shares);
-                    const pctReturn = ((exit - entry) / entry) * 100; const isWin = pl >= 0;
-                    const holdMs = trade.sold_at && trade.bought_at ? new Date(trade.sold_at) - new Date(trade.bought_at) : 0;
-                    const holdHours = holdMs / 3600000; const holdDisplay = holdHours < 24 ? `${Math.round(holdHours)}h` : `${Math.round(holdHours / 24)}d`;
-                    const buyDate = trade.bought_at ? new Date(trade.bought_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-                    return (<div key={trade.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text1)' }}>{trade.ticker}</span><span style={{ fontSize: 10, color: 'var(--text3)' }}>{buyDate} · {holdDisplay}</span><span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: isWin ? 'var(--green-btn)' : 'var(--red)' }}>{isWin ? '+' : ''}{pctReturn.toFixed(1)}%</span></div></div>);
-                  })}
-                  {closedTrades.length === 0 && <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', padding: '8px 0' }}>No closed trades yet</div>}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TODAY'S RACE */}
-          <div style={s.raceCard}>
-            <div style={s.raceCardHdr}><span style={s.raceCardTitle}>🏁 Today's Race</span><span style={s.raceCardSub}>{daysLeft} days left</span></div>
-            <div style={s.raceCardBody}>
-              {(() => {
-                const sorted = [...leaderboard].sort((a, b) => b.pctReturn - a.pctReturn);
-                const best = sorted[0]; const worst = sorted[sorted.length - 1];
-                if (!best) return <div style={{ fontSize: 11, color: 'var(--text3)' }}>Waiting for participants...</div>;
-                return (<div style={{ fontSize: 11, color: 'var(--text1)', lineHeight: 1.6 }}>
-                  <span style={{ color: 'var(--green-btn)', fontWeight: 600 }}>▲ {best.username} +{best.pctReturn.toFixed(1)}%</span>
-                  {best.positions?.[0] && <span style={{ color: 'var(--text3)' }}> — {best.positions[0].ticker}</span>}<br/>
-                  {worst && worst.userId !== best.userId && (<><span style={{ color: 'var(--red)', fontWeight: 600 }}>▼ {worst.username} {worst.pctReturn >= 0 ? '+' : ''}{worst.pctReturn.toFixed(1)}%</span>{worst.positions?.[0] && <span style={{ color: 'var(--text3)' }}> — {worst.positions[0].ticker}</span>}</>)}
-                </div>);
-              })()}
-            </div>
+            <div style={s.barNewBtn} onClick={() => setShowPortfolio(true)}>Join →</div>
           </div>
-
-          {/* DAILY LEARN */}
-          <div style={s.learnCard}>
-            <div style={s.learnCardHdr}><span style={{ fontSize: 9, fontWeight: 700, color: '#8B5CF6' }}>💡 LEARN</span></div>
-            <div style={s.learnCardBody}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text1)', marginBottom: 3 }}>{trades.length === 0 ? 'What is a stock ticker?' : 'When to cut your losses'}</div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.6 }}>{trades.length === 0 ? "A short code for a company. AAPL = Apple, NVDA = Nvidia, TSLA = Tesla. Tap Join above to pick your first stock!" : "Most pros set a stop at 15-20%. If a stock drops that much from your buy price, consider whether your original thesis still holds."}</div>
-            </div>
-          </div>
-
-          {/* SMACK TALK */}
-          <div style={s.smackWrap}>
-            <div style={s.smackHdr}><span>💬 Smack Talk</span><div style={s.smackLive}><div style={s.smackDot} /> LIVE</div></div>
-            <div style={{ ...s.smackMsgs, maxHeight: 150 }}>
-              {trashTalkMsgs.length === 0 ? (
-                <div style={{ fontSize: 11, color: 'var(--text3)', padding: '8px 0' }}>No smack yet — be the first</div>
-              ) : trashTalkMsgs.map((m) => {
-                const lbEntry = leaderboard.find(e => e.userId === m.user_id);
-                const rank = lbEntry ? leaderboard.indexOf(lbEntry) + 1 : null;
-                const tier = lbEntry ? getTier(lbEntry.pctReturn) : null;
-                const medalBg = rank === 1 ? 'linear-gradient(135deg,#FFD700,#e6a800)' : rank === 2 ? 'linear-gradient(135deg,#C0C0C0,#909090)' : rank === 3 ? 'linear-gradient(135deg,#CD7F32,#a0622d)' : '#d8e2ed';
-                const rxns = chatReactions[m.id] || {};
-                return (
-                  <div key={m.id} style={s.smackMsg}>
-                    <div style={s.smackMsgTop}>
-                      <div style={{ ...s.smackAv, background: medalBg, color: rank && rank <= 3 ? '#fff' : 'var(--text3)' }}>{(m.profiles?.username || '?')[0].toUpperCase()}</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text1)' }}>{m.profiles?.username || 'Anon'}</span>
-                          {tier && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: tier.bg, color: tier.color, fontWeight: 500 }}>{tier.short}</span>}
-                          <span style={{ fontSize: 9, color: 'var(--text3)', marginLeft: 'auto' }}>{timeAgo(m.created_at)}</span>
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--text1)', lineHeight: 1.35, marginTop: 2 }}>{m.message}</div>
-                      </div>
-                    </div>
-                    <div style={s.rxnRow}>
-                      {REACTIONS.map(r => { const users = rxns[r.label] || []; const myReacted = users.includes(session?.user?.id); if (users.length === 0 && !myReacted) return null; return (<div key={r.label} style={{ ...s.rxnPill, ...(myReacted ? s.rxnLit : {}) }} onClick={() => toggleReaction(m.id, r.label)}><span style={{ fontSize: 12 }}>{r.emoji}</span><span style={{ ...s.rxnCt, ...(myReacted ? { color: '#3B6D11' } : {}) }}>{users.length}</span></div>); })}
-                      <div style={s.rxnAdd} onClick={() => { const firstUnused = REACTIONS.find(r => !(rxns[r.label] || []).includes(session?.user?.id)); if (firstUnused) toggleReaction(m.id, firstUnused.label); }}>+</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={s.smackInput}>
-              <input style={s.smackInputField} value={trashTalkInput} onChange={e => setTrashTalkInput(e.target.value.slice(0, 200))} placeholder="Talk your talk..." onKeyDown={e => e.key === 'Enter' && sendTrashTalk()} enterKeyHint="send" />
-              <button style={s.smackSendBtn} onClick={() => sendTrashTalk()}>Send</button>
-            </div>
-          </div>
-
-        </div>
-      ) : (
-
-        /* ── LEADERBOARD VIEW — GAMIFIED ── */
-        <div style={{ padding: '0 0 8px' }}>
-
-          {/* Race lanes — top 3 */}
-          <div style={s.raceBg}>
-            <div style={s.raceTop}>
-              <span style={s.raceLabel}>Season 1 · Race to the top</span>
-              <div style={s.raceTimer}>
-                <span style={s.rtBox}>{daysLeft}d</span>
-                <span style={s.rtSep}>:</span>
-                <span style={s.rtBox}>{String(Math.floor((seasonEnd - new Date()) / 3600000) % 24).padStart(2, '0')}h</span>
-                <span style={s.rtSep}>:</span>
-                <span style={s.rtBox}>{String(Math.floor((seasonEnd - new Date()) / 60000) % 60).padStart(2, '0')}m</span>
+        ) : (
+          <div style={s.barActive}>
+            <div style={s.barRank}><span style={s.barRankText}>#{myRank || '-'}</span></div>
+            <div style={s.barStats}>
+              <div style={s.barStatsTop}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: isPositive ? 'var(--green-btn)' : 'var(--red)' }}>{isPositive ? '+' : ''}{totalReturn.toFixed(1)}%</span>
+                {userBadges.length > 0 && <span style={{ display: 'flex', gap: 2 }}>{userBadges.slice(0, 3).map(key => { const def = BADGE_DEFS[key]; return def ? <span key={key} style={{ fontSize: 12 }} title={def.label}>{def.emoji}</span> : null; })}</span>}
+              </div>
+              <div style={s.barStatsBottom}>
+                {aheadUser ? <span>🎯 {aheadUser.gap}% behind {aheadUser.username}</span> : myRank !== null ? <span style={{ color: 'var(--green-btn)' }}>👑 In the lead!</span> : null}
+                <span style={{ color: 'var(--green-btn)', fontWeight: 600 }}>Cash ${cashBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
               </div>
             </div>
-            {lbLoading ? (
-              [1, 2, 3].map(i => <div key={i} style={{ ...s.skeleton, height: 28, marginBottom: 10 }} />)
-            ) : leaderboard.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '16px 0' }}>No participants yet</div>
-            ) : (
-              <div style={s.track}>
-                {leaderboard.slice(0, 3).map((entry, idx) => {
-                  const tier = getTier(entry.pctReturn);
-                  const medalBg = idx === 0 ? 'linear-gradient(135deg,#FFD700,#e6a800)' : idx === 1 ? 'linear-gradient(135deg,#C0C0C0,#909090)' : 'linear-gradient(135deg,#CD7F32,#a0622d)';
-                  const laneBg = idx === 0 ? 'rgba(255,215,0,0.12)' : idx === 1 ? 'rgba(192,192,192,0.08)' : 'rgba(205,127,50,0.08)';
-                  const barWidth = idx === 0 ? '100%' : `${Math.max(10, (entry.pctReturn / Math.max(leaderboard[0]?.pctReturn || 1, 0.01)) * 100)}%`;
-                  const barGrad = idx === 0 ? 'linear-gradient(90deg,#FFD700,#8cd9a0)' : idx === 1 ? 'linear-gradient(90deg,#C0C0C0,#7B8CDE)' : 'linear-gradient(90deg,#CD7F32,#8cd9a0)';
-                  const pctColor = idx === 0 ? '#FFD700' : idx === 1 ? '#C0C0C0' : '#8cd9a0';
-                  const isMe = entry.userId === session?.user?.id;
+            <div style={{ ...s.barPortBtn, ...(showPortfolio ? s.barPortBtnOpen : {}) }} onClick={() => setShowPortfolio(p => !p)}>Portfolio {showPortfolio ? '▲' : '▼'}</div>
+          </div>
+        )}
+
+        {/* PORTFOLIO DROPDOWN */}
+        {showPortfolio && (
+          <div style={s.portDrop}>
+            <div style={s.portCash}>
+              <div style={s.portCashItem}><div style={s.portCashLabel}>Total</div><div style={{ ...s.portCashVal, color: 'var(--green-btn)' }}>${totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
+              <div style={{ ...s.portCashItem, borderLeft: '1px solid var(--border)' }}><div style={s.portCashLabel}>Cash</div><div style={s.portCashVal}>${cashBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
+              <div style={{ ...s.portCashItem, borderLeft: '1px solid var(--border)' }}><div style={s.portCashLabel}>Invested</div><div style={s.portCashVal}>${totalPositionsValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
+            </div>
+            <div style={s.portSecLabel}>Positions · {trades.length}</div>
+            {trades.length === 0 ? (
+              <div style={{ fontSize: 11, color: 'var(--text3)', padding: '8px 12px' }}>No positions yet — add a ticker below</div>
+            ) : trades.map(trade => {
+              const curPrice = prices[trade.ticker] || Number(trade.entry_price);
+              const entryPrice = Number(trade.entry_price);
+              const pctGain = ((curPrice - entryPrice) / entryPrice) * 100;
+              const isUp = pctGain >= 0;
+              return (
+                <div key={trade.id} style={s.portPos}>
+                  <span style={s.portPosTk}>{trade.ticker}</span>
+                  <span style={s.portPosInfo}>{Number(trade.shares).toFixed(1)} · avg ${entryPrice.toFixed(2)}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: isUp ? 'var(--green-btn)' : 'var(--red)', minWidth: 45, textAlign: 'right', marginRight: 6 }}>{isUp ? '+' : ''}{pctGain.toFixed(1)}%</span>
+                  <div onClick={(e) => { e.stopPropagation(); setSellTrade({ ...trade, currentPrice: curPrice }); }} style={s.portPosSell}>Sell</div>
+                </div>
+              );
+            })}
+            <div style={s.portBuyRow}>
+              <input style={s.portBuyInput} value={searchQuery} onChange={e => setSearchQuery(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))} placeholder="ADD TICKER" maxLength={5} />
+              <button style={s.portBuyBtn} onClick={() => { if (searchResults.length > 0) handleSelectTicker(searchResults[0]); }}>Buy</button>
+            </div>
+            {searchResults.length > 0 && (
+              <div style={{ borderTop: '1px solid var(--border)' }}>
+                {searchResults.map(r => (
+                  <div key={r.symbol} style={s.portSearchRow} onClick={() => handleSelectTicker(r)}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text1)' }}>{r.symbol}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text3)', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{r.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {searching && <div style={{ fontSize: 10, color: 'var(--text3)', padding: '6px 12px' }}>Searching...</div>}
+            {showPresets && selectedTicker && (
+              <div style={{ padding: '8px 12px', borderTop: '1px solid var(--border)', background: 'var(--green-bg)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div><b style={{ fontSize: 12, color: 'var(--green-btn)' }}>{selectedTicker.symbol}</b> <span style={{ fontSize: 10, color: 'var(--green-btn)' }}>${selectedTicker.price.toFixed(2)}</span></div>
+                  <button style={{ background: 'none', border: 'none', fontSize: 14, color: 'var(--green-btn)', cursor: 'pointer' }} onClick={clearSelection}>×</button>
+                </div>
+                {!showCustom ? (
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {[1000, 5000, 10000].map(amt => (<button key={amt} style={s.presetBtnSm} onClick={() => executeBuy(amt)}>{buying ? '..' : `$${amt / 1000}K`}</button>))}
+                    <button style={s.otherBtnSm} onClick={() => setShowCustom(true)}>Other</button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <div style={s.customWrapSm}><span style={{ fontSize: 12, fontWeight: 600, color: 'var(--green-btn)' }}>$</span><input style={s.customInputSm} type="number" inputMode="decimal" value={customAmount} onChange={e => setCustomAmount(e.target.value)} placeholder="Amt" autoFocus /></div>
+                    <button style={{ ...s.customBuySm, opacity: (parseFloat(customAmount) > 0 && !buying) ? 1 : 0.4 }} onClick={() => executeBuy(parseFloat(customAmount) || 0)} disabled={!(parseFloat(customAmount) > 0) || buying}>{buying ? '..' : 'Buy'}</button>
+                  </div>
+                )}
+                {buyError && <div style={{ fontSize: 10, color: '#E24B4A', marginTop: 3 }}>{buyError}</div>}
+              </div>
+            )}
+            <div onClick={() => setShowHistory(!showHistory)} style={s.portHistToggle}>{showHistory ? 'Hide History ▲' : `Trade History (${closedTrades.length}) ▼`}</div>
+            {showHistory && (
+              <div style={{ padding: '0 12px 8px' }}>
+                {closedTrades.length > 0 && (() => {
+                  const wins = closedTrades.filter(t => Number(t.exit_price) > Number(t.entry_price)).length;
+                  const totalPL = closedTrades.reduce((sum, t) => sum + (Number(t.exit_price) - Number(t.entry_price)) * Number(t.shares), 0);
+                  const avgHold = closedTrades.reduce((sum, t) => { if (!t.sold_at || !t.bought_at) return sum; return sum + (new Date(t.sold_at) - new Date(t.bought_at)) / 86400000; }, 0) / closedTrades.length;
+                  const winRate = Math.round((wins / closedTrades.length) * 100);
                   return (
-                    <div key={entry.userId} style={{ ...s.lane, background: laneBg, ...(isMe ? { border: '1px solid rgba(140,217,160,0.4)' } : {}) }}>
-                      <div style={s.laneLeft}>
-                        <div style={{ ...s.laneMedal, background: medalBg }}>{idx + 1}</div>
-                        <span style={s.laneName}>{entry.username}{isMe ? ' ★' : ''}</span>
-                        <span style={{ ...s.laneTier, background: tier.bg, color: tier.color }}>{tier.short}</span>
-                        {entry.behaviorBadges?.map(b => (
-                          <span key={b.type} style={{ fontSize: 11, padding: '1px 5px', borderRadius: 3, background: b.bg, color: b.color, fontWeight: 600 }}>{b.label}</span>
-                        ))}
-                      </div>
-                      <div style={s.laneBarWrap}><div style={{ ...s.laneBar, width: barWidth, background: barGrad }} /></div>
-                      <span style={{ ...s.lanePct, color: pctColor }}>{entry.pctReturn >= 0 ? '+' : ''}{entry.pctReturn.toFixed(1)}%</span>
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                      <div style={{ flex: 1, background: 'var(--card2)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: 'var(--text3)' }}>Win rate</div><div style={{ fontSize: 14, fontWeight: 700, color: winRate >= 50 ? 'var(--green-btn)' : 'var(--red)' }}>{winRate}%</div></div>
+                      <div style={{ flex: 1, background: 'var(--card2)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: 'var(--text3)' }}>Avg hold</div><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text1)' }}>{avgHold.toFixed(1)}d</div></div>
+                      <div style={{ flex: 1, background: 'var(--card2)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: 'var(--text3)' }}>Total P&L</div><div style={{ fontSize: 14, fontWeight: 700, color: totalPL >= 0 ? 'var(--green-btn)' : 'var(--red)' }}>{totalPL >= 0 ? '+' : '-'}${Math.abs(totalPL).toFixed(0)}</div></div>
                     </div>
                   );
+                })()}
+                {closedTrades.map(trade => {
+                  const entry = Number(trade.entry_price); const exit = Number(trade.exit_price);
+                  const pl = (exit - entry) * Number(trade.shares); const pctReturn = ((exit - entry) / entry) * 100; const isWin = pl >= 0;
+                  const holdMs = trade.sold_at && trade.bought_at ? new Date(trade.sold_at) - new Date(trade.bought_at) : 0;
+                  const holdHours = holdMs / 3600000; const holdDisplay = holdHours < 24 ? `${Math.round(holdHours)}h` : `${Math.round(holdHours / 24)}d`;
+                  const buyDate = trade.bought_at ? new Date(trade.bought_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+                  return (<div key={trade.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text1)' }}>{trade.ticker}</span><span style={{ fontSize: 10, color: 'var(--text3)' }}>{buyDate} · {holdDisplay}</span><span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: isWin ? 'var(--green-btn)' : 'var(--red)' }}>{isWin ? '+' : ''}{pctReturn.toFixed(1)}%</span></div></div>);
                 })}
+                {closedTrades.length === 0 && <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', padding: '8px 0' }}>No closed trades yet</div>}
               </div>
             )}
           </div>
+        )}
 
-          {/* Your stats strip */}
-          {myRank !== null && (() => {
-            const myEntry = leaderboard.find(e => e.userId === session?.user?.id);
-            const myTier = myEntry ? getTier(myEntry.pctReturn) : getTier(0);
-            return (
-              <div style={s.youStrip}>
-                <span style={s.youBadge}>#{myRank} YOU</span>
-                {myEntry?.behaviorBadges?.map(b => (
-                  <span key={b.type} style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: b.bg, color: b.color, fontWeight: 600 }}>{b.label}</span>
-                ))}
-                <div style={s.youMid}>
-                  <span style={s.youVal}>
-                    <strong>${totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong> · {trades.length} pos
-                  </span>
-                  {aheadUser && <span style={s.youCatch}>{aheadUser.gap}% behind {aheadUser.username}</span>}
-                  {!aheadUser && <span style={{ fontSize: 10, color: '#27500A', background: '#EAF3DE', padding: '2px 6px', borderRadius: 3 }}>In the lead!</span>}
-                </div>
-                <div style={s.youRight}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: isPositive ? '#3B6D11' : '#E24B4A' }}>
-                    {isPositive ? '+' : ''}{totalReturn.toFixed(1)}%
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Stat cards grid */}
-          <div style={s.statGrid}>
-            <div style={s.statCard}>
-              <div style={s.statLabel}>Best pick</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: myBestPick && myBestPick.pctGain >= 0 ? '#3B6D11' : '#E24B4A', marginTop: 2 }}>
-                {myBestPick ? myBestPick.ticker : '—'}
-              </div>
-              <div style={s.statSub}>{myBestPick ? `${myBestPick.pctGain >= 0 ? '+' : ''}${myBestPick.pctGain.toFixed(1)}% since buy` : 'No positions'}</div>
-              {myBestPick && (
-                <div style={s.statBar}>
-                  <div style={{ height: '100%', borderRadius: 2, width: `${Math.min(100, Math.max(5, Math.abs(myBestPick.pctGain) * 4))}%`, background: myBestPick.pctGain >= 0 ? '#3B6D11' : '#E24B4A' }} />
-                </div>
-              )}
-            </div>
-            <div style={s.statCard}>
-              <div style={s.statLabel}>Total trades</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text1)', marginTop: 2 }}>{myTotalTrades}</div>
-              <div style={s.statSub}>
-                {leaderboard.length > 0
-                  ? `Top ${Math.max(1, Math.round((1 - (leaderboard.findIndex(e => e.userId === session?.user?.id) / Math.max(leaderboard.length, 1))) * 100))}% in group`
-                  : 'Start trading!'}
-              </div>
-              <div style={s.statBar}>
-                <div style={{ height: '100%', borderRadius: 2, width: `${Math.min(100, myTotalTrades * 8)}%`, background: '#185FA5' }} />
-              </div>
-            </div>
-            <div style={s.statCard}>
-              <div style={s.statLabel}>Win rate</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text1)', marginTop: 2 }}>{myWinRate.pct}%</div>
-              <div style={s.statSub}>{myWinRate.wins} of {myWinRate.total} picks green</div>
-              <div style={s.statBar}>
-                <div style={{ height: '100%', borderRadius: 2, width: `${myWinRate.pct}%`, background: '#3B6D11' }} />
-              </div>
-            </div>
-            <div style={s.statCard}>
-              <div style={s.statLabel}>Next badge</div>
-              {(() => {
-                const unearned = Object.entries(BADGE_DEFS).find(([key]) => !userBadges.includes(key));
-                if (!unearned) return <div style={{ fontSize: 11, color: 'var(--text1)', fontWeight: 600, marginTop: 2 }}>All earned!</div>;
-                const [key, def] = unearned;
-                return (
-                  <>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                      <div style={{ width: 22, height: 22, borderRadius: '50%', background: def.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: def.color, fontWeight: 700 }}>
-                        {def.label[0]}
-                      </div>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text1)' }}>{def.label}</span>
-                    </div>
-                    <div style={s.statSub}>{key === 'expert' ? 'Make 10 trades' : key === 'champion' ? 'Reach #1' : key === 'diamond' ? 'Hold 7 days' : key === 'streak' ? '5-day streak' : 'Make your first trade'}</div>
-                  </>
-                );
-              })()}
+        {/* RACE LANES — top 3 */}
+        <div style={s.raceBg}>
+          <div style={s.raceTop}>
+            <span style={s.raceLabel}>Season 1 · Race to the top</span>
+            <div style={s.raceTimer}>
+              <span style={s.rtBox}>{daysLeft}d</span>
+              <span style={s.rtSep}>:</span>
+              <span style={s.rtBox}>{String(Math.floor((seasonEnd - new Date()) / 3600000) % 24).padStart(2, '0')}h</span>
+              <span style={s.rtSep}>:</span>
+              <span style={s.rtBox}>{String(Math.floor((seasonEnd - new Date()) / 60000) % 60).padStart(2, '0')}m</span>
             </div>
           </div>
-
-          {/* Full rankings */}
-          <div style={{ padding: '0 16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, marginTop: 8 }}>
-              <span style={s.sectionTitle}>Full rankings</span>
-              <span style={{ fontSize: 9, color: '#3B6D11' }}>tap to peek</span>
+          {lbLoading ? (
+            [1, 2, 3].map(i => <div key={i} style={{ ...s.skeleton, height: 28, marginBottom: 10 }} />)
+          ) : leaderboard.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '16px 0' }}>No participants yet</div>
+          ) : (
+            <div style={s.track}>
+              {leaderboard.slice(0, 3).map((entry, idx) => {
+                const tier = getTier(entry.pctReturn);
+                const medalBg = idx === 0 ? 'linear-gradient(135deg,#FFD700,#e6a800)' : idx === 1 ? 'linear-gradient(135deg,#C0C0C0,#909090)' : 'linear-gradient(135deg,#CD7F32,#a0622d)';
+                const laneBg = idx === 0 ? 'rgba(255,215,0,0.12)' : idx === 1 ? 'rgba(192,192,192,0.08)' : 'rgba(205,127,50,0.08)';
+                const barWidth = idx === 0 ? '100%' : `${Math.max(10, (entry.pctReturn / Math.max(leaderboard[0]?.pctReturn || 1, 0.01)) * 100)}%`;
+                const barGrad = idx === 0 ? 'linear-gradient(90deg,#FFD700,#8cd9a0)' : idx === 1 ? 'linear-gradient(90deg,#C0C0C0,#7B8CDE)' : 'linear-gradient(90deg,#CD7F32,#8cd9a0)';
+                const pctColor = idx === 0 ? '#FFD700' : idx === 1 ? '#C0C0C0' : '#8cd9a0';
+                const isMe = entry.userId === session?.user?.id;
+                return (
+                  <div key={entry.userId} style={{ ...s.lane, background: laneBg, ...(isMe ? { border: '1px solid rgba(140,217,160,0.4)' } : {}) }}>
+                    <div style={s.laneLeft}>
+                      <div style={{ ...s.laneMedal, background: medalBg }}>{idx + 1}</div>
+                      <span style={s.laneName}>{entry.username}{isMe ? ' ★' : ''}</span>
+                      <span style={{ ...s.laneTier, background: tier.bg, color: tier.color }}>{tier.short}</span>
+                    </div>
+                    <div style={s.laneBarWrap}><div style={{ ...s.laneBar, width: barWidth, background: barGrad }} /></div>
+                    <span style={{ ...s.lanePct, color: pctColor }}>{entry.pctReturn >= 0 ? '+' : ''}{entry.pctReturn.toFixed(1)}%</span>
+                  </div>
+                );
+              })}
             </div>
-            {leaderboard.slice(3).map((entry, idx) => {
+          )}
+        </div>
+
+        {/* RANKINGS 4+ */}
+        {leaderboard.length > 3 && (
+          <div style={{ marginBottom: 8 }}>
+            {leaderboard.slice(3, showAllRankings ? undefined : 5).map((entry, idx) => {
               const rank = idx + 4;
               const isMe = entry.userId === session?.user?.id;
               const isUp = entry.pctReturn >= 0;
-              const tier = getTier(entry.pctReturn);
               const isExpanded = expandedUser === entry.userId;
-              const barW = leaderboard[0]?.pctReturn > 0 ? Math.max(0, (entry.pctReturn / leaderboard[0].pctReturn) * 100) : 0;
+              const note = entry.openCount === 0 ? 'Watching from the sidelines' : entry.pctReturn > 5 ? `Strong season — ${entry.positions?.[0]?.ticker || 'diversified'} leading` : entry.pctReturn < 0 ? 'Looking for a comeback' : `${entry.openCount} positions active`;
               return (
                 <div key={entry.userId}>
-                  <div
-                    style={{ ...s.rankRow, ...(isMe ? { border: '2px solid #8cd9a0' } : {}) }}
-                    onClick={() => setExpandedUser(isExpanded ? null : entry.userId)}
-                  >
+                  <div style={{ ...s.rankRow, ...(isMe ? { border: '2px solid #8cd9a0' } : {}) }} onClick={() => setExpandedUser(isExpanded ? null : entry.userId)}>
                     <div style={s.rankNum}>{rank}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text1)', display: 'flex', alignItems: 'center', gap: 4 }}>
                         {entry.username}
                         {isMe && <span style={{ fontSize: 8, color: '#3B6D11', background: '#EAF3DE', padding: '0 4px', borderRadius: 2, fontWeight: 700 }}>YOU</span>}
                       </div>
-                      <div style={{ fontSize: 9, color: 'var(--text3)', display: 'flex', gap: 6, marginTop: 1 }}>
-                        <span>{entry.openCount} pos</span>
-                        <span style={{ color: tier.color, fontWeight: 500 }}>{tier.short}</span>
-                        {entry.behaviorBadges?.map(b => (
-                          <span key={b.type} style={{ fontSize: 9, padding: '1px 4px', borderRadius: 2, background: b.bg, color: b.color, fontWeight: 600 }}>{b.label}</span>
-                        ))}
-                      </div>
+                      <div style={{ fontSize: 9, color: 'var(--text3)', marginTop: 1 }}>{note}</div>
                     </div>
-                    <div style={{ width: 40, height: 3, background: '#eef2f7', borderRadius: 2, overflow: 'hidden', flexShrink: 0 }}>
-                      <div style={{ height: '100%', borderRadius: 2, width: `${Math.max(0, barW)}%`, background: isUp ? '#3B6D11' : '#E24B4A' }} />
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: isUp ? '#3B6D11' : '#E24B4A', flexShrink: 0, width: 55, textAlign: 'right' }}>
-                      {isUp ? '+' : ''}{entry.pctReturn.toFixed(1)}%
-                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: isUp ? '#3B6D11' : '#E24B4A', flexShrink: 0 }}>{isUp ? '+' : ''}{entry.pctReturn.toFixed(1)}%</div>
                   </div>
                   {isExpanded && entry.positions.length > 0 && (
                     <div style={{ padding: '4px 14px 8px 44px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -1090,104 +899,83 @@ export default function PortfolioTab({ session }) {
                 </div>
               );
             })}
-            {leaderboard.length <= 3 && leaderboard.length > 0 && (
-              <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', padding: '8px 0' }}>All players shown in race lanes above</div>
+            {leaderboard.length > 5 && (
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--blue)', textAlign: 'center', padding: '6px 0', cursor: 'pointer' }} onClick={() => setShowAllRankings(p => !p)}>
+                {showAllRankings ? 'Show less ▲' : `Show all ${leaderboard.length} ▼`}
+              </div>
             )}
           </div>
+        )}
 
-          {/* Activity feed chips */}
-          <div style={s.feedScroll}>
-            {activity.slice(0, 6).map((a, i) => {
-              const who = a.profiles?.username || 'Someone';
-              const isSell = a.status === 'closed';
+        {/* TODAY'S RACE */}
+        <div style={s.raceCard}>
+          <div style={s.raceCardHdr}><span style={s.raceCardTitle}>🏁 Today's Race</span><span style={s.raceCardSub}>{daysLeft} days left</span></div>
+          <div style={s.raceCardBody}>
+            {(() => {
+              const sorted = [...leaderboard].sort((a, b) => b.pctReturn - a.pctReturn);
+              const best = sorted[0]; const worst = sorted[sorted.length - 1];
+              if (!best) return <div style={{ fontSize: 11, color: 'var(--text3)' }}>Waiting for participants...</div>;
+              return (<div style={{ fontSize: 11, color: 'var(--text1)', lineHeight: 1.6 }}>
+                <span style={{ color: 'var(--green-btn)', fontWeight: 600 }}>▲ {best.username} +{best.pctReturn.toFixed(1)}%</span>
+                {best.positions?.[0] && <span style={{ color: 'var(--text3)' }}> — {best.positions[0].ticker}</span>}<br/>
+                {worst && worst.userId !== best.userId && (<><span style={{ color: 'var(--red)', fontWeight: 600 }}>▼ {worst.username} {worst.pctReturn >= 0 ? '+' : ''}{worst.pctReturn.toFixed(1)}%</span>{worst.positions?.[0] && <span style={{ color: 'var(--text3)' }}> — {worst.positions[0].ticker}</span>}</>)}
+              </div>);
+            })()}
+          </div>
+        </div>
+
+        {/* DAILY LEARN */}
+        <div style={s.learnCard}>
+          <div style={s.learnCardHdr}><span style={{ fontSize: 9, fontWeight: 700, color: '#8B5CF6' }}>💡 LEARN</span></div>
+          <div style={s.learnCardBody}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text1)', marginBottom: 3 }}>{trades.length === 0 ? 'What is a stock ticker?' : 'When to cut your losses'}</div>
+            <div style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.6 }}>{trades.length === 0 ? "A short code for a company. AAPL = Apple, NVDA = Nvidia, TSLA = Tesla. Tap Join above to pick your first stock!" : "Most pros set a stop at 15-20%. If a stock drops that much from your buy price, consider whether your original thesis still holds."}</div>
+          </div>
+        </div>
+
+        {/* SMACK TALK */}
+        <div style={s.smackWrap}>
+          <div style={s.smackHdr}><span>💬 Smack Talk</span><div style={s.smackLive}><div style={s.smackDot} /> LIVE</div></div>
+          <div style={{ ...s.smackMsgs, maxHeight: 150 }}>
+            {trashTalkMsgs.length === 0 ? (
+              <div style={{ fontSize: 11, color: 'var(--text3)', padding: '8px 0' }}>No smack yet — be the first</div>
+            ) : trashTalkMsgs.map((m) => {
+              const lbEntry = leaderboard.find(e => e.userId === m.user_id);
+              const rank = lbEntry ? leaderboard.indexOf(lbEntry) + 1 : null;
+              const tier = lbEntry ? getTier(lbEntry.pctReturn) : null;
+              const medalBg = rank === 1 ? 'linear-gradient(135deg,#FFD700,#e6a800)' : rank === 2 ? 'linear-gradient(135deg,#C0C0C0,#909090)' : rank === 3 ? 'linear-gradient(135deg,#CD7F32,#a0622d)' : '#d8e2ed';
+              const rxns = chatReactions[m.id] || {};
               return (
-                <div key={a.id || i} style={s.feedChip}>
-                  <div style={{ ...s.feedDot, background: isSell ? '#E24B4A' : '#3B6D11' }} />
-                  <strong>{who}</strong>&nbsp;{isSell ? '-' : '+'}{a.ticker} · {timeAgo(a.bought_at)}
+                <div key={m.id} style={s.smackMsg}>
+                  <div style={s.smackMsgTop}>
+                    <div style={{ ...s.smackAv, background: medalBg, color: rank && rank <= 3 ? '#fff' : 'var(--text3)' }}>{(m.profiles?.username || '?')[0].toUpperCase()}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text1)' }}>{m.profiles?.username || 'Anon'}</span>
+                        {tier && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: tier.bg, color: tier.color, fontWeight: 500 }}>{tier.short}</span>}
+                        <span style={{ fontSize: 9, color: 'var(--text3)', marginLeft: 'auto' }}>{timeAgo(m.created_at)}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text1)', lineHeight: 1.35, marginTop: 2 }}>{m.message}</div>
+                    </div>
+                  </div>
+                  <div style={s.rxnRow}>
+                    {REACTIONS.map(r => { const users = rxns[r.label] || []; const myReacted = users.includes(session?.user?.id); if (users.length === 0 && !myReacted) return null; return (<div key={r.label} style={{ ...s.rxnPill, ...(myReacted ? s.rxnLit : {}) }} onClick={() => toggleReaction(m.id, r.label)}><span style={{ fontSize: 12 }}>{r.emoji}</span><span style={{ ...s.rxnCt, ...(myReacted ? { color: '#3B6D11' } : {}) }}>{users.length}</span></div>); })}
+                    <div style={s.rxnAdd} onClick={() => { const firstUnused = REACTIONS.find(r => !(rxns[r.label] || []).includes(session?.user?.id)); if (firstUnused) toggleReaction(m.id, firstUnused.label); }}>+</div>
+                  </div>
                 </div>
               );
             })}
-            {activity.length === 0 && <div style={{ ...s.feedChip, color: 'var(--text3)' }}>No activity yet</div>}
           </div>
-
-          {/* Smack talk with reactions */}
-          <div style={s.smackWrap}>
-            <div style={s.smackHdr}>
-              <span>Smack talk</span>
-              <div style={s.smackLive}><div style={s.smackDot} /> LIVE</div>
-            </div>
-            <div style={s.smackMsgs}>
-              {trashTalkMsgs.length === 0 ? (
-                <div style={{ fontSize: 11, color: 'var(--text3)', padding: '8px 0' }}>No smack yet — be the first</div>
-              ) : (
-                trashTalkMsgs.map((m) => {
-                  const lbEntry = leaderboard.find(e => e.userId === m.user_id);
-                  const rank = lbEntry ? leaderboard.indexOf(lbEntry) + 1 : null;
-                  const tier = lbEntry ? getTier(lbEntry.pctReturn) : null;
-                  const medalBg = rank === 1 ? 'linear-gradient(135deg,#FFD700,#e6a800)' : rank === 2 ? 'linear-gradient(135deg,#C0C0C0,#909090)' : rank === 3 ? 'linear-gradient(135deg,#CD7F32,#a0622d)' : '#d8e2ed';
-                  const rxns = chatReactions[m.id] || {};
-                  return (
-                    <div key={m.id} style={s.smackMsg}>
-                      <div style={s.smackMsgTop}>
-                        <div style={{ ...s.smackAv, background: medalBg, color: rank && rank <= 3 ? '#fff' : 'var(--text3)' }}>
-                          {(m.profiles?.username || '?')[0].toUpperCase()}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text1)' }}>{m.profiles?.username || 'Anon'}</span>
-                            {tier && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: tier.bg, color: tier.color, fontWeight: 500 }}>{tier.short}</span>}
-                            <span style={{ fontSize: 9, color: 'var(--text3)', marginLeft: 'auto' }}>{timeAgo(m.created_at)}</span>
-                          </div>
-                          <div style={{ fontSize: 12, color: 'var(--text1)', lineHeight: 1.35, marginTop: 2 }}>{m.message}</div>
-                        </div>
-                      </div>
-                      <div style={s.rxnRow}>
-                        {REACTIONS.map(r => {
-                          const users = rxns[r.label] || [];
-                          const myReacted = users.includes(session?.user?.id);
-                          if (users.length === 0 && !myReacted) return null;
-                          return (
-                            <div key={r.label} style={{ ...s.rxnPill, ...(myReacted ? s.rxnLit : {}) }} onClick={() => toggleReaction(m.id, r.label)}>
-                              <span style={{ fontSize: 12 }}>{r.emoji}</span>
-                              <span style={{ ...s.rxnCt, ...(myReacted ? { color: '#3B6D11' } : {}) }}>{users.length}</span>
-                            </div>
-                          );
-                        })}
-                        <div style={s.rxnAdd} onClick={() => {
-                          const msgId = m.id;
-                          const firstUnused = REACTIONS.find(r => !(rxns[r.label] || []).includes(session?.user?.id));
-                          if (firstUnused) toggleReaction(msgId, firstUnused.label);
-                        }}>+</div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-            <div style={s.smackInput}>
-              <input
-                style={s.smackInputField}
-                value={trashTalkInput}
-                onChange={e => setTrashTalkInput(e.target.value.slice(0, 200))}
-                placeholder="Talk your talk..."
-                onKeyDown={e => e.key === 'Enter' && sendTrashTalk()}
-                enterKeyHint="send"
-              />
-              <button style={s.smackSendBtn} onClick={sendTrashTalk}>Send</button>
-            </div>
+          <div style={s.smackInput}>
+            <input style={s.smackInputField} value={trashTalkInput} onChange={e => setTrashTalkInput(e.target.value.slice(0, 200))} placeholder="Talk your talk..." onKeyDown={e => e.key === 'Enter' && sendTrashTalk()} enterKeyHint="send" />
+            <button style={s.smackSendBtn} onClick={() => sendTrashTalk()}>Send</button>
           </div>
-
         </div>
-      )}
 
-      {/* SellModal */}
+      </div>
+
       {sellTrade && (
-        <SellModal
-          session={session}
-          trade={sellTrade}
-          onClose={() => setSellTrade(null)}
-          onComplete={onSellComplete}
-        />
+        <SellModal session={session} trade={sellTrade} onClose={() => setSellTrade(null)} onComplete={onSellComplete} />
       )}
     </div>
   );
@@ -1198,17 +986,6 @@ export default function PortfolioTab({ session }) {
 // ═══════════════════════════════════════════
 const s = {
   scroll: { flex: 1, overflowY: 'auto', background: 'var(--bg)' },
-
-  // Segmented control
-  segWrap: { padding: '10px 12px 0' },
-  segBar: { display: 'flex', background: 'var(--card2)', borderRadius: 8, padding: 2, gap: 2 },
-  segBtn: {
-    flex: 1, padding: '7px 0', borderRadius: 6, border: 'none',
-    fontSize: 12, fontWeight: 600, cursor: 'pointer',
-    background: 'transparent', color: 'var(--text3)',
-    fontFamily: 'var(--font)', transition: 'all 0.15s',
-  },
-  segActive: { background: 'var(--card)', color: 'var(--text1)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
 
   // Top bar — new user
   barNew: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: 'var(--green-bg)', border: '1px solid rgba(59,109,17,0.15)', borderRadius: 10, marginTop: 8, marginBottom: 8 },
@@ -1257,24 +1034,6 @@ const s = {
   learnCardHdr: { padding: '8px 12px 4px' },
   learnCardBody: { padding: '0 12px 10px' },
 
-  // Leaderboard (full width, unchanged)
-  section: { padding: '0 16px 8px' },
-  lbRow: {
-    display: 'flex', alignItems: 'center', gap: 10,
-    padding: '13px 14px', borderRadius: 10, marginBottom: 4, cursor: 'pointer',
-  },
-  lbRank: { fontSize: 14, fontWeight: 700, color: 'var(--text2)', width: 30 },
-  lbName: { flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--text1)' },
-  lbYou: { fontSize: 12, fontWeight: 400, color: 'var(--text3)' },
-  lbReturn: { fontSize: 14, fontWeight: 700, width: 70, textAlign: 'right' },
-  lbCount: { fontSize: 11, color: 'var(--text3)', width: 40, textAlign: 'right' },
-  lbExpanded: { padding: '4px 14px 12px 44px', display: 'flex', flexWrap: 'wrap', gap: 8 },
-  lbTicker: {
-    display: 'flex', gap: 6, alignItems: 'center',
-    background: 'var(--card)', border: '1px solid var(--border)',
-    borderRadius: 8, padding: '6px 10px',
-  },
-  lbTickerName: { fontSize: 12, fontWeight: 700, color: 'var(--text1)' },
 
   // Loading
   skeleton: { height: 52, borderRadius: 12, marginBottom: 10, background: 'var(--card2)', animation: 'pulse 1.5s ease-in-out infinite' },
@@ -1308,49 +1067,11 @@ const s = {
   laneBar: { height: '100%', borderRadius: 3 },
   lanePct: { fontSize: 13, fontWeight: 700, flexShrink: 0 },
 
-  // ── Your stats strip ──
-  youStrip: {
-    margin: '8px 16px 0', background: 'var(--card)', border: '2px solid #8cd9a0',
-    borderRadius: 10, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8,
-  },
-  youBadge: { background: '#3B6D11', color: '#fff', fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 3, flexShrink: 0 },
-  youMid: { flex: 1, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  youVal: { fontSize: 12, color: 'var(--text1)' },
-  youCatch: { fontSize: 10, color: '#854F0B', background: '#FAEEDA', padding: '2px 6px', borderRadius: 3, whiteSpace: 'nowrap' },
-  youRight: { textAlign: 'right', flexShrink: 0 },
-
-  // ── Stat cards grid ──
-  statGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, margin: '8px 16px 0' },
-  statCard: { background: 'var(--card)', borderRadius: 10, border: '0.5px solid var(--border)', padding: '8px 10px' },
-  statLabel: { fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 500 },
-  statSub: { fontSize: 10, color: 'var(--text3)', marginTop: 1 },
-  statBar: { height: 3, background: '#eef2f7', borderRadius: 2, marginTop: 4, overflow: 'hidden' },
-
-  // ── Section titles ──
-  sectionTitle: { fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.4, fontWeight: 500 },
 
   // ── Rank rows ──
-  rankRow: {
-    background: 'var(--card)', borderRadius: 8, border: '0.5px solid var(--border)',
-    padding: '7px 10px', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
-  },
-  rankNum: {
-    width: 20, height: 20, borderRadius: '50%', background: '#d8e2ed',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 10, fontWeight: 600, color: 'var(--text3)', flexShrink: 0,
-  },
+  rankRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 4, cursor: 'pointer' },
+  rankNum: { fontSize: 12, fontWeight: 700, color: 'var(--text3)', width: 20, textAlign: 'center', flexShrink: 0 },
 
-  // ── Activity feed chips ──
-  feedScroll: {
-    margin: '8px 16px 0', display: 'flex', gap: 8, overflowX: 'auto',
-    scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', padding: '2px 0',
-  },
-  feedChip: {
-    flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4,
-    fontSize: 10, color: 'var(--text1)', background: 'var(--card)',
-    border: '0.5px solid var(--border)', padding: '4px 8px', borderRadius: 6,
-  },
-  feedDot: { width: 5, height: 5, borderRadius: '50%', flexShrink: 0 },
 
   // ── Smack talk ──
   smackWrap: { margin: '8px 16px 10px', background: 'var(--card)', borderRadius: 10, border: '0.5px solid var(--border)', overflow: 'hidden' },
