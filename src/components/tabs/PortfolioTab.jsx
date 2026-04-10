@@ -8,6 +8,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
 import SellModal from '../portfolio/SellModal';
+import StickerPicker, { STICKERS, StickerMessage, isSticker, getStickerId } from '../shared/StickerPicker';
 
 const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 const STARTING_CASH = 50000;
@@ -115,6 +116,7 @@ export default function PortfolioTab({ session }) {
   const [userBadges, setUserBadges] = useState([]);
   const [trashTalkMsgs, setTrashTalkMsgs] = useState([]);
   const [trashTalkInput, setTrashTalkInput] = useState('');
+  const [mentionFlash, setMentionFlash] = useState(false);
   const [riskLevel, setRiskLevel] = useState({ level: 'Low', bars: 2, color: '#2a7d4b', note: '' });
 
   // Leaderboard v2 state
@@ -600,23 +602,52 @@ export default function PortfolioTab({ session }) {
 
   useEffect(() => { loadTrashTalk(); }, [loadTrashTalk]);
 
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
   useEffect(() => {
     const channel = supabase
       .channel('challenge_chat_rt')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'challenge_chat' }, () => loadTrashTalk())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'challenge_chat' }, (payload) => {
+        loadTrashTalk();
+        // @mention detection — notify if current user is mentioned
+        const msg = payload.new?.message || '';
+        const myName = profile?.username;
+        if (myName && msg.toLowerCase().includes(`@${myName.toLowerCase()}`)) {
+          // Browser notification (if permitted and tab not focused)
+          if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
+            new Notification('UpTik — You were mentioned!', {
+              body: msg.length > 80 ? msg.slice(0, 80) + '…' : msg,
+              icon: '/apple-touch-icon.png',
+            });
+          }
+          // In-app visual flash on the Challenge tab
+          setMentionFlash(true);
+          setTimeout(() => setMentionFlash(false), 4000);
+        }
+      })
       .subscribe();
     return () => supabase.removeChannel(channel);
-  }, [loadTrashTalk]);
+  }, [loadTrashTalk, profile?.username]);
 
-  const sendTrashTalk = async () => {
-    if (!trashTalkInput.trim() || !session?.user?.id) return;
+  const sendTrashTalk = async (messageOverride) => {
+    const msg = messageOverride || trashTalkInput.trim();
+    if (!msg || !session?.user?.id) return;
     const { error } = await supabase.from('challenge_chat').insert({
       user_id: session.user.id,
-      message: trashTalkInput.trim(),
+      message: msg,
     });
     if (error) { console.error('[PortfolioTab] Send message failed:', error.message); return; }
-    setTrashTalkInput('');
+    if (!messageOverride) setTrashTalkInput('');
     document.activeElement?.blur();
+  };
+
+  const sendSticker = (sticker) => {
+    setTrashTalkInput(prev => prev + sticker.emoji);
   };
 
   const toggleReaction = async (msgId, reactionType) => {
@@ -733,15 +764,15 @@ export default function PortfolioTab({ session }) {
                   <span style={s.rankSmText}>#{myRank || '-'}</span>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, flexWrap: 'wrap' }}>
                     <span style={{ ...s.valSm, color: isPositive ? '#2a7d4b' : '#E24B4A' }}>
                       ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: isPositive ? '#2a7d4b' : '#E24B4A' }}>
+                    <span style={{ fontSize: 9, fontWeight: 600, color: isPositive ? '#2a7d4b' : '#E24B4A' }}>
                       {isPositive ? '+' : ''}{totalReturn.toFixed(2)}%
                     </span>
                     {aheadUser && (
-                      <span style={{ fontSize: 11, fontWeight: 800, color: '#B8451F', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 9, fontWeight: 800, color: '#B8451F', whiteSpace: 'nowrap' }}>
                         🎯 {aheadUser.gap}% behind {aheadUser.username}
                       </span>
                     )}
@@ -755,7 +786,7 @@ export default function PortfolioTab({ session }) {
 
               {/* Sparkline */}
               <div style={s.chartSm}>
-                <svg width="100%" height="36" viewBox="0 0 300 36" preserveAspectRatio="none" style={{ opacity: 0.15 }}>
+                <svg width="100%" height="30" viewBox="0 0 300 30" preserveAspectRatio="none" style={{ opacity: 0.15 }}>
                   <polyline points="0,32 20,29 40,25 60,27 80,20 100,23 120,16 140,18 160,12 180,14 200,9 220,11 240,7 260,9 280,5 300,3"
                     fill="none" stroke="var(--text3)" strokeWidth="1.5" strokeLinecap="round" />
                 </svg>
@@ -852,29 +883,29 @@ export default function PortfolioTab({ session }) {
                     const pctGain = ((curPrice - entryPrice) / entryPrice) * 100;
                     const isUp = pctGain >= 0;
                     return (
-                      <div key={trade.id} style={{ display: 'flex', alignItems: 'center', padding: '8px 6px', background: 'var(--card)', borderRadius: 8, border: '1px solid var(--border)', marginBottom: 4, gap: 6 }}>
+                      <div key={trade.id} style={{ display: 'flex', alignItems: 'center', padding: '4px 4px', background: 'var(--card)', borderRadius: 6, border: '1px solid var(--border)', marginBottom: 3, gap: 4 }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text1)' }}>{trade.ticker}</span>
-                            <span style={{ fontSize: 13, color: 'var(--text3)' }}>{Number(trade.shares).toFixed(1)} shares</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text1)' }}>{trade.ticker}</span>
+                            <span style={{ fontSize: 10, color: 'var(--text3)' }}>{Number(trade.shares).toFixed(1)}</span>
                           </div>
-                          <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
-                            <span style={{ fontSize: 13, color: 'var(--text3)' }}>${Number(trade.entry_price).toFixed(2)}</span>
-                            <span style={{ fontSize: 13, color: 'var(--text3)' }}>→</span>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>${curPrice.toFixed(2)}</span>
+                          <div style={{ display: 'flex', gap: 2, marginTop: 1 }}>
+                            <span style={{ fontSize: 10, color: 'var(--text3)' }}>${Number(trade.entry_price).toFixed(2)}</span>
+                            <span style={{ fontSize: 10, color: 'var(--text3)' }}>→</span>
+                            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text1)' }}>${curPrice.toFixed(2)}</span>
                           </div>
                         </div>
-                        <div style={{ textAlign: 'right', marginRight: 4 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: isUp ? '#2a7d4b' : '#E24B4A' }}>
+                        <div style={{ textAlign: 'right', marginRight: 2 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: isUp ? '#2a7d4b' : '#E24B4A' }}>
                             {isUp ? '+' : '-'}${Math.abs(Number(trade.shares) * (curPrice - entryPrice)).toFixed(2)}
                           </div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: isUp ? '#2a7d4b' : '#E24B4A' }}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: isUp ? '#2a7d4b' : '#E24B4A' }}>
                             {isUp ? '+' : ''}{pctGain.toFixed(1)}%
                           </div>
                         </div>
                         <div
                           onClick={(e) => { e.stopPropagation(); setSellTrade({ ...trade, currentPrice: curPrice }); }}
-                          style={{ background: 'rgba(224,82,82,0.08)', border: '1px solid rgba(224,82,82,0.2)', color: '#E24B4A', fontSize: 13, fontWeight: 600, padding: '5px 10px', borderRadius: 6, cursor: 'pointer', flexShrink: 0 }}
+                          style={{ background: 'rgba(224,82,82,0.08)', border: '1px solid rgba(224,82,82,0.2)', color: '#E24B4A', fontSize: 10, fontWeight: 600, padding: '4px 7px', borderRadius: 5, cursor: 'pointer', flexShrink: 0 }}
                         >Sell</div>
                       </div>
                     );
@@ -1029,18 +1060,39 @@ export default function PortfolioTab({ session }) {
               </div>
 
               {/* Card 5: Trash talk */}
-              <div style={s.cardPurple}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#3C3489', marginBottom: 4 }}>Trash talk</div>
+              <div style={{ ...s.cardPurple, ...(mentionFlash ? { boxShadow: '0 0 0 2px #1AAD5E', transition: 'box-shadow 0.3s' } : {}) }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#3C3489', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  Trash talk
+                  {mentionFlash && <span style={{ fontSize: 9, background: '#1AAD5E', color: '#fff', padding: '1px 5px', borderRadius: 6, fontWeight: 600 }}>You were mentioned!</span>}
+                </div>
                 {trashTalkMsgs.length === 0 ? (
                   <div style={{ fontSize: 10, color: '#534AB7' }}>No smack yet...</div>
                 ) : (
-                  trashTalkMsgs.map((m, i) => (
-                    <div key={m.id || i} style={{ fontSize: 10, color: '#534AB7', padding: '1px 0' }}>
-                      <b>{m.profiles?.username || 'Anon'}</b>: {m.message}
-                    </div>
-                  ))
+                  trashTalkMsgs.map((m, i) => {
+                    // Sticker messages — inline emoji, no card (keeps trash talk compact)
+                    if (isSticker(m.message)) {
+                      const s = STICKERS.find(st => st.id === getStickerId(m.message));
+                      return (
+                        <div key={m.id || i} style={{ fontSize: 10, color: '#534AB7', padding: '1px 0' }}>
+                          <b>{m.profiles?.username || 'Anon'}</b>: <span style={{ fontSize: 14 }}>{s?.emoji || '?'}</span>
+                        </div>
+                      );
+                    }
+                    // Highlight @mentions in green
+                    const parts = m.message.split(/(@\w+)/g);
+                    return (
+                      <div key={m.id || i} style={{ fontSize: 10, color: '#534AB7', padding: '1px 0', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                        <b>{m.profiles?.username || 'Anon'}</b>:{' '}
+                        {parts.map((p, j) =>
+                          p.startsWith('@') ? (
+                            <span key={j} style={{ color: '#1AAD5E', fontWeight: 700 }}>{p}</span>
+                          ) : p
+                        )}
+                      </div>
+                    );
+                  })
                 )}
-                <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                <div style={{ display: 'flex', gap: 4, marginTop: 6, alignItems: 'center' }}>
                   <input
                     style={s.ttInput}
                     value={trashTalkInput}
@@ -1048,7 +1100,8 @@ export default function PortfolioTab({ session }) {
                     placeholder="Talk smack..."
                     onKeyDown={e => e.key === 'Enter' && sendTrashTalk()}
                   />
-                  <button style={s.ttSend} onClick={sendTrashTalk}>Send</button>
+                  <StickerPicker onSend={sendSticker} size="sm" />
+                  <button style={s.ttSend} onClick={() => sendTrashTalk()}>Send</button>
                 </div>
               </div>
 
@@ -1379,42 +1432,42 @@ const s = {
   },
   tapeText: { fontSize: 10, color: '#8cd9a0', fontFamily: 'var(--font)', paddingRight: 40 },
 
-  // Split layout
+  // Split layout — tight two-column for mobile
   splitWrap: { display: 'flex', minHeight: 0 },
-  leftCol: { flex: '0 0 54%', borderRight: '0.5px solid var(--border)', padding: '10px 8px 10px 12px', position: 'relative' },
-  rightCol: { flex: '0 0 46%', padding: '10px 12px 10px 8px', display: 'flex', flexDirection: 'column', gap: 7 },
+  leftCol: { flex: '0 0 56%', borderRight: '0.5px solid var(--border)', padding: '6px 4px 6px 8px', position: 'relative', minWidth: 0 },
+  rightCol: { flex: '0 0 44%', padding: '6px 8px 6px 4px', display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0, overflow: 'hidden' },
 
   // Left: compact hero
-  heroCompact: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 },
+  heroCompact: { display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 },
   rankSm: {
-    width: 36, height: 36, borderRadius: '50%', background: '#EAF3DE',
+    width: 28, height: 28, borderRadius: '50%', background: '#EAF3DE',
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  rankSmText: { fontSize: 14, fontWeight: 800, color: '#27500A' },
-  valSm: { fontSize: 17, fontWeight: 700 },
+  rankSmText: { fontSize: 12, fontWeight: 800, color: '#27500A' },
+  valSm: { fontSize: 15, fontWeight: 700 },
 
   // Left: chart
   chartSm: {
-    height: 36, borderRadius: 6, background: 'var(--card)',
-    border: '1px dashed var(--border)', overflow: 'hidden', marginBottom: 6,
+    height: 30, borderRadius: 5, background: 'var(--card)',
+    border: '1px dashed var(--border)', overflow: 'hidden', marginBottom: 4,
   },
 
   // Left: catch-the-leader
-  leaderBarSm: { padding: '5px 8px', background: '#FAEEDA', borderRadius: 6, marginBottom: 6 },
+  leaderBarSm: { padding: '4px 6px', background: '#FAEEDA', borderRadius: 5, marginBottom: 4 },
   leaderTrackSm: { height: 3, background: '#EDD9A3', borderRadius: 2, marginTop: 4 },
   leaderFillSm: { height: 3, background: '#BA7517', borderRadius: 2, transition: 'width 0.3s' },
 
   // Left: add ticker
-  addSm: { marginBottom: 6, position: 'relative' },
+  addSm: { marginBottom: 4, position: 'relative' },
   addInputSm: {
     flex: 1, background: 'var(--card2)', border: '1px solid var(--border)',
-    borderRadius: 6, padding: '7px 8px', fontSize: 11, fontWeight: 600,
+    borderRadius: 5, padding: '5px 6px', fontSize: 10, fontWeight: 600,
     color: 'var(--text1)', fontFamily: 'var(--font)', outline: 'none',
     letterSpacing: 0.4, width: '100%', boxSizing: 'border-box',
   },
   addBtnSm: {
-    background: '#2a7d4b', color: '#fff', border: 'none', borderRadius: 6,
-    padding: '7px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+    background: '#2a7d4b', color: '#fff', border: 'none', borderRadius: 5,
+    padding: '5px 8px', fontSize: 10, fontWeight: 600, cursor: 'pointer',
     fontFamily: 'var(--font)', flexShrink: 0,
   },
   dropdownSm: {
@@ -1460,29 +1513,30 @@ const s = {
   // Left: positions
   posRowSm: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '5px 6px', background: 'var(--card)', borderRadius: 6,
-    border: '1px solid var(--border)', marginBottom: 3, cursor: 'pointer',
+    padding: '4px 5px', background: 'var(--card)', borderRadius: 5,
+    border: '1px solid var(--border)', marginBottom: 2, cursor: 'pointer',
   },
 
   // Right: card variants
-  cardAmber: { padding: 8, borderRadius: 7, background: '#FAEEDA' },
-  cardDefault: { padding: 8, borderRadius: 7, background: 'var(--card2)' },
-  cardBorder: { padding: 8, borderRadius: 7, border: '0.5px solid var(--border)' },
-  cardPurple: { padding: 8, borderRadius: 7, background: '#EEEDFE' },
-  cardGreen: { padding: 8, borderRadius: 7, background: '#EAF3DE' },
+  cardAmber: { padding: 6, borderRadius: 6, background: '#FAEEDA', overflow: 'hidden', minWidth: 0 },
+  cardDefault: { padding: 6, borderRadius: 6, background: 'var(--card2)' },
+  cardBorder: { padding: 6, borderRadius: 6, border: '0.5px solid var(--border)' },
+  cardPurple: { padding: 6, borderRadius: 6, background: '#EEEDFE', overflow: 'hidden', minWidth: 0 },
+  cardGreen: { padding: 6, borderRadius: 6, background: '#EAF3DE' },
 
   // Right: sector row
   sectorRow: { height: 13, borderRadius: 3, padding: '0 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
 
   // Right: trash talk
   ttInput: {
-    flex: 1, background: 'rgba(255,255,255,0.5)', border: '1px solid #CECBF6',
-    borderRadius: 5, padding: '5px 8px', fontSize: 9, color: '#3C3489',
+    flex: 1, minWidth: 0, background: 'rgba(255,255,255,0.5)', border: '1px solid #CECBF6',
+    borderRadius: 5, padding: '5px 6px', fontSize: 9, color: '#3C3489',
     fontFamily: 'var(--font)', outline: 'none',
   },
   ttSend: {
     background: '#534AB7', color: '#fff', border: 'none', borderRadius: 5,
-    padding: '5px 10px', fontSize: 9, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
+    padding: '5px 8px', fontSize: 9, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
+    flexShrink: 0, whiteSpace: 'nowrap',
   },
 
   // Leaderboard (full width, unchanged)
@@ -1606,19 +1660,5 @@ const s = {
   },
   rxnLit: { background: '#EAF3DE', borderColor: '#3B6D11' },
   rxnCt: { fontSize: 10, fontWeight: 600, color: 'var(--text3)' },
-  rxnAdd: {
-    padding: '2px 6px', borderRadius: 12, cursor: 'pointer', fontSize: 11,
-    border: '0.5px dashed var(--border)', background: 'transparent', color: 'var(--text3)',
-    display: 'flex', alignItems: 'center', gap: 2,
-  },
-  smackInput: { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderTop: '0.5px solid var(--border)', background: '#eef2f7' },
-  smackInputField: {
-    flex: 1, background: 'var(--card)', border: '0.5px solid var(--border)',
-    borderRadius: 8, padding: '8px 10px', fontSize: 12, color: 'var(--text1)',
-    fontFamily: 'var(--font)', outline: 'none',
-  },
-  smackSendBtn: {
-    background: '#3B6D11', color: '#fff', border: 'none', borderRadius: 8,
-    padding: '8px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
-  },
 };
+ 

@@ -10,6 +10,7 @@ import { isWeekend, isMarketHoliday, isMarketOpen, isAfterHours } from '../../ut
 import { askUpTikAI } from '../../lib/aiAgent';
 import CreateGroupModal from '../shared/CreateGroupModal';
 import InviteModal from '../shared/InviteModal';
+import StickerPicker, { STICKERS, isSticker, getStickerId } from '../shared/StickerPicker';
 
 const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
 const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
@@ -498,6 +499,13 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
     };
     findGroup();
   }, [publicGroups]);
+
+  // ── Sticker → insert emoji into input ──
+  const handleHomeSendSticker = (sticker) => {
+    const current = chatInputRef.current?.value || '';
+    setChatInput(current + sticker.emoji);
+    if (chatInputRef.current) chatInputRef.current.focus();
+  };
 
   // ── Send message from Home page ──
   const handleHomeSend = async () => {
@@ -1616,6 +1624,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
             </svg>
           </div>
         </div>
+        <StickerPicker onSend={handleHomeSendSticker} size="md" />
         <button
           style={{ ...S.ccSend, opacity: chatInput.trim() ? 1 : 0.4, ...(aiMode ? { background: '#8B5CF6' } : {}) }}
           onClick={handleHomeSend}
@@ -1671,6 +1680,17 @@ function ChatBubble({ msg, myId }) {
   const timeAgo = getTimeAgo(msg.created_at);
 
   const rawText = msg.text || msg.content || '';
+
+  // Sticker messages — render emoji inline
+  if (isSticker(rawText)) {
+    const s = STICKERS.find(st => st.id === getStickerId(rawText));
+    return (
+      <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', padding: '4px 12px', margin: '0 6px' }}>
+        {!isMe && <div style={{ ...S.ccAv, background: color, marginRight: 8 }}>{name[0].toUpperCase()}</div>}
+        <span style={{ fontSize: 32, lineHeight: 1 }} title={s?.label}>{s?.emoji || '?'}</span>
+      </div>
+    );
+  }
 
   // For AI messages, parse the ```uptik {json}``` envelope into a clean card + prose
   let card = null;

@@ -11,6 +11,7 @@ import { askUpTikAI } from '../../lib/aiAgent';
 import FadingMessage from '../shared/FadingMessage';
 import TickerBanner from './TickerBanner';
 import { isWeekend, isMarketHoliday } from '../../utils/marketUtils';
+import StickerPicker, { STICKERS, isSticker, getStickerId } from '../shared/StickerPicker';
 
 const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 
@@ -151,6 +152,20 @@ const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven }) => 
     ...(isAdmin ? styles.adminBody : {}),
     ...(isAI    ? styles.aiBody    : {}),
   };
+
+  // Sticker messages — render emoji inline
+  if (isSticker(msg.text)) {
+    const s = STICKERS.find(st => st.id === getStickerId(msg.text));
+    const isMe = currentUserId && msg.user_id === currentUserId;
+    return (
+      <div style={{ ...styles.msg, justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+          <span style={{ fontSize: 10, fontWeight: 600, color: msg.user_color || '#2a7d4b', marginBottom: 2 }}>{msg.username}</span>
+          <span style={{ fontSize: 32, lineHeight: 1 }} title={s?.label}>{s?.emoji || '?'}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.msg}>
@@ -1054,6 +1069,11 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     }
   }, [inputText, aiMode, profile, group, isAdmin, callAI, session]);
 
+  const handleSendSticker = useCallback((sticker) => {
+    setInputText(prev => prev + sticker.emoji);
+    inputRef.current?.focus();
+  }, []);
+
   const sendBroadcast = async () => {
     if (!broadcastText.trim() || sendingBroadcast) return;
     setSendingBroadcast(true);
@@ -1203,6 +1223,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
                 </svg>
               </div>
             )}
+            <StickerPicker onSend={handleSendSticker} size="md" />
             <button
               style={{ ...styles.sendBtn, background: aiMode ? '#8B5CF6' : 'var(--green)', opacity: inputText.trim() ? 1 : 0.4 }}
               onClick={handleSend}
