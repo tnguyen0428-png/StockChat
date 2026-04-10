@@ -30,7 +30,7 @@ export async function callClaude(systemPrompt, userMessage, history = [], tier =
     },
     body: JSON.stringify({
       model,
-      max_tokens: maxTokens || 500,
+      max_tokens: maxTokens || 300,
       temperature,
       system: systemPrompt,
       messages: [...recent, { role: 'user', content: userMessage }]
@@ -55,7 +55,7 @@ export async function callClaude(systemPrompt, userMessage, history = [], tier =
       },
       body: JSON.stringify({
         model: MODELS.smart,
-        max_tokens: maxTokens || 500,
+        max_tokens: maxTokens || 300,
         temperature,
         system: systemPrompt,
         messages: [...recent, { role: 'user', content: userMessage }]
