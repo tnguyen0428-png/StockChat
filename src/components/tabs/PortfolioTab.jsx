@@ -398,23 +398,57 @@ export default function PortfolioTab({ session }) {
         return;
       }
 
-      const { data: trade, error: insertErr } = await supabase.from('paper_trades').insert({
-        user_id: session.user.id,
-        ticker: selectedTicker.symbol,
-        shares,
-        dollar_amount: dollarAmount,
-        entry_price: selectedTicker.price,
-        status: 'open',
-        bought_at: new Date().toISOString(),
-      }).select('id').single();
-      if (insertErr) throw insertErr;
+      // Check for existing open position in same ticker
+      const { data: existingTrade } = await supabase
+        .from('paper_trades')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('ticker', selectedTicker.symbol)
+        .eq('status', 'open')
+        .maybeSingle();
+
+      let tradeId;
+      if (existingTrade) {
+        const oldShares = Number(existingTrade.shares);
+        const oldPrice = Number(existingTrade.entry_price);
+        const oldDollar = Number(existingTrade.dollar_amount);
+        const newShares = oldShares + shares;
+        const newAvgPrice = ((oldPrice * oldShares) + (selectedTicker.price * shares)) / newShares;
+        const newDollar = oldDollar + dollarAmount;
+        const { error: mergeErr } = await supabase
+          .from('paper_trades')
+          .update({ shares: newShares, entry_price: newAvgPrice, dollar_amount: newDollar })
+          .eq('id', existingTrade.id);
+        if (mergeErr) throw mergeErr;
+        tradeId = existingTrade.id;
+      } else {
+        const { data: trade, error: insertErr } = await supabase.from('paper_trades').insert({
+          user_id: session.user.id,
+          ticker: selectedTicker.symbol,
+          shares,
+          dollar_amount: dollarAmount,
+          entry_price: selectedTicker.price,
+          status: 'open',
+          bought_at: new Date().toISOString(),
+        }).select('id').single();
+        if (insertErr) throw insertErr;
+        tradeId = trade.id;
+      }
+
       const { error: updateErr } = await supabase
         .from('paper_portfolios')
         .update({ cash_balance: freshCash - dollarAmount })
         .eq('user_id', session.user.id);
       if (updateErr) {
-        // Rollback: delete the trade if cash update failed
-        await supabase.from('paper_trades').delete().eq('id', trade.id);
+        if (!existingTrade) {
+          await supabase.from('paper_trades').delete().eq('id', tradeId);
+        } else {
+          await supabase.from('paper_trades').update({
+            shares: existingTrade.shares,
+            entry_price: existingTrade.entry_price,
+            dollar_amount: existingTrade.dollar_amount,
+          }).eq('id', existingTrade.id);
+        }
         throw updateErr;
       }
       setSelectedTicker(null);
@@ -805,8 +839,16 @@ export default function PortfolioTab({ session }) {
     <div style={s.scroll}>
       <div style={{ padding: '0 12px 12px' }}>
 
-        {/* DARK MODE TOGGLE */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 0 4px' }}>
+        {/* HEADER ROW */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 16 }}>🏆</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: t.text1 }}>Portfolio Challenge</span>
+              <span style={{ fontSize: 9, fontWeight: 600, color: t.green, background: t.greenBg, padding: '2px 6px', borderRadius: 4 }}>S1</span>
+            </div>
+            <div style={{ fontSize: 10, color: t.text2, marginTop: 2, marginLeft: 24 }}>Trade with $50K fake money · learn together</div>
+          </div>
           <DarkModeToggle darkMode={darkMode} onToggle={() => setDarkMode(d => !d)} t={t} />
         </div>
 
