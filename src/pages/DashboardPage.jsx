@@ -18,8 +18,6 @@ const ProfileTab    = lazy(() => import('../components/tabs/ProfileTab'));
 const HelpTab       = lazy(() => import('../components/tabs/HelpTab'));
 const AITab         = lazy(() => import('../components/tabs/AITab'));
 const PortfolioTab  = lazy(() => import('../components/tabs/PortfolioTab'));
-const DailyPickCard = lazy(() => import('../components/challenge/DailyPickCard'));
-
 const TabFallback = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
     <div style={{ fontSize: 12, color: 'var(--text3)' }}>Loading…</div>
@@ -252,7 +250,6 @@ export default function DashboardPage({ session }) {
         {activeTab === 'challenge' && (
           <div style={{ flex: 1, overflow: 'auto' }}>
             <Suspense fallback={<TabFallback />}>
-              <DailyPickCard session={session} />
               <PortfolioTab session={session} />
             </Suspense>
           </div>

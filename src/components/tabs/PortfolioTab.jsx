@@ -8,16 +8,17 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
 import SellModal from '../portfolio/SellModal';
+import StickerPicker from '../shared/StickerPicker';
 
 const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 const STARTING_CASH = 50000;
 
 const BADGE_DEFS = {
-  champion: { label: 'Champion', bg: '#FAEEDA', border: '#BA7517', color: '#854F0B' },
-  expert:   { label: 'Expert',   bg: '#E6F1FB', border: '#378ADD', color: '#0C447C' },
-  newbie:   { label: 'Newbie',   bg: '#EAF3DE', border: '#639922', color: '#27500A' },
-  diamond:  { label: 'Diamond',  bg: '#EEEDFE', border: '#7F77DD', color: '#3C3489' },
-  streak:   { label: 'Streak',   bg: '#E1F5EE', border: '#1D9E75', color: '#085041' },
+  champion: { label: 'Champion', emoji: '👑', bg: '#FAEEDA', border: '#BA7517', color: '#854F0B' },
+  expert:   { label: 'Expert',   emoji: '🎯', bg: '#E6F1FB', border: '#378ADD', color: '#0C447C' },
+  newbie:   { label: 'Newbie',   emoji: '🌱', bg: '#EAF3DE', border: '#639922', color: '#27500A' },
+  diamond:  { label: 'Diamond',  emoji: '💎', bg: '#EEEDFE', border: '#7F77DD', color: '#3C3489' },
+  streak:   { label: 'Streak',   emoji: '🔥', bg: '#E1F5EE', border: '#1D9E75', color: '#085041' },
 };
 
 const TIER_DEFS = [
@@ -56,7 +57,7 @@ function detectBehaviorBadges(userId, allTrades) {
   const paperHands = recentClosed.some(t => {
     if (!t.sold_at || !t.bought_at) return false;
     const holdHours = (new Date(t.sold_at) - new Date(t.bought_at)) / 3600000;
-    return holdHours < 48 && Number(t.sold_price) < Number(t.entry_price);
+    return holdHours < 48 && Number(t.exit_price) < Number(t.entry_price);
   });
   if (paperHands) badges.push({ type: 'paper_hands', label: 'PAPER HANDS', bg: 'rgba(212,160,23,0.2)', color: '#FAC775' });
 
@@ -68,7 +69,7 @@ function detectBehaviorBadges(userId, allTrades) {
   if (diamond) badges.push({ type: 'diamond_hands', label: 'DIAMOND', bg: 'rgba(29,158,117,0.2)', color: '#5DCAA5' });
 
   const lastThree = userTrades.sort((a, b) => new Date(b.sold_at) - new Date(a.sold_at)).slice(0, 3);
-  if (lastThree.length >= 3 && lastThree.every(t => Number(t.sold_price) > Number(t.entry_price))) {
+  if (lastThree.length >= 3 && lastThree.every(t => Number(t.exit_price) > Number(t.entry_price))) {
     badges.push({ type: 'hot_streak', label: 'HOT STREAK', bg: 'rgba(255,215,0,0.2)', color: '#FFD700' });
   }
 
@@ -116,6 +117,7 @@ export default function PortfolioTab({ session }) {
   const [trashTalkMsgs, setTrashTalkMsgs] = useState([]);
   const [trashTalkInput, setTrashTalkInput] = useState('');
   const [riskLevel, setRiskLevel] = useState({ level: 'Low', bars: 2, color: '#2a7d4b', note: '' });
+  const [showPortfolio, setShowPortfolio] = useState(false);
 
   // Leaderboard v2 state
   const [chatReactions, setChatReactions] = useState({});
@@ -621,6 +623,10 @@ export default function PortfolioTab({ session }) {
     if (error) { console.error('[PortfolioTab] Send message failed:', error.message); }
   };
 
+  const sendSticker = (sticker) => {
+    setTrashTalkInput(prev => prev + sticker.emoji);
+  };
+
   const toggleReaction = async (msgId, reactionType) => {
     if (!session?.user?.id) return;
     const current = chatReactions[msgId] || {};
@@ -715,349 +721,191 @@ export default function PortfolioTab({ session }) {
       </div>
 
       {view === 'portfolio' ? (
-        <>
-          {/* ZONE 2: Live ticker tape */}
-          <div style={s.tape}>
-            <div style={s.tapeInner}>
-              <span style={s.tapeText}>{tapeText} · {tapeText} · </span>
+        <div style={{ padding: '0 12px 12px' }}>
+
+          {/* TOP BAR */}
+          {trades.length === 0 ? (
+            <div style={s.barNew}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>🏆</span>
+              <div style={s.barNewText}>
+                <div style={s.barNewTitle}>Paper Trading Challenge</div>
+                <div style={s.barNewSub}><b style={{ color: 'var(--green-btn)' }}>$50K fake money</b> · compete with your crew</div>
+              </div>
+              <div style={s.barNewBtn} onClick={() => setShowPortfolio(true)}>Join →</div>
             </div>
-          </div>
-
-          {/* ZONE 3: Split panel */}
-          <div style={s.splitWrap}>
-
-            {/* ── LEFT COLUMN ── */}
-            <div style={s.leftCol}>
-
-              {/* Rank + value */}
-              <div style={s.heroCompact}>
-                <div style={s.rankSm}>
-                  <span style={s.rankSmText}>#{myRank || '-'}</span>
+          ) : (
+            <div style={s.barActive}>
+              <div style={s.barRank}><span style={s.barRankText}>#{myRank || '-'}</span></div>
+              <div style={s.barStats}>
+                <div style={s.barStatsTop}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: isPositive ? 'var(--green-btn)' : 'var(--red)' }}>{isPositive ? '+' : ''}{totalReturn.toFixed(1)}%</span>
+                  {userBadges.length > 0 && <span style={{ display: 'flex', gap: 2 }}>{userBadges.slice(0, 3).map(key => { const def = BADGE_DEFS[key]; return def ? <span key={key} style={{ fontSize: 12 }} title={def.label}>{def.emoji}</span> : null; })}</span>}
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
-                    <span style={{ ...s.valSm, color: isPositive ? 'var(--green-btn)' : 'var(--red)' }}>
-                      ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: isPositive ? 'var(--green-btn)' : 'var(--red)' }}>
-                      {isPositive ? '+' : ''}{totalReturn.toFixed(2)}%
-                    </span>
-                    {aheadUser && (
-                      <span style={{ fontSize: 11, fontWeight: 800, color: '#B8451F', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-                        🎯 {aheadUser.gap}% behind {aheadUser.username}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>
-                    Cash: ${cashBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    {lastUpdated && <> · {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</>}
-                  </div>
+                <div style={s.barStatsBottom}>
+                  {aheadUser ? <span>🎯 {aheadUser.gap}% behind {aheadUser.username}</span> : myRank !== null ? <span style={{ color: 'var(--green-btn)' }}>👑 In the lead!</span> : null}
+                  <span style={{ color: 'var(--green-btn)', fontWeight: 600 }}>Cash ${cashBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
                 </div>
               </div>
+              <div style={{ ...s.barPortBtn, ...(showPortfolio ? s.barPortBtnOpen : {}) }} onClick={() => setShowPortfolio(p => !p)}>Portfolio {showPortfolio ? '▲' : '▼'}</div>
+            </div>
+          )}
 
-              {/* Catch-the-leader progress (text moved up to hero row) */}
-              {myRank !== null && aheadUser && (
-                <div style={s.leaderTrackSm}>
-                  <div style={{ ...s.leaderFillSm, width: `${Math.max(5, aheadUser.progress)}%` }} />
-                </div>
-              )}
-              {myRank !== null && !aheadUser && (
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--green-btn)', marginTop: 4 }}>👑 You're in the lead!</div>
-              )}
-
-              {/* Add ticker */}
-              <div style={s.addSm}>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <input
-                    style={s.addInputSm}
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
-                    placeholder="ADD TICKER"
-                    maxLength={5}
-                  />
-                  <button style={s.addBtnSm} onClick={() => { if (searchResults.length > 0) handleSelectTicker(searchResults[0]); }}>Add</button>
-                </div>
-
-                {searchResults.length > 0 && (
-                  <div style={s.dropdownSm}>
-                    {searchResults.map(r => (
-                      <div key={r.symbol} style={s.dropRowSm} onClick={() => handleSelectTicker(r)}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text1)' }}>{r.symbol}</span>
-                        <span style={{ fontSize: 10, color: 'var(--text3)', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{r.name}</span>
-                      </div>
-                    ))}
+          {/* PORTFOLIO DROPDOWN */}
+          {showPortfolio && (
+            <div style={s.portDrop}>
+              <div style={s.portCash}>
+                <div style={s.portCashItem}><div style={s.portCashLabel}>Total</div><div style={{ ...s.portCashVal, color: 'var(--green-btn)' }}>${totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
+                <div style={{ ...s.portCashItem, borderLeft: '1px solid var(--border)' }}><div style={s.portCashLabel}>Cash</div><div style={s.portCashVal}>${cashBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
+                <div style={{ ...s.portCashItem, borderLeft: '1px solid var(--border)' }}><div style={s.portCashLabel}>Invested</div><div style={s.portCashVal}>${totalPositionsValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
+              </div>
+              <div style={s.portSecLabel}>Positions · {trades.length}</div>
+              {trades.length === 0 ? (
+                <div style={{ fontSize: 11, color: 'var(--text3)', padding: '8px 12px' }}>No positions yet — add a ticker below</div>
+              ) : trades.map(trade => {
+                const curPrice = prices[trade.ticker] || Number(trade.entry_price);
+                const entryPrice = Number(trade.entry_price);
+                const pctGain = ((curPrice - entryPrice) / entryPrice) * 100;
+                const isUp = pctGain >= 0;
+                return (
+                  <div key={trade.id} style={s.portPos}>
+                    <span style={s.portPosTk}>{trade.ticker}</span>
+                    <span style={s.portPosInfo}>{Number(trade.shares).toFixed(1)} · avg ${entryPrice.toFixed(2)}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: isUp ? 'var(--green-btn)' : 'var(--red)', minWidth: 45, textAlign: 'right', marginRight: 6 }}>{isUp ? '+' : ''}{pctGain.toFixed(1)}%</span>
+                    <div onClick={(e) => { e.stopPropagation(); setSellTrade({ ...trade, currentPrice: curPrice }); }} style={s.portPosSell}>Sell</div>
                   </div>
-                )}
-                {searching && <div style={{ fontSize: 10, color: 'var(--text3)' }}>Searching...</div>}
-
-                {showPresets && selectedTicker && (
-                  <div style={s.presetSm}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <div><b style={{ fontSize: 12, color: 'var(--green-btn)' }}>{selectedTicker.symbol}</b> <span style={{ fontSize: 10, color: 'var(--green-btn)' }}>${selectedTicker.price.toFixed(2)}</span></div>
-                      <button style={{ background: 'none', border: 'none', fontSize: 14, color: 'var(--green-btn)', cursor: 'pointer', lineHeight: 1 }} onClick={clearSelection}>×</button>
+                );
+              })}
+              <div style={s.portBuyRow}>
+                <input style={s.portBuyInput} value={searchQuery} onChange={e => setSearchQuery(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))} placeholder="ADD TICKER" maxLength={5} />
+                <button style={s.portBuyBtn} onClick={() => { if (searchResults.length > 0) handleSelectTicker(searchResults[0]); }}>Buy</button>
+              </div>
+              {searchResults.length > 0 && (
+                <div style={{ borderTop: '1px solid var(--border)' }}>
+                  {searchResults.map(r => (
+                    <div key={r.symbol} style={s.portSearchRow} onClick={() => handleSelectTicker(r)}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text1)' }}>{r.symbol}</span>
+                      <span style={{ fontSize: 10, color: 'var(--text3)', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{r.name}</span>
                     </div>
-                    {!showCustom ? (
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        {[1000, 5000, 10000].map(amt => (
-                          <button key={amt} style={s.presetBtnSm} onClick={() => executeBuy(amt)}>
-                            {buying ? '..' : `$${amt / 1000}K`}
-                          </button>
-                        ))}
-                        <button style={s.otherBtnSm} onClick={() => setShowCustom(true)}>Other</button>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <div style={s.customWrapSm}>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--green-btn)' }}>$</span>
-                          <input
-                            style={s.customInputSm}
-                            type="number"
-                            inputMode="decimal"
-                            value={customAmount}
-                            onChange={e => setCustomAmount(e.target.value)}
-                            placeholder="Amt"
-                            autoFocus
-                          />
-                        </div>
-                        <button
-                          style={{ ...s.customBuySm, opacity: (parseFloat(customAmount) > 0 && !buying) ? 1 : 0.4 }}
-                          onClick={() => executeBuy(parseFloat(customAmount) || 0)}
-                          disabled={!(parseFloat(customAmount) > 0) || buying}
-                        >{buying ? '..' : 'Buy'}</button>
-                      </div>
-                    )}
-                    {buyError && <div style={{ fontSize: 10, color: '#E24B4A', marginTop: 3 }}>{buyError}</div>}
-                  </div>
-                )}
-                {buyError && !showPresets && <div style={{ fontSize: 10, color: '#E24B4A', marginTop: 3 }}>{buyError}</div>}
-              </div>
-
-              {/* Positions */}
-              <div style={{ padding: '6px 0 0' }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>
-                  Positions · {trades.length}
+                  ))}
                 </div>
-                {trades.length === 0 ? (
-                  <div style={{ fontSize: 10, color: 'var(--text3)', padding: '8px 0' }}>No positions yet</div>
-                ) : (
-                  trades.map(trade => {
-                    const curPrice = prices[trade.ticker] || Number(trade.entry_price);
-                    const entryPrice = Number(trade.entry_price);
-                    const pctGain = ((curPrice - entryPrice) / entryPrice) * 100;
-                    const isUp = pctGain >= 0;
-                    return (
-                      <div key={trade.id} style={{ display: 'flex', alignItems: 'center', padding: '8px 6px', background: 'var(--card)', borderRadius: 8, border: '1px solid var(--border)', marginBottom: 4, gap: 6 }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text1)' }}>{trade.ticker}</span>
-                            <span style={{ fontSize: 13, color: 'var(--text3)' }}>{Number(trade.shares).toFixed(1)} shares</span>
-                          </div>
-                          <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
-                            <span style={{ fontSize: 13, color: 'var(--text3)' }}>${Number(trade.entry_price).toFixed(2)}</span>
-                            <span style={{ fontSize: 13, color: 'var(--text3)' }}>→</span>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>${curPrice.toFixed(2)}</span>
-                          </div>
-                        </div>
-                        <div style={{ textAlign: 'right', marginRight: 4 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: isUp ? 'var(--green-btn)' : 'var(--red)' }}>
-                            {isUp ? '+' : '-'}${Math.abs(Number(trade.shares) * (curPrice - entryPrice)).toFixed(2)}
-                          </div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: isUp ? 'var(--green-btn)' : 'var(--red)' }}>
-                            {isUp ? '+' : ''}{pctGain.toFixed(1)}%
-                          </div>
-                        </div>
-                        <div
-                          onClick={(e) => { e.stopPropagation(); setSellTrade({ ...trade, currentPrice: curPrice }); }}
-                          style={{ background: 'var(--red-bg)', border: '1px solid rgba(224,82,82,0.2)', color: 'var(--red)', fontSize: 13, fontWeight: 600, padding: '5px 10px', borderRadius: 6, cursor: 'pointer', flexShrink: 0 }}
-                        >Sell</div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>
-                Cash: ${cashBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </div>
-
-              <div
-                onClick={() => setShowHistory(!showHistory)}
-                style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)', cursor: 'pointer', padding: '6px 0', textAlign: 'center', marginTop: 4 }}
-              >
-                {showHistory ? 'Hide History' : `Trade History (${closedTrades.length})`}
-              </div>
-
+              )}
+              {searching && <div style={{ fontSize: 10, color: 'var(--text3)', padding: '6px 12px' }}>Searching...</div>}
+              {showPresets && selectedTicker && (
+                <div style={{ padding: '8px 12px', borderTop: '1px solid var(--border)', background: 'var(--green-bg)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <div><b style={{ fontSize: 12, color: 'var(--green-btn)' }}>{selectedTicker.symbol}</b> <span style={{ fontSize: 10, color: 'var(--green-btn)' }}>${selectedTicker.price.toFixed(2)}</span></div>
+                    <button style={{ background: 'none', border: 'none', fontSize: 14, color: 'var(--green-btn)', cursor: 'pointer' }} onClick={clearSelection}>×</button>
+                  </div>
+                  {!showCustom ? (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {[1000, 5000, 10000].map(amt => (<button key={amt} style={s.presetBtnSm} onClick={() => executeBuy(amt)}>{buying ? '..' : `$${amt / 1000}K`}</button>))}
+                      <button style={s.otherBtnSm} onClick={() => setShowCustom(true)}>Other</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <div style={s.customWrapSm}><span style={{ fontSize: 12, fontWeight: 600, color: 'var(--green-btn)' }}>$</span><input style={s.customInputSm} type="number" inputMode="decimal" value={customAmount} onChange={e => setCustomAmount(e.target.value)} placeholder="Amt" autoFocus /></div>
+                      <button style={{ ...s.customBuySm, opacity: (parseFloat(customAmount) > 0 && !buying) ? 1 : 0.4 }} onClick={() => executeBuy(parseFloat(customAmount) || 0)} disabled={!(parseFloat(customAmount) > 0) || buying}>{buying ? '..' : 'Buy'}</button>
+                    </div>
+                  )}
+                  {buyError && <div style={{ fontSize: 10, color: '#E24B4A', marginTop: 3 }}>{buyError}</div>}
+                </div>
+              )}
+              <div onClick={() => setShowHistory(!showHistory)} style={s.portHistToggle}>{showHistory ? 'Hide History ▲' : `Trade History (${closedTrades.length}) ▼`}</div>
               {showHistory && (
-                <div style={{ marginTop: 6 }}>
+                <div style={{ padding: '0 12px 8px' }}>
                   {closedTrades.length > 0 && (() => {
-                    const wins = closedTrades.filter(t => Number(t.sold_price) > Number(t.entry_price)).length;
-                    const totalPL = closedTrades.reduce((sum, t) => {
-                      return sum + (Number(t.sold_price) - Number(t.entry_price)) * Number(t.shares);
-                    }, 0);
-                    const avgHold = closedTrades.reduce((sum, t) => {
-                      if (!t.sold_at || !t.bought_at) return sum;
-                      return sum + (new Date(t.sold_at) - new Date(t.bought_at)) / 86400000;
-                    }, 0) / closedTrades.length;
+                    const wins = closedTrades.filter(t => Number(t.exit_price) > Number(t.entry_price)).length;
+                    const totalPL = closedTrades.reduce((sum, t) => sum + (Number(t.exit_price) - Number(t.entry_price)) * Number(t.shares), 0);
+                    const avgHold = closedTrades.reduce((sum, t) => { if (!t.sold_at || !t.bought_at) return sum; return sum + (new Date(t.sold_at) - new Date(t.bought_at)) / 86400000; }, 0) / closedTrades.length;
                     const winRate = Math.round((wins / closedTrades.length) * 100);
                     return (
                       <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                        <div style={{ flex: 1, background: 'var(--card2)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}>
-                          <div style={{ fontSize: 11, color: 'var(--text3)' }}>Win rate</div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: winRate >= 50 ? 'var(--green-btn)' : 'var(--red)' }}>{winRate}%</div>
-                        </div>
-                        <div style={{ flex: 1, background: 'var(--card2)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}>
-                          <div style={{ fontSize: 11, color: 'var(--text3)' }}>Avg hold</div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text1)' }}>{avgHold.toFixed(1)}d</div>
-                        </div>
-                        <div style={{ flex: 1, background: 'var(--card2)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}>
-                          <div style={{ fontSize: 11, color: 'var(--text3)' }}>Total P&L</div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: totalPL >= 0 ? 'var(--green-btn)' : 'var(--red)' }}>
-                            {totalPL >= 0 ? '+' : '-'}${Math.abs(totalPL).toFixed(0)}
-                          </div>
-                        </div>
+                        <div style={{ flex: 1, background: 'var(--card2)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: 'var(--text3)' }}>Win rate</div><div style={{ fontSize: 14, fontWeight: 700, color: winRate >= 50 ? 'var(--green-btn)' : 'var(--red)' }}>{winRate}%</div></div>
+                        <div style={{ flex: 1, background: 'var(--card2)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: 'var(--text3)' }}>Avg hold</div><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text1)' }}>{avgHold.toFixed(1)}d</div></div>
+                        <div style={{ flex: 1, background: 'var(--card2)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: 'var(--text3)' }}>Total P&L</div><div style={{ fontSize: 14, fontWeight: 700, color: totalPL >= 0 ? 'var(--green-btn)' : 'var(--red)' }}>{totalPL >= 0 ? '+' : '-'}${Math.abs(totalPL).toFixed(0)}</div></div>
                       </div>
                     );
                   })()}
-
                   {closedTrades.map(trade => {
-                    const entry = Number(trade.entry_price);
-                    const exit = Number(trade.sold_price);
-                    const shares = Number(trade.shares);
-                    const pl = (exit - entry) * shares;
-                    const pctReturn = ((exit - entry) / entry) * 100;
-                    const isWin = pl >= 0;
+                    const entry = Number(trade.entry_price); const exit = Number(trade.exit_price); const pl = (exit - entry) * Number(trade.shares);
+                    const pctReturn = ((exit - entry) / entry) * 100; const isWin = pl >= 0;
                     const holdMs = trade.sold_at && trade.bought_at ? new Date(trade.sold_at) - new Date(trade.bought_at) : 0;
-                    const holdHours = holdMs / 3600000;
-                    const holdDisplay = holdHours < 24 ? `${Math.round(holdHours)}h hold` : `${Math.round(holdHours / 24)}d hold`;
-                    const isDayTrade = holdHours < 24;
-                    const isPaperHands = !isWin && holdHours < 48;
-                    const isDiamondHands = holdHours >= 720;
+                    const holdHours = holdMs / 3600000; const holdDisplay = holdHours < 24 ? `${Math.round(holdHours)}h` : `${Math.round(holdHours / 24)}d`;
                     const buyDate = trade.bought_at ? new Date(trade.bought_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-
-                    return (
-                      <div key={trade.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text1)' }}>{trade.ticker}</span>
-                          {isDayTrade && <span style={{ fontSize: 11, fontWeight: 600, color: '#791F1F', background: 'rgba(224,82,82,0.1)', padding: '1px 6px', borderRadius: 3 }}>Day traitor</span>}
-                          {isDiamondHands && <span style={{ fontSize: 11, fontWeight: 600, color: '#085041', background: 'rgba(29,158,117,0.1)', padding: '1px 6px', borderRadius: 3 }}>Diamond hands</span>}
-                          {isPaperHands && !isDayTrade && <span style={{ fontSize: 11, fontWeight: 600, color: '#854F0B', background: 'rgba(212,160,23,0.1)', padding: '1px 6px', borderRadius: 3 }}>Paper hands</span>}
-                          <div style={{ flex: 1 }} />
-                          <span style={{ fontSize: 13, fontWeight: 700, color: isWin ? 'var(--green-btn)' : 'var(--red)' }}>
-                            {isWin ? '+' : '-'}${Math.abs(pl).toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text3)' }}>
-                          <span>{buyDate}</span>
-                          <span>·</span>
-                          <span>{holdDisplay}</span>
-                          <span>·</span>
-                          <span style={{ color: isWin ? 'var(--green-btn)' : 'var(--red)', fontWeight: 600 }}>
-                            {isWin ? '+' : ''}{pctReturn.toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
-                    );
+                    return (<div key={trade.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text1)' }}>{trade.ticker}</span><span style={{ fontSize: 10, color: 'var(--text3)' }}>{buyDate} · {holdDisplay}</span><span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: isWin ? 'var(--green-btn)' : 'var(--red)' }}>{isWin ? '+' : ''}{pctReturn.toFixed(1)}%</span></div></div>);
                   })}
-
-                  {closedTrades.length === 0 && (
-                    <div style={{ fontSize: 12, color: 'var(--text3)', textAlign: 'center', padding: '8px 0' }}>No closed trades yet</div>
-                  )}
+                  {closedTrades.length === 0 && <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', padding: '8px 0' }}>No closed trades yet</div>}
                 </div>
               )}
             </div>
+          )}
 
-            {/* ── RIGHT COLUMN ── */}
-            <div style={s.rightCol}>
-
-              {/* Card 1: Hot in the group — tap to buy */}
-              <div style={s.cardAmber}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#633806', marginBottom: 4 }}>Hot in the group · tap to buy</div>
-                {hotTickers.length === 0 ? (
-                  <div style={{ fontSize: 10, color: '#854F0B' }}>No activity yet</div>
-                ) : (
-                  hotTickers.map((h, i) => (
-                    <div
-                      key={i}
-                      onClick={() => { handleSelectTicker({ symbol: h.ticker, name: h.ticker }); }}
-                      style={{
-                        fontSize: 10, color: '#854F0B', padding: '4px 6px',
-                        margin: '2px -4px', borderRadius: 4, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        background: 'rgba(255,255,255,0.35)',
-                        border: '1px solid rgba(133,79,11,0.15)',
-                      }}
-                    >
-                      <span><b>{h.ticker}</b> — {h.bought > 0 ? `${h.bought} bought` : ''}{h.bought > 0 && h.sold > 0 ? ', ' : ''}{h.sold > 0 ? `${h.sold} sold` : ''}</span>
-                      <span style={{ fontSize: 9, fontWeight: 800, color: '#27500A' }}>BUY ›</span>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Card 3: Badges (compact single row) */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8 }}>
-                <span style={{ fontSize: 9, fontWeight: 800, color: 'var(--text3)', letterSpacing: 0.5 }}>BADGES</span>
-                {(() => {
-                  const allEntries = Object.entries(BADGE_DEFS);
-                  return allEntries.map(([key, def]) => {
-                    const earned = userBadges.includes(key);
-                    return (
-                      <span
-                        key={key}
-                        title={earned ? def.label : `Locked: ${def.label}`}
-                        style={{
-                          width: 16, height: 16, borderRadius: '50%',
-                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 9,
-                          background: earned ? def.bg : 'transparent',
-                          border: `1px solid ${earned ? def.border : 'var(--border)'}`,
-                          color: earned ? def.color : 'var(--text3)',
-                          opacity: earned ? 1 : 0.5,
-                        }}
-                      >
-                        {earned ? '★' : '·'}
-                      </span>
-                    );
-                  });
-                })()}
-              </div>
-
-              {/* Card 5: Trash talk */}
-              <div style={s.cardPurple}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#3C3489', marginBottom: 4 }}>Trash talk</div>
-                {trashTalkMsgs.length === 0 ? (
-                  <div style={{ fontSize: 10, color: '#534AB7' }}>No smack yet...</div>
-                ) : (
-                  trashTalkMsgs.map((m, i) => (
-                    <div key={m.id || i} style={{ fontSize: 10, color: '#534AB7', padding: '1px 0' }}>
-                      <b>{m.profiles?.username || 'Anon'}</b>: {m.message}
-                    </div>
-                  ))
-                )}
-                <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                  <input
-                    style={s.ttInput}
-                    value={trashTalkInput}
-                    onChange={e => setTrashTalkInput(e.target.value.slice(0, 200))}
-                    placeholder="Talk smack..."
-                    onKeyDown={e => e.key === 'Enter' && sendTrashTalk()}
-                  />
-                  <button style={s.ttSend} onClick={sendTrashTalk}>Send</button>
-                </div>
-              </div>
-
-              {/* Card 6: Season countdown */}
-              <div style={s.cardGreen}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#27500A' }}>Season 1 · {daysLeft} days left</div>
-                <div style={{ fontSize: 10, color: 'var(--green-btn)', marginTop: 2 }}>$50k cash · ranked by % return</div>
-                <div style={{ height: 3, background: '#C0DD97', borderRadius: 2, marginTop: 6 }}>
-                  <div style={{ height: 3, background: 'var(--green-btn)', borderRadius: 2, width: `${seasonProgress}%`, transition: 'width 0.3s' }} />
-                </div>
-              </div>
-
+          {/* TODAY'S RACE */}
+          <div style={s.raceCard}>
+            <div style={s.raceCardHdr}><span style={s.raceCardTitle}>🏁 Today's Race</span><span style={s.raceCardSub}>{daysLeft} days left</span></div>
+            <div style={s.raceCardBody}>
+              {(() => {
+                const sorted = [...leaderboard].sort((a, b) => b.pctReturn - a.pctReturn);
+                const best = sorted[0]; const worst = sorted[sorted.length - 1];
+                if (!best) return <div style={{ fontSize: 11, color: 'var(--text3)' }}>Waiting for participants...</div>;
+                return (<div style={{ fontSize: 11, color: 'var(--text1)', lineHeight: 1.6 }}>
+                  <span style={{ color: 'var(--green-btn)', fontWeight: 600 }}>▲ {best.username} +{best.pctReturn.toFixed(1)}%</span>
+                  {best.positions?.[0] && <span style={{ color: 'var(--text3)' }}> — {best.positions[0].ticker}</span>}<br/>
+                  {worst && worst.userId !== best.userId && (<><span style={{ color: 'var(--red)', fontWeight: 600 }}>▼ {worst.username} {worst.pctReturn >= 0 ? '+' : ''}{worst.pctReturn.toFixed(1)}%</span>{worst.positions?.[0] && <span style={{ color: 'var(--text3)' }}> — {worst.positions[0].ticker}</span>}</>)}
+                </div>);
+              })()}
             </div>
           </div>
-        </>
+
+          {/* DAILY LEARN */}
+          <div style={s.learnCard}>
+            <div style={s.learnCardHdr}><span style={{ fontSize: 9, fontWeight: 700, color: '#8B5CF6' }}>💡 LEARN</span></div>
+            <div style={s.learnCardBody}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text1)', marginBottom: 3 }}>{trades.length === 0 ? 'What is a stock ticker?' : 'When to cut your losses'}</div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.6 }}>{trades.length === 0 ? "A short code for a company. AAPL = Apple, NVDA = Nvidia, TSLA = Tesla. Tap Join above to pick your first stock!" : "Most pros set a stop at 15-20%. If a stock drops that much from your buy price, consider whether your original thesis still holds."}</div>
+            </div>
+          </div>
+
+          {/* SMACK TALK */}
+          <div style={s.smackWrap}>
+            <div style={s.smackHdr}><span>💬 Smack Talk</span><div style={s.smackLive}><div style={s.smackDot} /> LIVE</div></div>
+            <div style={{ ...s.smackMsgs, maxHeight: 150 }}>
+              {trashTalkMsgs.length === 0 ? (
+                <div style={{ fontSize: 11, color: 'var(--text3)', padding: '8px 0' }}>No smack yet — be the first</div>
+              ) : trashTalkMsgs.map((m) => {
+                const lbEntry = leaderboard.find(e => e.userId === m.user_id);
+                const rank = lbEntry ? leaderboard.indexOf(lbEntry) + 1 : null;
+                const tier = lbEntry ? getTier(lbEntry.pctReturn) : null;
+                const medalBg = rank === 1 ? 'linear-gradient(135deg,#FFD700,#e6a800)' : rank === 2 ? 'linear-gradient(135deg,#C0C0C0,#909090)' : rank === 3 ? 'linear-gradient(135deg,#CD7F32,#a0622d)' : '#d8e2ed';
+                const rxns = chatReactions[m.id] || {};
+                return (
+                  <div key={m.id} style={s.smackMsg}>
+                    <div style={s.smackMsgTop}>
+                      <div style={{ ...s.smackAv, background: medalBg, color: rank && rank <= 3 ? '#fff' : 'var(--text3)' }}>{(m.profiles?.username || '?')[0].toUpperCase()}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text1)' }}>{m.profiles?.username || 'Anon'}</span>
+                          {tier && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: tier.bg, color: tier.color, fontWeight: 500 }}>{tier.short}</span>}
+                          <span style={{ fontSize: 9, color: 'var(--text3)', marginLeft: 'auto' }}>{timeAgo(m.created_at)}</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--text1)', lineHeight: 1.35, marginTop: 2 }}>{m.message}</div>
+                      </div>
+                    </div>
+                    <div style={s.rxnRow}>
+                      {REACTIONS.map(r => { const users = rxns[r.label] || []; const myReacted = users.includes(session?.user?.id); if (users.length === 0 && !myReacted) return null; return (<div key={r.label} style={{ ...s.rxnPill, ...(myReacted ? s.rxnLit : {}) }} onClick={() => toggleReaction(m.id, r.label)}><span style={{ fontSize: 12 }}>{r.emoji}</span><span style={{ ...s.rxnCt, ...(myReacted ? { color: '#3B6D11' } : {}) }}>{users.length}</span></div>); })}
+                      <div style={s.rxnAdd} onClick={() => { const firstUnused = REACTIONS.find(r => !(rxns[r.label] || []).includes(session?.user?.id)); if (firstUnused) toggleReaction(m.id, firstUnused.label); }}>+</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={s.smackInput}>
+              <input style={s.smackInputField} value={trashTalkInput} onChange={e => setTrashTalkInput(e.target.value.slice(0, 200))} placeholder="Talk your talk..." onKeyDown={e => e.key === 'Enter' && sendTrashTalk()} enterKeyHint="send" />
+              <button style={s.smackSendBtn} onClick={() => sendTrashTalk()}>Send</button>
+            </div>
+          </div>
+
+        </div>
       ) : (
 
         /* ── LEADERBOARD VIEW — GAMIFIED ── */
@@ -1362,116 +1210,52 @@ const s = {
   },
   segActive: { background: 'var(--card)', color: 'var(--text1)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
 
-  // Ticker tape
-  tape: {
-    background: '#0f2440', overflow: 'hidden', height: 22,
-    display: 'flex', alignItems: 'center', marginTop: 8,
-  },
-  tapeInner: {
-    display: 'flex', whiteSpace: 'nowrap',
-    animation: 'tickerScroll 75s linear infinite',
-  },
-  tapeText: { fontSize: 10, color: '#8cd9a0', fontFamily: 'var(--font)', paddingRight: 40 },
-
-  // Split layout
-  splitWrap: { display: 'flex', minHeight: 0 },
-  leftCol: { flex: '0 0 54%', borderRight: '0.5px solid var(--border)', padding: '10px 8px 10px 12px', position: 'relative' },
-  rightCol: { flex: '0 0 46%', padding: '10px 12px 10px 8px', display: 'flex', flexDirection: 'column', gap: 7 },
-
-  // Left: compact hero
-  heroCompact: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 },
-  rankSm: {
-    width: 36, height: 36, borderRadius: '50%', background: 'var(--green-bg)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  rankSmText: { fontSize: 14, fontWeight: 800, color: 'var(--green-btn)' },
-  valSm: { fontSize: 17, fontWeight: 700 },
-
-  // Left: catch-the-leader
-  leaderBarSm: { padding: '5px 8px', background: '#FAEEDA', borderRadius: 6, marginBottom: 6 },
-  leaderTrackSm: { height: 3, background: '#EDD9A3', borderRadius: 2, marginTop: 4 },
-  leaderFillSm: { height: 3, background: '#BA7517', borderRadius: 2, transition: 'width 0.3s' },
-
-  // Left: add ticker
-  addSm: { marginBottom: 6, position: 'relative' },
-  addInputSm: {
-    flex: 1, background: 'var(--card2)', border: '1px solid var(--border)',
-    borderRadius: 6, padding: '7px 8px', fontSize: 11, fontWeight: 600,
-    color: 'var(--text1)', fontFamily: 'var(--font)', outline: 'none',
-    letterSpacing: 0.4, width: '100%', boxSizing: 'border-box',
-  },
-  addBtnSm: {
-    background: 'var(--green-btn)', color: '#fff', border: 'none', borderRadius: 6,
-    padding: '7px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
-    fontFamily: 'var(--font)', flexShrink: 0,
-  },
-  dropdownSm: {
-    position: 'absolute', left: 0, right: 0, top: 34, zIndex: 50,
-    background: 'var(--card)', border: '1px solid var(--border)',
-    borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', overflow: 'hidden',
-  },
-  dropRowSm: {
-    padding: '8px 8px', borderBottom: '1px solid var(--border)',
-    cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center',
-  },
-
-  // Left: presets
-  presetSm: {
-    marginTop: 5, padding: '8px 8px', background: 'var(--green-bg)',
-    borderRadius: 6, border: '1px solid var(--green-border)',
-  },
-  presetBtnSm: {
-    flex: 1, padding: '6px 0', borderRadius: 5,
-    border: '1px solid var(--green-btn)', background: 'transparent',
-    fontSize: 11, fontWeight: 600, color: 'var(--green-btn)',
-    cursor: 'pointer', fontFamily: 'var(--font)',
-  },
-  otherBtnSm: {
-    flex: 1, padding: '6px 0', borderRadius: 5,
-    border: '1px solid var(--border)', background: 'transparent',
-    fontSize: 11, fontWeight: 600, color: 'var(--text2)',
-    cursor: 'pointer', fontFamily: 'var(--font)',
-  },
-  customWrapSm: {
-    flex: 1, display: 'flex', alignItems: 'center',
-    background: 'var(--card)', border: '1px solid var(--green-btn)', borderRadius: 5, padding: '0 6px',
-  },
-  customInputSm: {
-    flex: 1, border: 'none', background: 'transparent', padding: '6px 0',
-    fontSize: 12, fontWeight: 600, color: 'var(--green-btn)', outline: 'none', fontFamily: 'var(--font)',
-  },
-  customBuySm: {
-    background: 'var(--green-btn)', color: '#fff', border: 'none', borderRadius: 5,
-    padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
-  },
-
-  // Left: positions
-  posRowSm: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '5px 6px', background: 'var(--card)', borderRadius: 6,
-    border: '1px solid var(--border)', marginBottom: 3, cursor: 'pointer',
-  },
-
-  // Right: card variants
-  cardAmber: { padding: 8, borderRadius: 7, background: 'var(--yellow-bg)' },
-  cardDefault: { padding: 8, borderRadius: 7, background: 'var(--card2)' },
-  cardBorder: { padding: 8, borderRadius: 7, border: '0.5px solid var(--border)' },
-  cardPurple: { padding: 8, borderRadius: 7, background: 'var(--blue-bg)' },
-  cardGreen: { padding: 8, borderRadius: 7, background: 'var(--green-bg)' },
-
-  // Right: sector row
-  sectorRow: { height: 13, borderRadius: 3, padding: '0 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
-
-  // Right: trash talk
-  ttInput: {
-    flex: 1, background: 'rgba(255,255,255,0.5)', border: '1px solid #CECBF6',
-    borderRadius: 5, padding: '5px 8px', fontSize: 9, color: '#3C3489',
-    fontFamily: 'var(--font)', outline: 'none',
-  },
-  ttSend: {
-    background: '#534AB7', color: '#fff', border: 'none', borderRadius: 5,
-    padding: '5px 10px', fontSize: 9, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
-  },
+  // Top bar — new user
+  barNew: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: 'var(--green-bg)', border: '1px solid rgba(59,109,17,0.15)', borderRadius: 10, marginTop: 8, marginBottom: 8 },
+  barNewText: { flex: 1 },
+  barNewTitle: { fontSize: 12, fontWeight: 700, color: 'var(--text1)' },
+  barNewSub: { fontSize: 10, color: 'var(--text3)', marginTop: 2 },
+  barNewBtn: { background: 'var(--green-btn)', color: '#fff', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
+  // Top bar — active user
+  barActive: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, marginTop: 8, marginBottom: 8 },
+  barRank: { width: 30, height: 30, borderRadius: '50%', background: 'var(--green-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  barRankText: { fontSize: 13, fontWeight: 800, color: 'var(--green-btn)' },
+  barStats: { flex: 1 },
+  barStatsTop: { display: 'flex', alignItems: 'center', gap: 6 },
+  barStatsBottom: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--text3)', marginTop: 2, flexWrap: 'wrap' },
+  barPortBtn: { background: 'var(--green-bg)', border: '1px solid rgba(59,109,17,0.2)', borderRadius: 8, padding: '6px 12px', fontSize: 10, fontWeight: 600, color: 'var(--green-btn)', cursor: 'pointer', flexShrink: 0 },
+  barPortBtnOpen: { background: 'var(--green-btn)', color: '#fff', borderColor: 'var(--green-btn)' },
+  // Portfolio dropdown
+  portDrop: { background: 'var(--card)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 8, overflow: 'hidden' },
+  portCash: { display: 'flex' },
+  portCashItem: { flex: 1, padding: '10px 8px', textAlign: 'center' },
+  portCashLabel: { fontSize: 9, color: 'var(--text3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.3 },
+  portCashVal: { fontSize: 15, fontWeight: 700, color: 'var(--text1)', marginTop: 2 },
+  portSecLabel: { fontSize: 9, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.4, padding: '8px 12px 4px', borderTop: '1px solid var(--border)' },
+  portPos: { display: 'flex', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid var(--border)' },
+  portPosTk: { fontSize: 13, fontWeight: 700, color: 'var(--text1)', width: 48 },
+  portPosInfo: { flex: 1, fontSize: 11, color: 'var(--text3)' },
+  portPosSell: { fontSize: 10, fontWeight: 600, color: 'var(--red)', background: 'var(--red-bg)', border: '1px solid rgba(224,82,82,0.2)', padding: '5px 10px', borderRadius: 6, cursor: 'pointer', flexShrink: 0 },
+  portBuyRow: { display: 'flex', gap: 4, padding: '8px 12px', borderTop: '1px solid var(--border)' },
+  portBuyInput: { flex: 1, background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 8px', fontSize: 11, fontWeight: 600, color: 'var(--text1)', fontFamily: 'var(--font)', outline: 'none', letterSpacing: 0.4 },
+  portBuyBtn: { background: 'var(--green-btn)', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 },
+  portSearchRow: { padding: '8px 12px', borderBottom: '1px solid var(--border)', cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' },
+  portHistToggle: { fontSize: 10, fontWeight: 600, color: 'var(--blue)', textAlign: 'center', padding: '8px 12px', cursor: 'pointer', borderTop: '1px solid var(--border)' },
+  // Preset buy styles (kept)
+  presetBtnSm: { flex: 1, padding: '6px 0', borderRadius: 5, border: '1px solid var(--green-btn)', background: 'transparent', fontSize: 11, fontWeight: 600, color: 'var(--green-btn)', cursor: 'pointer', fontFamily: 'var(--font)' },
+  otherBtnSm: { flex: 1, padding: '6px 0', borderRadius: 5, border: '1px solid var(--border)', background: 'transparent', fontSize: 11, fontWeight: 600, color: 'var(--text2)', cursor: 'pointer', fontFamily: 'var(--font)' },
+  customWrapSm: { flex: 1, display: 'flex', alignItems: 'center', background: 'var(--card)', border: '1px solid var(--green-btn)', borderRadius: 5, padding: '0 6px' },
+  customInputSm: { flex: 1, border: 'none', background: 'transparent', padding: '6px 0', fontSize: 12, fontWeight: 600, color: 'var(--green-btn)', outline: 'none', fontFamily: 'var(--font)' },
+  customBuySm: { background: 'var(--green-btn)', color: '#fff', border: 'none', borderRadius: 5, padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' },
+  // Cards
+  raceCard: { background: 'var(--card)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 8, overflow: 'hidden' },
+  raceCardHdr: { padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  raceCardTitle: { fontSize: 11, fontWeight: 700, color: 'var(--text1)' },
+  raceCardSub: { fontSize: 9, color: 'var(--text3)' },
+  raceCardBody: { padding: '0 12px 10px' },
+  learnCard: { background: 'var(--card)', borderRadius: 10, border: '1px solid rgba(139,92,246,0.12)', marginBottom: 8, overflow: 'hidden' },
+  learnCardHdr: { padding: '8px 12px 4px' },
+  learnCardBody: { padding: '0 12px 10px' },
 
   // Leaderboard (full width, unchanged)
   section: { padding: '0 16px 8px' },
