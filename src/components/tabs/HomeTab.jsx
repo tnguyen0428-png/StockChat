@@ -1986,7 +1986,7 @@ const S = {
   resPills: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   resPill: {
     padding: '5px 12px', borderRadius: 14, fontSize: 12, fontWeight: 500,
-    cursor: 'pointer', border: '1px solid #d8e2ed', background: '#fff', color: '#1AAD5E',
+    cursor: 'pointer', border: '1px solid #8cd9a0', background: 'rgba(140,217,160,0.08)', color: '#1AAD5E',
   },
   resPillActive: { background: '#1AAD5E', color: '#fff', borderColor: '#1AAD5E' },
   resCard: {
