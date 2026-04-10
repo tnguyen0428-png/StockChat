@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
 import SellModal from '../portfolio/SellModal';
 import StickerPicker from '../shared/StickerPicker';
+import { DarkModeToggle } from './alertsCasinoComponents';
 
 const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 const STARTING_CASH = 50000;
@@ -119,6 +120,7 @@ export default function PortfolioTab({ session }) {
   const [riskLevel, setRiskLevel] = useState({ level: 'Low', bars: 2, color: '#2a7d4b', note: '' });
   const [showPortfolio, setShowPortfolio] = useState(false);
   const [showAllRankings, setShowAllRankings] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
 
   // Leaderboard v2 state
   const [chatReactions, setChatReactions] = useState({});
@@ -690,6 +692,104 @@ export default function PortfolioTab({ session }) {
     return { bg: '#FCEBEB', color: '#791F1F' };
   };
 
+  const t = darkMode ? {
+    bg: '#0a1628', card: '#132d52', surface: '#0e1e36',
+    border: '#1e3d62', text1: '#e8edf2', text2: '#8ca4c0', text3: '#5a7a9a',
+    green: '#5eed8a', red: '#F09595', blue: '#7B8CDE', purple: '#a78bfa',
+    greenBg: 'rgba(94,237,138,0.1)', redBg: 'rgba(240,149,149,0.1)',
+    medalGold: 'linear-gradient(135deg,#FFD700,#e6a800)',
+    medalSilver: 'linear-gradient(135deg,#C0C0C0,#909090)',
+    medalBronze: 'linear-gradient(135deg,#CD7F32,#a0622d)',
+    pctGold: '#FFD700', pctSilver: '#C0C0C0', pctBronze: '#8cd9a0',
+  } : {
+    bg: '#f8fafc', card: '#ffffff', surface: '#f8fafc',
+    border: '#e2e8f0', text1: '#0f172a', text2: '#64748b', text3: '#94a3b8',
+    green: '#16a34a', red: '#dc2626', blue: '#2563eb', purple: '#7c3aed',
+    greenBg: 'rgba(22,163,74,0.08)', redBg: 'rgba(220,38,38,0.08)',
+    medalGold: 'linear-gradient(135deg,#FFD700,#e6a800)',
+    medalSilver: 'linear-gradient(135deg,#C0C0C0,#909090)',
+    medalBronze: 'linear-gradient(135deg,#CD7F32,#a0622d)',
+    pctGold: '#b8860b', pctSilver: '#6b7280', pctBronze: '#16a34a',
+  };
+
+  const s = {
+    scroll: { flex: 1, overflowY: 'auto', background: t.bg },
+    barNew: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: t.card, border: `1px solid ${t.green}25`, borderRadius: 12, marginBottom: 8 },
+    barNewText: { flex: 1 },
+    barNewTitle: { fontSize: 12, fontWeight: 700, color: t.text1 },
+    barNewSub: { fontSize: 10, color: t.text3, marginTop: 2 },
+    barNewBtn: { background: t.green, color: darkMode ? '#0a1628' : '#fff', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
+    barActive: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, marginBottom: 8 },
+    barRank: { width: 30, height: 30, borderRadius: '50%', background: t.greenBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    barRankText: { fontSize: 13, fontWeight: 800, color: t.green },
+    barStats: { flex: 1 },
+    barStatsTop: { display: 'flex', alignItems: 'center', gap: 6 },
+    barStatsBottom: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: t.text3, marginTop: 2, flexWrap: 'wrap' },
+    barPortBtn: { background: t.greenBg, border: `1px solid ${t.green}40`, borderRadius: 8, padding: '6px 12px', fontSize: 10, fontWeight: 600, color: t.green, cursor: 'pointer', flexShrink: 0 },
+    barPortBtnOpen: { background: t.green, color: darkMode ? '#0a1628' : '#fff', borderColor: t.green },
+    portDrop: { background: t.card, borderRadius: 12, border: `1px solid ${t.border}`, marginBottom: 8, overflow: 'hidden' },
+    portCash: { display: 'flex' },
+    portCashItem: { flex: 1, padding: '10px 8px', textAlign: 'center' },
+    portCashLabel: { fontSize: 9, color: t.text3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.3 },
+    portCashVal: { fontSize: 15, fontWeight: 700, color: t.text1, marginTop: 2 },
+    portSecLabel: { fontSize: 9, fontWeight: 600, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.4, padding: '8px 12px 4px', borderTop: `1px solid ${t.border}` },
+    portPos: { display: 'flex', alignItems: 'center', padding: '8px 12px', borderBottom: `1px solid ${t.border}` },
+    portPosTk: { fontSize: 13, fontWeight: 700, color: t.text1, width: 48 },
+    portPosInfo: { flex: 1, fontSize: 11, color: t.text3 },
+    portPosSell: { fontSize: 10, fontWeight: 600, color: t.red, background: t.redBg, border: `1px solid ${t.red}30`, padding: '5px 10px', borderRadius: 6, cursor: 'pointer', flexShrink: 0 },
+    portBuyRow: { display: 'flex', gap: 4, padding: '8px 12px', borderTop: `1px solid ${t.border}` },
+    portBuyInput: { flex: 1, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 6, padding: '7px 8px', fontSize: 11, fontWeight: 600, color: t.text1, fontFamily: 'var(--font)', outline: 'none', letterSpacing: 0.4 },
+    portBuyBtn: { background: t.green, color: darkMode ? '#0a1628' : '#fff', border: 'none', borderRadius: 6, padding: '7px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 },
+    portSearchRow: { padding: '8px 12px', borderBottom: `1px solid ${t.border}`, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' },
+    portHistToggle: { fontSize: 10, fontWeight: 600, color: t.blue, textAlign: 'center', padding: '8px 12px', cursor: 'pointer', borderTop: `1px solid ${t.border}` },
+    presetBtnSm: { flex: 1, padding: '6px 0', borderRadius: 5, border: `1px solid ${t.green}`, background: 'transparent', fontSize: 11, fontWeight: 600, color: t.green, cursor: 'pointer', fontFamily: 'var(--font)' },
+    otherBtnSm: { flex: 1, padding: '6px 0', borderRadius: 5, border: `1px solid ${t.border}`, background: 'transparent', fontSize: 11, fontWeight: 600, color: t.text2, cursor: 'pointer', fontFamily: 'var(--font)' },
+    customWrapSm: { flex: 1, display: 'flex', alignItems: 'center', background: t.card, border: `1px solid ${t.green}`, borderRadius: 5, padding: '0 6px' },
+    customInputSm: { flex: 1, border: 'none', background: 'transparent', padding: '6px 0', fontSize: 12, fontWeight: 600, color: t.green, outline: 'none', fontFamily: 'var(--font)' },
+    customBuySm: { background: t.green, color: darkMode ? '#0a1628' : '#fff', border: 'none', borderRadius: 5, padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' },
+    rankingsCard: { background: t.card, borderRadius: 12, border: `1px solid ${t.border}`, marginBottom: 8, overflow: 'hidden' },
+    rankingsHdr: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px 8px' },
+    rankingsTitle: { fontSize: 11, fontWeight: 700, color: t.text1, textTransform: 'uppercase', letterSpacing: 0.5 },
+    rankingsShow: { fontSize: 10, fontWeight: 600, color: t.blue, cursor: 'pointer' },
+    topRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderTop: `1px solid ${t.border}`, cursor: 'pointer' },
+    topMedal: { width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 },
+    topInfo: { flex: 1, minWidth: 0 },
+    topName: { fontSize: 13, fontWeight: 700, color: darkMode ? '#fff' : t.text1 },
+    topNote: { fontSize: 10, color: t.text2, marginTop: 2, lineHeight: 1.4 },
+    topBadge: { color: t.purple, fontWeight: 600 },
+    topPct: { fontSize: 15, fontWeight: 700, flexShrink: 0 },
+    rankDivider: { height: 1, background: t.border, margin: '2px 12px' },
+    rankRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderTop: `1px solid ${t.border}`, cursor: 'pointer', border: '1px solid transparent' },
+    rankNum: { width: 24, height: 24, borderRadius: '50%', background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, color: t.text3, flexShrink: 0 },
+    expandedPositions: { padding: '4px 12px 8px 48px', display: 'flex', flexWrap: 'wrap', gap: 6, borderTop: `1px solid ${t.border}` },
+    expandedChip: { display: 'flex', gap: 4, alignItems: 'center', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 6, padding: '4px 8px' },
+    raceCard: { background: t.card, borderRadius: 12, border: `1px solid ${t.border}`, marginBottom: 8, overflow: 'hidden' },
+    raceCardHdr: { padding: '10px 12px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+    raceCardTitle: { fontSize: 11, fontWeight: 700, color: t.text1 },
+    raceCardSub: { fontSize: 9, color: t.text3 },
+    raceCardBody: { padding: '0 12px 10px' },
+    learnCard: { background: t.card, borderRadius: 12, border: `1px solid ${t.purple}30`, marginBottom: 8, overflow: 'hidden' },
+    learnCardHdr: { padding: '10px 12px 4px' },
+    learnCardBody: { padding: '0 12px 10px' },
+    skeleton: { height: 52, borderRadius: 12, marginBottom: 10, background: t.surface, animation: 'pulse 1.5s ease-in-out infinite' },
+    smackWrap: { margin: 0, background: t.card, borderRadius: 12, border: `1px solid ${t.border}`, overflow: 'hidden' },
+    smackHdr: { fontSize: 10, color: t.text1, textTransform: 'uppercase', letterSpacing: 0.4, fontWeight: 600, padding: '10px 12px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+    smackLive: { fontSize: 8, color: t.green, background: t.greenBg, padding: '2px 6px', borderRadius: 3, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 },
+    smackDot: { width: 5, height: 5, borderRadius: '50%', background: t.green },
+    smackMsgs: { padding: '0 12px 6px', maxHeight: 150, overflowY: 'auto' },
+    smackMsg: { padding: '6px 0', borderTop: `1px solid ${t.border}` },
+    smackMsgTop: { display: 'flex', alignItems: 'flex-start', gap: 8 },
+    smackAv: { width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, flexShrink: 0 },
+    rxnRow: { display: 'flex', gap: 4, marginTop: 5, marginLeft: 30 },
+    rxnPill: { display: 'flex', alignItems: 'center', gap: 3, padding: '2px 7px', borderRadius: 12, cursor: 'pointer', border: `0.5px solid ${t.border}`, background: t.surface, fontSize: 11 },
+    rxnLit: { background: t.greenBg, borderColor: t.green },
+    rxnCt: { fontSize: 10, fontWeight: 600, color: t.text3 },
+    rxnAdd: { padding: '2px 6px', borderRadius: 12, cursor: 'pointer', fontSize: 11, border: `0.5px dashed ${t.border}`, background: 'transparent', color: t.text3, display: 'flex', alignItems: 'center', gap: 2 },
+    smackInput: { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderTop: `1px solid ${t.border}`, background: t.surface },
+    smackInputField: { flex: 1, background: t.card, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 12, color: t.text1, fontFamily: 'var(--font)', outline: 'none' },
+    smackSendBtn: { background: t.green, color: darkMode ? '#0a1628' : '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' },
+  };
+
   // ── Loading ──
   if (loadingData) {
     return (
@@ -705,13 +805,18 @@ export default function PortfolioTab({ session }) {
     <div style={s.scroll}>
       <div style={{ padding: '0 12px 12px' }}>
 
+        {/* DARK MODE TOGGLE */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 0 4px' }}>
+          <DarkModeToggle darkMode={darkMode} onToggle={() => setDarkMode(d => !d)} t={t} />
+        </div>
+
         {/* TOP BAR */}
         {trades.length === 0 ? (
           <div style={s.barNew}>
             <span style={{ fontSize: 20, flexShrink: 0 }}>🏆</span>
             <div style={s.barNewText}>
               <div style={s.barNewTitle}>Paper Trading Challenge</div>
-              <div style={s.barNewSub}><b style={{ color: '#5eed8a' }}>$50K fake money</b> · compete with your crew</div>
+              <div style={s.barNewSub}><b style={{ color: t.green }}>$50K fake money</b> · compete with your crew</div>
             </div>
             <div style={s.barNewBtn} onClick={() => setShowPortfolio(true)}>Join →</div>
           </div>
@@ -720,12 +825,12 @@ export default function PortfolioTab({ session }) {
             <div style={s.barRank}><span style={s.barRankText}>#{myRank || '-'}</span></div>
             <div style={s.barStats}>
               <div style={s.barStatsTop}>
-                <span style={{ fontSize: 16, fontWeight: 700, color: isPositive ? '#5eed8a' : '#F09595' }}>{isPositive ? '+' : ''}{totalReturn.toFixed(1)}%</span>
+                <span style={{ fontSize: 16, fontWeight: 700, color: isPositive ? t.green : t.red }}>{isPositive ? '+' : ''}{totalReturn.toFixed(1)}%</span>
                 {userBadges.length > 0 && <span style={{ display: 'flex', gap: 2 }}>{userBadges.slice(0, 3).map(key => { const def = BADGE_DEFS[key]; return def ? <span key={key} style={{ fontSize: 12 }} title={def.label}>{def.emoji}</span> : null; })}</span>}
               </div>
               <div style={s.barStatsBottom}>
-                {aheadUser ? <span>🎯 {aheadUser.gap}% behind {aheadUser.username}</span> : myRank !== null ? <span style={{ color: '#5eed8a' }}>👑 In the lead!</span> : null}
-                <span style={{ color: '#5eed8a', fontWeight: 600 }}>Cash ${cashBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+                {aheadUser ? <span>🎯 {aheadUser.gap}% behind {aheadUser.username}</span> : myRank !== null ? <span style={{ color: t.green }}>👑 In the lead!</span> : null}
+                <span style={{ color: t.green, fontWeight: 600 }}>Cash ${cashBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
               </div>
             </div>
             <div style={{ ...s.barPortBtn, ...(showPortfolio ? s.barPortBtnOpen : {}) }} onClick={() => setShowPortfolio(p => !p)}>Portfolio {showPortfolio ? '▲' : '▼'}</div>
@@ -736,13 +841,13 @@ export default function PortfolioTab({ session }) {
         {showPortfolio && (
           <div style={s.portDrop}>
             <div style={s.portCash}>
-              <div style={s.portCashItem}><div style={s.portCashLabel}>Total</div><div style={{ ...s.portCashVal, color: '#5eed8a' }}>${totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
-              <div style={{ ...s.portCashItem, borderLeft: '1px solid #1e3d62' }}><div style={s.portCashLabel}>Cash</div><div style={s.portCashVal}>${cashBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
-              <div style={{ ...s.portCashItem, borderLeft: '1px solid #1e3d62' }}><div style={s.portCashLabel}>Invested</div><div style={s.portCashVal}>${totalPositionsValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
+              <div style={s.portCashItem}><div style={s.portCashLabel}>Total</div><div style={{ ...s.portCashVal, color: t.green }}>${totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
+              <div style={{ ...s.portCashItem, borderLeft: `1px solid ${t.border}` }}><div style={s.portCashLabel}>Cash</div><div style={s.portCashVal}>${cashBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
+              <div style={{ ...s.portCashItem, borderLeft: `1px solid ${t.border}` }}><div style={s.portCashLabel}>Invested</div><div style={s.portCashVal}>${totalPositionsValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
             </div>
             <div style={s.portSecLabel}>Positions · {trades.length}</div>
             {trades.length === 0 ? (
-              <div style={{ fontSize: 11, color: '#5a7a9a', padding: '8px 12px' }}>No positions yet — add a ticker below</div>
+              <div style={{ fontSize: 11, color: t.text3, padding: '8px 12px' }}>No positions yet — add a ticker below</div>
             ) : trades.map(trade => {
               const curPrice = prices[trade.ticker] || Number(trade.entry_price);
               const entryPrice = Number(trade.entry_price);
@@ -752,7 +857,7 @@ export default function PortfolioTab({ session }) {
                 <div key={trade.id} style={s.portPos}>
                   <span style={s.portPosTk}>{trade.ticker}</span>
                   <span style={s.portPosInfo}>{Number(trade.shares).toFixed(1)} · avg ${entryPrice.toFixed(2)}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: isUp ? '#5eed8a' : '#F09595', minWidth: 45, textAlign: 'right', marginRight: 6 }}>{isUp ? '+' : ''}{pctGain.toFixed(1)}%</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: isUp ? t.green : t.red, minWidth: 45, textAlign: 'right', marginRight: 6 }}>{isUp ? '+' : ''}{pctGain.toFixed(1)}%</span>
                   <div onClick={(e) => { e.stopPropagation(); setSellTrade({ ...trade, currentPrice: curPrice }); }} style={s.portPosSell}>Sell</div>
                 </div>
               );
@@ -762,21 +867,21 @@ export default function PortfolioTab({ session }) {
               <button style={s.portBuyBtn} onClick={() => { if (searchResults.length > 0) handleSelectTicker(searchResults[0]); }}>Buy</button>
             </div>
             {searchResults.length > 0 && (
-              <div style={{ borderTop: '1px solid #1e3d62' }}>
+              <div style={{ borderTop: `1px solid ${t.border}` }}>
                 {searchResults.map(r => (
                   <div key={r.symbol} style={s.portSearchRow} onClick={() => handleSelectTicker(r)}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#e8edf2' }}>{r.symbol}</span>
-                    <span style={{ fontSize: 10, color: '#5a7a9a', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{r.name}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: t.text1 }}>{r.symbol}</span>
+                    <span style={{ fontSize: 10, color: t.text3, flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{r.name}</span>
                   </div>
                 ))}
               </div>
             )}
-            {searching && <div style={{ fontSize: 10, color: '#5a7a9a', padding: '6px 12px' }}>Searching...</div>}
+            {searching && <div style={{ fontSize: 10, color: t.text3, padding: '6px 12px' }}>Searching...</div>}
             {showPresets && selectedTicker && (
-              <div style={{ padding: '8px 12px', borderTop: '1px solid #1e3d62', background: '#0e1e36' }}>
+              <div style={{ padding: '8px 12px', borderTop: `1px solid ${t.border}`, background: t.surface }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div><b style={{ fontSize: 12, color: '#5eed8a' }}>{selectedTicker.symbol}</b> <span style={{ fontSize: 10, color: '#5eed8a' }}>${selectedTicker.price.toFixed(2)}</span></div>
-                  <button style={{ background: 'none', border: 'none', fontSize: 14, color: '#5eed8a', cursor: 'pointer' }} onClick={clearSelection}>×</button>
+                  <div><b style={{ fontSize: 12, color: t.green }}>{selectedTicker.symbol}</b> <span style={{ fontSize: 10, color: t.green }}>${selectedTicker.price.toFixed(2)}</span></div>
+                  <button style={{ background: 'none', border: 'none', fontSize: 14, color: t.green, cursor: 'pointer' }} onClick={clearSelection}>×</button>
                 </div>
                 {!showCustom ? (
                   <div style={{ display: 'flex', gap: 4 }}>
@@ -785,11 +890,11 @@ export default function PortfolioTab({ session }) {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', gap: 4 }}>
-                    <div style={s.customWrapSm}><span style={{ fontSize: 12, fontWeight: 600, color: 'var(--green-btn)' }}>$</span><input style={s.customInputSm} type="number" inputMode="decimal" value={customAmount} onChange={e => setCustomAmount(e.target.value)} placeholder="Amt" autoFocus /></div>
+                    <div style={s.customWrapSm}><span style={{ fontSize: 12, fontWeight: 600, color: t.green }}>$</span><input style={s.customInputSm} type="number" inputMode="decimal" value={customAmount} onChange={e => setCustomAmount(e.target.value)} placeholder="Amt" autoFocus /></div>
                     <button style={{ ...s.customBuySm, opacity: (parseFloat(customAmount) > 0 && !buying) ? 1 : 0.4 }} onClick={() => executeBuy(parseFloat(customAmount) || 0)} disabled={!(parseFloat(customAmount) > 0) || buying}>{buying ? '..' : 'Buy'}</button>
                   </div>
                 )}
-                {buyError && <div style={{ fontSize: 10, color: '#F09595', marginTop: 3 }}>{buyError}</div>}
+                {buyError && <div style={{ fontSize: 10, color: t.red, marginTop: 3 }}>{buyError}</div>}
               </div>
             )}
             <div onClick={() => setShowHistory(!showHistory)} style={s.portHistToggle}>{showHistory ? 'Hide History ▲' : `Trade History (${closedTrades.length}) ▼`}</div>
@@ -802,9 +907,9 @@ export default function PortfolioTab({ session }) {
                   const winRate = Math.round((wins / closedTrades.length) * 100);
                   return (
                     <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                      <div style={{ flex: 1, background: '#0e1e36', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: '#5a7a9a' }}>Win rate</div><div style={{ fontSize: 14, fontWeight: 700, color: winRate >= 50 ? '#5eed8a' : '#F09595' }}>{winRate}%</div></div>
-                      <div style={{ flex: 1, background: '#0e1e36', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: '#5a7a9a' }}>Avg hold</div><div style={{ fontSize: 14, fontWeight: 700, color: '#e8edf2' }}>{avgHold.toFixed(1)}d</div></div>
-                      <div style={{ flex: 1, background: '#0e1e36', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: '#5a7a9a' }}>Total P&L</div><div style={{ fontSize: 14, fontWeight: 700, color: totalPL >= 0 ? '#5eed8a' : '#F09595' }}>{totalPL >= 0 ? '+' : '-'}${Math.abs(totalPL).toFixed(0)}</div></div>
+                      <div style={{ flex: 1, background: t.surface, borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: t.text3 }}>Win rate</div><div style={{ fontSize: 14, fontWeight: 700, color: winRate >= 50 ? t.green : t.red }}>{winRate}%</div></div>
+                      <div style={{ flex: 1, background: t.surface, borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: t.text3 }}>Avg hold</div><div style={{ fontSize: 14, fontWeight: 700, color: t.text1 }}>{avgHold.toFixed(1)}d</div></div>
+                      <div style={{ flex: 1, background: t.surface, borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: t.text3 }}>Total P&L</div><div style={{ fontSize: 14, fontWeight: 700, color: totalPL >= 0 ? t.green : t.red }}>{totalPL >= 0 ? '+' : '-'}${Math.abs(totalPL).toFixed(0)}</div></div>
                     </div>
                   );
                 })()}
@@ -814,98 +919,103 @@ export default function PortfolioTab({ session }) {
                   const holdMs = trade.sold_at && trade.bought_at ? new Date(trade.sold_at) - new Date(trade.bought_at) : 0;
                   const holdHours = holdMs / 3600000; const holdDisplay = holdHours < 24 ? `${Math.round(holdHours)}h` : `${Math.round(holdHours / 24)}d`;
                   const buyDate = trade.bought_at ? new Date(trade.bought_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-                  return (<div key={trade.id} style={{ padding: '6px 0', borderBottom: '1px solid #1e3d62' }}><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 12, fontWeight: 700, color: '#e8edf2' }}>{trade.ticker}</span><span style={{ fontSize: 10, color: '#5a7a9a' }}>{buyDate} · {holdDisplay}</span><span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: isWin ? '#5eed8a' : '#F09595' }}>{isWin ? '+' : ''}{pctReturn.toFixed(1)}%</span></div></div>);
+                  return (<div key={trade.id} style={{ padding: '6px 0', borderBottom: `1px solid ${t.border}` }}><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 12, fontWeight: 700, color: t.text1 }}>{trade.ticker}</span><span style={{ fontSize: 10, color: t.text3 }}>{buyDate} · {holdDisplay}</span><span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: isWin ? t.green : t.red }}>{isWin ? '+' : ''}{pctReturn.toFixed(1)}%</span></div></div>);
                 })}
-                {closedTrades.length === 0 && <div style={{ fontSize: 11, color: '#5a7a9a', textAlign: 'center', padding: '8px 0' }}>No closed trades yet</div>}
+                {closedTrades.length === 0 && <div style={{ fontSize: 11, color: t.text3, textAlign: 'center', padding: '8px 0' }}>No closed trades yet</div>}
               </div>
             )}
           </div>
         )}
 
-        {/* RACE LANES — top 3 */}
-        <div style={s.raceBg}>
-          <div style={s.raceTop}>
-            <span style={s.raceLabel}>Season 1 · Race to the top</span>
-            <div style={s.raceTimer}>
-              <span style={s.rtBox}>{daysLeft}d</span>
-              <span style={s.rtSep}>:</span>
-              <span style={s.rtBox}>{String(Math.floor((seasonEnd - new Date()) / 3600000) % 24).padStart(2, '0')}h</span>
-              <span style={s.rtSep}>:</span>
-              <span style={s.rtBox}>{String(Math.floor((seasonEnd - new Date()) / 60000) % 60).padStart(2, '0')}m</span>
-            </div>
+        {/* UNIFIED RANKINGS */}
+        <div style={s.rankingsCard}>
+          <div style={s.rankingsHdr}>
+            <span style={s.rankingsTitle}>Season 1 Rankings</span>
+            {leaderboard.length > 5 && (
+              <span style={s.rankingsShow} onClick={() => setShowAllRankings(p => !p)}>
+                {showAllRankings ? 'Show less ▲' : `Show all ${leaderboard.length} ▼`}
+              </span>
+            )}
           </div>
           {lbLoading ? (
-            [1, 2, 3].map(i => <div key={i} style={{ ...s.skeleton, height: 28, marginBottom: 10 }} />)
+            [1, 2, 3].map(i => <div key={i} style={{ ...s.skeleton, height: 40, margin: '0 12px 8px' }} />)
           ) : leaderboard.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '16px 0' }}>No participants yet</div>
+            <div style={{ fontSize: 12, color: t.text3, textAlign: 'center', padding: '20px 0' }}>No participants yet</div>
           ) : (
-            <div style={s.track}>
+            <>
               {leaderboard.slice(0, 3).map((entry, idx) => {
-                const tier = getTier(entry.pctReturn);
-                const medalBg = idx === 0 ? 'linear-gradient(135deg,#FFD700,#e6a800)' : idx === 1 ? 'linear-gradient(135deg,#C0C0C0,#909090)' : 'linear-gradient(135deg,#CD7F32,#a0622d)';
-                const laneBg = idx === 0 ? 'rgba(255,215,0,0.12)' : idx === 1 ? 'rgba(192,192,192,0.08)' : 'rgba(205,127,50,0.08)';
-                const barWidth = idx === 0 ? '100%' : `${Math.max(10, (entry.pctReturn / Math.max(leaderboard[0]?.pctReturn || 1, 0.01)) * 100)}%`;
-                const barGrad = idx === 0 ? 'linear-gradient(90deg,#FFD700,#8cd9a0)' : idx === 1 ? 'linear-gradient(90deg,#C0C0C0,#7B8CDE)' : 'linear-gradient(90deg,#CD7F32,#8cd9a0)';
-                const pctColor = idx === 0 ? '#FFD700' : idx === 1 ? '#C0C0C0' : '#8cd9a0';
+                const medalBg = [t.medalGold, t.medalSilver, t.medalBronze][idx];
+                const pctColor = [t.pctGold, t.pctSilver, t.pctBronze][idx];
                 const isMe = entry.userId === session?.user?.id;
+                const topStock = entry.positions?.[0];
+                const note = topStock
+                  ? `${topStock.ticker} ${topStock.pctGain >= 0 ? '+' : ''}${topStock.pctGain.toFixed(0)}% since buy`
+                  : entry.openCount === 0 ? 'Watching from the sidelines' : `${entry.openCount} positions active`;
                 return (
-                  <div key={entry.userId} style={{ ...s.lane, background: laneBg, ...(isMe ? { border: '1px solid rgba(140,217,160,0.4)' } : {}) }}>
-                    <div style={s.laneLeft}>
-                      <div style={{ ...s.laneMedal, background: medalBg }}>{idx + 1}</div>
-                      <span style={s.laneName}>{entry.username}{isMe ? ' ★' : ''}</span>
-                      <span style={{ ...s.laneTier, background: tier.bg, color: tier.color }}>{tier.short}</span>
+                  <div key={entry.userId} style={{ ...s.topRow, ...(isMe ? { background: `${t.green}08` } : {}) }}
+                    onClick={() => setExpandedUser(expandedUser === entry.userId ? null : entry.userId)}>
+                    <div style={{ ...s.topMedal, background: medalBg }}>{idx + 1}</div>
+                    <div style={s.topInfo}>
+                      <div style={s.topName}>{entry.username}{isMe ? ' ★' : ''}</div>
+                      <div style={s.topNote}>{note}</div>
                     </div>
-                    <div style={s.laneBarWrap}><div style={{ ...s.laneBar, width: barWidth, background: barGrad }} /></div>
-                    <span style={{ ...s.lanePct, color: pctColor }}>{entry.pctReturn >= 0 ? '+' : ''}{entry.pctReturn.toFixed(1)}%</span>
+                    <div style={{ ...s.topPct, color: pctColor }}>{entry.pctReturn >= 0 ? '+' : ''}{entry.pctReturn.toFixed(1)}%</div>
                   </div>
                 );
               })}
-            </div>
+              {/* Expanded positions for any expanded user */}
+              {leaderboard.map(entry => (
+                expandedUser === entry.userId && entry.positions?.length > 0 ? (
+                  <div key={`exp-${entry.userId}`} style={s.expandedPositions}>
+                    {entry.positions.map((p, i) => (
+                      <div key={i} style={s.expandedChip}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: t.text1 }}>{p.ticker}</span>
+                        <span style={{ fontSize: 10, color: p.pctGain >= 0 ? t.green : t.red }}>{p.pctGain >= 0 ? '+' : ''}{p.pctGain.toFixed(1)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null
+              ))}
+              {leaderboard.length > 3 && <div style={s.rankDivider} />}
+              {leaderboard.slice(3, showAllRankings ? undefined : 5).map((entry, idx) => {
+                const rank = idx + 4;
+                const isMe = entry.userId === session?.user?.id;
+                const isUp = entry.pctReturn >= 0;
+                const isExpanded = expandedUser === entry.userId;
+                const topStock = entry.positions?.[0];
+                const note = entry.openCount === 0 ? 'Watching from the sidelines'
+                  : topStock ? `${topStock.ticker} ${topStock.pctGain >= 0 ? 'up' : 'down'} ${Math.abs(topStock.pctGain).toFixed(0)}%`
+                  : `${entry.openCount} positions active`;
+                return (
+                  <div key={entry.userId}>
+                    <div style={{ ...s.rankRow, ...(isMe ? { border: `2px solid ${t.green}60` } : {}) }}
+                      onClick={() => setExpandedUser(isExpanded ? null : entry.userId)}>
+                      <div style={s.rankNum}>{rank}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: t.text1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {entry.username}
+                          {isMe && <span style={{ fontSize: 8, color: t.green, background: t.greenBg, padding: '0 4px', borderRadius: 2, fontWeight: 700 }}>YOU</span>}
+                        </div>
+                        <div style={{ fontSize: 10, color: t.text3, marginTop: 2 }}>{note}</div>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: isUp ? t.green : t.red, flexShrink: 0 }}>{isUp ? '+' : ''}{entry.pctReturn.toFixed(1)}%</div>
+                    </div>
+                    {isExpanded && entry.positions?.length > 0 && (
+                      <div style={s.expandedPositions}>
+                        {entry.positions.map((p, i) => (
+                          <div key={i} style={s.expandedChip}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: t.text1 }}>{p.ticker}</span>
+                            <span style={{ fontSize: 10, color: p.pctGain >= 0 ? t.green : t.red }}>{p.pctGain >= 0 ? '+' : ''}{p.pctGain.toFixed(1)}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
-
-        {/* RANKINGS 4+ */}
-        {leaderboard.length > 3 && (
-          <div style={{ marginBottom: 8 }}>
-            {leaderboard.slice(3, showAllRankings ? undefined : 5).map((entry, idx) => {
-              const rank = idx + 4;
-              const isMe = entry.userId === session?.user?.id;
-              const isUp = entry.pctReturn >= 0;
-              const isExpanded = expandedUser === entry.userId;
-              const note = entry.openCount === 0 ? 'Watching from the sidelines' : entry.pctReturn > 5 ? `Strong season — ${entry.positions?.[0]?.ticker || 'diversified'} leading` : entry.pctReturn < 0 ? 'Looking for a comeback' : `${entry.openCount} positions active`;
-              return (
-                <div key={entry.userId}>
-                  <div style={{ ...s.rankRow, ...(isMe ? { border: '2px solid #8cd9a0' } : {}) }} onClick={() => setExpandedUser(isExpanded ? null : entry.userId)}>
-                    <div style={s.rankNum}>{rank}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#e8edf2', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        {entry.username}
-                        {isMe && <span style={{ fontSize: 8, color: '#5eed8a', background: 'rgba(94,237,138,0.1)', padding: '0 4px', borderRadius: 2, fontWeight: 700 }}>YOU</span>}
-                      </div>
-                      <div style={{ fontSize: 9, color: '#5a7a9a', marginTop: 1 }}>{note}</div>
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: isUp ? '#5eed8a' : '#F09595', flexShrink: 0 }}>{isUp ? '+' : ''}{entry.pctReturn.toFixed(1)}%</div>
-                  </div>
-                  {isExpanded && entry.positions.length > 0 && (
-                    <div style={{ padding: '4px 14px 8px 44px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {entry.positions.map((p, i) => (
-                        <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center', background: '#0e1e36', border: '1px solid #1e3d62', borderRadius: 6, padding: '4px 8px' }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: '#e8edf2' }}>{p.ticker}</span>
-                          <span style={{ fontSize: 10, color: p.pctGain >= 0 ? '#5eed8a' : '#F09595' }}>{p.pctGain >= 0 ? '+' : ''}{p.pctGain.toFixed(1)}%</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {leaderboard.length > 5 && (
-              <div style={{ fontSize: 10, fontWeight: 600, color: '#7B8CDE', textAlign: 'center', padding: '6px 0', cursor: 'pointer' }} onClick={() => setShowAllRankings(p => !p)}>
-                {showAllRankings ? 'Show less ▲' : `Show all ${leaderboard.length} ▼`}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* TODAY'S RACE */}
         <div style={s.raceCard}>
@@ -914,11 +1024,11 @@ export default function PortfolioTab({ session }) {
             {(() => {
               const sorted = [...leaderboard].sort((a, b) => b.pctReturn - a.pctReturn);
               const best = sorted[0]; const worst = sorted[sorted.length - 1];
-              if (!best) return <div style={{ fontSize: 11, color: '#5a7a9a' }}>Waiting for participants...</div>;
-              return (<div style={{ fontSize: 11, color: '#e8edf2', lineHeight: 1.6 }}>
-                <span style={{ color: '#5eed8a', fontWeight: 600 }}>▲ {best.username} +{best.pctReturn.toFixed(1)}%</span>
-                {best.positions?.[0] && <span style={{ color: '#5a7a9a' }}> — {best.positions[0].ticker}</span>}<br/>
-                {worst && worst.userId !== best.userId && (<><span style={{ color: '#F09595', fontWeight: 600 }}>▼ {worst.username} {worst.pctReturn >= 0 ? '+' : ''}{worst.pctReturn.toFixed(1)}%</span>{worst.positions?.[0] && <span style={{ color: '#5a7a9a' }}> — {worst.positions[0].ticker}</span>}</>)}
+              if (!best) return <div style={{ fontSize: 11, color: t.text3 }}>Waiting for participants...</div>;
+              return (<div style={{ fontSize: 11, color: t.text1, lineHeight: 1.6 }}>
+                <span style={{ color: t.green, fontWeight: 600 }}>▲ {best.username} +{best.pctReturn.toFixed(1)}%</span>
+                {best.positions?.[0] && <span style={{ color: t.text3 }}> — {best.positions[0].ticker}</span>}<br/>
+                {worst && worst.userId !== best.userId && (<><span style={{ color: t.red, fontWeight: 600 }}>▼ {worst.username} {worst.pctReturn >= 0 ? '+' : ''}{worst.pctReturn.toFixed(1)}%</span>{worst.positions?.[0] && <span style={{ color: t.text3 }}> — {worst.positions[0].ticker}</span>}</>)}
               </div>);
             })()}
           </div>
@@ -926,10 +1036,10 @@ export default function PortfolioTab({ session }) {
 
         {/* DAILY LEARN */}
         <div style={s.learnCard}>
-          <div style={s.learnCardHdr}><span style={{ fontSize: 9, fontWeight: 700, color: '#8B5CF6' }}>💡 LEARN</span></div>
+          <div style={s.learnCardHdr}><span style={{ fontSize: 9, fontWeight: 700, color: t.purple }}>💡 LEARN</span></div>
           <div style={s.learnCardBody}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#e8edf2', marginBottom: 3 }}>{trades.length === 0 ? 'What is a stock ticker?' : 'When to cut your losses'}</div>
-            <div style={{ fontSize: 11, color: '#5a7a9a', lineHeight: 1.6 }}>{trades.length === 0 ? "A short code for a company. AAPL = Apple, NVDA = Nvidia, TSLA = Tesla. Tap Join above to pick your first stock!" : "Most pros set a stop at 15-20%. If a stock drops that much from your buy price, consider whether your original thesis still holds."}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: t.text1, marginBottom: 3 }}>{trades.length === 0 ? 'What is a stock ticker?' : 'When to cut your losses'}</div>
+            <div style={{ fontSize: 11, color: t.text3, lineHeight: 1.6 }}>{trades.length === 0 ? "A short code for a company. AAPL = Apple, NVDA = Nvidia, TSLA = Tesla. Tap Join above to pick your first stock!" : "Most pros set a stop at 15-20%. If a stock drops that much from your buy price, consider whether your original thesis still holds."}</div>
           </div>
         </div>
 
@@ -938,28 +1048,28 @@ export default function PortfolioTab({ session }) {
           <div style={s.smackHdr}><span>💬 Smack Talk</span><div style={s.smackLive}><div style={s.smackDot} /> LIVE</div></div>
           <div style={{ ...s.smackMsgs, maxHeight: 150 }}>
             {trashTalkMsgs.length === 0 ? (
-              <div style={{ fontSize: 11, color: '#5a7a9a', padding: '8px 0' }}>No smack yet — be the first</div>
+              <div style={{ fontSize: 11, color: t.text3, padding: '8px 0' }}>No smack yet — be the first</div>
             ) : trashTalkMsgs.map((m) => {
               const lbEntry = leaderboard.find(e => e.userId === m.user_id);
               const rank = lbEntry ? leaderboard.indexOf(lbEntry) + 1 : null;
               const tier = lbEntry ? getTier(lbEntry.pctReturn) : null;
-              const medalBg = rank === 1 ? 'linear-gradient(135deg,#FFD700,#e6a800)' : rank === 2 ? 'linear-gradient(135deg,#C0C0C0,#909090)' : rank === 3 ? 'linear-gradient(135deg,#CD7F32,#a0622d)' : '#d8e2ed';
+              const medalBg = rank === 1 ? t.medalGold : rank === 2 ? t.medalSilver : rank === 3 ? t.medalBronze : t.border;
               const rxns = chatReactions[m.id] || {};
               return (
                 <div key={m.id} style={s.smackMsg}>
                   <div style={s.smackMsgTop}>
-                    <div style={{ ...s.smackAv, background: medalBg, color: rank && rank <= 3 ? '#fff' : '#5a7a9a' }}>{(m.profiles?.username || '?')[0].toUpperCase()}</div>
+                    <div style={{ ...s.smackAv, background: medalBg, color: rank && rank <= 3 ? '#fff' : t.text3 }}>{(m.profiles?.username || '?')[0].toUpperCase()}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: '#e8edf2' }}>{m.profiles?.username || 'Anon'}</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: t.text1 }}>{m.profiles?.username || 'Anon'}</span>
                         {tier && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: tier.bg, color: tier.color, fontWeight: 500 }}>{tier.short}</span>}
-                        <span style={{ fontSize: 9, color: '#5a7a9a', marginLeft: 'auto' }}>{timeAgo(m.created_at)}</span>
+                        <span style={{ fontSize: 9, color: t.text3, marginLeft: 'auto' }}>{timeAgo(m.created_at)}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: '#e8edf2', lineHeight: 1.35, marginTop: 2 }}>{m.message}</div>
+                      <div style={{ fontSize: 12, color: t.text1, lineHeight: 1.35, marginTop: 2 }}>{m.message}</div>
                     </div>
                   </div>
                   <div style={s.rxnRow}>
-                    {REACTIONS.map(r => { const users = rxns[r.label] || []; const myReacted = users.includes(session?.user?.id); if (users.length === 0 && !myReacted) return null; return (<div key={r.label} style={{ ...s.rxnPill, ...(myReacted ? s.rxnLit : {}) }} onClick={() => toggleReaction(m.id, r.label)}><span style={{ fontSize: 12 }}>{r.emoji}</span><span style={{ ...s.rxnCt, ...(myReacted ? { color: '#5eed8a' } : {}) }}>{users.length}</span></div>); })}
+                    {REACTIONS.map(r => { const users = rxns[r.label] || []; const myReacted = users.includes(session?.user?.id); if (users.length === 0 && !myReacted) return null; return (<div key={r.label} style={{ ...s.rxnPill, ...(myReacted ? s.rxnLit : {}) }} onClick={() => toggleReaction(m.id, r.label)}><span style={{ fontSize: 12 }}>{r.emoji}</span><span style={{ ...s.rxnCt, ...(myReacted ? { color: t.green } : {}) }}>{users.length}</span></div>); })}
                     <div style={s.rxnAdd} onClick={() => { const firstUnused = REACTIONS.find(r => !(rxns[r.label] || []).includes(session?.user?.id)); if (firstUnused) toggleReaction(m.id, firstUnused.label); }}>+</div>
                   </div>
                 </div>
@@ -980,138 +1090,3 @@ export default function PortfolioTab({ session }) {
     </div>
   );
 }
-
-// ═══════════════════════════════════════════
-// STYLES
-// ═══════════════════════════════════════════
-const s = {
-  scroll: { flex: 1, overflowY: 'auto', background: '#0a1628' },
-
-  // Top bar — new user
-  barNew: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#132d52', border: '1px solid rgba(140,217,160,0.15)', borderRadius: 10, marginTop: 8, marginBottom: 8 },
-  barNewText: { flex: 1 },
-  barNewTitle: { fontSize: 12, fontWeight: 700, color: '#e8edf2' },
-  barNewSub: { fontSize: 10, color: '#5a7a9a', marginTop: 2 },
-  barNewBtn: { background: '#5eed8a', color: '#0a1628', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
-  // Top bar — active user
-  barActive: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#132d52', border: '1px solid #1e3d62', borderRadius: 10, marginTop: 8, marginBottom: 8 },
-  barRank: { width: 30, height: 30, borderRadius: '50%', background: 'rgba(140,217,160,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  barRankText: { fontSize: 13, fontWeight: 800, color: '#5eed8a' },
-  barStats: { flex: 1 },
-  barStatsTop: { display: 'flex', alignItems: 'center', gap: 6 },
-  barStatsBottom: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#5a7a9a', marginTop: 2, flexWrap: 'wrap' },
-  barPortBtn: { background: 'rgba(140,217,160,0.1)', border: '1px solid rgba(140,217,160,0.3)', borderRadius: 8, padding: '6px 12px', fontSize: 10, fontWeight: 600, color: '#5eed8a', cursor: 'pointer', flexShrink: 0 },
-  barPortBtnOpen: { background: '#5eed8a', color: '#0a1628', borderColor: '#5eed8a' },
-  // Portfolio dropdown
-  portDrop: { background: '#132d52', borderRadius: 10, border: '1px solid #1e3d62', marginBottom: 8, overflow: 'hidden' },
-  portCash: { display: 'flex' },
-  portCashItem: { flex: 1, padding: '10px 8px', textAlign: 'center' },
-  portCashLabel: { fontSize: 9, color: '#5a7a9a', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.3 },
-  portCashVal: { fontSize: 15, fontWeight: 700, color: '#e8edf2', marginTop: 2 },
-  portSecLabel: { fontSize: 9, fontWeight: 600, color: '#5a7a9a', textTransform: 'uppercase', letterSpacing: 0.4, padding: '8px 12px 4px', borderTop: '1px solid #1e3d62' },
-  portPos: { display: 'flex', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid #1e3d62' },
-  portPosTk: { fontSize: 13, fontWeight: 700, color: '#e8edf2', width: 48 },
-  portPosInfo: { flex: 1, fontSize: 11, color: '#5a7a9a' },
-  portPosSell: { fontSize: 10, fontWeight: 600, color: '#F09595', background: 'rgba(240,149,149,0.1)', border: '1px solid rgba(240,149,149,0.2)', padding: '5px 10px', borderRadius: 6, cursor: 'pointer', flexShrink: 0 },
-  portBuyRow: { display: 'flex', gap: 4, padding: '8px 12px', borderTop: '1px solid #1e3d62' },
-  portBuyInput: { flex: 1, background: '#0e1e36', border: '1px solid #1e3d62', borderRadius: 6, padding: '7px 8px', fontSize: 11, fontWeight: 600, color: '#e8edf2', fontFamily: 'var(--font)', outline: 'none', letterSpacing: 0.4 },
-  portBuyBtn: { background: '#5eed8a', color: '#0a1628', border: 'none', borderRadius: 6, padding: '7px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 },
-  portSearchRow: { padding: '8px 12px', borderBottom: '1px solid #1e3d62', cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' },
-  portHistToggle: { fontSize: 10, fontWeight: 600, color: '#7B8CDE', textAlign: 'center', padding: '8px 12px', cursor: 'pointer', borderTop: '1px solid #1e3d62' },
-  // Preset buy styles (kept)
-  presetBtnSm: { flex: 1, padding: '6px 0', borderRadius: 5, border: '1px solid var(--green-btn)', background: 'transparent', fontSize: 11, fontWeight: 600, color: 'var(--green-btn)', cursor: 'pointer', fontFamily: 'var(--font)' },
-  otherBtnSm: { flex: 1, padding: '6px 0', borderRadius: 5, border: '1px solid var(--border)', background: 'transparent', fontSize: 11, fontWeight: 600, color: 'var(--text2)', cursor: 'pointer', fontFamily: 'var(--font)' },
-  customWrapSm: { flex: 1, display: 'flex', alignItems: 'center', background: 'var(--card)', border: '1px solid var(--green-btn)', borderRadius: 5, padding: '0 6px' },
-  customInputSm: { flex: 1, border: 'none', background: 'transparent', padding: '6px 0', fontSize: 12, fontWeight: 600, color: 'var(--green-btn)', outline: 'none', fontFamily: 'var(--font)' },
-  customBuySm: { background: 'var(--green-btn)', color: '#fff', border: 'none', borderRadius: 5, padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' },
-  // Cards
-  raceCard: { background: '#132d52', borderRadius: 10, border: '1px solid #1e3d62', marginBottom: 8, overflow: 'hidden' },
-  raceCardHdr: { padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  raceCardTitle: { fontSize: 11, fontWeight: 700, color: '#e8edf2' },
-  raceCardSub: { fontSize: 9, color: '#5a7a9a' },
-  raceCardBody: { padding: '0 12px 10px' },
-  learnCard: { background: '#132d52', borderRadius: 10, border: '1px solid rgba(139,92,246,0.2)', marginBottom: 8, overflow: 'hidden' },
-  learnCardHdr: { padding: '8px 12px 4px' },
-  learnCardBody: { padding: '0 12px 10px' },
-
-
-  // Loading
-  skeleton: { height: 52, borderRadius: 12, marginBottom: 10, background: '#0e1e36', animation: 'pulse 1.5s ease-in-out infinite' },
-
-  // ── Leaderboard v2: Race lanes ──
-  raceBg: {
-    margin: '0 0 8px 0', background: 'linear-gradient(135deg,#132d52,#1a3d6e)',
-    borderRadius: 12, padding: '10px 12px', position: 'relative', overflow: 'hidden',
-  },
-  raceTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  raceLabel: { fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 },
-  raceTimer: { display: 'flex', gap: 3, alignItems: 'center' },
-  rtBox: { background: 'rgba(255,255,255,0.1)', color: '#8cd9a0', fontSize: 10, fontWeight: 600, padding: '2px 4px', borderRadius: 3 },
-  rtSep: { color: 'rgba(255,255,255,0.3)', fontSize: 9 },
-  track: { display: 'flex', flexDirection: 'column', gap: 10 },
-  lane: {
-    display: 'flex', alignItems: 'center', borderRadius: 6, padding: '0 8px', height: 28,
-    border: '1px solid transparent',
-  },
-  laneLeft: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flexShrink: 0 },
-  laneMedal: {
-    width: 18, height: 18, borderRadius: '50%', display: 'flex', alignItems: 'center',
-    justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fff', flexShrink: 0,
-  },
-  laneName: { fontSize: 12, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap' },
-  laneTier: { fontSize: 8, padding: '1px 5px', borderRadius: 2, fontWeight: 500, whiteSpace: 'nowrap' },
-  laneBarWrap: {
-    flex: 1, margin: '0 8px', height: 6, background: 'rgba(255,255,255,0.06)',
-    borderRadius: 3, overflow: 'hidden',
-  },
-  laneBar: { height: '100%', borderRadius: 3 },
-  lanePct: { fontSize: 13, fontWeight: 700, flexShrink: 0 },
-
-
-  // ── Rank rows ──
-  rankRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#132d52', border: '1px solid #1e3d62', borderRadius: 8, marginBottom: 4, cursor: 'pointer' },
-  rankNum: { fontSize: 12, fontWeight: 700, color: '#5a7a9a', width: 20, textAlign: 'center', flexShrink: 0 },
-
-
-  // ── Smack talk ──
-  smackWrap: { margin: '8px 16px 10px', background: '#132d52', borderRadius: 10, border: '1px solid #1e3d62', overflow: 'hidden' },
-  smackHdr: {
-    fontSize: 10, color: '#5a7a9a', textTransform: 'uppercase', letterSpacing: 0.4,
-    fontWeight: 500, padding: '8px 10px 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-  },
-  smackLive: {
-    fontSize: 8, color: '#5eed8a', background: 'rgba(94,237,138,0.1)', padding: '2px 6px',
-    borderRadius: 3, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3,
-  },
-  smackDot: { width: 5, height: 5, borderRadius: '50%', background: '#5eed8a' },
-  smackMsgs: { padding: '0 10px 6px', maxHeight: 200, overflowY: 'auto' },
-  smackMsg: { padding: '6px 0', borderTop: '1px solid #1e3d62' },
-  smackMsgTop: { display: 'flex', alignItems: 'flex-start', gap: 8 },
-  smackAv: {
-    width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center',
-    justifyContent: 'center', fontSize: 9, fontWeight: 700, flexShrink: 0,
-  },
-  rxnRow: { display: 'flex', gap: 4, marginTop: 5, marginLeft: 30 },
-  rxnPill: {
-    display: 'flex', alignItems: 'center', gap: 3, padding: '2px 7px',
-    borderRadius: 12, cursor: 'pointer', border: '0.5px solid #1e3d62',
-    background: '#0e1e36', fontSize: 11,
-  },
-  rxnLit: { background: 'rgba(94,237,138,0.1)', borderColor: '#5eed8a' },
-  rxnCt: { fontSize: 10, fontWeight: 600, color: '#5a7a9a' },
-  rxnAdd: {
-    padding: '2px 6px', borderRadius: 12, cursor: 'pointer', fontSize: 11,
-    border: '0.5px dashed #1e3d62', background: 'transparent', color: '#5a7a9a',
-    display: 'flex', alignItems: 'center', gap: 2,
-  },
-  smackInput: { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderTop: '1px solid #1e3d62', background: '#0e1e36' },
-  smackInputField: {
-    flex: 1, background: '#132d52', border: '1px solid #1e3d62',
-    borderRadius: 8, padding: '8px 10px', fontSize: 12, color: '#e8edf2',
-    fontFamily: 'var(--font)', outline: 'none',
-  },
-  smackSendBtn: {
-    background: '#5eed8a', color: '#0a1628', border: 'none', borderRadius: 8,
-    padding: '8px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
-  },
-};
