@@ -77,6 +77,14 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   const [researchLoading, setResearchLoading]   = useState(false);
   const [researchExpanded, setResearchExpanded] = useState(null);
   const [researchPrices, setResearchPrices]     = useState({});
+  const [showSectorDropdown, setShowSectorDropdown] = useState(false);
+
+  useEffect(() => {
+    if (!showSectorDropdown) return;
+    const handleClick = () => setShowSectorDropdown(false);
+    setTimeout(() => document.addEventListener('click', handleClick), 0);
+    return () => document.removeEventListener('click', handleClick);
+  }, [showSectorDropdown]);
 
   // ── Onboarding state (first-login flow) ──
   const [showOnboarding, setShowOnboarding]     = useState(false);
@@ -422,6 +430,17 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
       }
     })();
   }, []);
+
+  const sectorLabels = (() => {
+    const SHORT = { 'Communication Services': 'Communication', 'Communication': 'Communication', 'Consumer Discretionary': 'Consumer', 'Consumer Cyclical': 'Consumer', 'Consumer Defensive': 'Consumer', 'Consumer Staples': 'Consumer', 'Information Technology': 'Tech', 'Technology': 'Tech', 'Industrials': 'Industrial', 'Industrial': 'Industrial', 'Financial Services': 'Finance', 'Finance': 'Finance', 'Real Estate': 'Real Estate', 'RealEstate': 'Real Estate', 'Basic Materials': 'Materials', 'Materials': 'Materials' };
+    const seen = new Set();
+    return researchSectors.filter(sec => sec !== 'Auto' && sec !== 'ETF').filter(sec => {
+      const label = SHORT[sec] || sec;
+      if (seen.has(label)) return false;
+      seen.add(label);
+      return true;
+    }).map(sec => SHORT[sec] || sec);
+  })();
 
   const loadResearch = async (sector) => {
     setResearchSector(sector);
@@ -1278,240 +1297,215 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
 
         <div style={S.sectionDivider} />
 
-        {/* ── SECTOR RESEARCH ── */}
-        <div style={S.resSection}>
-          <div style={S.resHeader}>
-            <span style={S.resTitle}>Sector Research</span>
-            <span style={S.resSub}>Top 15 Ranked</span>
+        {/* ── STOCKS ── */}
+        <div style={S.stocksSection}>
+          <div style={S.stocksHeader}>
+            <span style={S.stocksTitle}>Stocks</span>
           </div>
-
-          {/* Sector pills — "My List" first, then dynamic from DB, deduplicated by short label */}
-          <div style={S.resPills}>
-            {/* My List pill — always first */}
+          <div style={S.stocksBtns}>
             <div
-              style={{ ...S.resPill, ...(researchSector === '__mylist__' ? S.resPillActive : {}) }}
+              style={{ ...S.stocksBtn, ...(researchSector === '__mylist__' ? S.stocksBtnActive : {}) }}
               onClick={() => {
                 if (researchSector === '__mylist__') {
                   setResearchSector(null);
                   setResearchStocks([]);
                 } else {
+                  setShowSectorDropdown(false);
                   setResearchSector('__mylist__');
                   setResearchExpanded(null);
-                  // Load watchlist stocks into research format
                   const wlStocks = watchlist.map((w, i) => ({
-                    id: w.id,
-                    ticker: w.symbol,
-                    ranking: i + 1,
-                    score: null,
-                    thesis: null,
-                    notes: null,
-                    _isWatchlist: true,
+                    id: w.id, ticker: w.symbol, ranking: i + 1,
+                    score: null, thesis: null, notes: null, _isWatchlist: true,
                   }));
                   setResearchStocks(wlStocks);
-                  // Fetch prices for watchlist tickers
-                  if (watchlist.length > 0) {
-                    fetchResearchPrices(watchlist.map(w => w.symbol));
-                  }
+                  if (watchlist.length > 0) fetchResearchPrices(watchlist.map(w => w.symbol));
                 }
               }}
             >
               My List{hasWatchlist ? ` (${watchlist.length})` : ''}
             </div>
-            {(() => {
-              const SHORT = { 'Communication Services': 'Communication', 'Communication': 'Communication', 'Consumer Discretionary': 'Consumer', 'Consumer Cyclical': 'Consumer', 'Consumer Defensive': 'Consumer', 'Consumer Staples': 'Consumer', 'Information Technology': 'Tech', 'Technology': 'Tech', 'Industrials': 'Industrial', 'Industrial': 'Industrial', 'Financial Services': 'Finance', 'Finance': 'Finance', 'Real Estate': 'Real Estate', 'RealEstate': 'Real Estate', 'Basic Materials': 'Materials', 'Materials': 'Materials' };
-              const seen = new Set();
-              return researchSectors.filter(sec => sec !== 'Auto' && sec !== 'ETF').filter(sec => {
-                const label = SHORT[sec] || sec;
-                if (seen.has(label)) return false;
-                seen.add(label);
-                return true;
-              }).map(sec => {
-                const label = SHORT[sec] || sec;
-                return (
-                <div
-                  key={sec}
-                  style={{ ...S.resPill, ...(researchSector === label ? S.resPillActive : {}) }}
-                  onClick={() => researchSector === label ? (setResearchSector(null), setResearchStocks([])) : loadResearch(label)}
-                >
-                  {label}
+            <div style={{ position: 'relative' }}>
+              <div
+                style={{ ...S.stocksBtn, ...(researchSector && researchSector !== '__mylist__' ? S.stocksBtnActive : {}), ...(showSectorDropdown ? S.stocksBtnActive : {}) }}
+                onClick={() => {
+                  if (showSectorDropdown) {
+                    setShowSectorDropdown(false);
+                  } else {
+                    setShowSectorDropdown(true);
+                    if (researchSector === '__mylist__') {
+                      setResearchSector(null);
+                      setResearchStocks([]);
+                    }
+                  }
+                }}
+              >
+                {researchSector && researchSector !== '__mylist__' ? `${researchSector} ▼` : 'Sectors ▼'}
+              </div>
+              {showSectorDropdown && (
+                <div style={S.sectorDropdown}>
+                  {sectorLabels.map(label => (
+                    <div
+                      key={label}
+                      style={{ ...S.sectorDropItem, ...(researchSector === label ? { color: '#1AAD5E', fontWeight: 600 } : {}) }}
+                      onClick={() => {
+                        setShowSectorDropdown(false);
+                        loadResearch(label);
+                      }}
+                    >
+                      {label}{researchSector === label ? ' ✓' : ''}
+                    </div>
+                  ))}
                 </div>
-              );
-              })
-            })()}
+              )}
+            </div>
           </div>
 
-          {/* Results */}
           {researchSector && (
-            <div style={{ ...S.resCard, ...(researchSector === '__mylist__' ? { borderRadius: '12px 12px 0 0' } : {}) }}>
-              {researchLoading ? (
-                <div style={{ padding: 16, textAlign: 'center', color: '#7a8ea3', fontSize: 13 }}>Loading...</div>
-              ) : researchStocks.length === 0 ? (
-                researchSector === '__mylist__' ? (
-                  /* Empty watchlist state */
-                  <div style={{ padding: '20px 16px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 13, color: '#7a8ea3', marginBottom: 10 }}>No tickers in your list yet</div>
-                    <div style={S.wlPopRow}>
-                      <span style={S.wlPopLabel}>Popular:</span>
-                      {POPULAR_TICKERS.map(t => (
-                        <span key={t} style={{ ...S.wlPopChip, ...(addingTicker === t ? { opacity: 0.5 } : {}) }} onClick={() => addToWatchlist(t)}>{t}</span>
-                      ))}
-                    </div>
-                  </div>
+            <div style={S.stocksCard}>
+              <div style={S.stocksHeaderRow}>
+                {researchSector === '__mylist__' ? (
+                  <>
+                    <span style={{ ...S.stocksColLabel, flex: 1 }}>Ticker</span>
+                    <span style={{ ...S.stocksColLabel, width: 60, textAlign: 'right' }}>Price</span>
+                    <span style={{ ...S.stocksColLabel, width: 60, textAlign: 'right' }}>Chg%</span>
+                    <span style={{ width: 24 }}></span>
+                  </>
                 ) : (
-                  <div style={{ padding: 16, textAlign: 'center', color: '#7a8ea3', fontSize: 13 }}>
-                    No rankings available for {researchSector} yet
-                  </div>
-                )
-              ) : (
-                <>
-                  {/* Column headers — different for My List vs Sector */}
-                  <div style={S.resHeaderRow}>
-                    {researchSector === '__mylist__' ? (
-                      <>
-                        <span style={{ ...S.resColTicker, flex: 1 }}>Ticker</span>
-                        <span style={{ ...S.resColPrice, flex: 'none', minWidth: 70, textAlign: 'right' }}>Price</span>
-                        <span style={{ ...S.resColScore, flex: 'none', minWidth: 80, textAlign: 'right' }}>CHG%</span>
-                        <span style={{ minWidth: 28 }}></span>
-                      </>
-                    ) : (
-                      <>
-                        <span style={S.resColRank}>Rank</span>
-                        <span style={S.resColTicker}>Ticker</span>
-                        <span style={S.resColScore}>Score</span>
-                        <span style={S.resColPrice}>Price</span>
-                      </>
-                    )}
-                  </div>
-                  {researchStocks.map((stock, i) => {
+                  <>
+                    <span style={{ ...S.stocksColLabel, width: 28 }}>Rank</span>
+                    <span style={{ ...S.stocksColLabel, flex: 1 }}>Ticker</span>
+                    <span style={{ ...S.stocksColLabel, flex: 1, textAlign: 'center' }}>Score</span>
+                    <span style={{ ...S.stocksColLabel, width: 60, textAlign: 'right' }}>Price</span>
+                  </>
+                )}
+              </div>
+
+              <div style={S.stocksScroll}>
+                {researchLoading ? (
+                  <div style={{ padding: 16, textAlign: 'center', color: '#7a8ea3', fontSize: 13 }}>Loading...</div>
+                ) : researchStocks.length === 0 ? (
+                  researchSector === '__mylist__' ? (
+                    <div style={{ padding: '16px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 13, color: '#7a8ea3', marginBottom: 10 }}>No tickers in your list yet</div>
+                      <div style={S.wlPopRow}>
+                        <span style={S.wlPopLabel}>Popular:</span>
+                        {POPULAR_TICKERS.map(t => (
+                          <span key={t} style={{ ...S.wlPopChip, ...(addingTicker === t ? { opacity: 0.5 } : {}) }} onClick={() => addToWatchlist(t)}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ padding: 16, textAlign: 'center', color: '#7a8ea3', fontSize: 13 }}>
+                      No rankings available for {researchSector} yet
+                    </div>
+                  )
+                ) : (
+                  researchStocks.map((stock, i) => {
                     const isOpen = researchExpanded === stock.id;
                     const isMyList = researchSector === '__mylist__';
                     const priceData = researchPrices[stock.ticker];
                     const chg = priceData?.change;
                     const isUp = chg > 0;
                     return (
-                      <div key={stock.id} style={S.resRow}>
-                        <div style={S.resRowTop} onClick={() => !isMyList && setResearchExpanded(isOpen ? null : stock.id)}>
+                      <div key={stock.id}>
+                        <div
+                          style={{ ...S.stocksRow, ...(isOpen ? { background: '#f8fafc' } : {}) }}
+                          onClick={() => !isMyList && setResearchExpanded(isOpen ? null : stock.id)}
+                        >
                           {isMyList ? (
                             <>
-                              <span style={{ ...S.resTicker, flex: 1 }}>{stock.ticker}</span>
-                              <span style={{ ...S.resPrice, flex: 'none', minWidth: 70 }}>
+                              <span style={{ ...S.stocksRowTk, flex: 1 }}>{stock.ticker}</span>
+                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, color: '#7a8ea3' }}>
                                 {priceData ? `$${priceData.price.toFixed(2)}` : '—'}
                               </span>
-                              <span style={{ flex: 'none', minWidth: 80, textAlign: 'right' }}>
-                                {priceData ? (
-                                  <span style={{
-                                    fontSize: 12, fontWeight: 600,
-                                    color: isUp ? '#1AAD5E' : chg < 0 ? '#e05252' : '#5a7080',
-                                  }}>
-                                    {isUp ? '▲' : chg < 0 ? '▼' : ''}{chg != null ? `${isUp ? '+' : ''}${chg.toFixed(2)}%` : '—'}
-                                  </span>
-                                ) : (
-                                  <span style={{ fontSize: 12, color: '#7a8ea3' }}>—</span>
-                                )}
+                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, fontWeight: 600, color: isUp ? '#1AAD5E' : chg < 0 ? '#e05252' : '#7a8ea3' }}>
+                                {chg != null ? `${isUp ? '+' : ''}${chg.toFixed(2)}%` : '—'}
                               </span>
                               <span
-                                style={S.wlRemoveBtn}
+                                style={{ width: 24, textAlign: 'center', fontSize: 14, color: '#d8e2ed', cursor: 'pointer' }}
                                 onClick={(e) => { e.stopPropagation(); removeFromWatchlist(stock.id, stock.ticker); }}
-                                title="Remove"
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1AAD5E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
-                                </svg>
-                              </span>
+                              >×</span>
                             </>
                           ) : (
                             <>
-                              <span style={S.resRank}>#{stock.ranking}</span>
-                              <span style={S.resTicker}>{stock.ticker}</span>
-                              <span style={S.resScoreWrap}>
-                                <span style={S.resChev}>{isOpen ? '▲' : '▼'}</span>
+                              <span style={{ width: 28, fontSize: 11, fontWeight: 700, color: '#7a8ea3' }}>#{stock.ranking}</span>
+                              <span style={{ ...S.stocksRowTk, flex: 1 }}>{stock.ticker}</span>
+                              <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
                                 {stock.score != null && (
                                   <span style={{
-                                    ...S.resScoreBadge,
+                                    fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
                                     background: stock.score >= 70 ? 'rgba(140,217,160,0.15)' : stock.score >= 50 ? 'rgba(255,193,7,0.15)' : 'rgba(224,82,82,0.1)',
                                     color: stock.score >= 70 ? '#1AAD5E' : stock.score >= 50 ? '#b8860b' : '#e05252',
                                   }}>{stock.score}</span>
                                 )}
+                                <span style={{ fontSize: 10, color: '#d8e2ed' }}>{isOpen ? '▲' : '▼'}</span>
                               </span>
-                              <span style={S.resPrice}>
+                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, color: '#7a8ea3' }}>
                                 {priceData ? `$${priceData.price.toFixed(2)}` : '—'}
                               </span>
                             </>
                           )}
                         </div>
                         {!isMyList && isOpen && (
-                          <div style={S.resExpandedBody}>
-                            {stock.notes && (
-                              <div style={S.resMetrics}>{stock.notes}</div>
-                            )}
-                            {stock.thesis && (
-                              <div style={S.resThesis}>{stock.thesis}</div>
-                            )}
-                            {!stock.thesis && !stock.notes && (
-                              <div style={{ ...S.resThesis, fontStyle: 'italic', color: '#7a8ea3' }}>No analysis available yet</div>
-                            )}
+                          <div style={S.stocksExpand}>
+                            {stock.notes && <div style={{ fontSize: 11, color: '#1a2d4a', lineHeight: 1.5 }}>{stock.notes}</div>}
+                            {stock.thesis && <div style={{ fontSize: 11, color: '#5a6f85', lineHeight: 1.5, marginTop: 4 }}>{stock.thesis}</div>}
+                            {!stock.thesis && !stock.notes && <div style={{ fontSize: 11, color: '#7a8ea3', fontStyle: 'italic' }}>No analysis available yet</div>}
                           </div>
                         )}
                       </div>
                     );
-                  })}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Add ticker search — below the card, always visible when My List is active */}
-          {researchSector === '__mylist__' && (
-            <div style={S.wlAddSection}>
-              <div style={S.wlAddSearchBar} onClick={() => { if (!showSearch) setShowSearch(true); }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a8ea3" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-                {showSearch ? (
-                  <input
-                    ref={searchRef}
-                    style={S.searchInputLight}
-                    placeholder="Search ticker or company..."
-                    value={searchQuery}
-                    onChange={e => handleSearchChange(e.target.value)}
-                    autoFocus
-                  />
-                ) : (
-                  <span style={{ fontSize: 12, color: '#7a8ea3' }}>+ Add ticker...</span>
+                  })
                 )}
-                {showSearch && searchQuery && (
-                  <span style={{ color: '#7a8ea3', cursor: 'pointer', fontSize: 16 }} onClick={(e) => { e.stopPropagation(); setSearchQuery(''); setSearchResults([]); }}>×</span>
-                )}
-                <span
-                  style={S.wlAddBtn}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (showSearch) {
-                      setShowSearch(false); setSearchQuery(''); setSearchResults([]);
-                    } else {
-                      setShowSearch(true);
-                    }
-                  }}
-                >
-                  {showSearch ? 'Done' : '+ Add'}
-                </span>
               </div>
-              {showSearch && searchResults.length > 0 && (
-                <div style={{ marginTop: 6 }}>
+
+              {researchSector === '__mylist__' && (
+                <div style={S.stocksAddBar}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a8ea3" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                  {showSearch ? (
+                    <input
+                      ref={searchRef}
+                      style={S.stocksAddInput}
+                      placeholder="Search ticker or company..."
+                      value={searchQuery}
+                      onChange={e => handleSearchChange(e.target.value)}
+                      autoFocus
+                    />
+                  ) : (
+                    <span style={{ fontSize: 12, color: '#7a8ea3', flex: 1, cursor: 'pointer' }} onClick={() => setShowSearch(true)}>+ Add ticker...</span>
+                  )}
+                  <span
+                    style={{ fontSize: 12, fontWeight: 600, color: '#1AAD5E', cursor: 'pointer' }}
+                    onClick={() => {
+                      if (showSearch) { setShowSearch(false); setSearchQuery(''); setSearchResults([]); }
+                      else setShowSearch(true);
+                    }}
+                  >{showSearch ? 'Done' : '+ Add'}</span>
+                </div>
+              )}
+
+              {researchSector === '__mylist__' && showSearch && searchResults.length > 0 && (
+                <div style={{ maxHeight: 120, overflowY: 'auto', borderTop: '1px solid #f0f4f8' }}>
                   {searchResults.map(r => (
-                    <div key={r.symbol} style={S.searchItemLight}>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2d4a' }}>{r.symbol}</div>
-                        <div style={{ fontSize: 10, color: '#7a8ea3' }}>{r.name}</div>
+                    <div key={r.symbol} style={{ display: 'flex', alignItems: 'center', padding: '6px 12px', borderBottom: '1px solid #f5f7fa' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#1a2d4a' }}>{r.symbol}</div>
+                        <div style={{ fontSize: 9, color: '#7a8ea3' }}>{r.name}</div>
                       </div>
                       {r.alreadyAdded ? (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: '#7a8ea3', padding: '4px 12px' }}>Added ✓</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#7a8ea3' }}>Added ✓</span>
                       ) : (
-                        <button style={S.siAddBtnLight} onClick={() => { addToWatchlist(r.symbol); setSearchResults(prev => prev.map(s => s.symbol === r.symbol ? { ...s, alreadyAdded: true } : s)); }}>+ Add</button>
+                        <button style={{ background: '#1AAD5E', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                          onClick={() => { addToWatchlist(r.symbol); setSearchResults(prev => prev.map(s => s.symbol === r.symbol ? { ...s, alreadyAdded: true } : s)); }}
+                        >+ Add</button>
                       )}
                     </div>
                   ))}
                 </div>
               )}
-              {showSearch && searchLoading && <div style={{ padding: '6px 0', fontSize: 11, color: '#7a8ea3', textAlign: 'center' }}>Searching...</div>}
+              {researchSector === '__mylist__' && showSearch && searchLoading && (
+                <div style={{ padding: '6px 0', fontSize: 11, color: '#7a8ea3', textAlign: 'center' }}>Searching...</div>
+              )}
             </div>
           )}
         </div>
@@ -1978,51 +1972,57 @@ const S = {
   bfLink: { color: '#1AAD5E', fontSize: 12, fontWeight: 600, textDecoration: 'none', flexShrink: 0 },
   briefEmpty: { background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 12, padding: 16, textAlign: 'center', fontSize: 13, color: '#7a8ea3' },
 
-  // ── Research section ──
-  resSection: { padding: '12px 14px 8px' },
-  resHeader: { display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 },
-  resTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', letterSpacing: '-0.01em' },
-  resSub: { fontSize: 11, color: '#7a8ea3', fontWeight: 500 },
-  resPills: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
-  resPill: {
-    padding: '5px 12px', borderRadius: 14, fontSize: 12, fontWeight: 500,
-    cursor: 'pointer', border: '1px solid #8cd9a0', background: 'rgba(140,217,160,0.08)', color: '#1AAD5E',
+  // ── Stocks section (inline) ──
+  stocksSection: { padding: '0 16px 8px' },
+  stocksHeader: { marginBottom: 6 },
+  stocksTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', fontFamily: "'Outfit', sans-serif" },
+  stocksBtns: { display: 'flex', gap: 8 },
+  stocksBtn: {
+    padding: '7px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+    cursor: 'pointer', border: '1px solid #8cd9a0', background: 'rgba(140,217,160,0.08)',
+    color: '#1AAD5E', fontFamily: "'DM Sans', sans-serif",
   },
-  resPillActive: { background: '#1AAD5E', color: '#fff', borderColor: '#1AAD5E' },
-  resCard: {
-    background: '#fff', border: '1px solid #d8e2ed', borderRadius: 12,
-    maxHeight: 260, overflowY: 'auto',
+  stocksBtnActive: { background: '#1AAD5E', color: '#fff', borderColor: '#1AAD5E' },
+  sectorDropdown: {
+    position: 'absolute', left: 0, top: '100%', marginTop: 4,
+    background: '#fff', border: '1px solid #d8e2ed', borderRadius: 10,
+    boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden',
+    zIndex: 100, minWidth: 140,
   },
-  resRow: {
-    padding: '8px 12px', borderBottom: '1px solid #f5f7fa', cursor: 'pointer',
+  sectorDropItem: {
+    padding: '10px 16px', fontSize: 13, color: '#1a2d4a', cursor: 'pointer',
+    borderBottom: '1px solid #f5f7fa', fontFamily: "'DM Sans', sans-serif",
   },
-  resRowTop: {
-    display: 'flex', alignItems: 'center', gap: 8,
+  stocksCard: {
+    background: '#fff', border: '1px solid #d8e2ed', borderRadius: 10,
+    overflow: 'hidden', marginTop: 8,
   },
-  resRank: { fontSize: 12, fontWeight: 700, color: '#7a8ea3', minWidth: 24 },
-  resTicker: { fontSize: 13, fontWeight: 700, color: '#1a2d4a', flex: 1 },
-  resScoreWrap: { flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4 },
-  resScoreBadge: {
-    fontSize: 12, fontWeight: 700, padding: '2px 10px', borderRadius: 8, textAlign: 'center',
+  stocksHeaderRow: {
+    display: 'flex', alignItems: 'center', padding: '6px 10px',
+    borderBottom: '1px solid #d8e2ed', background: '#fafbfc',
   },
-  resPrice: { fontSize: 13, fontWeight: 600, color: '#3a5068', minWidth: 70, textAlign: 'right' },
-  resHeaderRow: {
-    display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',
-    borderBottom: '1.5px solid #d8e2ed', background: '#f8fafc',
+  stocksColLabel: {
+    fontSize: 9, fontWeight: 600, color: '#7a8ea3',
+    textTransform: 'uppercase', letterSpacing: 0.5,
   },
-  resColRank: { fontSize: 11, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 24 },
-  resColTicker: { fontSize: 11, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: '0.05em', flex: 1 },
-  resColScore: { fontSize: 11, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 36, textAlign: 'center', flex: 1 },
-  resColPrice: { fontSize: 11, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 70, textAlign: 'right' },
-  resChev: { fontSize: 10, color: '#1AAD5E' },
-  resExpandedBody: {
-    padding: '6px 12px 8px 36px', background: '#f8fafc', borderTop: '1px solid #eef2f7',
+  stocksScroll: { maxHeight: 200, overflowY: 'auto' },
+  stocksRow: {
+    display: 'flex', alignItems: 'center', padding: '7px 10px',
+    borderBottom: '1px solid #f5f7fa', cursor: 'pointer',
   },
-  resMetrics: {
-    fontSize: 12, color: '#1AAD5E', fontWeight: 600, lineHeight: 1.5, marginBottom: 4,
+  stocksRowTk: { fontSize: 13, fontWeight: 600, color: '#1a2d4a' },
+  stocksExpand: {
+    padding: '8px 10px 8px 38px', background: '#f8fafc',
+    borderBottom: '1px solid #f0f4f8',
   },
-  resThesis: {
-    fontSize: 13, color: '#4a6178', lineHeight: 1.4,
+  stocksAddBar: {
+    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+    borderTop: '1px solid #d8e2ed', background: '#fafbfc',
+    borderRadius: '0 0 10px 10px',
+  },
+  stocksAddInput: {
+    flex: 1, border: 'none', outline: 'none', fontSize: 13,
+    color: '#1a2d4a', background: 'transparent', fontFamily: "'DM Sans', sans-serif",
   },
 
   // ── Chat section ──
@@ -2181,6 +2181,7 @@ const S = {
     border: '1px solid rgba(26,173,94,0.2)', borderRadius: 12, padding: '4px 12px', cursor: 'pointer',
     fontFamily: 'inherit',
   },
+
 };
 
 // ═══════════════════════════════════════
