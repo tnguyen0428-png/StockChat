@@ -20,10 +20,10 @@ export const SCREENER_TICKERS = [
   'BIIB','REGN','VRTX','MRNA','ILMN','A','IQV','DXCM','PODD','IDXX',
   // Finance
   'BRK.B','JPM','BAC','WFC','GS','MS','BLK','SCHW','AXP','COF',
-  'USB','PNC','TFC','SPGI','MCO','ICE','CME','MSCI','FIS','FISV',
-  'MA','V','PYPL','SQ','COIN',
+  'USB','PNC','TFC','SPGI','MCO','ICE','CME','MSCI','FIS','FI',
+  'MA','V','PYPL','XYZ','COIN',
   // Energy
-  'XOM','CVX','COP','EOG','SLB','MPC','PSX','VLO','OXY','PXD',
+  'XOM','CVX','COP','EOG','SLB','MPC','PSX','VLO','OXY',
   'HAL','DVN','FANG','HES','BKR','CTRA','EQT','APA','MRO','NOV',
   // Industrial
   'GE','HON','UPS','CAT','DE','LMT','RTX','NOC','GD','BA',
@@ -52,8 +52,8 @@ export const SCREENER_TICKERS = [
 export const SECTOR_MAP = {
   Tech:         ['AAPL','MSFT','NVDA','GOOGL','GOOG','META','AVGO','ORCL','AMD','QCOM','INTC','TXN','MU','AMAT','KLAC','LRCX','ADI','MCHP','SNPS','CDNS','FTNT','PANW','CRWD','ZS','SNOW','PLTR','NOW','CRM','ADBE','INTU','TEAM','WDAY','DDOG','HUBS','MDB','NET','VEEV','ROP','ANSS','PTC'],
   Healthcare:   ['LLY','UNH','JNJ','ABBV','MRK','TMO','ABT','DHR','BMY','AMGN','GILD','ISRG','SYK','BSX','MDT','ELV','CI','CVS','HUM','CNC','BIIB','REGN','VRTX','MRNA','ILMN','A','IQV','DXCM','PODD','IDXX'],
-  Finance:      ['BRK.B','JPM','BAC','WFC','GS','MS','BLK','SCHW','AXP','COF','USB','PNC','TFC','SPGI','MCO','ICE','CME','MSCI','FIS','FISV','MA','V','PYPL','SQ','COIN'],
-  Energy:       ['XOM','CVX','COP','EOG','SLB','MPC','PSX','VLO','OXY','PXD','HAL','DVN','FANG','HES','BKR','CTRA','EQT','APA','MRO','NOV'],
+  Finance:      ['BRK.B','JPM','BAC','WFC','GS','MS','BLK','SCHW','AXP','COF','USB','PNC','TFC','SPGI','MCO','ICE','CME','MSCI','FIS','FI','MA','V','PYPL','XYZ','COIN'],
+  Energy:       ['XOM','CVX','COP','EOG','SLB','MPC','PSX','VLO','OXY','HAL','DVN','FANG','HES','BKR','CTRA','EQT','APA','MRO','NOV'],
   Industrial:   ['GE','HON','UPS','CAT','DE','LMT','RTX','NOC','GD','BA','EMR','ETN','PH','ITW','ROK','XYL','IR','CARR','OTIS','TT','FDX','DAL','UAL','ALK','AAL','CSX','UNP','NSC','CHRW','EXPD'],
   Consumer:     ['AMZN','TSLA','HD','MCD','NKE','SBUX','TGT','WMT','COST','TJX','LOW','BKNG','MAR','HLT','YUM','DPZ','CMG','ROST','EBAY','ETSY','DKNG','ABNB','UBER','LYFT','DASH'],
   Communication:['NFLX','DIS','CHTR','TMUS','VZ','T','CMCSA','EA','TTWO','SNAP','PINS','RBLX','WBD','FOX','FOXA','LYV','MTCH','IPG','OMC'],
@@ -94,13 +94,19 @@ export async function scoreTicker(symbol) {
     const r = ratios[0];
     const p = profile[0];
 
+    // Sort earnings newest-first by date so eps[0] / eps[4] = "latest vs year ago"
+    // regardless of which order the API returns. FMP has flipped this in past versions.
+    const sortedEarnings = (earnings || [])
+      .filter(e => e.date)
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+
     // ── 1. Earnings score (30%) ──
-    const recentEarnings = (earnings || []).slice(0, 8).filter(e => e.epsActual != null && e.epsEstimated != null);
+    const recentEarnings = sortedEarnings.slice(0, 8).filter(e => e.epsActual != null && e.epsEstimated != null);
     const beats = recentEarnings.filter(e => e.epsActual >= e.epsEstimated).length;
     const beatRate = recentEarnings.length > 0 ? beats / recentEarnings.length : 0;
 
     // EPS growth (latest vs year ago)
-    const eps = (earnings || []).filter(e => e.epsActual != null);
+    const eps = sortedEarnings.filter(e => e.epsActual != null);
     const epsGrowth = eps.length >= 5 && eps[0]?.epsActual != null && eps[4]?.epsActual != null
       ? (eps[0].epsActual - eps[4].epsActual) / Math.abs(eps[4].epsActual || 1)
       : 0;
@@ -116,7 +122,7 @@ export async function scoreTicker(symbol) {
     const fundScore   = (marginScore * 0.6) + (debtScore * 0.4);
 
     // ── 3. Sales growth YOY (20%) ──
-    const revEarnings = (earnings || []).filter(e => e.revenueActual != null);
+    const revEarnings = sortedEarnings.filter(e => e.revenueActual != null);
     const salesGrowth = revEarnings.length >= 5 && revEarnings[0]?.revenueActual != null && revEarnings[4]?.revenueActual != null
       ? (revEarnings[0].revenueActual - revEarnings[4].revenueActual) / Math.abs(revEarnings[4].revenueActual || 1)
       : 0;

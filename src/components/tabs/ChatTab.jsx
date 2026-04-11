@@ -117,7 +117,7 @@ const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiv
     // Extract envelope JSON if present
     let card = null;
     let clean = raw;
-    const m = raw.match(/`{1,3}\s*uptik\s*([\s\S]*?)`{3}/i);
+    const m = raw.match(/```uptik\s*([\s\S]*?)```/i);
     if (m) {
       try {
         // Tolerate trailing commas / stray chars
@@ -280,6 +280,8 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const messagesAreaRef = useRef(null);
   const inputRef       = useRef(null);
   const sendingRef     = useRef(false);
+  const messagesRef    = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -351,7 +353,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const callAI = useCallback(async (query) => {
     setAiLoading(true);
     try {
-      const recentHistory = messages
+      const recentHistory = messagesRef.current
         .filter(m => m.type === 'user' || m.type === 'ai')
         .slice(-10)
         .map(m => ({
@@ -386,7 +388,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     } finally {
       setAiLoading(false);
     }
-  }, [group?.id, activeGroup?.name, profile?.username, watchlist, messages, aiLastTicker]);
+  }, [group?.id, activeGroup?.name, profile?.username, watchlist, aiLastTicker, session?.user?.id]);
 
   const handleSend = useCallback(async () => {
     if (sendingRef.current) return;
@@ -428,10 +430,11 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     }
   }, [inputText, aiMode, profile, group, isAdmin, callAI, session]);
 
-  const handleSendSticker = useCallback((sticker) => {
-    setInputText(prev => prev + sticker.emoji);
+  const appendToInput = useCallback((str) => {
+    setInputText(prev => prev + str);
     inputRef.current?.focus();
   }, []);
+  const handleSendSticker = useCallback((sticker) => appendToInput(sticker.emoji), [appendToInput]);
 
   const sendBroadcast = async () => {
     if (!broadcastText.trim() || sendingBroadcast) return;
@@ -454,10 +457,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  const addEmoji = (emoji) => {
-    setInputText(prev => prev + emoji);
-    inputRef.current?.focus();
-  };
+  const addEmoji = appendToInput;
 
   // ── Tap username to start DM ──
   const handleTapUsername = (userId, username) => {
@@ -626,8 +626,8 @@ const styles = {
     borderRadius: 10, padding: '8px 10px',
   },
   aiBody: {
-    background: '#F5F3FF',
-    border: '1px solid rgba(139,92,246,0.15)',
+    background: 'rgba(139,92,246,0.08)',
+    border: '1px solid rgba(139,92,246,0.2)',
     borderRadius: 10, padding: '8px 10px',
   },
   feedbackRow: {
@@ -657,7 +657,7 @@ const styles = {
     letterSpacing: '0.5px', border: '1px solid rgba(26,173,94,0.2)',
   },
   aiBadge: {
-    background: '#F5F3FF', color: '#8B5CF6',
+    background: 'rgba(139,92,246,0.15)', color: '#8B5CF6',
     fontSize: 11, fontWeight: 700, padding: '1px 6px',
     borderRadius: 3, textTransform: 'uppercase',
     letterSpacing: '0.5px', border: '1px solid rgba(139,92,246,0.2)',
@@ -667,7 +667,7 @@ const styles = {
     lineHeight: 1.6, wordBreak: 'break-word',
   },
   tickerMention: {
-    background: '#FFFBEB', color: '#D4A017',
+    background: 'rgba(212,160,23,0.12)', color: '#D4A017',
     fontSize: 14, fontWeight: 600,
     padding: '1px 6px', borderRadius: 4,
     border: '1px solid rgba(212,160,23,0.2)',

@@ -11,6 +11,7 @@ const UW_KEY  = import.meta.env.VITE_UW_API_KEY;
 const UW_BASE = 'https://api.unusualwhales.com';
 const TOP_N   = 4;
 const MIN_MARKET_CAP_B = 3;
+const FLOW_DEBUG = false; // flip to true for per-ticker filter logs
 
 // ── Excluded tickers (ETFs, indexes, leveraged) ────────────────────────────
 const EXCLUDED = new Set([
@@ -108,8 +109,8 @@ function parseOptionsFlow(raw) {
       trade_type: (t.option_activity_type || t.trade_type || t.type || '').toLowerCase() || null,
       sentiment: (t.sentiment || t.aggressor || '').toLowerCase() || null,
       strike, expiry, option_type: optionType, premium, size,
-      open_interest: isNaN(parseInt(t.open_interest, 10)) ? null : parseInt(t.open_interest, 10),
-      volume: isNaN(parseInt(t.volume || t.option_volume, 10)) ? null : parseInt(t.volume || t.option_volume, 10),
+      open_interest: (() => { const n = parseInt(t.open_interest, 10); return isNaN(n) ? null : n; })(),
+      volume: (() => { const n = parseInt(t.volume || t.option_volume, 10); return isNaN(n) ? null : n; })(),
       underlying_price: underlyingPrice,
       is_unusual: !!(t.is_unusual || t.unusual),
       is_otm: isOtm,
@@ -298,8 +299,7 @@ function scoreAndRank(options, darkpool, sectorMap, convictionMap) {
 
   const all = Array.from(tickerMap.values());
   console.log(`[Flow] Scoring: ${all.length} unique tickers in tickerMap`);
-  if (all.length > 0) {
-    // Debug: show top 10 before filtering
+  if (FLOW_DEBUG && all.length > 0) {
     const sorted = [...all].sort((a, b) => b.score - a.score).slice(0, 10);
     console.log('[Flow] Top 10 before filter:', sorted.map(t =>
       `${t.ticker}(score=${t.score}, opts=${t.optionsCount}, dp=${t.darkpoolCount}, excluded=${EXCLUDED.has(t.ticker)}, mcap=${t.marketCapB})`
@@ -308,12 +308,12 @@ function scoreAndRank(options, darkpool, sectorMap, convictionMap) {
 
   return all
     .filter(ts => {
-      if (ts.score <= 0) { console.log(`[Flow] FILTER OUT ${ts.ticker}: score=${ts.score} <= 0`); return false; }
-      if (EXCLUDED.has(ts.ticker)) { console.log(`[Flow] FILTER OUT ${ts.ticker}: excluded`); return false; }
+      if (ts.score <= 0) { if (FLOW_DEBUG) console.log(`[Flow] FILTER OUT ${ts.ticker}: score=${ts.score} <= 0`); return false; }
+      if (EXCLUDED.has(ts.ticker)) { if (FLOW_DEBUG) console.log(`[Flow] FILTER OUT ${ts.ticker}: excluded`); return false; }
       // Require options flow OR significant dark pool activity
-      if (ts.optionsCount < 1 && ts.darkpoolCount < 1) { console.log(`[Flow] FILTER OUT ${ts.ticker}: opts=${ts.optionsCount}, dp=${ts.darkpoolCount}`); return false; }
-      if (ts.marketCapB !== null && ts.marketCapB < MIN_MARKET_CAP_B) { console.log(`[Flow] FILTER OUT ${ts.ticker}: mcap=${ts.marketCapB} < ${MIN_MARKET_CAP_B}`); return false; }
-      console.log(`[Flow] PASS ${ts.ticker}: score=${ts.score}, opts=${ts.optionsCount}, dp=${ts.darkpoolCount}`);
+      if (ts.optionsCount < 1 && ts.darkpoolCount < 1) { if (FLOW_DEBUG) console.log(`[Flow] FILTER OUT ${ts.ticker}: opts=${ts.optionsCount}, dp=${ts.darkpoolCount}`); return false; }
+      if (ts.marketCapB !== null && ts.marketCapB < MIN_MARKET_CAP_B) { if (FLOW_DEBUG) console.log(`[Flow] FILTER OUT ${ts.ticker}: mcap=${ts.marketCapB} < ${MIN_MARKET_CAP_B}`); return false; }
+      if (FLOW_DEBUG) console.log(`[Flow] PASS ${ts.ticker}: score=${ts.score}, opts=${ts.optionsCount}, dp=${ts.darkpoolCount}`);
       return true;
     })
     .sort((a, b) => b.score - a.score);
@@ -341,7 +341,7 @@ export async function runFlowScan() {
   try {
     console.log('[Flow] Fetching options flow…');
     const flowData = await uwGet('/api/option-trades/flow-alerts');
-    const rawFlow = Array.isArray(flowData) ? flowData : (flowData.data || flowData.trades || []);
+    const rawFlow = Array.isArray(flowData) ? flowData : (flowData?.data || flowData?.trades || []);
     console.log(`[Flow] Raw options: ${rawFlow.length} trades`);
 
     if (rawFlow.length > 0) {
@@ -367,7 +367,7 @@ export async function runFlowScan() {
   try {
     console.log('[Flow] Fetching dark pool…');
     const dpData = await uwGet('/api/darkpool/recent');
-    const rawDp = Array.isArray(dpData) ? dpData : (dpData.data || dpData.trades || []);
+    const rawDp = Array.isArray(dpData) ? dpData : (dpData?.data || dpData?.trades || []);
     console.log(`[Flow] Raw dark pool: ${rawDp.length} trades`);
 
     if (rawDp.length > 0) {
@@ -393,22 +393,23 @@ export async function runFlowScan() {
     const today = new Date().toISOString().split('T')[0];
     const rollups = {};
 
-    for (const o of allOptions) {
-      if (EXCLUDED.has(o.ticker)) continue;
-      const key = `${o.ticker}:options:${today}`;
-      if (!rollups[key]) rollups[key] = { ticker: o.ticker, activity_type: 'options', trading_date: today, trade_count: 0, total_premium: 0, total_dp_value: 0, net_direction: 'neutral' };
-      rollups[key].trade_count++;
-      if (o.premium) rollups[key].total_premium += o.premium;
-      if (o.direction === 'bullish') rollups[key].net_direction = 'bullish';
-    }
-    for (const d of allDarkpool) {
-      if (EXCLUDED.has(d.ticker)) continue;
-      const key = `${d.ticker}:darkpool:${today}`;
-      if (!rollups[key]) rollups[key] = { ticker: d.ticker, activity_type: 'darkpool', trading_date: today, trade_count: 0, total_premium: 0, total_dp_value: 0, net_direction: 'neutral' };
-      rollups[key].trade_count++;
-      if (d.dollar_value) rollups[key].total_dp_value += d.dollar_value;
-      if (d.direction === 'buying') rollups[key].net_direction = 'bullish';
-    }
+    const addRollup = (ticker, activityType, item) => {
+      if (EXCLUDED.has(ticker)) return;
+      const key = `${ticker}:${activityType}:${today}`;
+      if (!rollups[key]) rollups[key] = { ticker, activity_type: activityType, trading_date: today, trade_count: 0, total_premium: 0, total_dp_value: 0, net_direction: 'neutral' };
+      const r = rollups[key];
+      r.trade_count++;
+      if (activityType === 'options') {
+        if (item.premium) r.total_premium += item.premium;
+        if (item.direction === 'bullish') r.net_direction = 'bullish';
+      } else {
+        if (item.dollar_value) r.total_dp_value += item.dollar_value;
+        if (item.direction === 'buying') r.net_direction = 'bullish';
+      }
+    };
+
+    for (const o of allOptions) addRollup(o.ticker, 'options', o);
+    for (const d of allDarkpool) addRollup(d.ticker, 'darkpool', d);
 
     const rows = Object.values(rollups);
     if (rows.length > 0) {

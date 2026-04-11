@@ -62,6 +62,10 @@ const COMPANY_TO_TICKER = {
   'bloom energy': 'BE', 'bloom': 'BE',
 };
 
+// Pre-computed for hot loops — avoid Object.entries() per call/per history message
+const COMPANY_ENTRIES = Object.entries(COMPANY_TO_TICKER);
+const COMPANY_ENTRIES_MULTI = COMPANY_ENTRIES.filter(([n]) => n.includes(' '));
+
 // Words that look like tickers but aren't — with exceptions for stock context
 const IGNORE_TICKERS = new Set(['AI', 'AM', 'PM', 'OK', 'US', 'CEO', 'IPO', 'ETF', 'GDP', 'FBI', 'USA', 'THE', 'FOR', 'AND', 'CAN', 'YOU', 'ARE', 'HOW', 'WHAT', 'WHY', 'IS', 'AT', 'IN', 'ON', 'TO', 'ME', 'MY', 'NO', 'YES', 'HI', 'HEY', 'UP', 'DO', 'IF', 'OR', 'SO', 'IT', 'BY', 'OF', 'AN', 'AS', 'GO', 'IM']);
 
@@ -101,7 +105,7 @@ export async function route(message, history = [], lastTicker = null) {
       const tickerInHistory = h.match(/\$([A-Z]{1,5})\b/);
       if (tickerInHistory?.[1]) return { agent: 'data', params: { ticker: tickerInHistory[1], needsTranscript: transcript } };
       const hLower = h.toLowerCase();
-      for (const [name, ticker] of Object.entries(COMPANY_TO_TICKER)) {
+      for (const [name, ticker] of COMPANY_ENTRIES) {
         if (hLower.includes(name)) return { agent: 'data', params: { ticker, needsTranscript: transcript } };
       }
       const bare = h.match(/\b([A-Z]{2,5})\b/);
@@ -125,8 +129,8 @@ export async function route(message, history = [], lastTicker = null) {
   }
 
   // 2. Check multi-word company names first (before single words)
-  for (const [name, ticker] of Object.entries(COMPANY_TO_TICKER)) {
-    if (name.includes(' ') && lower.includes(name.toLowerCase())) {
+  for (const [name, ticker] of COMPANY_ENTRIES_MULTI) {
+    if (lower.includes(name)) {
       return { agent: 'data', params: { ticker, needsTranscript: transcript } };
     }
   }
@@ -220,7 +224,8 @@ Respond: {"agent":"data or macro or knowledge","params":{"ticker":"SYMBOL or nul
       parsed.params.needsTranscript = true;
     }
     return parsed;
-  } catch {
+  } catch (e) {
+    console.warn('[Router] Haiku classifier failed:', e.message);
     return { agent: 'knowledge', params: { ticker: null } };
   }
 }
