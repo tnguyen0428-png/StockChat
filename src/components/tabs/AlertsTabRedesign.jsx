@@ -226,6 +226,20 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
     return [...seen.values()].slice(0, 8);
   }, [displayAlerts]);
 
+  const alertStats = useMemo(() => {
+    const total = alertHistory.length;
+    const byType = {};
+    alertHistory.forEach(a => {
+      const t = a.signal_type || 'vol_surge';
+      byType[t] = (byType[t] || 0) + 1;
+    });
+    const resolved = perfHistory.filter(h => h.return_pct != null);
+    const wins = resolved.filter(h => h.return_pct > 0).length;
+    const winRate = resolved.length > 0 ? Math.round((wins / resolved.length) * 100) : null;
+    const avgReturn = resolved.length > 0 ? resolved.reduce((s, h) => s + Number(h.return_pct), 0) / resolved.length : null;
+    return { total, byType, winRate, avgReturn, hasPerf: resolved.length > 0 };
+  }, [alertHistory, perfHistory]);
+
   const selectedAlert = selectedId ? uniqueAlerts.find(a => a.id === selectedId) : null;
   const marketOpen = isMarketOpen();
   const hasAlerts = uniqueAlerts.length > 0;
@@ -357,6 +371,39 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
           <div style={{ fontSize: 9, color: t.text3, lineHeight: 1.5 }}>
             Tap any chip above to see what triggered the alert
           </div>
+        </div>
+      )}
+
+      {/* ═══ STATS STRIP ═══ */}
+      {alertStats.total > 0 && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+          <div style={{ flex: 1, background: t.card, borderRadius: 8, padding: '8px 6px', textAlign: 'center', border: '1px solid ' + t.border }}>
+            <div style={{ fontSize: 7, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3, fontFamily: "'DM Sans', sans-serif" }}>Total alerts</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: t.text1, marginTop: 2, fontFamily: "'Outfit', sans-serif" }}>{alertStats.total}</div>
+          </div>
+          {alertStats.hasPerf ? (
+            <>
+              <div style={{ flex: 1, background: t.card, borderRadius: 8, padding: '8px 6px', textAlign: 'center', border: '1px solid ' + t.border }}>
+                <div style={{ fontSize: 7, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3 }}>Win rate</div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: alertStats.winRate >= 50 ? t.green : t.red, marginTop: 2, fontFamily: "'Outfit', sans-serif" }}>{alertStats.winRate}%</div>
+              </div>
+              <div style={{ flex: 1, background: t.card, borderRadius: 8, padding: '8px 6px', textAlign: 'center', border: '1px solid ' + t.border }}>
+                <div style={{ fontSize: 7, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3 }}>Avg return</div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: alertStats.avgReturn >= 0 ? t.green : t.red, marginTop: 2, fontFamily: "'Outfit', sans-serif" }}>{alertStats.avgReturn >= 0 ? '+' : ''}{alertStats.avgReturn.toFixed(1)}%</div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ flex: 1, background: t.card, borderRadius: 8, padding: '8px 6px', textAlign: 'center', border: '1px solid ' + t.border }}>
+                <div style={{ fontSize: 7, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3 }}>Breakouts</div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: '#fbbf24', marginTop: 2, fontFamily: "'Outfit', sans-serif" }}>{alertStats.byType['52w_high'] || 0}</div>
+              </div>
+              <div style={{ flex: 1, background: t.card, borderRadius: 8, padding: '8px 6px', textAlign: 'center', border: '1px solid ' + t.border }}>
+                <div style={{ fontSize: 7, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3 }}>Big money</div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: '#5eed8a', marginTop: 2, fontFamily: "'Outfit', sans-serif" }}>{alertStats.byType['flow_signal'] || 0}</div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
