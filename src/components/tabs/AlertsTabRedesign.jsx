@@ -147,6 +147,7 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
   const [selectedId, setSelectedId] = useState(null);
   const [perfHistory, setPerfHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [alertHistory, setAlertHistory] = useState([]);
 
   useEffect(() => {
     const load = async () => {
@@ -199,6 +200,17 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
         else if (row.key === 'vix_score' && !data.some(r => r.key === 'fear_greed')) setFearScore(row.value?.score ?? null);
       });
     });
+  }, []);
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('breakout_alerts')
+        .select('id, ticker, signal_type, price, change_pct, created_at')
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (data) setAlertHistory(data);
+    };
+    load();
   }, []);
 
   const displayAlerts = useMemo(() => {
@@ -351,23 +363,25 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
       {/* ═══ EDUCATION — always visible ═══ */}
       <EducationZone t={t} />
 
-      {/* ═══ HISTORY ═══ */}
-      {historyRows.length > 0 && (
-        <div style={{ background: t.card, borderRadius: 10, border: `1px solid ${t.border}`, overflow: 'hidden' }}>
+      {/* ═══ ALERT HISTORY ═══ */}
+      {alertHistory.length > 0 && (
+        <div style={{ background: t.card, borderRadius: 10, border: '1px solid ' + t.border, overflow: 'hidden', marginTop: 10 }}>
           <div style={{ padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 9, fontWeight: 600, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: "'Outfit', sans-serif" }}>Past alert performance</span>
+            <span style={{ fontSize: 9, fontWeight: 600, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: "'Outfit', sans-serif" }}>Recent alerts</span>
             <span style={{ fontSize: 9, fontWeight: 600, color: t.blue, cursor: 'pointer' }}>See all</span>
           </div>
-          {historyRows.map(h => (
-            <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderTop: `1px solid ${t.border}`, fontSize: 10 }}>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, color: t.text1, width: 42, fontSize: 11 }}>{h.ticker}</span>
-              <span style={{ fontSize: 8, fontWeight: 600, padding: '1px 5px', borderRadius: 3, background: h.typeBg, color: h.typeColor }}>{h.typeLabel}</span>
-              <span style={{ color: t.text3, flex: 1, fontSize: 9 }}>{h.time}</span>
-              <span style={{ fontWeight: 700, color: h.pct >= 0 ? t.green : t.red }}>
-                {h.pct >= 0 ? '+' : ''}{h.pct.toFixed(1)}%
-              </span>
-            </div>
-          ))}
+          {alertHistory.slice(0, 8).map(h => {
+            const tc = TYPE_CONFIG[h.signal_type] || TYPE_CONFIG.vol_surge;
+            const pct = Number(h.change_pct) || 0;
+            return (
+              <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderTop: '1px solid ' + t.border, fontSize: 10 }}>
+                <span style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, color: t.text1, width: 44, fontSize: 11 }}>{h.ticker}</span>
+                <span style={{ fontSize: 8, fontWeight: 600, padding: '1px 5px', borderRadius: 3, background: tc.bg, color: tc.color }}>{tc.label}</span>
+                <span style={{ color: t.text3, fontSize: 9, flex: 1 }}>{h.price ? '$' + Number(h.price).toFixed(2) : ''}</span>
+                <span style={{ color: t.text3, fontSize: 9 }}>{timeAgo(h.created_at)}</span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
