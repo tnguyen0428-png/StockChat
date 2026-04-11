@@ -29,8 +29,6 @@ const FLOAT_KEYFRAMES = `
 @keyframes float5{0%,100%{transform:translate(0,0) rotate(0deg)}25%{transform:translate(-4px,7px) rotate(2deg)}75%{transform:translate(7px,-3px) rotate(-1deg)}}
 @keyframes float6{0%,100%{transform:translate(0,0) rotate(0deg)}35%{transform:translate(3px,-6px) rotate(-1deg)}65%{transform:translate(-6px,4px) rotate(2deg)}}
 @keyframes float7{0%,100%{transform:translate(0,0) rotate(0deg)}45%{transform:translate(-5px,-3px) rotate(1.5deg)}55%{transform:translate(4px,5px) rotate(-1.5deg)}}
-@keyframes freshGlowGreen{0%,100%{box-shadow:0 0 8px rgba(94,237,138,0.3),0 0 20px rgba(94,237,138,0.1)}50%{box-shadow:0 0 20px rgba(94,237,138,0.7),0 0 40px rgba(94,237,138,0.3)}}
-@keyframes freshGlowRed{0%,100%{box-shadow:0 0 8px rgba(240,149,149,0.3),0 0 20px rgba(240,149,149,0.1)}50%{box-shadow:0 0 20px rgba(240,149,149,0.7),0 0 40px rgba(240,149,149,0.3)}}
 `;
 const FLOAT_DURATIONS = [18, 15, 22, 17, 20, 16, 19, 21];
 
@@ -112,11 +110,11 @@ function mapAlert(a) {
 
 function chipSize(pct) {
   const abs = Math.abs(pct || 0);
-  if (abs >= 8) return 90;
-  if (abs >= 5) return 82;
-  if (abs >= 3) return 72;
-  if (abs >= 1.5) return 64;
-  return 56;
+  if (abs >= 8) return 76;
+  if (abs >= 5) return 68;
+  if (abs >= 3) return 60;
+  if (abs >= 1.5) return 54;
+  return 48;
 }
 
 function nextMarketDay() {
@@ -147,6 +145,7 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
   const [liveAlerts, setLiveAlerts] = useState([]);
   const [fearScore, setFearScore] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [perfHistory, setPerfHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [alertHistory, setAlertHistory] = useState([]);
 
@@ -165,6 +164,30 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
     const channel = supabase.channel('alerts_chips_feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'breakout_alerts' }, (payload) => {
         setLiveAlerts(prev => [payload.new, ...prev]);
+      }).subscribe();
+    return () => supabase.removeChannel(channel);
+  }, []);
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('alert_performance').select('*')
+        .not('outcome', 'is', null)
+        .order('alert_time', { ascending: false })
+        .limit(20);
+      if (data) setPerfHistory(data);
+    };
+    load();
+    const channel = supabase.channel('perf_chips_feed')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'alert_performance' }, (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          setPerfHistory(prev => {
+            const filtered = prev.filter(p => p.id !== payload.new.id);
+            if (payload.new.outcome || payload.new.admin_outcome) {
+              return [payload.new, ...filtered].slice(0, 20);
+            }
+            return filtered;
+          });
+        }
       }).subscribe();
     return () => supabase.removeChannel(channel);
   }, []);
@@ -210,8 +233,12 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
       const t = a.signal_type || 'vol_surge';
       byType[t] = (byType[t] || 0) + 1;
     });
-    return { total, byType, hasPerf: false };
-  }, [alertHistory]);
+    const resolved = perfHistory.filter(h => h.return_pct != null);
+    const wins = resolved.filter(h => h.return_pct > 0).length;
+    const winRate = resolved.length > 0 ? Math.round((wins / resolved.length) * 100) : null;
+    const avgReturn = resolved.length > 0 ? resolved.reduce((s, h) => s + Number(h.return_pct), 0) / resolved.length : null;
+    return { total, byType, winRate, avgReturn, hasPerf: resolved.length > 0 };
+  }, [alertHistory, perfHistory]);
 
   const selectedAlert = selectedId ? uniqueAlerts.find(a => a.id === selectedId) : null;
   const marketOpen = isMarketOpen();
@@ -259,7 +286,7 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
       {hasAlerts && (
         <div style={{
           position: 'relative',
-          height: selectedAlert ? 100 : 210,
+          height: selectedAlert ? 100 : 170,
           background: t.surface,
           borderRadius: 10,
           border: `1px solid ${t.border}`,
@@ -272,7 +299,6 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
             const size = chipSize(alert.changePct);
             const slot = CHIP_SLOTS[i % CHIP_SLOTS.length];
             const isUp = alert.changePct >= 0;
-            const isFresh = alert.created_at && (Date.now() - new Date(alert.created_at).getTime()) < 20 * 60 * 1000;
             return (
               <div
                 key={alert.id}
@@ -287,9 +313,6 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
                   zIndex: isSelected ? 10 : 1,
                 }}
               >
-                {isFresh && (
-                  <div style={{ position: 'absolute', top: -6, left: '50%', transform: 'translateX(-50%)', fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: isUp ? '#5eed8a' : '#F09595', color: '#0a1628', whiteSpace: 'nowrap', zIndex: 2 }}>NEW</div>
-                )}
                 <div style={{
                   width: size, height: size, borderRadius: '50%',
                   background: isUp
@@ -299,10 +322,9 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                   boxShadow: isSelected ? `0 0 0 3px rgba(123,140,222,0.5)` : undefined,
                   transition: 'box-shadow 0.2s ease',
-                  animation: isFresh ? `${isUp ? 'freshGlowGreen' : 'freshGlowRed'} 2s ease-in-out infinite` : undefined,
                 }}>
-                  <span style={{ fontSize: Math.max(11, Math.round(size * 0.16)), fontWeight: 700, color: '#000', textShadow: 'none', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{alert.ticker}</span>
-                  <span style={{ fontSize: Math.max(9, Math.round(size * 0.13)), color: 'rgba(0,0,0,0.6)', lineHeight: 1, marginTop: 1 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#000', textShadow: 'none', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{alert.ticker}</span>
+                  <span style={{ fontSize: 9, color: 'rgba(0,0,0,0.6)', lineHeight: 1, marginTop: 1 }}>
                     {alert.changePct >= 0 ? '+' : ''}{alert.changePct.toFixed(1)}%
                   </span>
                 </div>
@@ -329,14 +351,29 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
             <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3, fontFamily: "'DM Sans', sans-serif" }}>Total alerts</div>
             <div style={{ fontSize: 18, fontWeight: 600, color: t.text1, marginTop: 2, fontFamily: "'Outfit', sans-serif" }}>{alertStats.total}</div>
           </div>
-          <div style={{ flex: 1, background: t.card, borderRadius: 8, padding: '8px 6px', textAlign: 'center', border: '1px solid ' + t.border }}>
-            <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3 }}>Breakouts</div>
-            <div style={{ fontSize: 18, fontWeight: 600, color: '#fbbf24', marginTop: 2, fontFamily: "'Outfit', sans-serif" }}>{alertStats.byType['52w_high'] || 0}</div>
-          </div>
-          <div style={{ flex: 1, background: t.card, borderRadius: 8, padding: '8px 6px', textAlign: 'center', border: '1px solid ' + t.border }}>
-            <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3 }}>Big money</div>
-            <div style={{ fontSize: 18, fontWeight: 600, color: '#5eed8a', marginTop: 2, fontFamily: "'Outfit', sans-serif" }}>{alertStats.byType['flow_signal'] || 0}</div>
-          </div>
+          {alertStats.hasPerf ? (
+            <>
+              <div style={{ flex: 1, background: t.card, borderRadius: 8, padding: '8px 6px', textAlign: 'center', border: '1px solid ' + t.border }}>
+                <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3 }}>Win rate</div>
+                <div style={{ fontSize: 18, fontWeight: 600, color: alertStats.winRate >= 50 ? t.green : t.red, marginTop: 2, fontFamily: "'Outfit', sans-serif" }}>{alertStats.winRate}%</div>
+              </div>
+              <div style={{ flex: 1, background: t.card, borderRadius: 8, padding: '8px 6px', textAlign: 'center', border: '1px solid ' + t.border }}>
+                <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3 }}>Avg return</div>
+                <div style={{ fontSize: 18, fontWeight: 600, color: alertStats.avgReturn >= 0 ? t.green : t.red, marginTop: 2, fontFamily: "'Outfit', sans-serif" }}>{alertStats.avgReturn >= 0 ? '+' : ''}{alertStats.avgReturn.toFixed(1)}%</div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ flex: 1, background: t.card, borderRadius: 8, padding: '8px 6px', textAlign: 'center', border: '1px solid ' + t.border }}>
+                <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3 }}>Breakouts</div>
+                <div style={{ fontSize: 18, fontWeight: 600, color: '#fbbf24', marginTop: 2, fontFamily: "'Outfit', sans-serif" }}>{alertStats.byType['52w_high'] || 0}</div>
+              </div>
+              <div style={{ flex: 1, background: t.card, borderRadius: 8, padding: '8px 6px', textAlign: 'center', border: '1px solid ' + t.border }}>
+                <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3 }}>Big money</div>
+                <div style={{ fontSize: 18, fontWeight: 600, color: '#5eed8a', marginTop: 2, fontFamily: "'Outfit', sans-serif" }}>{alertStats.byType['flow_signal'] || 0}</div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -345,41 +382,57 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
 
       {/* ═══ ALERT HISTORY ═══ */}
       {alertHistory.length > 0 && (
-        <div style={{ background: t.card, borderRadius: 10, border: `1px solid ${t.border}`, overflow: 'hidden', marginTop: 10 }}>
+        <div style={{ background: t.card, borderRadius: 10, border: '1px solid ' + t.border, overflow: 'hidden', marginTop: 10 }}>
           <div style={{ padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 9, fontWeight: 600, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: "'Outfit', sans-serif" }}>Recent alerts</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: "'Outfit', sans-serif" }}>Recent alerts</span>
             <div style={{ display: 'flex', gap: 4 }}>
-              {[{ key: 'all', label: 'All' }, { key: 'vol_surge', label: 'Stocks' }, { key: 'flow_signal', label: 'Big $' }].map(f => (
-                <div key={f.key} onClick={() => setHistoryFilter(f.key)} style={{
-                  fontSize: 9, fontWeight: 600, padding: '2px 8px', borderRadius: 4, cursor: 'pointer',
-                  background: historyFilter === f.key ? (f.key === 'flow_signal' ? 'rgba(94,237,138,0.15)' : f.key === 'vol_surge' ? 'rgba(167,139,250,0.15)' : `${t.green}15`) : 'transparent',
-                  color: historyFilter === f.key ? (f.key === 'flow_signal' ? '#5eed8a' : f.key === 'vol_surge' ? '#a78bfa' : t.green) : t.text3,
-                  border: `1px solid ${historyFilter === f.key ? (f.key === 'flow_signal' ? 'rgba(94,237,138,0.3)' : f.key === 'vol_surge' ? 'rgba(167,139,250,0.3)' : `${t.green}30`) : 'transparent'}`,
-                }}>{f.label}</div>
+              {[
+                { key: 'all', label: 'All', color: t.blue, bg: t.blueBg },
+                { key: 'vol_surge', label: 'Stocks', color: '#a78bfa', bg: 'rgba(167,139,250,0.1)' },
+                { key: 'flow_signal', label: 'Big $', color: '#5eed8a', bg: 'rgba(94,237,138,0.08)' },
+              ].map(f => (
+                <span
+                  key={f.key}
+                  onClick={() => setHistoryFilter(f.key)}
+                  style={{
+                    fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 4, cursor: 'pointer',
+                    background: historyFilter === f.key ? f.bg : 'transparent',
+                    color: historyFilter === f.key ? f.color : t.text3,
+                    border: historyFilter === f.key ? `0.5px solid ${f.color}30` : '0.5px solid transparent',
+                  }}
+                >{f.label}</span>
               ))}
             </div>
           </div>
           {(() => {
-            const filtered = historyFilter === 'all' ? alertHistory : alertHistory.filter(h => (h.signal_type || 'vol_surge') === historyFilter);
+            const filtered = alertHistory.filter(h => historyFilter === 'all' || h.signal_type === historyFilter);
             const visible = showAllHistory ? filtered : filtered.slice(0, 5);
+            const hasMore = filtered.length > 5;
             return (
               <>
                 {visible.map(h => {
                   const tc = TYPE_CONFIG[h.signal_type] || TYPE_CONFIG.vol_surge;
                   const pct = Number(h.change_pct) || 0;
                   return (
-                    <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderTop: `1px solid ${t.border}`, fontSize: 11 }}>
+                    <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderTop: '1px solid ' + t.border }}>
                       <span style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, color: t.text1, width: 44, fontSize: 12 }}>{h.ticker}</span>
-                      <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 3, background: tc.bg, color: tc.color }}>{tc.label}</span>
-                      <span style={{ color: t.text3, fontSize: 11 }}>{h.price ? '$' + Number(h.price).toFixed(2) : ''}</span>
-                      <span style={{ fontWeight: 600, color: pct >= 0 ? t.green : t.red, fontSize: 11, marginLeft: 'auto' }}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span>
+                      <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 3, background: tc.bg, color: tc.color }}>{tc.label}</span>
+                      <span style={{ color: t.text3, fontSize: 11, flex: 1 }}>{h.price ? '$' + Number(h.price).toFixed(2) : ''}</span>
+                      <span style={{ color: pct >= 0 ? t.green : t.red, fontSize: 11, fontWeight: 600 }}>
+                        {pct >= 0 ? '+' : ''}{pct.toFixed(1)}%
+                      </span>
                       <span style={{ color: t.text3, fontSize: 11 }}>{timeAgo(h.created_at)}</span>
                     </div>
                   );
                 })}
-                {filtered.length > 5 && (
-                  <div onClick={() => setShowAllHistory(p => !p)} style={{ fontSize: 10, fontWeight: 600, color: t.blue, textAlign: 'center', padding: '8px 12px', cursor: 'pointer', borderTop: `1px solid ${t.border}` }}>
-                    {showAllHistory ? 'Show less ▴' : `Show more (${filtered.length}) ▾`}
+                {hasMore && (
+                  <div
+                    onClick={() => setShowAllHistory(prev => !prev)}
+                    style={{ padding: '8px 12px', textAlign: 'center', borderTop: '1px solid ' + t.border, cursor: 'pointer' }}
+                  >
+                    <span style={{ fontSize: 11, fontWeight: 600, color: t.blue }}>
+                      {showAllHistory ? 'Show less ▴' : `Show more (${filtered.length - 5}) ▾`}
+                    </span>
                   </div>
                 )}
               </>
@@ -398,67 +451,129 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
 
 function EducationZone({ t }) {
   const [expanded, setExpanded] = useState(null);
+  const toggle = (id) => setExpanded(prev => prev === id ? null : id);
+
   return (
-    <div style={{ marginBottom: 10 }}>
+    <div style={{ background: t.surface, borderRadius: 10, border: `1px solid ${t.border}`, padding: '12px 10px', marginBottom: 10 }}>
+      <div style={{ fontSize: 13, fontWeight: 500, color: t.text1, textAlign: 'center', marginBottom: 10, fontFamily: "'Outfit', sans-serif" }}>
+        How alerts work
+      </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'flex-start' }}>
-        {/* Volume card */}
-        <div style={{ flex: 1, background: t.card, borderRadius: 10, border: `1px solid ${t.border}`, overflow: 'hidden', cursor: 'pointer' }} onClick={() => setExpanded(expanded === 'vol' ? null : 'vol')}>
-          <div style={{ padding: '10px 10px 8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#a78bfa', fontFamily: "'Outfit', sans-serif" }}>🔥 Stocks on the move</div>
-              <span style={{ fontSize: 10, color: t.text3, transform: expanded === 'vol' ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>▾</span>
+
+        {/* ── Stocks on the move ── */}
+        <div
+          onClick={() => toggle('vol')}
+          style={{ flex: 1, background: t.purpleBg || 'rgba(167,139,250,0.08)', borderRadius: 8, border: `0.5px solid rgba(167,139,250,0.2)`, overflow: 'hidden', cursor: 'pointer' }}
+        >
+          <div style={{ padding: '8px 8px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#a78bfa', fontFamily: "'Outfit', sans-serif" }}>Stocks on the move</div>
+              <div style={{ fontSize: 9, color: t.text3, marginTop: 2 }}>Manual · admin triggered</div>
             </div>
-            <div style={{ fontSize: 9, color: t.text3, marginTop: 2 }}>Manual · admin triggered</div>
+            <div style={{ fontSize: 11, color: t.text3, transition: 'transform 0.2s', transform: expanded === 'vol' ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</div>
           </div>
           <div style={{ maxHeight: expanded === 'vol' ? 400 : 0, overflow: 'hidden', transition: 'max-height 0.3s ease' }}>
-            <div style={{ padding: '0 10px 10px', fontSize: 10, color: t.text2, lineHeight: 1.6 }}>
-              <div style={{ marginBottom: 6 }}>Flags stocks trading at 2x+ their normal volume with significant price movement.</div>
-              <div style={{ fontSize: 9, fontWeight: 600, color: t.text1, marginBottom: 4 }}>What we scan for:</div>
-              {['Volume ratio — today vs 20-day avg (must be 2x+)', 'Price change — how much the stock moved (%)', 'Current price — live price at time of scan', 'Avg volume — 20-day average daily volume', 'Sector — which industry the stock belongs to'].map((item, i) => (
-                <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 3 }}>
-                  <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#a78bfa', marginTop: 5, flexShrink: 0 }} />
-                  <span>{item}</span>
+            <div style={{ padding: '0 8px 8px', borderTop: '0.5px solid rgba(167,139,250,0.15)' }}>
+              <div style={{ fontSize: 11, color: t.text2, lineHeight: 1.6, marginTop: 6 }}>
+                <span style={{ fontWeight: 500, color: t.text1 }}>What it does:</span> Scans ~250 stocks and flags any trading at <span style={{ color: '#a78bfa', fontWeight: 500 }}>2x or more</span> their normal daily volume.
+              </div>
+              <div style={{ fontSize: 11, color: t.text2, lineHeight: 1.6, marginTop: 4 }}>
+                <span style={{ fontWeight: 500, color: t.text1 }}>Why it matters:</span> Volume often leads price. A sudden spike means something is happening — earnings, news, or insider moves.
+              </div>
+              <div style={{ marginTop: 6, fontSize: 11, fontWeight: 500, color: t.text1, textTransform: 'uppercase', letterSpacing: 0.4 }}>What we scan for</div>
+              <div style={{ marginTop: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {[
+                  ['Volume ratio', "today's volume vs 20-day avg (must be 2x+)"],
+                  ['Price change', 'how much the stock moved today (%)'],
+                  ['Current price', 'live stock price at time of scan'],
+                  ['Avg volume', '20-day average daily trading volume'],
+                  ['Sector', 'which industry the stock belongs to'],
+                ].map(([label, desc]) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'baseline', gap: 5, fontSize: 11, color: t.text2 }}>
+                    <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#a78bfa', flexShrink: 0, marginTop: 5 }} />
+                    <span><span style={{ color: '#a78bfa', fontWeight: 500 }}>{label}</span> — {desc}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 6, padding: '5px 7px', background: 'rgba(167,139,250,0.06)', borderRadius: 6, border: '0.5px solid rgba(167,139,250,0.1)' }}>
+                <div style={{ fontSize: 9, color: t.text3, fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2 }}>Example</div>
+                <div style={{ fontSize: 11, color: t.text2 }}>
+                  <span style={{ color: '#a78bfa', fontWeight: 500 }}>CRWD</span> at <span style={{ color: '#a78bfa' }}>3.2x</span> avg volume → something is driving unusual interest in CrowdStrike today
                 </div>
-              ))}
-              <div style={{ fontSize: 9, color: t.text3, marginTop: 6, fontStyle: 'italic' }}>Example: CRWD at 3.2x avg volume</div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Flow card */}
-        <div style={{ flex: 1, background: t.card, borderRadius: 10, border: `1px solid ${t.border}`, overflow: 'hidden', cursor: 'pointer' }} onClick={() => setExpanded(expanded === 'flow' ? null : 'flow')}>
-          <div style={{ padding: '10px 10px 8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#5eed8a', fontFamily: "'Outfit', sans-serif" }}>💰 Options & dark pools</div>
-              <span style={{ fontSize: 10, color: t.text3, transform: expanded === 'flow' ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>▾</span>
+        {/* ── Options & dark pools ── */}
+        <div
+          onClick={() => toggle('ai')}
+          style={{ flex: 1, background: t.greenBg || 'rgba(94,237,138,0.06)', borderRadius: 8, border: `0.5px solid rgba(94,237,138,0.15)`, overflow: 'hidden', cursor: 'pointer' }}
+        >
+          <div style={{ padding: '8px 8px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#5eed8a', fontFamily: "'Outfit', sans-serif" }}>Options & dark pools</div>
+              <div style={{ fontSize: 9, color: t.text3, marginTop: 2 }}>Smart · auto-scored</div>
             </div>
-            <div style={{ fontSize: 9, color: t.text3, marginTop: 2 }}>Smart · auto-scored</div>
+            <div style={{ fontSize: 11, color: t.text3, transition: 'transform 0.2s', transform: expanded === 'ai' ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</div>
           </div>
-          <div style={{ maxHeight: expanded === 'flow' ? 500 : 0, overflow: 'hidden', transition: 'max-height 0.3s ease' }}>
-            <div style={{ padding: '0 10px 10px', fontSize: 10, color: t.text2, lineHeight: 1.6 }}>
-              <div style={{ marginBottom: 6 }}>Tracks unusual options sweeps and dark pool block trades from institutional players.</div>
-              <div style={{ fontSize: 9, fontWeight: 600, color: t.text1, marginBottom: 4 }}>What we scan for:</div>
-              {['Sweeps — large orders split across exchanges (urgency)', 'Premium size — total $ bet ($100K+ flagged, $1M+ high alert)', 'Dark pool prints — hidden block trades ($500K+ flagged)', 'Direction — bullish (call buys) or bearish (put buys)', 'Multi-day conviction — same ticker 3+ days = high confidence', 'Cross-signal — options + dark pool = strongest signal'].map((item, i) => (
-                <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 3 }}>
-                  <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#5eed8a', marginTop: 5, flexShrink: 0 }} />
-                  <span>{item}</span>
+          <div style={{ maxHeight: expanded === 'ai' ? 500 : 0, overflow: 'hidden', transition: 'max-height 0.3s ease' }}>
+            <div style={{ padding: '0 8px 8px', borderTop: '0.5px solid rgba(94,237,138,0.1)' }}>
+              <div style={{ fontSize: 11, color: t.text2, lineHeight: 1.6, marginTop: 6 }}>
+                <span style={{ fontWeight: 500, color: t.text1 }}>What it does:</span> Tracks where institutions are placing large bets through <span style={{ color: '#5eed8a', fontWeight: 500 }}>options sweeps</span> and <span style={{ color: '#5eed8a', fontWeight: 500 }}>dark pool trades</span>, then scores and ranks by conviction.
+              </div>
+              <div style={{ fontSize: 11, color: t.text2, lineHeight: 1.6, marginTop: 4 }}>
+                <span style={{ fontWeight: 500, color: t.text1 }}>Why it matters:</span> Institutions trade through hidden channels. Unusually large or aggressive bets often signal they know something retail doesn't.
+              </div>
+              <div style={{ marginTop: 6, fontSize: 11, fontWeight: 500, color: t.text1, textTransform: 'uppercase', letterSpacing: 0.4 }}>What we scan for</div>
+              <div style={{ marginTop: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {[
+                  ['Sweeps', 'large orders split across exchanges to fill fast (urgency)'],
+                  ['Premium size', 'total $ bet on options ($100K+ flagged, $1M+ high alert)'],
+                  ['Dark pool prints', 'hidden block trades ($500K+ flagged, $10M+ high alert)'],
+                  ['Direction', 'bullish (call buys) or bearish (put buys)'],
+                  ['Multi-day conviction', 'same ticker active 3+ days = high confidence'],
+                  ['Cross-signal', 'options + dark pool on same stock = strongest signal'],
+                ].map(([label, desc]) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'baseline', gap: 5, fontSize: 11, color: t.text2 }}>
+                    <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#5eed8a', flexShrink: 0, marginTop: 5 }} />
+                    <span><span style={{ color: '#5eed8a', fontWeight: 500 }}>{label}</span> — {desc}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 6, padding: '5px 7px', background: 'rgba(94,237,138,0.04)', borderRadius: 6, border: '0.5px solid rgba(94,237,138,0.1)' }}>
+                <div style={{ fontSize: 9, color: t.text3, fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2 }}>Example</div>
+                <div style={{ fontSize: 11, color: t.text2 }}>
+                  <span style={{ color: '#5eed8a', fontWeight: 500 }}>PLTR</span> — 3 bullish sweeps · $2.1M premium · $4.5M dark pool → institutions loading up aggressively
                 </div>
-              ))}
-              <div style={{ fontSize: 9, color: t.text3, marginTop: 6, fontStyle: 'italic' }}>Example: PLTR — 3 sweeps · $2.1M premium · $4.5M dark pool</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Legend */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 18, padding: '8px 0', borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}><div style={{ width: 14, height: 14, borderRadius: '50%', background: 'radial-gradient(circle at 40% 40%, #7dffb0, #2ebd68)', border: '1.5px solid #5eed8a' }} /><span style={{ fontSize: 9, color: t.text3 }}>Stock up</span></div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}><div style={{ width: 14, height: 14, borderRadius: '50%', background: 'radial-gradient(circle at 40% 40%, #ff9e9e, #c94444)', border: '1.5px solid #F09595' }} /><span style={{ fontSize: 9, color: t.text3 }}>Stock down</span></div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}><div style={{ width: 10, height: 10, borderRadius: '50%', background: t.card, border: `1.5px solid ${t.text3}` }} /><span style={{ fontSize: 9, color: t.text3 }}>Small move</span></div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}><div style={{ width: 18, height: 18, borderRadius: '50%', background: t.card, border: `1.5px solid ${t.text3}` }} /><span style={{ fontSize: 9, color: t.text3 }}>Big move</span></div>
       </div>
-
-      <div style={{ fontSize: 9, color: t.text3, textAlign: 'center', marginTop: 8 }}>Scanners run during market hours · 9:30am–4pm EST</div>
+      {/* ── Chip legend ── */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 14, paddingTop: 8, borderTop: `0.5px solid ${t.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, #6aff9e, #1a8a45)', border: '1.5px solid #5eed8a' }} />
+          <span style={{ fontSize: 11, color: t.text3 }}>Up</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, #ff8a8a, #a03030)', border: '1.5px solid #F09595' }} />
+          <span style={{ fontSize: 11, color: t.text3 }}>Down</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: t.card, border: `1.5px solid ${t.text3}` }} />
+          <span style={{ fontSize: 11, color: t.text3 }}>Small</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ width: 16, height: 16, borderRadius: '50%', background: t.card, border: `1.5px solid ${t.text3}` }} />
+          <span style={{ fontSize: 11, color: t.text3 }}>Big</span>
+        </div>
+      </div>
+      <div style={{ fontSize: 11, color: t.text3, textAlign: 'center', marginTop: 6 }}>
+        Scanners run during market hours · 9:30am–4pm EST
+      </div>
     </div>
   );
 }
