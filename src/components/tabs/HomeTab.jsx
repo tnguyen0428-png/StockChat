@@ -12,6 +12,7 @@ import { getBatchQuotes } from '../../lib/polygonQuote';
 import CreateGroupModal from '../shared/CreateGroupModal';
 import InviteModal from '../shared/InviteModal';
 import StickerPicker, { STICKERS, isSticker, getStickerId } from '../shared/StickerPicker';
+import { DarkModeToggle, useTheme } from './alertsCasinoComponents';
 
 const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
 const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
@@ -54,6 +55,10 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   const [searchLoading, setSearchLoading]       = useState(false);
   const [addingTicker, setAddingTicker]         = useState(null);
   const [toast, setToast]                       = useState(null);
+
+  // ── Dark mode ──
+  const [darkMode, setDarkMode] = useState(true);
+  const t = useTheme(darkMode);
 
   // ── Briefing state ──
   const [briefingExpanded, setBriefingExpanded] = useState(false);
@@ -1217,6 +1222,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               {marketStatus === 'open' ? 'LIVE' : marketStatus === 'premarket' ? 'PRE' : marketStatus === 'afterhours' ? 'AH' : 'CLOSED'}
             </span>
           </div>
+          <DarkModeToggle darkMode={darkMode} onToggle={() => setDarkMode(d => !d)} t={t} />
           <div ref={profileMenuRef} style={{ position: 'relative' }}>
             <div style={S.avatar} onClick={() => setShowProfileMenu(p => !p)}>
               {(profile?.username || 'U')[0].toUpperCase()}
