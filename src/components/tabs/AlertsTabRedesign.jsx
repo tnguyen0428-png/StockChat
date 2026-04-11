@@ -320,8 +320,8 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
                   boxShadow: isSelected ? `0 0 0 3px rgba(123,140,222,0.5)` : undefined,
                   transition: 'box-shadow 0.2s ease',
                 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.4)', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{alert.ticker}</span>
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', lineHeight: 1, marginTop: 1 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#000', textShadow: 'none', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{alert.ticker}</span>
+                  <span style={{ fontSize: 9, color: 'rgba(0,0,0,0.6)', lineHeight: 1, marginTop: 1 }}>
                     {alert.changePct >= 0 ? '+' : ''}{alert.changePct.toFixed(1)}%
                   </span>
                 </div>
