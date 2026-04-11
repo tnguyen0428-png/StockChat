@@ -245,7 +245,7 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
   }
 
   return (
-    <div style={{ background: t.bg, minHeight: '100vh', maxWidth: 480, margin: '0 auto', padding: '12px 12px 80px', fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ background: t.bg, minHeight: '100vh', maxWidth: '100%', width: '100%', padding: '12px 12px 80px', fontFamily: "'DM Sans', sans-serif" }}>
       <style>{FLOAT_KEYFRAMES}</style>
 
       {/* ═══ HEADER ═══ */}
@@ -326,9 +326,18 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
         </div>
       )}
 
-      {/* ═══ DETAIL PANEL ═══ */}
-      {selectedAlert && (
+      {/* ═══ DETAIL PANEL or HELPER ═══ */}
+      {selectedAlert ? (
         <DetailPanel alert={selectedAlert} t={t} />
+      ) : hasAlerts && (
+        <div style={{ background: t.card, borderRadius: 10, border: '1px solid ' + t.border, padding: '16px', textAlign: 'center', marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: t.text1, marginBottom: 4, fontFamily: "'Outfit', sans-serif" }}>
+            {uniqueAlerts.length} alert{uniqueAlerts.length !== 1 ? 's' : ''} detected
+          </div>
+          <div style={{ fontSize: 9, color: t.text3, lineHeight: 1.5 }}>
+            Tap any chip above to see what triggered the alert
+          </div>
+        </div>
       )}
 
       {/* ═══ HISTORY ═══ */}
