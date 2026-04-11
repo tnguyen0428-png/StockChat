@@ -57,7 +57,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   const [toast, setToast]                       = useState(null);
 
   // ── Dark mode ──
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
   const t = useTheme(darkMode);
 
   // ── Briefing state ──
