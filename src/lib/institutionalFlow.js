@@ -78,14 +78,20 @@ function parseOptionsFlow(raw) {
     const strike = parseFloat(t.strike_price || t.strike) || null;
     const expiry = t.expires_at || t.expiration_date || null;
     const optionType = (t.put_call || t.option_type || '').toLowerCase() || null;
-    const premium = parseFloat(t.total_premium || t.premium || t.cost_basis) || null;
-    const size = parseInt(t.total_size || t.size || t.volume) || null;
-    const underlyingPrice = parseFloat(t.underlying_price || t.stock_price) || null;
+    const rawPremium = parseFloat(t.total_premium || t.premium || t.cost_basis);
+    const premium = isNaN(rawPremium) ? null : rawPremium;
+    const rawSize = parseInt(t.total_size || t.size || t.volume, 10);
+    const size = isNaN(rawSize) ? null : rawSize;
+    const rawUnderlyingPrice = parseFloat(t.underlying_price || t.stock_price);
+    const underlyingPrice = isNaN(rawUnderlyingPrice) ? null : rawUnderlyingPrice;
 
     let betDesc = null;
     if (strike && expiry && optionType) {
       const verb = optionType === 'call' ? 'Above' : 'Below';
-      const expiryShort = new Date(expiry).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const expiryDate = new Date(expiry);
+      const expiryShort = isNaN(expiryDate.getTime())
+        ? 'TBD'
+        : expiryDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       betDesc = `${verb} $${strike} by ${expiryShort}`;
     }
 
@@ -102,8 +108,8 @@ function parseOptionsFlow(raw) {
       trade_type: (t.option_activity_type || t.trade_type || t.type || '').toLowerCase() || null,
       sentiment: (t.sentiment || t.aggressor || '').toLowerCase() || null,
       strike, expiry, option_type: optionType, premium, size,
-      open_interest: parseInt(t.open_interest) || null,
-      volume: parseInt(t.volume || t.option_volume) || null,
+      open_interest: isNaN(parseInt(t.open_interest, 10)) ? null : parseInt(t.open_interest, 10),
+      volume: isNaN(parseInt(t.volume || t.option_volume, 10)) ? null : parseInt(t.volume || t.option_volume, 10),
       underlying_price: underlyingPrice,
       is_unusual: !!(t.is_unusual || t.unusual),
       is_otm: isOtm,
@@ -115,10 +121,14 @@ function parseOptionsFlow(raw) {
 
 function parseDarkpool(raw) {
   return raw.map(t => {
-    const price = parseFloat(t.price || t.avg_price || t.trade_price) || 0;
-    const shares = parseInt(t.shares || t.size || t.volume) || 0;
-    const dollarValue = price && shares ? price * shares : parseFloat(t.notional || t.dollar_value) || null;
-    const multiplier = parseFloat(t.volume_multiplier || t.size_multiplier) || null;
+    const rawPrice = parseFloat(t.price || t.avg_price || t.trade_price);
+    const price = isNaN(rawPrice) ? 0 : rawPrice;
+    const rawShares = parseInt(t.shares || t.size || t.volume, 10);
+    const shares = isNaN(rawShares) ? 0 : rawShares;
+    const rawDollarValue = price && shares ? price * shares : parseFloat(t.notional || t.dollar_value);
+    const dollarValue = isNaN(rawDollarValue) ? null : rawDollarValue;
+    const rawMultiplier = parseFloat(t.volume_multiplier || t.size_multiplier);
+    const multiplier = isNaN(rawMultiplier) ? null : rawMultiplier;
 
     let note = null;
     if (dollarValue && dollarValue >= 1_000_000) {

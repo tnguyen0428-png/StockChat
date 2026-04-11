@@ -101,7 +101,7 @@ export async function scoreTicker(symbol) {
 
     // EPS growth (latest vs year ago)
     const eps = (earnings || []).filter(e => e.epsActual != null);
-    const epsGrowth = eps.length >= 5
+    const epsGrowth = eps.length >= 5 && eps[0]?.epsActual != null && eps[4]?.epsActual != null
       ? (eps[0].epsActual - eps[4].epsActual) / Math.abs(eps[4].epsActual || 1)
       : 0;
 
@@ -117,7 +117,7 @@ export async function scoreTicker(symbol) {
 
     // ── 3. Sales growth YOY (20%) ──
     const revEarnings = (earnings || []).filter(e => e.revenueActual != null);
-    const salesGrowth = revEarnings.length >= 5
+    const salesGrowth = revEarnings.length >= 5 && revEarnings[0]?.revenueActual != null && revEarnings[4]?.revenueActual != null
       ? (revEarnings[0].revenueActual - revEarnings[4].revenueActual) / Math.abs(revEarnings[4].revenueActual || 1)
       : 0;
     const salesScore = Math.min(100, Math.max(0, salesGrowth * 200));
@@ -131,12 +131,14 @@ export async function scoreTicker(symbol) {
 
     // ── 5. Price trend 6 months (10%) ──
     const range = p.range?.split('-');
-    const low6m  = parseFloat(range?.[0]) || p.price;
-    const high6m = parseFloat(range?.[1]) || p.price;
+    const rawLow  = range?.[0] ? parseFloat(range[0].trim()) : NaN;
+    const rawHigh = range?.[1] ? parseFloat(range[1].trim()) : NaN;
+    const low6m  = isNaN(rawLow)  ? (p.price || 0) : rawLow;
+    const high6m = isNaN(rawHigh) ? (p.price || 0) : rawHigh;
     const pricePosition = high6m > low6m
       ? (p.price - low6m) / (high6m - low6m)
       : 0.5;
-    const trendScore = pricePosition * 100;
+    const trendScore = isNaN(pricePosition) ? 50 : pricePosition * 100;
 
     // ── 6. Market cap score (5%) ──
     const mcap = p.marketCap || 0;

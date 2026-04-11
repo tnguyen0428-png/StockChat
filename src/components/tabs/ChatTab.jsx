@@ -123,7 +123,10 @@ const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiv
         // Tolerate trailing commas / stray chars
         const jsonStr = m[1].trim().replace(/,\s*([}\]])/g, '$1');
         card = JSON.parse(jsonStr);
-      } catch (e) { card = null; }
+      } catch (e) {
+        console.warn('[ChatTab] Failed to parse uptik card:', e.message, '| Raw:', m[1]?.slice(0, 100));
+        card = null;
+      }
       clean = raw.replace(m[0], '').trim();
     }
     clean = clean.replace(/^`+\s*/, '').replace(/`+$/, '').trim();

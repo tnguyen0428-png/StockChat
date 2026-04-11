@@ -162,9 +162,9 @@ export async function runPipeline(userMessage, conversationHistory, supabase, us
   let cardBlock = '';
   let bodyText = rawResponse;
   const cardMatch = rawResponse.match(/```uptik[\s\S]*?```/i);
-  if (cardMatch) {
+  if (cardMatch?.[0]) {
     cardBlock = cardMatch[0];
-    bodyText = rawResponse.replace(cardMatch[0], '').trim();
+    bodyText = rawResponse.replace(cardBlock, '').trim();
   }
 
   let response = stripMarkdown(bodyText);

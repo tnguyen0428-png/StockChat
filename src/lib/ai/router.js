@@ -99,7 +99,7 @@ export async function route(message, history = [], lastTicker = null) {
     for (let i = history.length - 1; i >= 0; i--) {
       const h = history[i]?.content || '';
       const tickerInHistory = h.match(/\$([A-Z]{1,5})\b/);
-      if (tickerInHistory) return { agent: 'data', params: { ticker: tickerInHistory[1], needsTranscript: transcript } };
+      if (tickerInHistory?.[1]) return { agent: 'data', params: { ticker: tickerInHistory[1], needsTranscript: transcript } };
       const hLower = h.toLowerCase();
       for (const [name, ticker] of Object.entries(COMPANY_TO_TICKER)) {
         if (hLower.includes(name)) return { agent: 'data', params: { ticker, needsTranscript: transcript } };
@@ -126,7 +126,7 @@ export async function route(message, history = [], lastTicker = null) {
 
   // 2. Check multi-word company names first (before single words)
   for (const [name, ticker] of Object.entries(COMPANY_TO_TICKER)) {
-    if (name.includes(' ') && lower.includes(name)) {
+    if (name.includes(' ') && lower.includes(name.toLowerCase())) {
       return { agent: 'data', params: { ticker, needsTranscript: transcript } };
     }
   }
@@ -211,8 +211,10 @@ Respond: {"agent":"data or macro or knowledge","params":{"ticker":"SYMBOL or nul
     });
 
     const data = await response.json();
-    const text = data.content[0].text.replace(/```json|```/g, '').trim();
+    const text = data?.content?.[0]?.text?.replace(/```json|```/g, '').trim();
+    if (!text) throw new Error('Empty classifier response');
     const parsed = JSON.parse(text);
+    if (!parsed?.agent || !parsed?.params) throw new Error('Invalid classifier shape');
     // Add transcript flag if needed
     if (parsed.params?.ticker && transcript) {
       parsed.params.needsTranscript = true;
