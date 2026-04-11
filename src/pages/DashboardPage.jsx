@@ -467,19 +467,20 @@ const styles = {
   },
   content: { flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: 'calc(62px + env(safe-area-inset-bottom, 0px))' },
   chatToggleRow: {
-    display: 'flex', gap: 0, padding: '8px 16px',
+    display: 'flex', gap: 0, padding: '6px 14px',
     background: 'var(--card)', borderBottom: '1px solid var(--border)',
     flexShrink: 0,
   },
   chatTogglePill: {
-    flex: 1, textAlign: 'center', padding: '8px 0',
-    fontSize: 13, fontWeight: 500, color: 'var(--text3)',
+    flex: 1, textAlign: 'center', padding: '7px 0',
+    fontSize: 12, fontWeight: 500, color: 'var(--text3)',
     cursor: 'pointer', borderRadius: 8,
     transition: 'all 0.15s',
   },
   chatToggleActive: {
-    background: '#132d52', color: '#fff',
+    background: 'var(--btn-active, #132d52)', color: '#fff',
     fontWeight: 600, borderRadius: 8,
+    boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
   },
   dmBadge: {
     position: 'absolute', top: 2, right: 12,

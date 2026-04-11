@@ -307,13 +307,14 @@ const styles = {
     flexWrap: 'nowrap',
   },
   chatLabel: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 700,
     color: '#f0f0f0',
+    fontFamily: "'Outfit', sans-serif",
   },
   chatSep: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.4)',
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.35)',
     fontWeight: 400,
   },
   groupNameWrap: {
