@@ -1125,22 +1125,25 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
       p.startsWith('$') && /^\$[A-Z]{1,5}$/.test(p) ? <span key={i} style={S.ccTk}>{p}</span> : p
     );
 
-    // iMessage-style right-align for the current user's own messages
+    // User's own messages — same left-aligned style as others
     if (isMe) {
       return (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 12px', background: 'rgba(94,237,138,0.08)', borderRadius: 10, margin: '0 6px' }}>
-          <div style={{
-            maxWidth: '78%',
-            background: '#1AAD5E',
-            color: '#fff',
-            padding: '8px 12px',
-            borderRadius: '16px 16px 4px 16px',
+        <div style={S.ccMsg}>
+          <div style={{ ...S.ccAv, background: color }}>{name[0].toUpperCase()}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={S.ccTop}>
+              <span style={{ ...S.ccName, color }}>{name}</span>
+              <span style={S.ccTime}>{timeAgo}</span>
+            </div>
+            <div style={{
             fontSize: 13,
             lineHeight: 1.4,
+            color: t.text1,
             fontFamily: 'inherit',
             wordBreak: 'break-word',
           }}>
             {renderInline(proseText)}
+          </div>
           </div>
         </div>
       );
