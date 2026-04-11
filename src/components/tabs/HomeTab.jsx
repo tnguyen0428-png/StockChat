@@ -1059,6 +1059,310 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   // ═══════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════
+  // ═══════════════════════════════════════
+  // STYLES
+  // ═══════════════════════════════════════
+  const S = {
+    outerWrap: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 },
+  
+    // ── Toast ──
+    toast: {
+      position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)',
+      background: '#1AAD5E', color: '#fff', fontSize: 13, fontWeight: 600,
+      padding: '8px 16px', borderRadius: 20, boxShadow: '0 4px 12px rgba(26,173,94,0.3)',
+      display: 'flex', alignItems: 'center', gap: 6, zIndex: 10000,
+    },
+  
+    // ── Header ──
+    header: {
+      background: '#132d52', padding: '10px 16px 8px',
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      flexShrink: 0,
+    },
+    hLeft: { display: 'flex', alignItems: 'center', gap: 5 },
+    logoRow: { display: 'flex', alignItems: 'baseline' },
+    logoUp: { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
+    logoTik: { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
+    logoAlerts: { fontSize: 11, fontWeight: 400, color: '#d4e4f2', letterSpacing: 1.5, fontFamily: "var(--font-heading)", marginTop: -3, paddingLeft: 26 },
+    hRight: { display: 'flex', alignItems: 'center', gap: 8 },
+    statusPill: {
+      display: 'flex', alignItems: 'center', gap: 4,
+      background: 'rgba(255,255,255,0.1)', padding: '2px 7px', borderRadius: 8,
+    },
+    statusDot: { width: 5, height: 5, borderRadius: '50%' },
+    statusText: { fontSize: 10, fontWeight: 600, letterSpacing: '0.04em' },
+    avatar: {
+      width: 26, height: 26, borderRadius: '50%', background: 'rgba(255,255,255,0.12)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 11, fontWeight: 600, color: '#f0ede8', cursor: 'pointer',
+    },
+    profileMenu: {
+      position: 'absolute', top: 'calc(100% + 8px)', right: -4, width: 130,
+      background: '#132d52', border: '1px solid rgba(255,255,255,0.15)',
+      borderRadius: 12, boxShadow: '0 6px 24px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden',
+    },
+    pmName: { fontSize: 13, fontWeight: 600, color: '#e0e0e0', padding: '9px 12px 8px', borderBottom: '1px solid rgba(255,255,255,0.1)' },
+    pmItem: { fontSize: 13, fontWeight: 500, color: t.green, padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)' },
+  
+    // ── Market Ticker Bar ──
+    combinedBar: { background: '#1a3a5e', flexShrink: 0 },
+    barContent: { padding: '8px 0', minHeight: 34 },
+    barScroll: { overflow: 'hidden', display: 'flex', alignItems: 'center' },
+    pulseItem: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 14px' },
+    pulseName: { fontSize: 13, fontWeight: 600, color: '#b8cde0', letterSpacing: 0.3 },
+    pulsePrice: { fontSize: 13, fontWeight: 700 },
+    pulseVal: { fontSize: 12, fontWeight: 600 },
+  
+    // ── Content (scrollable area) ──
+    content: { flex: 1, overflowY: 'auto', paddingBottom: 8, background: t.bg, position: 'relative', zIndex: 1 },
+    sectionDivider: { height: 1, background: t.border, margin: '0 14px' },
+  
+    fixedChatBar: {
+      flexShrink: 0,
+      padding: '12px 14px 14px', background: t.surface,
+      display: 'flex', alignItems: 'center', gap: 10,
+      position: 'relative', zIndex: 50,
+      borderTop: `1px solid ${t.border}`,
+      pointerEvents: 'auto',
+    },
+  
+    // ── Watchlist / My List helpers ──
+    wlPopRow: { display: 'flex', gap: 5, justifyContent: 'center', flexWrap: 'wrap' },
+    wlPopLabel: { fontSize: 11, color: t.text2, marginRight: 2, alignSelf: 'center' },
+    wlPopChip: {
+      fontSize: 12, fontWeight: 600, color: t.green,
+      background: t.greenBg, border: '1px solid rgba(26,173,94,0.2)',
+      borderRadius: 8, padding: '4px 10px', cursor: 'pointer',
+    },
+  
+  
+    // ── Briefing ──
+    briefSection: { padding: '12px 14px 8px' },
+    briefHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    briefTitle: { fontSize: 15, fontWeight: 700, color: t.text1, letterSpacing: '-0.01em' },
+    briefTime: { fontSize: 11, color: t.text3 },
+    briefToggle: { fontSize: 12, color: t.green, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' },
+    briefCard: {
+      background: t.card, border: `1px solid ${t.border}`, borderRadius: 12,
+      padding: '10px 12px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10,
+    },
+    bfTickers: { fontSize: 11, fontWeight: 700, color: t.green, marginBottom: 2 },
+    bfTitle: { fontSize: 13, color: t.text1, fontWeight: 500, lineHeight: 1.3 },
+    bfLink: { color: t.green, fontSize: 12, fontWeight: 600, textDecoration: 'none', flexShrink: 0 },
+    briefEmpty: { background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, padding: 16, textAlign: 'center', fontSize: 13, color: t.text3 },
+  
+    // ── Stocks section (inline) ──
+    stocksSection: { padding: '0 16px 8px' },
+    stocksHeader: { marginBottom: 6 },
+    stocksTitle: { fontSize: 15, fontWeight: 700, color: t.text1, fontFamily: "var(--font-heading)" },
+    stocksBtns: { display: 'flex', gap: 8 },
+    stocksBtn: {
+      padding: '7px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+      cursor: 'pointer', border: '1px solid #8cd9a0', background: t.greenBg,
+      color: t.green, fontFamily: "var(--font)",
+    },
+    stocksBtnActive: { background: '#1AAD5E', color: '#fff', borderColor: '#1AAD5E' },
+    sectorDropdown: {
+      position: 'absolute', left: 0, top: '100%', marginTop: 4,
+      background: t.card, border: `1px solid ${t.border}`, borderRadius: 10,
+      boxShadow: '0 4px 16px rgba(0,0,0,0.4)', overflow: 'hidden',
+      zIndex: 100, minWidth: 140,
+    },
+    sectorDropItem: {
+      padding: '10px 16px', fontSize: 13, color: t.text1, cursor: 'pointer',
+      borderBottom: `1px solid ${t.border}`, fontFamily: "var(--font)",
+    },
+    stocksCard: {
+      background: t.card, border: `1px solid ${t.border}`, borderRadius: 10,
+      overflow: 'hidden', marginTop: 8,
+    },
+    stocksHeaderRow: {
+      display: 'flex', alignItems: 'center', padding: '6px 10px',
+      borderBottom: `1px solid ${t.border}`, background: t.surface,
+    },
+    stocksColLabel: {
+      fontSize: 9, fontWeight: 600, color: t.text3,
+      textTransform: 'uppercase', letterSpacing: 0.5,
+    },
+    stocksScroll: { maxHeight: 200, overflowY: 'auto' },
+    stocksRow: {
+      display: 'flex', alignItems: 'center', padding: '7px 10px',
+      borderBottom: `1px solid ${t.border}`, cursor: 'pointer',
+    },
+    stocksRowTk: { fontSize: 13, fontWeight: 600, color: t.text1 },
+    stocksExpand: {
+      padding: '8px 10px 8px 38px', background: t.surface,
+      borderBottom: `1px solid ${t.border}`,
+    },
+    stocksAddBar: {
+      display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+      borderTop: `1px solid ${t.border}`, background: t.surface,
+      borderRadius: '0 0 10px 10px',
+    },
+    stocksAddInput: {
+      flex: 1, border: 'none', outline: 'none', fontSize: 13,
+      color: t.text1, background: 'transparent', fontFamily: "var(--font)",
+    },
+  
+    // ── Chat section ──
+    chatSection: { padding: '12px 14px 8px' },
+    csHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    csTitle: { fontSize: 15, fontWeight: 700, color: t.text1, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 6 },
+    csLive: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: t.green, fontWeight: 500 },
+    csLiveDot: { width: 5, height: 5, borderRadius: '50%', background: '#1AAD5E', animation: 'pulse 1.5s ease-in-out infinite' },
+    privateChatBtn: {
+      display: 'flex', alignItems: 'center', gap: 5,
+      fontSize: 12, fontWeight: 600, color: '#fff',
+      background: '#1AAD5E', border: 'none', borderRadius: 14,
+      padding: '5px 12px', cursor: 'pointer',
+      fontFamily: 'inherit',
+    },
+  
+    // ── My Groups section ──
+    groupSection: { padding: '12px 14px 16px' },
+    groupSectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+    groupSectionTitle: { fontSize: 15, fontWeight: 700, color: t.text1, letterSpacing: '-0.01em' },
+    groupCreateBtn: {
+      fontSize: 13, fontWeight: 600, color: t.green, background: 'none', border: 'none',
+      cursor: 'pointer', padding: '4px 0',
+    },
+    myGroupsPills: { display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2, justifyContent: 'center', flexWrap: 'wrap' },
+    myGroupPill: {
+      flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
+      borderRadius: 12, border: `1px solid ${t.border}`, background: t.card, cursor: 'pointer',
+    },
+    myGroupName: { fontSize: 14, fontWeight: 600, color: t.text1 },
+    groupCta: {
+      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+      background: `linear-gradient(135deg, ${t.surface} 0%, ${t.card} 100%)`, borderRadius: 12,
+      border: `1px solid ${t.border}`, cursor: 'pointer',
+    },
+    groupCtaIcon: {
+      width: 40, height: 40, borderRadius: '50%', background: t.card,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      border: `1px solid ${t.border}`,
+    },
+    groupCtaText: { flex: 1 },
+    groupCtaTitle: { fontSize: 15, fontWeight: 700, color: t.text1, marginBottom: 2 },
+    groupCtaSub: { fontSize: 12, color: t.text2, lineHeight: 1.3 },
+  
+    chatCard: {
+      background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden',
+    },
+    ccMsgs: { padding: 6, display: 'flex', flexDirection: 'column', gap: 6 },
+    ccMsg: {
+      padding: '10px 12px',
+      background: 'rgba(139,92,246,0.08)',
+      borderRadius: 10,
+      display: 'flex', gap: 8, alignItems: 'flex-start',
+    },
+    ccFooter: {
+      padding: '8px 12px', background: t.surface,
+      display: 'flex', alignItems: 'center', gap: 8,
+      borderTop: `1px solid ${t.border}`,
+    },
+    ccAv: {
+      width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', fontSize: 11, fontWeight: 600, color: '#fff', flexShrink: 0,
+    },
+    ccTop: { display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 1 },
+    ccName: { fontSize: 13, fontWeight: 600 },
+    ccTime: { fontSize: 11, color: t.text3, marginLeft: 'auto' },
+    ccText: { fontSize: 13, color: t.text1, lineHeight: 1.4 },
+    ccTk: { color: t.green, fontWeight: 600 },
+    // ccFooter replaced by fixedChatBar
+    ccAiBtn: {
+      width: 36, height: 36, borderRadius: '50%',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+      transition: 'all 0.2s',
+    },
+    ccAiBtnOff: {
+      background: t.card, color: '#fff', border: '1px solid rgba(139,92,246,0.3)',
+    },
+    ccAiBtnActive: {
+      background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)',
+      color: '#fff', boxShadow: '0 0 8px rgba(139,92,246,0.4)',
+    },
+    ccInputWrap: {
+      flex: 1, display: 'flex', alignItems: 'center',
+      background: t.card, border: `1.5px solid ${t.border}`,
+      borderRadius: 20, height: 42, paddingRight: 4,
+    },
+    ccInput: {
+      flex: 1, background: 'transparent', border: 'none',
+      padding: '8px 0 8px 16px', fontSize: 15, color: t.text1,
+      fontFamily: 'inherit', outline: 'none', height: '100%',
+    },
+    ccMic: {
+      width: 32, height: 32, borderRadius: '50%', background: 'transparent',
+      border: 'none', cursor: 'pointer', flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      transition: 'all 0.2s',
+    },
+    ccMicActive: {
+      background: '#EF4444',
+      boxShadow: '0 0 10px rgba(239,68,68,0.4)',
+      animation: 'pulse 1.2s ease-in-out infinite',
+    },
+    ccSend: {
+      width: 38, height: 38, borderRadius: '50%', background: '#1AAD5E',
+      border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    },
+  
+    // ── My List styles ──
+    wlRemoveBtn: {
+      minWidth: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      cursor: 'pointer', borderRadius: '50%',
+      transition: 'opacity 0.15s', opacity: 0.7,
+    },
+    wlAddSection: {
+      padding: '8px 12px',
+      background: t.card, border: `1px solid ${t.border}`, borderTop: 'none',
+      borderRadius: '0 0 12px 12px', marginTop: -1,
+    },
+    wlAddSearchBar: {
+      display: 'flex', alignItems: 'center', gap: 8,
+      background: t.surface, border: `1.5px solid ${t.border}`, borderRadius: 12,
+      padding: '8px 12px', cursor: 'text',
+    },
+    wlAddBtn: {
+      flexShrink: 0, marginLeft: 'auto',
+      fontSize: 12, fontWeight: 600, color: '#fff',
+      background: '#1AAD5E', border: 'none',
+      borderRadius: 14, padding: '5px 12px', cursor: 'pointer',
+    },
+  
+    // ── Search overlay (light theme) ──
+    searchOverlay: {
+      padding: '10px 14px', background: t.card, border: `1px solid ${t.border}`,
+      borderRadius: 12, margin: '8px 14px 0',
+    },
+    searchBarLight: {
+      display: 'flex', alignItems: 'center', gap: 8,
+      background: t.surface, border: `1px solid ${t.border}`,
+      borderRadius: 12, padding: '7px 12px',
+    },
+    searchInputLight: {
+      flex: 1, background: 'none', border: 'none', outline: 'none',
+      fontFamily: 'inherit', fontSize: 13, color: t.text1,
+    },
+    searchResultsLight: {
+      marginTop: 6, background: t.card,
+      border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden',
+    },
+    searchItemLight: {
+      padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      borderBottom: `1px solid ${t.border}`, cursor: 'pointer',
+    },
+    siAddBtnLight: {
+      fontSize: 12, fontWeight: 600, color: t.green, background: t.greenBg,
+      border: '1px solid rgba(26,173,94,0.2)', borderRadius: 12, padding: '4px 12px', cursor: 'pointer',
+      fontFamily: 'inherit',
+    },
+  
+  };
+
   return (
     <div style={S.outerWrap}>
 
@@ -1081,11 +1385,11 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
 
           {/* Progress */}
           <div style={OB.progress}>
-            <span style={OB.count}><span style={{ color: 'var(--green-btn)' }}>{onboardSelected.size}</span> selected</span>
+            <span style={OB.count}><span style={{ color: t.green }}>{onboardSelected.size}</span> selected</span>
             <div style={OB.barTrack}>
               <div style={{ ...OB.barFill, width: `${Math.min((onboardSelected.size / 5) * 100, 100)}%` }} />
             </div>
-            <span style={{ fontSize: 11, color: 'var(--text3)' }}>min 1</span>
+            <span style={{ fontSize: 11, color: t.text3 }}>min 1</span>
           </div>
 
           {/* Search */}
@@ -1098,7 +1402,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               onChange={e => handleOnboardSearch(e.target.value)}
             />
             {onboardSearch && (
-              <span style={{ color: 'var(--text3)', cursor: 'pointer', fontSize: 16 }} onClick={() => { setOnboardSearch(''); setOnboardSearchResults([]); }}>×</span>
+              <span style={{ color: t.text3, cursor: 'pointer', fontSize: 16 }} onClick={() => { setOnboardSearch(''); setOnboardSearchResults([]); }}>×</span>
             )}
           </div>
 
@@ -1108,11 +1412,11 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               {onboardSearchResults.map(r => (
                 <div key={r.symbol} style={OB.searchItem}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text1)' }}>{r.symbol}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text3)' }}>{r.name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1 }}>{r.symbol}</div>
+                    <div style={{ fontSize: 10, color: t.text3 }}>{r.name}</div>
                   </div>
                   {onboardSelected.has(r.symbol) ? (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--green-btn)', padding: '4px 12px' }}>Added ✓</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: t.green, padding: '4px 12px' }}>Added ✓</span>
                   ) : (
                     <button style={OB.searchAddBtn} onClick={() => toggleOnboardTicker(r.symbol)}>+ Add</button>
                   )}
@@ -1120,7 +1424,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               ))}
             </div>
           )}
-          {onboardSearchLoading && <div style={{ padding: '8px 20px', fontSize: 11, color: 'var(--text3)' }}>Searching...</div>}
+          {onboardSearchLoading && <div style={{ padding: '8px 20px', fontSize: 11, color: t.text3 }}>Searching...</div>}
 
           {/* Scrollable picks area */}
           <div style={OB.scrollArea}>
@@ -1370,7 +1674,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                   {sectorLabels.map(label => (
                     <div
                       key={label}
-                      style={{ ...S.sectorDropItem, ...(researchSector === label ? { color: 'var(--green-btn)', fontWeight: 600 } : {}) }}
+                      style={{ ...S.sectorDropItem, ...(researchSector === label ? { color: t.green, fontWeight: 600 } : {}) }}
                       onClick={() => {
                         setShowSectorDropdown(false);
                         loadResearch(label);
@@ -1406,11 +1710,11 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
 
               <div style={S.stocksScroll}>
                 {researchLoading ? (
-                  <div style={{ padding: 16, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>Loading...</div>
+                  <div style={{ padding: 16, textAlign: 'center', color: t.text3, fontSize: 13 }}>Loading...</div>
                 ) : researchStocks.length === 0 ? (
                   researchSector === '__mylist__' ? (
                     <div style={{ padding: '16px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 10 }}>No tickers in your list yet</div>
+                      <div style={{ fontSize: 13, color: t.text3, marginBottom: 10 }}>No tickers in your list yet</div>
                       <div style={S.wlPopRow}>
                         <span style={S.wlPopLabel}>Popular:</span>
                         {POPULAR_TICKERS.map(t => (
@@ -1419,7 +1723,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                       </div>
                     </div>
                   ) : (
-                    <div style={{ padding: 16, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>
+                    <div style={{ padding: 16, textAlign: 'center', color: t.text3, fontSize: 13 }}>
                       No rankings available for {researchSector} yet
                     </div>
                   )
@@ -1433,26 +1737,26 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                     return (
                       <div key={stock.id}>
                         <div
-                          style={{ ...S.stocksRow, ...(isOpen ? { background: '#0e1e36' } : {}) }}
+                          style={{ ...S.stocksRow, ...(isOpen ? { background: t.surface } : {}) }}
                           onClick={() => !isMyList && setResearchExpanded(isOpen ? null : stock.id)}
                         >
                           {isMyList ? (
                             <>
                               <span style={{ ...S.stocksRowTk, flex: 1 }}>{stock.ticker}</span>
-                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, color: 'var(--text3)' }}>
+                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, color: t.text3 }}>
                                 {priceData ? `$${priceData.price.toFixed(2)}` : '—'}
                               </span>
-                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, fontWeight: 600, color: isUp ? '#1AAD5E' : chg < 0 ? 'var(--red)' : '#5a7a9a' }}>
+                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, fontWeight: 600, color: isUp ? '#1AAD5E' : chg < 0 ? 'var(--red)' : t.text3 }}>
                                 {chg != null ? `${isUp ? '+' : ''}${chg.toFixed(2)}%` : '—'}
                               </span>
                               <span
-                                style={{ width: 24, textAlign: 'center', fontSize: 14, color: 'var(--border)', cursor: 'pointer' }}
+                                style={{ width: 24, textAlign: 'center', fontSize: 14, color: t.border, cursor: 'pointer' }}
                                 onClick={(e) => { e.stopPropagation(); removeFromWatchlist(stock.id, stock.ticker); }}
                               >×</span>
                             </>
                           ) : (
                             <>
-                              <span style={{ width: 28, fontSize: 11, fontWeight: 700, color: 'var(--text3)' }}>#{stock.ranking}</span>
+                              <span style={{ width: 28, fontSize: 11, fontWeight: 700, color: t.text3 }}>#{stock.ranking}</span>
                               <span style={{ ...S.stocksRowTk, flex: 1 }}>{stock.ticker}</span>
                               <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
                                 {stock.score != null && (
@@ -1462,9 +1766,9 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                                     color: stock.score >= 70 ? '#1AAD5E' : stock.score >= 50 ? 'var(--yellow)' : 'var(--red)',
                                   }}>{stock.score}</span>
                                 )}
-                                <span style={{ fontSize: 10, color: 'var(--border)' }}>{isOpen ? '▲' : '▼'}</span>
+                                <span style={{ fontSize: 10, color: t.border }}>{isOpen ? '▲' : '▼'}</span>
                               </span>
-                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, color: 'var(--text3)' }}>
+                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, color: t.text3 }}>
                                 {priceData ? `$${priceData.price.toFixed(2)}` : '—'}
                               </span>
                             </>
@@ -1472,9 +1776,9 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                         </div>
                         {!isMyList && isOpen && (
                           <div style={S.stocksExpand}>
-                            {stock.notes && <div style={{ fontSize: 11, color: 'var(--text1)', lineHeight: 1.5 }}>{stock.notes}</div>}
-                            {stock.thesis && <div style={{ fontSize: 11, color: '#8ca4c0', lineHeight: 1.5, marginTop: 4 }}>{stock.thesis}</div>}
-                            {!stock.thesis && !stock.notes && <div style={{ fontSize: 11, color: 'var(--text3)', fontStyle: 'italic' }}>No analysis available yet</div>}
+                            {stock.notes && <div style={{ fontSize: 11, color: t.text1, lineHeight: 1.5 }}>{stock.notes}</div>}
+                            {stock.thesis && <div style={{ fontSize: 11, color: t.text2, lineHeight: 1.5, marginTop: 4 }}>{stock.thesis}</div>}
+                            {!stock.thesis && !stock.notes && <div style={{ fontSize: 11, color: t.text3, fontStyle: 'italic' }}>No analysis available yet</div>}
                           </div>
                         )}
                       </div>
@@ -1485,7 +1789,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
 
               {researchSector === '__mylist__' && (
                 <div style={S.stocksAddBar}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5a7a9a" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.text3} strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
                   {showSearch ? (
                     <input
                       ref={searchRef}
@@ -1496,10 +1800,10 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                       autoFocus
                     />
                   ) : (
-                    <span style={{ fontSize: 12, color: 'var(--text3)', flex: 1, cursor: 'pointer' }} onClick={() => setShowSearch(true)}>+ Add ticker...</span>
+                    <span style={{ fontSize: 12, color: t.text3, flex: 1, cursor: 'pointer' }} onClick={() => setShowSearch(true)}>+ Add ticker...</span>
                   )}
                   <span
-                    style={{ fontSize: 12, fontWeight: 600, color: 'var(--green-btn)', cursor: 'pointer' }}
+                    style={{ fontSize: 12, fontWeight: 600, color: t.green, cursor: 'pointer' }}
                     onClick={() => {
                       if (showSearch) { setShowSearch(false); setSearchQuery(''); setSearchResults([]); }
                       else setShowSearch(true);
@@ -1509,15 +1813,15 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               )}
 
               {researchSector === '__mylist__' && showSearch && searchResults.length > 0 && (
-                <div style={{ maxHeight: 120, overflowY: 'auto', borderTop: '1px solid #1e3d62' }}>
+                <div style={{ maxHeight: 120, overflowY: 'auto', borderTop: `1px solid ${t.border}` }}>
                   {searchResults.map(r => (
-                    <div key={r.symbol} style={{ display: 'flex', alignItems: 'center', padding: '6px 12px', borderBottom: '1px solid #1e3d62' }}>
+                    <div key={r.symbol} style={{ display: 'flex', alignItems: 'center', padding: '6px 12px', borderBottom: `1px solid ${t.border}` }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text1)' }}>{r.symbol}</div>
-                        <div style={{ fontSize: 9, color: 'var(--text3)' }}>{r.name}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: t.text1 }}>{r.symbol}</div>
+                        <div style={{ fontSize: 9, color: t.text3 }}>{r.name}</div>
                       </div>
                       {r.alreadyAdded ? (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Added ✓</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: t.text3 }}>Added ✓</span>
                       ) : (
                         <button style={{ background: '#1AAD5E', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                           onClick={() => { addToWatchlist(r.symbol); setSearchResults(prev => prev.map(s => s.symbol === r.symbol ? { ...s, alreadyAdded: true } : s)); }}
@@ -1528,7 +1832,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                 </div>
               )}
               {researchSector === '__mylist__' && showSearch && searchLoading && (
-                <div style={{ padding: '6px 0', fontSize: 11, color: 'var(--text3)', textAlign: 'center' }}>Searching...</div>
+                <div style={{ padding: '6px 0', fontSize: 11, color: t.text3, textAlign: 'center' }}>Searching...</div>
               )}
             </div>
           )}
@@ -1569,7 +1873,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                   }} />
                 ))
               ) : (
-                <div style={{ padding: 16, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>
+                <div style={{ padding: 16, textAlign: 'center', color: t.text3, fontSize: 13 }}>
                   No recent messages
                 </div>
               )}
@@ -1604,11 +1908,11 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                     flexShrink: 0,
                     padding: '5px 12px',
                     borderRadius: 14,
-                    background: '#132d52',
-                    border: '1px solid #1e3d62',
+                    background: t.card,
+                    border: `1px solid ${t.border}`,
                     fontSize: 11,
                     fontWeight: 500,
-                    color: 'var(--text1)',
+                    color: t.text1,
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
                   }}
@@ -1639,7 +1943,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
             style={{ ...S.ccMic, ...(isListening ? S.ccMicActive : {}) }}
             onClick={toggleListening}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isListening ? '#fff' : '#5a7a9a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isListening ? '#fff' : t.text3} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="9" y="1" width="6" height="11" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
             </svg>
           </div>
@@ -1914,309 +2218,6 @@ function getTimeAgo(timestamp) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-// ═══════════════════════════════════════
-// STYLES
-// ═══════════════════════════════════════
-const S = {
-  outerWrap: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 },
-
-  // ── Toast ──
-  toast: {
-    position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)',
-    background: '#1AAD5E', color: '#fff', fontSize: 13, fontWeight: 600,
-    padding: '8px 16px', borderRadius: 20, boxShadow: '0 4px 12px rgba(26,173,94,0.3)',
-    display: 'flex', alignItems: 'center', gap: 6, zIndex: 10000,
-  },
-
-  // ── Header ──
-  header: {
-    background: '#132d52', padding: '10px 16px 8px',
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    flexShrink: 0,
-  },
-  hLeft: { display: 'flex', alignItems: 'center', gap: 5 },
-  logoRow: { display: 'flex', alignItems: 'baseline' },
-  logoUp: { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
-  logoTik: { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
-  logoAlerts: { fontSize: 11, fontWeight: 400, color: '#d4e4f2', letterSpacing: 1.5, fontFamily: "var(--font-heading)", marginTop: -3, paddingLeft: 26 },
-  hRight: { display: 'flex', alignItems: 'center', gap: 8 },
-  statusPill: {
-    display: 'flex', alignItems: 'center', gap: 4,
-    background: 'rgba(255,255,255,0.1)', padding: '2px 7px', borderRadius: 8,
-  },
-  statusDot: { width: 5, height: 5, borderRadius: '50%' },
-  statusText: { fontSize: 10, fontWeight: 600, letterSpacing: '0.04em' },
-  avatar: {
-    width: 26, height: 26, borderRadius: '50%', background: 'rgba(255,255,255,0.12)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 11, fontWeight: 600, color: '#f0ede8', cursor: 'pointer',
-  },
-  profileMenu: {
-    position: 'absolute', top: 'calc(100% + 8px)', right: -4, width: 130,
-    background: '#132d52', border: '1px solid rgba(255,255,255,0.15)',
-    borderRadius: 12, boxShadow: '0 6px 24px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden',
-  },
-  pmName: { fontSize: 13, fontWeight: 600, color: '#e0e0e0', padding: '9px 12px 8px', borderBottom: '1px solid rgba(255,255,255,0.1)' },
-  pmItem: { fontSize: 13, fontWeight: 500, color: 'var(--green-btn)', padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)' },
-
-  // ── Market Ticker Bar ──
-  combinedBar: { background: '#1a3a5e', flexShrink: 0 },
-  barContent: { padding: '8px 0', minHeight: 34 },
-  barScroll: { overflow: 'hidden', display: 'flex', alignItems: 'center' },
-  pulseItem: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 14px' },
-  pulseName: { fontSize: 13, fontWeight: 600, color: '#b8cde0', letterSpacing: 0.3 },
-  pulsePrice: { fontSize: 13, fontWeight: 700 },
-  pulseVal: { fontSize: 12, fontWeight: 600 },
-
-  // ── Content (scrollable area) ──
-  content: { flex: 1, overflowY: 'auto', paddingBottom: 8, background: '#0a1628', position: 'relative', zIndex: 1 },
-  sectionDivider: { height: 1, background: '#1e3d62', margin: '0 14px' },
-
-  fixedChatBar: {
-    flexShrink: 0,
-    padding: '12px 14px 14px', background: '#0e1e36',
-    display: 'flex', alignItems: 'center', gap: 10,
-    position: 'relative', zIndex: 50,
-    borderTop: '1px solid #1e3d62',
-    pointerEvents: 'auto',
-  },
-
-  // ── Watchlist / My List helpers ──
-  wlPopRow: { display: 'flex', gap: 5, justifyContent: 'center', flexWrap: 'wrap' },
-  wlPopLabel: { fontSize: 11, color: '#8ca4c0', marginRight: 2, alignSelf: 'center' },
-  wlPopChip: {
-    fontSize: 12, fontWeight: 600, color: 'var(--green-btn)',
-    background: 'rgba(94,237,138,0.1)', border: '1px solid rgba(26,173,94,0.2)',
-    borderRadius: 8, padding: '4px 10px', cursor: 'pointer',
-  },
-
-
-  // ── Briefing ──
-  briefSection: { padding: '12px 14px 8px' },
-  briefHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  briefTitle: { fontSize: 15, fontWeight: 700, color: 'var(--text1)', letterSpacing: '-0.01em' },
-  briefTime: { fontSize: 11, color: 'var(--text3)' },
-  briefToggle: { fontSize: 12, color: 'var(--green-btn)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' },
-  briefCard: {
-    background: '#132d52', border: '1px solid #1e3d62', borderRadius: 12,
-    padding: '10px 12px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10,
-  },
-  bfTickers: { fontSize: 11, fontWeight: 700, color: 'var(--green-btn)', marginBottom: 2 },
-  bfTitle: { fontSize: 13, color: 'var(--text1)', fontWeight: 500, lineHeight: 1.3 },
-  bfLink: { color: 'var(--green-btn)', fontSize: 12, fontWeight: 600, textDecoration: 'none', flexShrink: 0 },
-  briefEmpty: { background: '#132d52', border: '1px solid #1e3d62', borderRadius: 12, padding: 16, textAlign: 'center', fontSize: 13, color: 'var(--text3)' },
-
-  // ── Stocks section (inline) ──
-  stocksSection: { padding: '0 16px 8px' },
-  stocksHeader: { marginBottom: 6 },
-  stocksTitle: { fontSize: 15, fontWeight: 700, color: 'var(--text1)', fontFamily: "var(--font-heading)" },
-  stocksBtns: { display: 'flex', gap: 8 },
-  stocksBtn: {
-    padding: '7px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-    cursor: 'pointer', border: '1px solid #8cd9a0', background: 'rgba(140,217,160,0.08)',
-    color: 'var(--green-btn)', fontFamily: "var(--font)",
-  },
-  stocksBtnActive: { background: '#1AAD5E', color: '#fff', borderColor: '#1AAD5E' },
-  sectorDropdown: {
-    position: 'absolute', left: 0, top: '100%', marginTop: 4,
-    background: '#132d52', border: '1px solid #1e3d62', borderRadius: 10,
-    boxShadow: '0 4px 16px rgba(0,0,0,0.4)', overflow: 'hidden',
-    zIndex: 100, minWidth: 140,
-  },
-  sectorDropItem: {
-    padding: '10px 16px', fontSize: 13, color: 'var(--text1)', cursor: 'pointer',
-    borderBottom: '1px solid #1e3d62', fontFamily: "var(--font)",
-  },
-  stocksCard: {
-    background: '#132d52', border: '1px solid #1e3d62', borderRadius: 10,
-    overflow: 'hidden', marginTop: 8,
-  },
-  stocksHeaderRow: {
-    display: 'flex', alignItems: 'center', padding: '6px 10px',
-    borderBottom: '1px solid #1e3d62', background: '#0e1e36',
-  },
-  stocksColLabel: {
-    fontSize: 9, fontWeight: 600, color: 'var(--text3)',
-    textTransform: 'uppercase', letterSpacing: 0.5,
-  },
-  stocksScroll: { maxHeight: 200, overflowY: 'auto' },
-  stocksRow: {
-    display: 'flex', alignItems: 'center', padding: '7px 10px',
-    borderBottom: '1px solid #1e3d62', cursor: 'pointer',
-  },
-  stocksRowTk: { fontSize: 13, fontWeight: 600, color: 'var(--text1)' },
-  stocksExpand: {
-    padding: '8px 10px 8px 38px', background: '#0e1e36',
-    borderBottom: '1px solid #1e3d62',
-  },
-  stocksAddBar: {
-    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-    borderTop: '1px solid #1e3d62', background: '#0e1e36',
-    borderRadius: '0 0 10px 10px',
-  },
-  stocksAddInput: {
-    flex: 1, border: 'none', outline: 'none', fontSize: 13,
-    color: 'var(--text1)', background: 'transparent', fontFamily: "var(--font)",
-  },
-
-  // ── Chat section ──
-  chatSection: { padding: '12px 14px 8px' },
-  csHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  csTitle: { fontSize: 15, fontWeight: 700, color: 'var(--text1)', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 6 },
-  csLive: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--green-btn)', fontWeight: 500 },
-  csLiveDot: { width: 5, height: 5, borderRadius: '50%', background: '#1AAD5E', animation: 'pulse 1.5s ease-in-out infinite' },
-  privateChatBtn: {
-    display: 'flex', alignItems: 'center', gap: 5,
-    fontSize: 12, fontWeight: 600, color: '#fff',
-    background: '#1AAD5E', border: 'none', borderRadius: 14,
-    padding: '5px 12px', cursor: 'pointer',
-    fontFamily: 'inherit',
-  },
-
-  // ── My Groups section ──
-  groupSection: { padding: '12px 14px 16px' },
-  groupSectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  groupSectionTitle: { fontSize: 15, fontWeight: 700, color: 'var(--text1)', letterSpacing: '-0.01em' },
-  groupCreateBtn: {
-    fontSize: 13, fontWeight: 600, color: 'var(--green-btn)', background: 'none', border: 'none',
-    cursor: 'pointer', padding: '4px 0',
-  },
-  myGroupsPills: { display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2, justifyContent: 'center', flexWrap: 'wrap' },
-  myGroupPill: {
-    flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
-    borderRadius: 12, border: '1px solid #1e3d62', background: '#132d52', cursor: 'pointer',
-  },
-  myGroupName: { fontSize: 14, fontWeight: 600, color: 'var(--text1)' },
-  groupCta: {
-    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-    background: 'linear-gradient(135deg, #0e1e36 0%, #132d52 100%)', borderRadius: 12,
-    border: '1px solid #1e3d62', cursor: 'pointer',
-  },
-  groupCtaIcon: {
-    width: 40, height: 40, borderRadius: '50%', background: '#132d52',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-    border: '1px solid #1e3d62',
-  },
-  groupCtaText: { flex: 1 },
-  groupCtaTitle: { fontSize: 15, fontWeight: 700, color: 'var(--text1)', marginBottom: 2 },
-  groupCtaSub: { fontSize: 12, color: '#8ca4c0', lineHeight: 1.3 },
-
-  chatCard: {
-    background: '#132d52', border: '1px solid #1e3d62', borderRadius: 12, overflow: 'hidden',
-  },
-  ccMsgs: { padding: 6, display: 'flex', flexDirection: 'column', gap: 6 },
-  ccMsg: {
-    padding: '10px 12px',
-    background: 'rgba(139,92,246,0.08)',
-    borderRadius: 10,
-    display: 'flex', gap: 8, alignItems: 'flex-start',
-  },
-  ccFooter: {
-    padding: '8px 12px', background: '#0e1e36',
-    display: 'flex', alignItems: 'center', gap: 8,
-    borderTop: '1px solid #1e3d62',
-  },
-  ccAv: {
-    width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center',
-    justifyContent: 'center', fontSize: 11, fontWeight: 600, color: '#fff', flexShrink: 0,
-  },
-  ccTop: { display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 1 },
-  ccName: { fontSize: 13, fontWeight: 600 },
-  ccTime: { fontSize: 11, color: 'var(--text3)', marginLeft: 'auto' },
-  ccText: { fontSize: 13, color: '#e8edf2', lineHeight: 1.4 },
-  ccTk: { color: 'var(--green-btn)', fontWeight: 600 },
-  // ccFooter replaced by fixedChatBar
-  ccAiBtn: {
-    width: 36, height: 36, borderRadius: '50%',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
-    transition: 'all 0.2s',
-  },
-  ccAiBtnOff: {
-    background: '#132d52', color: '#fff', border: '1px solid rgba(139,92,246,0.3)',
-  },
-  ccAiBtnActive: {
-    background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)',
-    color: '#fff', boxShadow: '0 0 8px rgba(139,92,246,0.4)',
-  },
-  ccInputWrap: {
-    flex: 1, display: 'flex', alignItems: 'center',
-    background: '#132d52', border: '1.5px solid #1e3d62',
-    borderRadius: 20, height: 42, paddingRight: 4,
-  },
-  ccInput: {
-    flex: 1, background: 'transparent', border: 'none',
-    padding: '8px 0 8px 16px', fontSize: 15, color: 'var(--text1)',
-    fontFamily: 'inherit', outline: 'none', height: '100%',
-  },
-  ccMic: {
-    width: 32, height: 32, borderRadius: '50%', background: 'transparent',
-    border: 'none', cursor: 'pointer', flexShrink: 0,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    transition: 'all 0.2s',
-  },
-  ccMicActive: {
-    background: '#EF4444',
-    boxShadow: '0 0 10px rgba(239,68,68,0.4)',
-    animation: 'pulse 1.2s ease-in-out infinite',
-  },
-  ccSend: {
-    width: 38, height: 38, borderRadius: '50%', background: '#1AAD5E',
-    border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-  },
-
-  // ── My List styles ──
-  wlRemoveBtn: {
-    minWidth: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', borderRadius: '50%',
-    transition: 'opacity 0.15s', opacity: 0.7,
-  },
-  wlAddSection: {
-    padding: '8px 12px',
-    background: '#132d52', border: '1px solid #1e3d62', borderTop: 'none',
-    borderRadius: '0 0 12px 12px', marginTop: -1,
-  },
-  wlAddSearchBar: {
-    display: 'flex', alignItems: 'center', gap: 8,
-    background: '#0e1e36', border: '1.5px solid #1e3d62', borderRadius: 12,
-    padding: '8px 12px', cursor: 'text',
-  },
-  wlAddBtn: {
-    flexShrink: 0, marginLeft: 'auto',
-    fontSize: 12, fontWeight: 600, color: '#fff',
-    background: '#1AAD5E', border: 'none',
-    borderRadius: 14, padding: '5px 12px', cursor: 'pointer',
-  },
-
-  // ── Search overlay (light theme) ──
-  searchOverlay: {
-    padding: '10px 14px', background: '#132d52', border: '1px solid #1e3d62',
-    borderRadius: 12, margin: '8px 14px 0',
-  },
-  searchBarLight: {
-    display: 'flex', alignItems: 'center', gap: 8,
-    background: '#0e1e36', border: '1px solid #1e3d62',
-    borderRadius: 12, padding: '7px 12px',
-  },
-  searchInputLight: {
-    flex: 1, background: 'none', border: 'none', outline: 'none',
-    fontFamily: 'inherit', fontSize: 13, color: 'var(--text1)',
-  },
-  searchResultsLight: {
-    marginTop: 6, background: '#132d52',
-    border: '1px solid #1e3d62', borderRadius: 12, overflow: 'hidden',
-  },
-  searchItemLight: {
-    padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    borderBottom: '1px solid #1e3d62', cursor: 'pointer',
-  },
-  siAddBtnLight: {
-    fontSize: 12, fontWeight: 600, color: 'var(--green-btn)', background: 'rgba(26,173,94,0.08)',
-    border: '1px solid rgba(26,173,94,0.2)', borderRadius: 12, padding: '4px 12px', cursor: 'pointer',
-    fontFamily: 'inherit',
-  },
-
-};
 
 // ═══════════════════════════════════════
 // ONBOARDING STYLES
