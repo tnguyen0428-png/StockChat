@@ -343,6 +343,24 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
     if (publicGroups.length > 0) {
       loadChatPreview();
     }
+    // Realtime subscription for chat messages
+    const uptikPublic = publicGroups.find(g => g.name === 'UpTik Public') || publicGroups[0];
+    if (!uptikPublic) return;
+    const channel = supabase
+      .channel('home_chat_' + uptikPublic.id)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chat_messages',
+        filter: 'group_id=eq.' + uptikPublic.id,
+      }, (payload) => {
+        setChatMessages(prev => {
+          if (prev.some(m => m.id === payload.new.id)) return prev;
+          return [...prev, payload.new];
+        });
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
   }, [publicGroups]);
 
   // Close profile menu on outside click
@@ -522,14 +540,21 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   // ── Send message from Home page ──
   const handleHomeSend = async () => {
     const raw = chatInput.trim();
-    if (!raw || chatSending || !profile || !homeGroup) return;
+    if (!raw || chatSending || !profile) return;
+    // Resolve homeGroup if not yet set
+    let group = homeGroup;
+    if (!group) {
+      group = publicGroups.find(g => g.name === 'UpTik Public') || publicGroups[0];
+      if (group) setHomeGroup(group);
+    }
+    if (!group) return;
     const text = aiMode ? `@AI ${raw}` : raw;
 
     chatInputRef.current?.blur();
     setChatSending(true);
     try {
       const { data, error } = await supabase.from('chat_messages').insert({
-        group_id: homeGroup.id,
+        group_id: group.id,
         user_id: session.user.id,
         username: profile.username,
         user_color: profile.color,
@@ -569,12 +594,12 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               history: recentHistory,
               lastTicker: aiLastTicker,
               username: profile?.username,
-              groupName: homeGroup?.name,
+              groupName: group?.name,
               watchlist: watchlist.map(w => w.symbol),
             });
             if (newLastTicker) setAiLastTicker(newLastTicker);
             const { data: aiMsg } = await supabase.from('chat_messages').insert({
-              group_id: homeGroup.id, user_id: 'user_ai',
+              group_id: group.id, user_id: 'user_ai',
               username: 'UpTik', user_color: '#8B5CF6',
               text: aiReply, type: 'ai', is_admin: false,
             }).select().single();
