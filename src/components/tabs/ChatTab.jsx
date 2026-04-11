@@ -88,7 +88,7 @@ const UptikCard = ({ card }) => {
 };
 
 // ── Message Item ──
-const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven }) => {
+const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven, onTapUsername }) => {
   const isAdmin = msg.is_admin;
   const isAI    = msg.user_id === 'user_ai' || msg.type === 'ai';
 
@@ -171,7 +171,18 @@ const MessageItem = memo(({ msg, currentUserId, onFeedback, feedbackGiven }) => 
     <div style={styles.msg}>
       <div style={bodyStyle}>
         <div style={styles.msgTop}>
-          <span style={{ ...styles.msgName, color: isAI ? '#8B5CF6' : (msg.user_color || '#2a7d4b') }}>
+          <span
+            style={{
+              ...styles.msgName,
+              color: isAI ? '#8B5CF6' : (msg.user_color || '#2a7d4b'),
+              ...((!isAI && msg.user_id !== currentUserId && onTapUsername) ? { cursor: 'pointer', textDecoration: 'underline', textDecorationColor: isAI ? '#8B5CF6' : (msg.user_color || '#2a7d4b'), textUnderlineOffset: 2 } : {}),
+            }}
+            onClick={() => {
+              if (!isAI && msg.user_id !== currentUserId && onTapUsername) {
+                onTapUsername(msg.user_id, msg.username);
+              }
+            }}
+          >
             {msg.username}
           </span>
           {isAdmin && <span style={styles.adminBadge}>Admin</span>}
@@ -899,7 +910,7 @@ const ws = {
 };
 
 // ── Main ChatTab ──
-export default function ChatTab({ session, profile, group, isAdmin, isModerator, setUnreadChat }) {
+export default function ChatTab({ session, profile, group, isAdmin, isModerator, setUnreadChat, onStartDM }) {
   const { activeGroup } = useGroup();
   const [watchlist, setWatchlist] = useState([]);
   const [subTab, setSubTab]         = useState('chat');
@@ -1100,6 +1111,11 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     inputRef.current?.focus();
   };
 
+  // ── Tap username to start DM ──
+  const handleTapUsername = (userId, username) => {
+    if (onStartDM) onStartDM(userId, username);
+  };
+
   if (!group) {
     return (
       <div style={styles.loadingWrap}>
@@ -1157,18 +1173,18 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
                 if (isAI) {
                   return (
                     <FadingMessage key={msg.id} delay={60000} duration={5000} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
-                      <MessageItem msg={msg} currentUserId={session?.user?.id} onFeedback={handleFeedback} feedbackGiven={feedbackMap[msg.id]} />
+                      <MessageItem msg={msg} currentUserId={session?.user?.id} onFeedback={handleFeedback} feedbackGiven={feedbackMap[msg.id]} onTapUsername={handleTapUsername} />
                     </FadingMessage>
                   );
                 }
                 if (isAIQuestion) {
                   return (
                     <FadingMessage key={msg.id} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
-                      <MessageItem msg={msg} currentUserId={session?.user?.id} />
+                      <MessageItem msg={msg} currentUserId={session?.user?.id} onTapUsername={handleTapUsername} />
                     </FadingMessage>
                   );
                 }
-                return <MessageItem key={msg.id} msg={msg} currentUserId={session?.user?.id} />;
+                return <MessageItem key={msg.id} msg={msg} currentUserId={session?.user?.id} onTapUsername={handleTapUsername} />;
               })}
               {aiLoading && (
                 <div style={styles.aiLoading}>

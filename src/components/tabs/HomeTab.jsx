@@ -35,7 +35,7 @@ const ONBOARD_SECTORS = [
   { name: 'Consumer', color: '#9C27B0', tickers: ['DIS', 'NKE', 'SBUX', 'MCD'] },
 ];
 
-export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePress, onTabChange, scrollToChatRef }) {
+export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePress, onTabChange, scrollToChatRef, onOpenDMs, onStartDM }) {
   const { publicGroups, privateGroup, activeGroup, profile, customGroups } = useGroup();
 
   // ── Market data state (kept from original) ──
@@ -1524,7 +1524,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
             </div>
             <button
               style={S.privateChatBtn}
-              onClick={() => onTabChange?.('profile')}
+              onClick={() => onOpenDMs?.()}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
@@ -1540,7 +1540,9 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                 // No FadingMessage — auto-disappearing messages fight stickiness
                 // and any refetch path resurrects them with fresh timers, looking broken.
                 chatMessages.map((msg, i) => (
-                  <ChatBubble key={msg.id || i} msg={msg} myId={session?.user?.id} />
+                  <ChatBubble key={msg.id || i} msg={msg} myId={session?.user?.id} onTapUsername={(userId, username) => {
+                    if (onStartDM) { onStartDM(userId, username); onTabChange?.('chat'); }
+                  }} />
                 ))
               ) : (
                 <div style={{ padding: 16, textAlign: 'center', color: '#7a8ea3', fontSize: 13 }}>
@@ -1665,11 +1667,12 @@ function BriefCard({ article }) {
   );
 }
 
-function ChatBubble({ msg, myId }) {
+function ChatBubble({ msg, myId, onTapUsername }) {
   const name = msg.username || msg.profiles?.username || 'User';
   const colors = ['#1AAD5E', '#7B68EE', '#FF7043', '#4CAF50', '#E91E63', '#FF9800'];
   const isAI = msg.user_id === 'user_ai' || msg.type === 'ai';
   const isMe = !isAI && myId && msg.user_id === myId;
+  const canTap = !isAI && !isMe && onTapUsername;
   const color = isAI ? '#8B5CF6' : (msg.user_color || colors[name.charCodeAt(0) % colors.length]);
   const timeAgo = getTimeAgo(msg.created_at);
 
@@ -1736,7 +1739,13 @@ function ChatBubble({ msg, myId }) {
       <div style={{ ...S.ccAv, background: color }}>{name[0].toUpperCase()}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={S.ccTop}>
-          <span style={{ ...S.ccName, color }}>{name}</span>
+          <span
+            style={{
+              ...S.ccName, color,
+              ...(canTap ? { cursor: 'pointer', textDecoration: 'underline', textDecorationColor: color, textUnderlineOffset: 2, opacity: 0.9 } : {}),
+            }}
+            onClick={() => { if (canTap) onTapUsername(msg.user_id, name); }}
+          >{name}</span>
           <span style={S.ccTime}>{timeAgo}</span>
         </div>
         {card && <UptikCardInline card={card} />}

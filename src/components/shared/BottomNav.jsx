@@ -47,17 +47,23 @@ const TABS = [
   { id: 'profile',   label: 'Profile',   Icon: ProfileIcon   },
 ];
 
-export default function BottomNav({ activeTab, onTabChange, unreadAlerts }) {
+export default function BottomNav({ activeTab, onTabChange, unreadAlerts, dmUnreadCount }) {
   return (
     <div style={styles.nav}>
       {TABS.map(({ id, label, Icon }) => {
         const isActive = activeTab === id;
         const hasBadge = id === 'alerts' && unreadAlerts;
+        const hasDmBadge = id === 'chat' && dmUnreadCount > 0;
         return (
           <div key={id} style={styles.item} onClick={() => onTabChange(id)}>
             <div style={styles.iconWrap}>
               <Icon active={isActive} />
               {hasBadge && <div style={styles.badge} />}
+              {hasDmBadge && (
+                <div style={styles.dmBadge}>
+                  {dmUnreadCount > 9 ? '9+' : dmUnreadCount}
+                </div>
+              )}
             </div>
             <span style={{
               ...styles.label,
@@ -99,4 +105,12 @@ const styles = {
     borderRadius: '50%', border: '1.5px solid #f8fafc',
   },
   label: { fontSize: 11, fontWeight: 500 },
+  dmBadge: {
+    position: 'absolute', top: -4, right: -8,
+    background: '#5eed8a', color: '#0a1628',
+    fontSize: 8, fontWeight: 700,
+    minWidth: 14, height: 14, borderRadius: 7,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: '0 3px', border: '1.5px solid #f8fafc',
+  },
 };

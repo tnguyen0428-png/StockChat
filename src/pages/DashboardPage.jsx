@@ -18,6 +18,8 @@ const ProfileTab    = lazy(() => import('../components/tabs/ProfileTab'));
 const HelpTab       = lazy(() => import('../components/tabs/HelpTab'));
 const AITab         = lazy(() => import('../components/tabs/AITab'));
 const PortfolioTab  = lazy(() => import('../components/tabs/PortfolioTab'));
+const DMInbox       = lazy(() => import('../components/dm/DMInbox'));
+const DMChat        = lazy(() => import('../components/dm/DMChat'));
 const TabFallback = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
     <div style={{ fontSize: 12, color: 'var(--text3)' }}>Loading…</div>
@@ -35,6 +37,9 @@ export default function DashboardPage({ session }) {
     publicGroups, privateGroup,
     isAdmin, isModerator, loading,
     enterGroup, refreshGroups,
+    // DM
+    dmConversations, activeDM, dmUnreadCount,
+    startDM, markDMRead, closeDM, setActiveDM,
   } = useGroup();
 
   const [activeTab, setActiveTab]         = useState(() => {
@@ -48,6 +53,8 @@ export default function DashboardPage({ session }) {
   const [activeBroadcast, setActiveBroadcast] = useState(null);
   const [unreadAlerts, setUnreadAlerts]   = useState(false);
   const [unreadChat, setUnreadChat]       = useState(false);
+  const [chatMode, setChatMode]           = useState('groups'); // 'groups' | 'dms' | 'dm-chat'
+  const [startingDM, setStartingDM]       = useState(false);
   const dismissTimerRef = useRef(null);
 
   // Listen for broadcasts
@@ -107,6 +114,34 @@ export default function DashboardPage({ session }) {
     }
   }, [activeTab, publicGroups, loading]);
 
+  // ── DM Handlers ──
+  const handleStartDM = async (otherUserId, otherUsername) => {
+    // Optimistically flip to dm-chat mode so we don't flash the Groups or
+    // Inbox view between tap and RPC resolution. A small loader covers the gap.
+    setActiveTab('chat');
+    setChatMode('dm-chat');
+    setStartingDM(true);
+    try {
+      const dm = await startDM(otherUserId);
+      if (!dm) {
+        // Creation failed — fall back to the inbox rather than stranding the user
+        setChatMode('dms');
+      }
+    } finally {
+      setStartingDM(false);
+    }
+  };
+
+  const handleOpenDMFromInbox = (convo) => {
+    setActiveDM(convo);
+    setChatMode('dm-chat');
+  };
+
+  const handleBackFromDM = () => {
+    closeDM();
+    setChatMode('dms');
+  };
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     navigate('/login');
@@ -116,14 +151,19 @@ export default function DashboardPage({ session }) {
   const scrollToChatRef = useRef(null);
 
   const handleTabChange = useCallback((tab) => {
-    if (tab === 'chat' || tab === 'home') {
-      // Go to home tab — don't auto-focus input so keyboard stays down on mobile
-      // (user may want to tap AI button before typing)
+    if (tab === 'home') {
       setActiveTab('home');
+    } else if (tab === 'chat') {
+      setActiveTab('chat');
+      // Reset to groups view when tapping Chat tab (unless already in chat)
+      if (chatMode === 'dm-chat') {
+        closeDM();
+        setChatMode('groups');
+      }
     } else {
       setActiveTab(tab);
     }
-  }, []);
+  }, [chatMode, closeDM]);
 
   const handleGroupSelect = (group) => {
     enterGroup(group);
@@ -218,6 +258,8 @@ export default function DashboardPage({ session }) {
             onProfilePress={() => setActiveTab('profile')}
             onTabChange={handleTabChange}
             scrollToChatRef={scrollToChatRef}
+            onOpenDMs={() => { setActiveTab('chat'); setChatMode('dms'); }}
+            onStartDM={handleStartDM}
           />
         )}
         {activeTab === 'ai' && (
@@ -230,22 +272,75 @@ export default function DashboardPage({ session }) {
             <AlertsTab session={session} group={activeGroup} />
           </Suspense>
         )}
-        {activeTab === 'chat' && activeGroup && (
-          <Suspense fallback={<TabFallback />}>
-            <ChatTab
-              session={session}
-              profile={profile}
-              group={activeGroup}
-              isAdmin={isAdmin}
-              isModerator={isModerator}
-              setUnreadChat={setUnreadChat}
-            />
-          </Suspense>
-        )}
-        {activeTab === 'chat' && !activeGroup && (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ fontSize: 14, color: 'var(--text3)' }}>Loading chat...</div>
-          </div>
+        {activeTab === 'chat' && (
+          <>
+            {/* Groups | DMs toggle — only show when not in active DM chat */}
+            {chatMode !== 'dm-chat' && (
+              <div style={styles.chatToggleRow}>
+                <div
+                  style={{ ...styles.chatTogglePill, ...(chatMode === 'groups' ? styles.chatToggleActive : {}) }}
+                  onClick={() => setChatMode('groups')}
+                >
+                  Groups
+                </div>
+                <div
+                  style={{ ...styles.chatTogglePill, ...(chatMode === 'dms' ? styles.chatToggleActive : {}), position: 'relative' }}
+                  onClick={() => setChatMode('dms')}
+                >
+                  DMs
+                  {dmUnreadCount > 0 && (
+                    <span style={styles.dmBadge}>{dmUnreadCount > 9 ? '9+' : dmUnreadCount}</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Group Chat view */}
+            {chatMode === 'groups' && activeGroup && (
+              <Suspense fallback={<TabFallback />}>
+                <ChatTab
+                  session={session}
+                  profile={profile}
+                  group={activeGroup}
+                  isAdmin={isAdmin}
+                  isModerator={isModerator}
+                  setUnreadChat={setUnreadChat}
+                  onStartDM={handleStartDM}
+                />
+              </Suspense>
+            )}
+            {chatMode === 'groups' && !activeGroup && (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ fontSize: 14, color: 'var(--text3)' }}>Loading chat...</div>
+              </div>
+            )}
+
+            {/* DM Inbox view */}
+            {chatMode === 'dms' && (
+              <Suspense fallback={<TabFallback />}>
+                <DMInbox onOpenDM={handleOpenDMFromInbox} />
+              </Suspense>
+            )}
+
+            {/* Active DM Chat view */}
+            {chatMode === 'dm-chat' && activeDM && !startingDM && (
+              <Suspense fallback={<TabFallback />}>
+                <DMChat session={session} dm={activeDM} onBack={handleBackFromDM} />
+              </Suspense>
+            )}
+            {/* Transitional loader: DM is being created from a username tap */}
+            {chatMode === 'dm-chat' && startingDM && (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ fontSize: 13, color: 'var(--text3)' }}>Starting chat…</div>
+              </div>
+            )}
+            {/* Safety fallback: dm-chat mode, not loading, but no activeDM — bounce to inbox */}
+            {chatMode === 'dm-chat' && !activeDM && !startingDM && (
+              <Suspense fallback={<TabFallback />}>
+                <DMInbox onOpenDM={handleOpenDMFromInbox} />
+              </Suspense>
+            )}
+          </>
         )}
         {activeTab === 'challenge' && (
           <div style={{ flex: 1, overflow: 'auto' }}>
@@ -277,6 +372,7 @@ export default function DashboardPage({ session }) {
         onTabChange={handleTabChange}
         unreadAlerts={unreadAlerts}
         unreadChat={unreadChat}
+        dmUnreadCount={dmUnreadCount}
       />
 
     </div>
@@ -319,4 +415,27 @@ const styles = {
     alignItems: 'center', justifyContent: 'center', lineHeight: 1,
   },
   content: { flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: 'calc(90px + env(safe-area-inset-bottom, 0px))' },
+  chatToggleRow: {
+    display: 'flex', gap: 0, padding: '8px 16px',
+    background: 'var(--card)', borderBottom: '1px solid var(--border)',
+    flexShrink: 0,
+  },
+  chatTogglePill: {
+    flex: 1, textAlign: 'center', padding: '8px 0',
+    fontSize: 13, fontWeight: 500, color: 'var(--text3)',
+    cursor: 'pointer', borderRadius: 8,
+    transition: 'all 0.15s',
+  },
+  chatToggleActive: {
+    background: '#132d52', color: '#fff',
+    fontWeight: 600, borderRadius: 8,
+  },
+  dmBadge: {
+    position: 'absolute', top: 2, right: 12,
+    background: '#5eed8a', color: '#0a1628',
+    fontSize: 9, fontWeight: 700,
+    minWidth: 16, height: 16, borderRadius: 8,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: '0 4px',
+  },
 };
