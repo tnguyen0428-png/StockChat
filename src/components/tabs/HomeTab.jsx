@@ -1085,7 +1085,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
 
           {/* Search */}
           <div style={OB.search}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7a8ea3" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5a7a9a" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
             <input
               style={OB.searchInput}
               placeholder="Search any ticker or company..."
@@ -1141,7 +1141,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                           {chg >= 0 ? '+' : ''}{chg.toFixed(2)}%
                         </span>
                       )}
-                      <span style={{ fontSize: sel ? 13 : 16, color: sel ? '#1AAD5E' : '#7a8ea3' }}>
+                      <span style={{ fontSize: sel ? 13 : 16, color: sel ? '#1AAD5E' : '#5a7a9a' }}>
                         {sel ? '✓' : '+'}
                       </span>
                     </div>
@@ -1427,7 +1427,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                     return (
                       <div key={stock.id}>
                         <div
-                          style={{ ...S.stocksRow, ...(isOpen ? { background: '#f8fafc' } : {}) }}
+                          style={{ ...S.stocksRow, ...(isOpen ? { background: '#0e1e36' } : {}) }}
                           onClick={() => !isMyList && setResearchExpanded(isOpen ? null : stock.id)}
                         >
                           {isMyList ? (
@@ -1436,7 +1436,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                               <span style={{ width: 60, textAlign: 'right', fontSize: 11, color: 'var(--text3)' }}>
                                 {priceData ? `$${priceData.price.toFixed(2)}` : '—'}
                               </span>
-                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, fontWeight: 600, color: isUp ? '#1AAD5E' : chg < 0 ? 'var(--red)' : '#7a8ea3' }}>
+                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, fontWeight: 600, color: isUp ? '#1AAD5E' : chg < 0 ? 'var(--red)' : '#5a7a9a' }}>
                                 {chg != null ? `${isUp ? '+' : ''}${chg.toFixed(2)}%` : '—'}
                               </span>
                               <span
@@ -1467,7 +1467,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                         {!isMyList && isOpen && (
                           <div style={S.stocksExpand}>
                             {stock.notes && <div style={{ fontSize: 11, color: 'var(--text1)', lineHeight: 1.5 }}>{stock.notes}</div>}
-                            {stock.thesis && <div style={{ fontSize: 11, color: '#5a6f85', lineHeight: 1.5, marginTop: 4 }}>{stock.thesis}</div>}
+                            {stock.thesis && <div style={{ fontSize: 11, color: '#8ca4c0', lineHeight: 1.5, marginTop: 4 }}>{stock.thesis}</div>}
                             {!stock.thesis && !stock.notes && <div style={{ fontSize: 11, color: 'var(--text3)', fontStyle: 'italic' }}>No analysis available yet</div>}
                           </div>
                         )}
@@ -1479,7 +1479,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
 
               {researchSector === '__mylist__' && (
                 <div style={S.stocksAddBar}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a8ea3" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5a7a9a" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
                   {showSearch ? (
                     <input
                       ref={searchRef}
@@ -1503,9 +1503,9 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               )}
 
               {researchSector === '__mylist__' && showSearch && searchResults.length > 0 && (
-                <div style={{ maxHeight: 120, overflowY: 'auto', borderTop: '1px solid #f0f4f8' }}>
+                <div style={{ maxHeight: 120, overflowY: 'auto', borderTop: '1px solid #1e3d62' }}>
                   {searchResults.map(r => (
-                    <div key={r.symbol} style={{ display: 'flex', alignItems: 'center', padding: '6px 12px', borderBottom: '1px solid #f5f7fa' }}>
+                    <div key={r.symbol} style={{ display: 'flex', alignItems: 'center', padding: '6px 12px', borderBottom: '1px solid #1e3d62' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text1)' }}>{r.symbol}</div>
                         <div style={{ fontSize: 9, color: 'var(--text3)' }}>{r.name}</div>
@@ -1598,8 +1598,8 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                     flexShrink: 0,
                     padding: '5px 12px',
                     borderRadius: 14,
-                    background: '#fff',
-                    border: '1px solid #d8e2ed',
+                    background: '#132d52',
+                    border: '1px solid #1e3d62',
                     fontSize: 11,
                     fontWeight: 500,
                     color: 'var(--text1)',
@@ -1633,7 +1633,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
             style={{ ...S.ccMic, ...(isListening ? S.ccMicActive : {}) }}
             onClick={toggleListening}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isListening ? '#fff' : '#7a8ea3'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isListening ? '#fff' : '#5a7a9a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="9" y="1" width="6" height="11" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
             </svg>
           </div>
@@ -1733,7 +1733,7 @@ function ChatBubble({ msg, myId, onTapUsername }) {
   // iMessage-style right-align for the current user's own messages
   if (isMe) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 12px', background: '#f8fafc', borderRadius: 10, margin: '0 6px' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 12px', background: 'rgba(94,237,138,0.08)', borderRadius: 10, margin: '0 6px' }}>
         <div style={{
           maxWidth: '78%',
           background: '#1AAD5E',
@@ -1786,18 +1786,18 @@ function ChatBubble({ msg, myId, onTapUsername }) {
 function UptikCardInline({ card }) {
   if (!card || !card.type) return null;
   const wrap = {
-    background: '#eef2f7',
+    background: '#0e1e36',
     borderRadius: 10,
     margin: '6px 0 8px',
     fontFamily: "var(--font-heading)",
     overflow: 'hidden',
-    color: 'var(--text1)',
-    border: '1px solid #d8e2ed',
+    color: '#e8edf2',
+    border: '1px solid #1e3d62',
   };
   const head = {
     display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
     padding: '10px 14px',
-    borderBottom: '1px solid #d8e2ed',
+    borderBottom: '1px solid #1e3d62',
   };
   const ticker = { fontWeight: 700, fontSize: 15, color: '#8B5CF6', letterSpacing: 0.4 };
   const price = { fontWeight: 700, fontSize: 14, color: 'var(--text1)' };
@@ -1818,7 +1818,7 @@ function UptikCardInline({ card }) {
               <div key={i} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '8px 14px',
-                borderBottom: i < qs.length - 1 ? '1px solid #d8e2ed' : 'none',
+                borderBottom: i < qs.length - 1 ? '1px solid #1e3d62' : 'none',
                 fontSize: 13,
               }}>
                 <span style={{ color: 'var(--text3)', fontWeight: 500 }}>{q.label}</span>
@@ -1836,7 +1836,7 @@ function UptikCardInline({ card }) {
             color: 'var(--text3)',
             letterSpacing: 0.5,
             textTransform: 'uppercase',
-            borderTop: '1px solid #d8e2ed',
+            borderTop: '1px solid #1e3d62',
           }}>
             Next: {card.nextEarnings}
           </div>
@@ -1871,25 +1871,25 @@ function UptikCardInline({ card }) {
           {card.pe != null && (
             <div style={{ fontSize: 12 }}>
               <span style={{ color: 'var(--text3)' }}>P/E </span>
-              <span style={{ color: '#e6ecf5', fontWeight: 600 }}>{card.pe}</span>
+              <span style={{ color: '#e8edf2', fontWeight: 600 }}>{card.pe}</span>
             </div>
           )}
           {card.peg != null && (
             <div style={{ fontSize: 12 }}>
               <span style={{ color: 'var(--text3)' }}>PEG </span>
-              <span style={{ color: '#e6ecf5', fontWeight: 600 }}>{card.peg}</span>
+              <span style={{ color: '#e8edf2', fontWeight: 600 }}>{card.peg}</span>
             </div>
           )}
           {card.netMargin != null && (
             <div style={{ fontSize: 12 }}>
               <span style={{ color: 'var(--text3)' }}>Margin </span>
-              <span style={{ color: '#e6ecf5', fontWeight: 600 }}>{card.netMargin}%</span>
+              <span style={{ color: '#e8edf2', fontWeight: 600 }}>{card.netMargin}%</span>
             </div>
           )}
           {card.salesGrowth != null && (
             <div style={{ fontSize: 12 }}>
               <span style={{ color: 'var(--text3)' }}>Sales </span>
-              <span style={{ color: '#22c55e', fontWeight: 600 }}>+{card.salesGrowth}%</span>
+              <span style={{ color: '#5eed8a', fontWeight: 600 }}>+{card.salesGrowth}%</span>
             </div>
           )}
         </div>
@@ -1963,23 +1963,24 @@ const S = {
   pulseVal: { fontSize: 12, fontWeight: 600 },
 
   // ── Content (scrollable area) ──
-  content: { flex: 1, overflowY: 'auto', paddingBottom: 8, background: '#eef2f7', position: 'relative', zIndex: 1 },
-  sectionDivider: { height: 1, background: '#dce4ed', margin: '0 14px' },
+  content: { flex: 1, overflowY: 'auto', paddingBottom: 8, background: '#0a1628', position: 'relative', zIndex: 1 },
+  sectionDivider: { height: 1, background: '#1e3d62', margin: '0 14px' },
 
   fixedChatBar: {
     flexShrink: 0,
-    padding: '12px 14px 14px', background: '#eef2f7',
+    padding: '12px 14px 14px', background: '#0e1e36',
     display: 'flex', alignItems: 'center', gap: 10,
     position: 'relative', zIndex: 50,
-    borderTop: '1px solid #d8e2ed',
+    borderTop: '1px solid #1e3d62',
+    pointerEvents: 'auto',
   },
 
   // ── Watchlist / My List helpers ──
   wlPopRow: { display: 'flex', gap: 5, justifyContent: 'center', flexWrap: 'wrap' },
-  wlPopLabel: { fontSize: 11, color: '#3e5568', marginRight: 2, alignSelf: 'center' },
+  wlPopLabel: { fontSize: 11, color: '#8ca4c0', marginRight: 2, alignSelf: 'center' },
   wlPopChip: {
     fontSize: 12, fontWeight: 600, color: 'var(--green-btn)',
-    background: 'rgba(26,173,94,0.08)', border: '1px solid rgba(26,173,94,0.2)',
+    background: 'rgba(94,237,138,0.1)', border: '1px solid rgba(26,173,94,0.2)',
     borderRadius: 8, padding: '4px 10px', cursor: 'pointer',
   },
 
@@ -1991,13 +1992,13 @@ const S = {
   briefTime: { fontSize: 11, color: 'var(--text3)' },
   briefToggle: { fontSize: 12, color: 'var(--green-btn)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' },
   briefCard: {
-    background: '#fff', border: '1px solid #d8e2ed', borderRadius: 12,
+    background: '#132d52', border: '1px solid #1e3d62', borderRadius: 12,
     padding: '10px 12px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10,
   },
   bfTickers: { fontSize: 11, fontWeight: 700, color: 'var(--green-btn)', marginBottom: 2 },
   bfTitle: { fontSize: 13, color: 'var(--text1)', fontWeight: 500, lineHeight: 1.3 },
   bfLink: { color: 'var(--green-btn)', fontSize: 12, fontWeight: 600, textDecoration: 'none', flexShrink: 0 },
-  briefEmpty: { background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 12, padding: 16, textAlign: 'center', fontSize: 13, color: 'var(--text3)' },
+  briefEmpty: { background: '#132d52', border: '1px solid #1e3d62', borderRadius: 12, padding: 16, textAlign: 'center', fontSize: 13, color: 'var(--text3)' },
 
   // ── Stocks section (inline) ──
   stocksSection: { padding: '0 16px 8px' },
@@ -2012,21 +2013,21 @@ const S = {
   stocksBtnActive: { background: '#1AAD5E', color: '#fff', borderColor: '#1AAD5E' },
   sectorDropdown: {
     position: 'absolute', left: 0, top: '100%', marginTop: 4,
-    background: '#fff', border: '1px solid #d8e2ed', borderRadius: 10,
-    boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden',
+    background: '#132d52', border: '1px solid #1e3d62', borderRadius: 10,
+    boxShadow: '0 4px 16px rgba(0,0,0,0.4)', overflow: 'hidden',
     zIndex: 100, minWidth: 140,
   },
   sectorDropItem: {
     padding: '10px 16px', fontSize: 13, color: 'var(--text1)', cursor: 'pointer',
-    borderBottom: '1px solid #f5f7fa', fontFamily: "var(--font)",
+    borderBottom: '1px solid #1e3d62', fontFamily: "var(--font)",
   },
   stocksCard: {
-    background: '#fff', border: '1px solid #d8e2ed', borderRadius: 10,
+    background: '#132d52', border: '1px solid #1e3d62', borderRadius: 10,
     overflow: 'hidden', marginTop: 8,
   },
   stocksHeaderRow: {
     display: 'flex', alignItems: 'center', padding: '6px 10px',
-    borderBottom: '1px solid #d8e2ed', background: '#fafbfc',
+    borderBottom: '1px solid #1e3d62', background: '#0e1e36',
   },
   stocksColLabel: {
     fontSize: 9, fontWeight: 600, color: 'var(--text3)',
@@ -2035,16 +2036,16 @@ const S = {
   stocksScroll: { maxHeight: 200, overflowY: 'auto' },
   stocksRow: {
     display: 'flex', alignItems: 'center', padding: '7px 10px',
-    borderBottom: '1px solid #f5f7fa', cursor: 'pointer',
+    borderBottom: '1px solid #1e3d62', cursor: 'pointer',
   },
   stocksRowTk: { fontSize: 13, fontWeight: 600, color: 'var(--text1)' },
   stocksExpand: {
-    padding: '8px 10px 8px 38px', background: '#f8fafc',
-    borderBottom: '1px solid #f0f4f8',
+    padding: '8px 10px 8px 38px', background: '#0e1e36',
+    borderBottom: '1px solid #1e3d62',
   },
   stocksAddBar: {
     display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-    borderTop: '1px solid #d8e2ed', background: '#fafbfc',
+    borderTop: '1px solid #1e3d62', background: '#0e1e36',
     borderRadius: '0 0 10px 10px',
   },
   stocksAddInput: {
@@ -2077,37 +2078,37 @@ const S = {
   myGroupsPills: { display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2, justifyContent: 'center', flexWrap: 'wrap' },
   myGroupPill: {
     flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
-    borderRadius: 12, border: '1px solid #d8e2ed', background: '#fff', cursor: 'pointer',
+    borderRadius: 12, border: '1px solid #1e3d62', background: '#132d52', cursor: 'pointer',
   },
   myGroupName: { fontSize: 14, fontWeight: 600, color: 'var(--text1)' },
   groupCta: {
     display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-    background: 'linear-gradient(135deg, #f0f7f3 0%, #e8f4ec 100%)', borderRadius: 12,
-    border: '1px solid #c8e6d0', cursor: 'pointer',
+    background: 'linear-gradient(135deg, #0e1e36 0%, #132d52 100%)', borderRadius: 12,
+    border: '1px solid #1e3d62', cursor: 'pointer',
   },
   groupCtaIcon: {
-    width: 40, height: 40, borderRadius: '50%', background: '#fff',
+    width: 40, height: 40, borderRadius: '50%', background: '#132d52',
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-    border: '1px solid #c8e6d0',
+    border: '1px solid #1e3d62',
   },
   groupCtaText: { flex: 1 },
   groupCtaTitle: { fontSize: 15, fontWeight: 700, color: 'var(--text1)', marginBottom: 2 },
-  groupCtaSub: { fontSize: 12, color: '#5a8a6a', lineHeight: 1.3 },
+  groupCtaSub: { fontSize: 12, color: '#8ca4c0', lineHeight: 1.3 },
 
   chatCard: {
-    background: '#fff', border: '1px solid #d8e2ed', borderRadius: 12, overflow: 'hidden',
+    background: '#132d52', border: '1px solid #1e3d62', borderRadius: 12, overflow: 'hidden',
   },
   ccMsgs: { padding: 6, display: 'flex', flexDirection: 'column', gap: 6 },
   ccMsg: {
     padding: '10px 12px',
-    background: '#f8fafc',
+    background: 'rgba(139,92,246,0.08)',
     borderRadius: 10,
     display: 'flex', gap: 8, alignItems: 'flex-start',
   },
   ccFooter: {
-    padding: '8px 12px', background: '#f8fafc',
+    padding: '8px 12px', background: '#0e1e36',
     display: 'flex', alignItems: 'center', gap: 8,
-    borderTop: '1px solid #eef2f7',
+    borderTop: '1px solid #1e3d62',
   },
   ccAv: {
     width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center',
@@ -2116,7 +2117,7 @@ const S = {
   ccTop: { display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 1 },
   ccName: { fontSize: 13, fontWeight: 600 },
   ccTime: { fontSize: 11, color: 'var(--text3)', marginLeft: 'auto' },
-  ccText: { fontSize: 13, color: '#4a6178', lineHeight: 1.4 },
+  ccText: { fontSize: 13, color: '#e8edf2', lineHeight: 1.4 },
   ccTk: { color: 'var(--green-btn)', fontWeight: 600 },
   // ccFooter replaced by fixedChatBar
   ccAiBtn: {
@@ -2126,7 +2127,7 @@ const S = {
     transition: 'all 0.2s',
   },
   ccAiBtnOff: {
-    background: '#7a8ea3', color: '#fff',
+    background: '#132d52', color: '#fff', border: '1px solid rgba(139,92,246,0.3)',
   },
   ccAiBtnActive: {
     background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)',
@@ -2134,7 +2135,7 @@ const S = {
   },
   ccInputWrap: {
     flex: 1, display: 'flex', alignItems: 'center',
-    background: '#fff', border: '1.5px solid #d8e2ed',
+    background: '#132d52', border: '1.5px solid #1e3d62',
     borderRadius: 20, height: 42, paddingRight: 4,
   },
   ccInput: {
@@ -2166,12 +2167,12 @@ const S = {
   },
   wlAddSection: {
     padding: '8px 12px',
-    background: '#fff', border: '1px solid #d8e2ed', borderTop: 'none',
+    background: '#132d52', border: '1px solid #1e3d62', borderTop: 'none',
     borderRadius: '0 0 12px 12px', marginTop: -1,
   },
   wlAddSearchBar: {
     display: 'flex', alignItems: 'center', gap: 8,
-    background: '#fff', border: '1.5px solid #d8e2ed', borderRadius: 12,
+    background: '#0e1e36', border: '1.5px solid #1e3d62', borderRadius: 12,
     padding: '8px 12px', cursor: 'text',
   },
   wlAddBtn: {
@@ -2183,12 +2184,12 @@ const S = {
 
   // ── Search overlay (light theme) ──
   searchOverlay: {
-    padding: '10px 14px', background: '#fff', border: '1px solid #d8e2ed',
+    padding: '10px 14px', background: '#132d52', border: '1px solid #1e3d62',
     borderRadius: 12, margin: '8px 14px 0',
   },
   searchBarLight: {
     display: 'flex', alignItems: 'center', gap: 8,
-    background: '#f5f7fa', border: '1px solid #d8e2ed',
+    background: '#0e1e36', border: '1px solid #1e3d62',
     borderRadius: 12, padding: '7px 12px',
   },
   searchInputLight: {
@@ -2196,12 +2197,12 @@ const S = {
     fontFamily: 'inherit', fontSize: 13, color: 'var(--text1)',
   },
   searchResultsLight: {
-    marginTop: 6, background: '#f8fafc',
-    border: '1px solid #d8e2ed', borderRadius: 12, overflow: 'hidden',
+    marginTop: 6, background: '#132d52',
+    border: '1px solid #1e3d62', borderRadius: 12, overflow: 'hidden',
   },
   searchItemLight: {
     padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    borderBottom: '1px solid #f0f3f6', cursor: 'pointer',
+    borderBottom: '1px solid #1e3d62', cursor: 'pointer',
   },
   siAddBtnLight: {
     fontSize: 12, fontWeight: 600, color: 'var(--green-btn)', background: 'rgba(26,173,94,0.08)',
@@ -2269,6 +2270,7 @@ const OB = {
     background: '#fff', border: '1.5px solid #d8e2ed', cursor: 'pointer', transition: 'all 0.2s',
   },
   trendingChipSel: { borderColor: '#1AAD5E', background: 'rgba(26,173,94,0.06)' },
+trendingChipSel: { borderColor: '#1AAD5E', background: 'rgba(26,173,94,0.06)' },
   tcTicker: { fontSize: 13, fontWeight: 700, color: '#132d52' },
 
   sectorGroup: { marginBottom: 14 },
