@@ -3,7 +3,7 @@
 // Main app entry — handles routing only
 // ============================================
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 
@@ -18,7 +18,7 @@ import { GroupProvider } from './context/GroupContext';
 function LoadingScreen() {
   return (
     <div style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       background: 'var(--bg)',
       display: 'flex',
       alignItems: 'center',
@@ -80,35 +80,55 @@ export default function App() {
         });
     }
 
-    // Get initial session
+    // Get initial session — this is the single source of truth on first load.
+    // onAuthStateChange fires AFTER this, so we gate on initialised to avoid
+    // a flash where session briefly becomes null between the two.
+    let initialised = false;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+      setSession(session ?? null);   // null (not undefined) = "checked, no session"
+      initialised = true;
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (event, newSession) => {
+        // Ignore events that arrive before getSession resolves — they carry
+        // the same data and setting state twice causes a flash.
+        if (!initialised) return;
+
         if (event === 'PASSWORD_RECOVERY') {
           setRecoveryMode(true);
         } else if (event === 'USER_UPDATED' || event === 'SIGNED_IN') {
           setRecoveryMode(false);
         }
-        setSession(session);
+
+        // TOKEN_REFRESHED with a null session means the refresh failed (e.g.
+        // phone came back from background on a bad connection). Don't kick the
+        // user to /login — keep the stale session so the UI stays up. The next
+        // Supabase call will 401 and we handle it there.
+        if (event === 'TOKEN_REFRESHED' && !newSession) {
+          console.warn('[Auth] Token refresh returned null session — keeping current session');
+          return;
+        }
+
+        setSession(newSession);
 
         // Handle pending invite after sign-in
-        if (event === 'SIGNED_IN' && session) {
-          const pendingCode = localStorage.getItem('uptik_pending_invite');
-          if (pendingCode) {
-            localStorage.removeItem('uptik_pending_invite');
-            // Join the group in the background
-            supabase.rpc('join_custom_group', { p_invite_code: pendingCode })
-              .then(({ data, error }) => {
-                if (error) { console.error('[App] Pending invite join failed:', error.message); return; }
-                if (data?.success && data.group_id) {
-                  localStorage.setItem('uptik_active_group', data.group_id);
-                }
-              });
-          }
+        if (event === 'SIGNED_IN' && newSession) {
+          try {
+            const pendingCode = localStorage.getItem('uptik_pending_invite');
+            if (pendingCode) {
+              localStorage.removeItem('uptik_pending_invite');
+              supabase.rpc('join_custom_group', { p_invite_code: pendingCode })
+                .then(({ data, error }) => {
+                  if (error) { console.error('[App] Pending invite join failed:', error.message); return; }
+                  if (data?.success && data.group_id) {
+                    try { localStorage.setItem('uptik_active_group', data.group_id); } catch {}
+                  }
+                });
+            }
+          } catch { /* localStorage unavailable (iOS private browsing) */ }
         }
       }
     );

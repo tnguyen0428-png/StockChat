@@ -373,6 +373,8 @@ const typingStyles = {
 // ── Main DM Chat Component ──
 export default function DMChat({ session, dm, onBack }) {
   const { profile, markDMRead, onlineUsers } = useGroup();
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -628,7 +630,7 @@ export default function DMChat({ session, dm, onBack }) {
           type: 'ai',
         }).catch(() => {});
       } finally {
-        setAiLoading(false);
+        if (mountedRef.current) setAiLoading(false);
       }
     }
   };

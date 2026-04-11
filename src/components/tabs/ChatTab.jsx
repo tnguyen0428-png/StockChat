@@ -333,20 +333,18 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   useEffect(() => {
     const el = messagesAreaRef.current;
     if (!el) return;
-    const pin = () => { el.scrollTop = el.scrollHeight; };
+    // Only auto-scroll if user is near bottom — don't yank them away from reading history
+    const nearBottom = () => el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    if (!nearBottom()) return;
+    const pin = () => {
+      if (!nearBottom()) return;
+      el.scrollTop = el.scrollHeight;
+    };
     const raf = requestAnimationFrame(pin);
     const t = setTimeout(pin, 120);
-    let ro;
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(pin);
-      ro.observe(el);
-      // Observe last child too — its height growing is the real signal
-      if (el.lastElementChild) ro.observe(el.lastElementChild);
-    }
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(t);
-      ro?.disconnect();
     };
   }, [messages.length, aiLoading]);
 

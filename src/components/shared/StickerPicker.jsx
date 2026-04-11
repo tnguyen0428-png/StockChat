@@ -26,8 +26,8 @@ export default function StickerPicker({ onSend, size = 'md' }) {
   useEffect(() => {
     if (open && btnRef.current) {
       const r = btnRef.current.getBoundingClientRect();
-      const vh = window.innerHeight;
-      const vw = window.innerWidth;
+      const vh = window.visualViewport?.height || window.innerHeight;
+      const vw = window.visualViewport?.width  || window.innerWidth;
       let left = r.right - popupW;
       if (left < 8) left = 8;
       if (left + popupW > vw - 8) left = vw - popupW - 8;

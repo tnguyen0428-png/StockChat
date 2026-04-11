@@ -12,7 +12,7 @@ import { getBatchQuotes } from '../../lib/polygonQuote';
 import CreateGroupModal from '../shared/CreateGroupModal';
 import InviteModal from '../shared/InviteModal';
 import StickerPicker, { STICKERS, isSticker, getStickerId } from '../shared/StickerPicker';
-import { DarkModeToggle, useTheme } from './alertsCasinoComponents';
+import { useTheme } from './alertsCasinoComponents';
 
 const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
 const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
@@ -37,10 +37,9 @@ const ONBOARD_SECTORS = [
   { name: 'Consumer', color: '#9C27B0', tickers: ['DIS', 'NKE', 'SBUX', 'MCD'] },
 ];
 
-export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePress, onTabChange, scrollToChatRef, onOpenDMs, onStartDM }) {
+export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToChatRef, onOpenDMs, onStartDM, darkMode }) {
   const { publicGroups, privateGroup, activeGroup, profile, customGroups } = useGroup();
 
-  const [darkMode, setDarkMode] = useState(true);
   const t = useTheme(darkMode);
 
   // ── Market data state (kept from original) ──
@@ -71,12 +70,11 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   const [showInviteGroup, setShowInviteGroup]   = useState(null);
 
   // ── Research / Curated Lists state ──
-  const savedSector = localStorage.getItem('uptik_last_sector');
+  const savedSector = (() => { try { return localStorage.getItem('uptik_last_sector'); } catch { return null; } })();
   const [researchSector, setResearchSectorRaw]  = useState(savedSector || null);
   const setResearchSector = (val) => {
     setResearchSectorRaw(val);
-    if (val) localStorage.setItem('uptik_last_sector', val);
-    else localStorage.removeItem('uptik_last_sector');
+    try { if (val) localStorage.setItem('uptik_last_sector', val); else localStorage.removeItem('uptik_last_sector'); } catch { /* iOS private */ }
   };
   const [researchStocks, setResearchStocks]     = useState([]);
   const [researchLoading, setResearchLoading]   = useState(false);
@@ -101,11 +99,11 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   const onboardSearchTimeout = useRef(null);
 
   // ── Chat input state (sends from Home page) ──
-  const [chatInput, setChatInputRaw]            = useState(() => localStorage.getItem('uptik_chat_draft') || '');
-  const setChatInput = (val) => { setChatInputRaw(val); if (val) localStorage.setItem('uptik_chat_draft', val); else localStorage.removeItem('uptik_chat_draft'); };
+  const [chatInput, setChatInputRaw]            = useState(() => { try { return localStorage.getItem('uptik_chat_draft') || ''; } catch { return ''; } });
+  const setChatInput = (val) => { setChatInputRaw(val); try { if (val) localStorage.setItem('uptik_chat_draft', val); else localStorage.removeItem('uptik_chat_draft'); } catch { /* iOS private */ } };
   const [chatSending, setChatSending]           = useState(false);
-  const [aiMode, setAiMode]                     = useState(() => localStorage.getItem('uptik_ai_mode') === '1');
-  useEffect(() => { localStorage.setItem('uptik_ai_mode', aiMode ? '1' : '0'); }, [aiMode]);
+  const [aiMode, setAiMode]                     = useState(() => { try { return localStorage.getItem('uptik_ai_mode') === '1'; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem('uptik_ai_mode', aiMode ? '1' : '0'); } catch { /* iOS private */ } }, [aiMode]);
   const [chatExpanded, setChatExpanded]          = useState(false);
   const [aiLoading, setAiLoading]               = useState(false);
   const [aiLastTicker, setAiLastTicker]         = useState(null);
@@ -201,8 +199,6 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   }, [scrollToChatRef]);
 
   // ── UI state ──
-  const [showProfileMenu, setShowProfileMenu]   = useState(false);
-  const profileMenuRef = useRef(null);
   const searchRef = useRef(null);
   const searchTimeout = useRef(null);
 
@@ -227,15 +223,23 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   // INITIAL LOAD
   // ═══════════════════════════════════════
   useEffect(() => {
-    loadBriefing();
-    loadMarketIndicators();
-    loadWatchlist().then(() => {
-      // Restore saved sector on mount
-      const saved = localStorage.getItem('uptik_last_sector');
-      if (saved && saved !== '__mylist__') {
-        loadResearch(saved);
-      }
-    });
+    let cancelled = false;
+    const init = async () => {
+      // Run in parallel — none of these depend on each other
+      await Promise.allSettled([
+        loadBriefing(),
+        loadMarketIndicators(),
+        loadWatchlist().then(() => {
+          if (cancelled) return;
+          try {
+            const saved = localStorage.getItem('uptik_last_sector');
+            if (saved && saved !== '__mylist__') loadResearch(saved);
+          } catch {}
+        }),
+      ]);
+    };
+    init();
+    return () => { cancelled = true; };
   }, []);
 
   // ── First-login detection: show onboarding if watchlist is empty & never dismissed ──
@@ -347,9 +351,12 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
     if (publicGroups.length > 0) {
       loadChatPreview();
     }
-    // Realtime subscription for chat messages
+    // Realtime subscription for chat messages on Home preview.
+    // We use a unique channel name so it doesn't collide with ChatTab's channel.
+    // This is intentionally lightweight — just appends new messages to the preview.
     const uptikPublic = publicGroups.find(g => g.name === 'UpTik Public') || publicGroups[0];
     if (!uptikPublic) return;
+    let cancelled = false;
     const channel = supabase
       .channel('home_chat_' + uptikPublic.id)
       .on('postgres_changes', {
@@ -358,30 +365,18 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
         table: 'chat_messages',
         filter: 'group_id=eq.' + uptikPublic.id,
       }, (payload) => {
+        if (cancelled) return;
         setChatMessages(prev => {
           if (prev.some(m => m.id === payload.new.id)) return prev;
-          return [...prev, payload.new];
+          return [...prev, payload.new].slice(-50); // cap at 50 to avoid unbounded growth
         });
       })
       .subscribe();
-    return () => supabase.removeChannel(channel);
-  }, [publicGroups]);
-
-  // Close profile menu on outside click
-  useEffect(() => {
-    if (!showProfileMenu) return;
-    const handler = (e) => {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
-        setShowProfileMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    document.addEventListener('touchstart', handler);
     return () => {
-      document.removeEventListener('mousedown', handler);
-      document.removeEventListener('touchstart', handler);
+      cancelled = true;
+      supabase.removeChannel(channel);
     };
-  }, [showProfileMenu]);
+  }, [publicGroups]);
 
   // ═══════════════════════════════════════
   // BRIEFING
@@ -1320,37 +1315,6 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
       display: 'flex', alignItems: 'center', gap: 6, zIndex: 10000,
     },
 
-    // ── Header ──
-    header: {
-      background: '#132d52', padding: '10px 16px 8px',
-      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      flexShrink: 0,
-    },
-    hLeft: { display: 'flex', alignItems: 'center', gap: 5 },
-    logoRow: { display: 'flex', alignItems: 'baseline' },
-    logoUp: { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
-    logoTik: { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
-    logoAlerts: { fontSize: 11, fontWeight: 400, color: '#d4e4f2', letterSpacing: 1.5, fontFamily: "var(--font-heading)", marginTop: -3, paddingLeft: 26 },
-    hRight: { display: 'flex', alignItems: 'center', gap: 8 },
-    statusPill: {
-      display: 'flex', alignItems: 'center', gap: 4,
-      background: 'rgba(255,255,255,0.1)', padding: '2px 7px', borderRadius: 8,
-    },
-    statusDot: { width: 5, height: 5, borderRadius: '50%' },
-    statusText: { fontSize: 10, fontWeight: 600, letterSpacing: '0.04em' },
-    avatar: {
-      width: 26, height: 26, borderRadius: '50%', background: 'rgba(255,255,255,0.12)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 11, fontWeight: 600, color: '#f0ede8', cursor: 'pointer',
-    },
-    profileMenu: {
-      position: 'absolute', top: 'calc(100% + 8px)', right: -4, width: 130,
-      background: '#132d52', border: '1px solid rgba(255,255,255,0.15)',
-      borderRadius: 12, boxShadow: '0 6px 24px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden',
-    },
-    pmName: { fontSize: 13, fontWeight: 600, color: '#e0e0e0', padding: '9px 12px 8px', borderBottom: '1px solid rgba(255,255,255,0.1)' },
-    pmItem: { fontSize: 13, fontWeight: 500, color: t.green, padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)' },
-
     // ── Market Ticker Bar ──
     combinedBar: { background: '#1a3a5e', flexShrink: 0 },
     barContent: { padding: '8px 0', minHeight: 34 },
@@ -1525,7 +1489,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
       transition: 'all 0.2s',
     },
     ccAiBtnOff: {
-      background: darkMode ? t.card : t.surface, color: darkMode ? '#fff' : '#8B5CF6', border: `1px solid ${darkMode ? 'rgba(139,92,246,0.3)' : '#d8e2ed'}`,
+      background: t.surface, color: t.purple, border: `1px solid ${t.border}`,
     },
     ccAiBtnActive: {
       background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)',
@@ -1836,45 +1800,6 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
           </div>
         </div>
       )}
-
-      {/* ═══ SLIM HEADER ═══ */}
-      <div style={S.header}>
-        <div style={S.hLeft}>
-          <div>
-            <div style={S.logoRow}>
-              <svg width="30" height="30" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: -5, verticalAlign: 'bottom', position: 'relative', top: 6 }}>
-                <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3.5" />
-                <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.5" opacity="0.6" />
-                <path d="M25 22 L25 30 C25 34 25 34 25 30 L25 22" strokeWidth="1.8" opacity="0.35" />
-                <path d="M35 8 L29 14 M35 8 L41 14" strokeWidth="3.5" />
-              </svg>
-              <span style={S.logoUp}>p</span><span style={S.logoTik}>tik</span>
-            </div>
-            <div style={S.logoAlerts}>a l e r t s</div>
-          </div>
-        </div>
-        <div style={S.hRight}>
-          <div style={S.statusPill}>
-            <div style={{ ...S.statusDot, background: marketStatus === 'open' ? '#8cd9a0' : '#ef5350' }} />
-            <span style={{ ...S.statusText, color: marketStatus === 'open' ? '#8cd9a0' : '#ef5350' }}>
-              {marketStatus === 'open' ? 'LIVE' : marketStatus === 'premarket' ? 'PRE' : marketStatus === 'afterhours' ? 'AH' : 'CLOSED'}
-            </span>
-          </div>
-          <DarkModeToggle darkMode={darkMode} onToggle={() => setDarkMode(d => !d)} t={t} />
-          <div ref={profileMenuRef} style={{ position: 'relative' }}>
-            <div style={S.avatar} onClick={() => setShowProfileMenu(p => !p)}>
-              {(profile?.username || 'U')[0].toUpperCase()}
-            </div>
-            {showProfileMenu && (
-              <div style={S.profileMenu}>
-                <div style={S.pmName}>{profile?.username || 'User'}</div>
-                <div style={S.pmItem} onClick={() => { setShowProfileMenu(false); onProfilePress?.(); }}>Profile</div>
-                <div style={{ ...S.pmItem, color: '#EF4444' }} onClick={() => { setShowProfileMenu(false); onSignOut?.(); }}>Sign Out</div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* ═══ MARKET TICKER SCROLL ═══ */}
       <div style={S.combinedBar}>

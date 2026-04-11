@@ -80,11 +80,16 @@ async function fetchWithRetry(url, retries = 2) {
 // ── Score a single ticker ──
 export async function scoreTicker(symbol) {
   try {
-    const [ratios, earnings, profile] = await Promise.all([
+    const results = await Promise.allSettled([
       fetchWithRetry(`${BASE}/ratios?symbol=${symbol}&apikey=${FMP_KEY}`),
       fetchWithRetry(`${BASE}/earnings?symbol=${symbol}&apikey=${FMP_KEY}`),
       fetchWithRetry(`${BASE}/profile?symbol=${symbol}&apikey=${FMP_KEY}`),
     ]);
+    const [ratios, earnings, profile] = results.map((r, i) => {
+      if (r.status === 'fulfilled') return r.value;
+      console.warn(`[Screener] ${symbol} fetch ${['ratios','earnings','profile'][i]} failed:`, r.reason);
+      return null;
+    });
 
     if (!ratios?.[0] || !profile?.[0]) {
       console.warn(`[Screener] ${symbol} skipped — missing data (ratios: ${!!ratios?.[0]}, profile: ${!!profile?.[0]})`);

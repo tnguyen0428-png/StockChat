@@ -9,7 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
 import SellModal from '../portfolio/SellModal';
 import StickerPicker from '../shared/StickerPicker';
-import { DarkModeToggle } from './alertsCasinoComponents';
+import { useTheme } from './alertsCasinoComponents';
 
 const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
 const STARTING_CASH = 50000;
@@ -77,7 +77,7 @@ function detectBehaviorBadges(userId, allTrades) {
   return badges;
 }
 
-export default function PortfolioTab({ session, darkMode: parentDarkMode, setDarkMode: parentSetDarkMode }) {
+export default function PortfolioTab({ session, darkMode }) {
   const { profile } = useGroup();
 
   const [portfolio, setPortfolio] = useState(null);
@@ -120,11 +120,6 @@ export default function PortfolioTab({ session, darkMode: parentDarkMode, setDar
   const [riskLevel, setRiskLevel] = useState({ level: 'Low', bars: 2, color: '#2a7d4b', note: '' });
   const [showPortfolio, setShowPortfolio] = useState(false);
   const [showAllRankings, setShowAllRankings] = useState(false);
-  const [localDarkMode, setLocalDarkMode] = useState(() => {
-    try { return localStorage.getItem('uptik_darkMode') === 'true'; } catch { return false; }
-  });
-  const darkMode = parentDarkMode !== undefined ? parentDarkMode : localDarkMode;
-  const setDarkMode = parentSetDarkMode || setLocalDarkMode;
 
   // Leaderboard v2 state
   const [chatReactions, setChatReactions] = useState({});
@@ -134,6 +129,8 @@ export default function PortfolioTab({ session, darkMode: parentDarkMode, setDar
 
   const refreshRef = useRef(null);
   const allTradesRef = useRef([]);
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
   // ── Load portfolio ──
   const loadPortfolio = useCallback(async () => {
@@ -196,7 +193,7 @@ export default function PortfolioTab({ session, darkMode: parentDarkMode, setDar
         }));
         if (i + 6 < symbols.length) await new Promise(r => setTimeout(r, 250));
       }
-      if (Object.keys(map).length > 0) {
+      if (Object.keys(map).length > 0 && mountedRef.current) {
         setPrices(prev => ({ ...prev, ...map }));
         setLastUpdated(new Date());
       }
@@ -602,6 +599,7 @@ export default function PortfolioTab({ session, darkMode: parentDarkMode, setDar
   // ── Compute my stats ──
   useEffect(() => {
     if (!session?.user?.id || trades.length === 0) return;
+    let cancelled = false;
     // Best pick
     let best = null;
     trades.forEach(t => {
@@ -616,14 +614,15 @@ export default function PortfolioTab({ session, darkMode: parentDarkMode, setDar
       return curPrice >= Number(t.entry_price);
     }).length;
     setMyWinRate({ wins, total: trades.length, pct: trades.length > 0 ? Math.round((wins / trades.length) * 100) : 0 });
-    // Total trades count
+    // Total trades count (async — must check mounted)
     (async () => {
       const { count } = await supabase
         .from('paper_trades')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', session.user.id);
-      setMyTotalTrades(count || 0);
+      if (!cancelled) setMyTotalTrades(count || 0);
     })();
+    return () => { cancelled = true; };
   }, [trades, prices, session?.user?.id]);
 
   // ── NEW: Trash talk ──
@@ -730,24 +729,19 @@ export default function PortfolioTab({ session, darkMode: parentDarkMode, setDar
     return { bg: '#FCEBEB', color: '#791F1F' };
   };
 
-  const t = darkMode ? {
-    bg: '#0a1628', card: '#132d52', surface: '#0e1e36',
-    border: '#1e3d62', text1: '#e8edf2', text2: '#8ca4c0', text3: '#5a7a9a',
-    green: '#5eed8a', red: '#F09595', blue: '#7B8CDE', purple: '#a78bfa',
-    greenBg: 'rgba(94,237,138,0.1)', redBg: 'rgba(240,149,149,0.1)',
+  const _t = useTheme(darkMode);
+  // Extend with portfolio-specific overrides + medal colors
+  const t = {
+    ..._t,
+    // Portfolio uses a brighter green than the shared theme
+    green: darkMode ? '#5eed8a' : '#16a34a',
+    greenBg: darkMode ? 'rgba(94,237,138,0.1)' : 'rgba(22,163,74,0.08)',
     medalGold: 'linear-gradient(135deg,#FFD700,#e6a800)',
     medalSilver: 'linear-gradient(135deg,#C0C0C0,#909090)',
     medalBronze: 'linear-gradient(135deg,#CD7F32,#a0622d)',
-    pctGold: '#FFD700', pctSilver: '#C0C0C0', pctBronze: '#8cd9a0',
-  } : {
-    bg: '#f8fafc', card: '#ffffff', surface: '#f8fafc',
-    border: '#e2e8f0', text1: '#0f172a', text2: '#64748b', text3: '#94a3b8',
-    green: '#16a34a', red: '#dc2626', blue: '#2563eb', purple: '#7c3aed',
-    greenBg: 'rgba(22,163,74,0.08)', redBg: 'rgba(220,38,38,0.08)',
-    medalGold: 'linear-gradient(135deg,#FFD700,#e6a800)',
-    medalSilver: 'linear-gradient(135deg,#C0C0C0,#909090)',
-    medalBronze: 'linear-gradient(135deg,#CD7F32,#a0622d)',
-    pctGold: '#b8860b', pctSilver: '#6b7280', pctBronze: '#16a34a',
+    pctGold: darkMode ? '#FFD700' : '#b8860b',
+    pctSilver: darkMode ? '#C0C0C0' : '#6b7280',
+    pctBronze: darkMode ? '#8cd9a0' : '#16a34a',
   };
 
   const s = {
@@ -756,7 +750,7 @@ export default function PortfolioTab({ session, darkMode: parentDarkMode, setDar
     barNewText: { flex: 1 },
     barNewTitle: { fontSize: 12, fontWeight: 700, color: t.text1 },
     barNewSub: { fontSize: 10, color: t.text3, marginTop: 2 },
-    barNewBtn: { background: t.green, color: darkMode ? '#0a1628' : '#fff', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
+    barNewBtn: { background: t.green, color: t.btnText, borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
     barActive: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, marginBottom: 8 },
     barRank: { width: 30, height: 30, borderRadius: '50%', background: t.greenBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
     barRankText: { fontSize: 13, fontWeight: 800, color: t.green },
@@ -764,7 +758,7 @@ export default function PortfolioTab({ session, darkMode: parentDarkMode, setDar
     barStatsTop: { display: 'flex', alignItems: 'center', gap: 6 },
     barStatsBottom: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: t.text3, marginTop: 2, flexWrap: 'wrap' },
     barPortBtn: { background: t.greenBg, border: `1px solid ${t.green}40`, borderRadius: 8, padding: '6px 12px', fontSize: 10, fontWeight: 600, color: t.green, cursor: 'pointer', flexShrink: 0 },
-    barPortBtnOpen: { background: t.green, color: darkMode ? '#0a1628' : '#fff', borderColor: t.green },
+    barPortBtnOpen: { background: t.green, color: t.btnText, borderColor: t.green },
     portDrop: { background: t.card, borderRadius: 12, border: `1px solid ${t.border}`, marginBottom: 8, overflow: 'hidden' },
     portCash: { display: 'flex' },
     portCashItem: { flex: 1, padding: '10px 8px', textAlign: 'center' },
@@ -777,14 +771,14 @@ export default function PortfolioTab({ session, darkMode: parentDarkMode, setDar
     portPosSell: { fontSize: 10, fontWeight: 600, color: t.red, background: t.redBg, border: `1px solid ${t.red}30`, padding: '5px 10px', borderRadius: 6, cursor: 'pointer', flexShrink: 0 },
     portBuyRow: { display: 'flex', gap: 4, padding: '8px 12px', borderTop: `1px solid ${t.border}` },
     portBuyInput: { flex: 1, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 6, padding: '7px 8px', fontSize: 11, fontWeight: 600, color: t.text1, fontFamily: 'var(--font)', outline: 'none', letterSpacing: 0.4 },
-    portBuyBtn: { background: t.green, color: darkMode ? '#0a1628' : '#fff', border: 'none', borderRadius: 6, padding: '7px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 },
+    portBuyBtn: { background: t.green, color: t.btnText, border: 'none', borderRadius: 6, padding: '7px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 },
     portSearchRow: { padding: '8px 12px', borderBottom: `1px solid ${t.border}`, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' },
     portHistToggle: { fontSize: 10, fontWeight: 600, color: t.blue, textAlign: 'center', padding: '8px 12px', cursor: 'pointer', borderTop: `1px solid ${t.border}` },
     presetBtnSm: { flex: 1, padding: '6px 0', borderRadius: 5, border: `1px solid ${t.green}`, background: 'transparent', fontSize: 11, fontWeight: 600, color: t.green, cursor: 'pointer', fontFamily: 'var(--font)' },
     otherBtnSm: { flex: 1, padding: '6px 0', borderRadius: 5, border: `1px solid ${t.border}`, background: 'transparent', fontSize: 11, fontWeight: 600, color: t.text2, cursor: 'pointer', fontFamily: 'var(--font)' },
     customWrapSm: { flex: 1, display: 'flex', alignItems: 'center', background: t.card, border: `1px solid ${t.green}`, borderRadius: 5, padding: '0 6px' },
     customInputSm: { flex: 1, border: 'none', background: 'transparent', padding: '6px 0', fontSize: 12, fontWeight: 600, color: t.green, outline: 'none', fontFamily: 'var(--font)' },
-    customBuySm: { background: t.green, color: darkMode ? '#0a1628' : '#fff', border: 'none', borderRadius: 5, padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' },
+    customBuySm: { background: t.green, color: t.btnText, border: 'none', borderRadius: 5, padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' },
     rankingsCard: { background: t.card, borderRadius: 12, border: `1px solid ${t.border}`, marginBottom: 8, overflow: 'hidden' },
     rankingsHdr: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px 8px' },
     rankingsTitle: { fontSize: 11, fontWeight: 700, color: t.text1, textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -792,12 +786,12 @@ export default function PortfolioTab({ session, darkMode: parentDarkMode, setDar
     topRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderTop: `1px solid ${t.border}`, cursor: 'pointer' },
     topMedal: { width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 },
     topInfo: { flex: 1, minWidth: 0 },
-    topName: { fontSize: 13, fontWeight: 700, color: darkMode ? '#fff' : t.text1 },
+    topName: { fontSize: 13, fontWeight: 700, color: t.text1 },
     topNote: { fontSize: 10, color: t.text2, marginTop: 2, lineHeight: 1.4 },
     topBadge: { color: t.purple, fontWeight: 600 },
     topPct: { fontSize: 15, fontWeight: 700, flexShrink: 0 },
     rankDivider: { height: 1, background: t.border, margin: '2px 12px' },
-    rankRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderTop: `1px solid ${t.border}`, cursor: 'pointer', border: '1px solid transparent' },
+    rankRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', border: '1px solid transparent', borderTop: `1px solid ${t.border}`, cursor: 'pointer' },
     rankNum: { width: 24, height: 24, borderRadius: '50%', background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, color: t.text3, flexShrink: 0 },
     expandedPositions: { padding: '4px 12px 8px 48px', display: 'flex', flexWrap: 'wrap', gap: 6, borderTop: `1px solid ${t.border}` },
     expandedChip: { display: 'flex', gap: 4, alignItems: 'center', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 6, padding: '4px 8px' },
@@ -825,7 +819,7 @@ export default function PortfolioTab({ session, darkMode: parentDarkMode, setDar
     rxnAdd: { padding: '2px 6px', borderRadius: 12, cursor: 'pointer', fontSize: 11, border: `0.5px dashed ${t.border}`, background: 'transparent', color: t.text3, display: 'flex', alignItems: 'center', gap: 2 },
     smackInput: { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderTop: `1px solid ${t.border}`, background: t.surface },
     smackInputField: { flex: 1, background: t.card, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 12, color: t.text1, fontFamily: 'var(--font)', outline: 'none' },
-    smackSendBtn: { background: t.green, color: darkMode ? '#0a1628' : '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' },
+    smackSendBtn: { background: t.green, color: t.btnText, border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' },
   };
 
   // ── Loading ──
@@ -853,7 +847,6 @@ export default function PortfolioTab({ session, darkMode: parentDarkMode, setDar
             </div>
             <div style={{ fontSize: 10, color: t.text2, marginTop: 2, marginLeft: 24 }}>Trade with $50K fake money · learn together</div>
           </div>
-          <DarkModeToggle darkMode={darkMode} onToggle={() => setDarkMode(d => !d)} t={t} />
         </div>
 
         {/* TOP BAR */}

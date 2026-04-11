@@ -6,8 +6,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useGroup } from '../../context/GroupContext';
-import { useTheme, DarkModeToggle, SentimentPill, timeAgo } from './alertsCasinoComponents';
+import { useTheme, SentimentPill, timeAgo } from './alertsCasinoComponents';
 import { isMarketOpen } from '../../utils/marketUtils';
 
 // ── Alert type badge config ──
@@ -128,19 +127,8 @@ function nextMarketDay() {
 }
 
 // ===== MAIN COMPONENT =====
-export default function AlertsTab({ session, group, darkMode: parentDarkMode, setDarkMode: parentSetDarkMode }) {
-  const { isAdmin } = useGroup();
-
-  const [localDarkMode, setLocalDarkMode] = useState(() => {
-    try { return localStorage.getItem('uptik_darkMode') === 'true'; } catch { return false; }
-  });
-  const darkMode = parentDarkMode !== undefined ? parentDarkMode : localDarkMode;
-  const setDarkMode = parentSetDarkMode || setLocalDarkMode;
+export default function AlertsTab({ session, group, darkMode }) {
   const t = useTheme(darkMode);
-
-  useEffect(() => {
-    try { localStorage.setItem('uptik_darkMode', String(darkMode)); } catch {}
-  }, [darkMode]);
 
   const [liveAlerts, setLiveAlerts] = useState([]);
   const [fearScore, setFearScore] = useState(null);
@@ -253,14 +241,14 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
 
   if (loading) {
     return (
-      <div style={{ background: t.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: t.bg, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontSize: 12, color: t.text3, fontFamily: "'DM Sans', sans-serif" }}>Loading alerts…</span>
       </div>
     );
   }
 
   return (
-    <div style={{ background: t.bg, minHeight: '100vh', maxWidth: '100%', width: '100%', padding: '12px 12px 80px', fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ background: t.bg, flex: 1, maxWidth: '100%', width: '100%', padding: '12px 12px 80px', fontFamily: "'DM Sans', sans-serif" }}>
       <style>{FLOAT_KEYFRAMES}</style>
 
       {/* ═══ HEADER ═══ */}
@@ -278,7 +266,6 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <SentimentPill score={fearScore} darkMode={darkMode} />
-          <DarkModeToggle darkMode={darkMode} onToggle={() => setDarkMode(d => !d)} t={t} />
         </div>
       </div>
 

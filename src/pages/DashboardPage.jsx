@@ -56,13 +56,17 @@ export default function DashboardPage({ session }) {
   }, [darkMode]);
 
   const [activeTab, setActiveTab]         = useState(() => {
-    const redirect = localStorage.getItem('uptik_join_redirect');
-    if (redirect) {
-      localStorage.removeItem('uptik_join_redirect');
-      return redirect;
-    }
+    try {
+      const redirect = localStorage.getItem('uptik_join_redirect');
+      if (redirect) {
+        localStorage.removeItem('uptik_join_redirect');
+        return redirect;
+      }
+    } catch { /* localStorage unavailable — iOS private browsing */ }
     return 'home';
   });
+  // Track which tabs have been visited so we can lazy-mount but never unmount
+  const [mountedTabs, setMountedTabs] = useState(new Set(['home']));
   const [activeBroadcast, setActiveBroadcast] = useState(null);
   const [unreadAlerts, setUnreadAlerts]   = useState(false);
   const [unreadChat, setUnreadChat]       = useState(false);
@@ -114,18 +118,26 @@ export default function DashboardPage({ session }) {
     return () => { if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current); };
   }, []);
 
+  // Mark tabs as visited so they stay mounted (display:none) instead of unmounting
   useEffect(() => {
+    setMountedTabs(prev => {
+      if (prev.has(activeTab)) return prev;
+      const next = new Set(prev);
+      next.add(activeTab);
+      return next;
+    });
     if (activeTab === 'alerts') setUnreadAlerts(false);
     if (activeTab === 'chat')   setUnreadChat(false);
   }, [activeTab]);
 
+  // Auto-join UpTik Public if no group is active (any tab, not just chat)
   useEffect(() => {
-    if (loading) return;
-    if (activeTab === 'chat' && publicGroups.length > 0 && !activeGroup) {
+    if (loading || activeGroup) return;
+    if (publicGroups.length > 0) {
       const uptikPublic = publicGroups.find(g => g.name === 'UpTik Public');
       if (uptikPublic) enterGroup(uptikPublic);
     }
-  }, [activeTab, publicGroups, loading]);
+  }, [publicGroups, loading, activeGroup]);
 
   // ── DM Handlers ──
   const handleStartDM = async (otherUserId, otherUsername) => {
@@ -164,19 +176,16 @@ export default function DashboardPage({ session }) {
   const scrollToChatRef = useRef(null);
 
   const handleTabChange = useCallback((tab) => {
-    if (tab === 'home') {
-      setActiveTab('home');
-    } else if (tab === 'chat') {
-      setActiveTab('chat');
-      // Reset to chat view when tapping Chat tab (unless already in chat)
-      if (chatMode === 'dm-chat') {
-        closeDM();
-        setChatMode('chat');
-      }
-    } else {
-      setActiveTab(tab);
+    setActiveTab(tab);
+    // When tapping Chat tab while already on Chat, cycle: dm-chat → dms → chat
+    // This gives users a way back without accidentally destroying their DM.
+    if (tab === 'chat') {
+      setChatMode(prev => {
+        if (prev === 'dm-chat') return 'dms';  // go to inbox, not hard-close
+        return 'chat';
+      });
     }
-  }, [chatMode, closeDM]);
+  }, []);
 
   const handleGroupSelect = (group) => {
     enterGroup(group);
@@ -233,6 +242,8 @@ export default function DashboardPage({ session }) {
         onSignOut={handleSignOut}
         onHomePress={() => setActiveTab('home')}
         onProfilePress={() => setActiveTab('profile')}
+        darkMode={darkMode}
+        setDarkMode={setDarkMode}
       />
 
       {/* Broadcast Banner */}
@@ -261,32 +272,44 @@ export default function DashboardPage({ session }) {
         );
       })()}
 
-      {/* Tab Content */}
-      <div style={{ ...styles.content, ...(activeTab === 'home' ? { paddingBottom: 58, overflowX: 'hidden', overflowY: 'hidden' } : {}) }}>
-        {activeTab === 'home' && (
+      {/* Tab Content — tabs use display:none instead of unmounting so scroll
+           position, subscriptions, and in-progress state survive tab switches. */}
+      <div style={styles.content}>
+
+        {/* ── Home (eagerly loaded) ── */}
+        <div style={{ display: activeTab === 'home' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflowX: 'hidden', overflowY: 'hidden', paddingBottom: 58 }}>
           <HomeTab
             session={session}
             onGroupSelect={handleGroupSelect}
-            onSignOut={handleSignOut}
-            onProfilePress={() => setActiveTab('profile')}
             onTabChange={handleTabChange}
             scrollToChatRef={scrollToChatRef}
             onOpenDMs={() => { setActiveTab('chat'); setChatMode('dms'); }}
             onStartDM={handleStartDM}
+            darkMode={darkMode}
           />
+        </div>
+
+        {/* ── AI ── */}
+        {mountedTabs.has('ai') && (
+          <div style={{ display: activeTab === 'ai' ? 'flex' : 'none', flex: 1, flexDirection: 'column' }}>
+            <Suspense fallback={<TabFallback />}>
+              <AITab session={session} />
+            </Suspense>
+          </div>
         )}
-        {activeTab === 'ai' && (
-          <Suspense fallback={<TabFallback />}>
-            <AITab session={session} />
-          </Suspense>
+
+        {/* ── Alerts ── */}
+        {mountedTabs.has('alerts') && (
+          <div style={{ display: activeTab === 'alerts' ? 'flex' : 'none', flex: 1, flexDirection: 'column' }}>
+            <Suspense fallback={<TabFallback />}>
+              <AlertsTab session={session} group={activeGroup} darkMode={darkMode} />
+            </Suspense>
+          </div>
         )}
-        {activeTab === 'alerts' && (
-          <Suspense fallback={<TabFallback />}>
-            <AlertsTab session={session} group={activeGroup} darkMode={darkMode} setDarkMode={setDarkMode} />
-          </Suspense>
-        )}
-        {activeTab === 'chat' && (
-          <>
+
+        {/* ── Chat ── */}
+        {mountedTabs.has('chat') && (
+          <div style={{ display: activeTab === 'chat' ? 'flex' : 'none', flex: 1, flexDirection: 'column' }}>
             {/* Chat | Trending | DMs toggle — only show when not in active DM chat */}
             {chatMode !== 'dm-chat' && (
               <div style={styles.chatToggleRow}>
@@ -341,45 +364,47 @@ export default function DashboardPage({ session }) {
               </Suspense>
             )}
 
-            {/* DM Inbox view */}
+            {/* DM views */}
             {chatMode === 'dms' && (
               <Suspense fallback={<TabFallback />}>
                 <DMInbox onOpenDM={handleOpenDMFromInbox} />
               </Suspense>
             )}
-
-            {/* Active DM Chat view */}
             {chatMode === 'dm-chat' && activeDM && !startingDM && (
               <Suspense fallback={<TabFallback />}>
                 <DMChat session={session} dm={activeDM} onBack={handleBackFromDM} />
               </Suspense>
             )}
-            {/* Transitional loader: DM is being created from a username tap */}
             {chatMode === 'dm-chat' && startingDM && (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ fontSize: 13, color: 'var(--text3)' }}>Starting chat…</div>
               </div>
             )}
-            {/* Safety fallback: dm-chat mode, not loading, but no activeDM — bounce to inbox */}
             {chatMode === 'dm-chat' && !activeDM && !startingDM && (
               <Suspense fallback={<TabFallback />}>
                 <DMInbox onOpenDM={handleOpenDMFromInbox} />
               </Suspense>
             )}
-          </>
+          </div>
         )}
-        {activeTab === 'challenge' && (
-          <div style={{ flex: 1, overflow: 'auto' }}>
+
+        {/* ── Challenge ── */}
+        {mountedTabs.has('challenge') && (
+          <div style={{ display: activeTab === 'challenge' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflow: 'auto' }}>
             <Suspense fallback={<TabFallback />}>
-              <PortfolioTab session={session} darkMode={darkMode} setDarkMode={setDarkMode} />
+              <PortfolioTab session={session} darkMode={darkMode} />
             </Suspense>
           </div>
         )}
+
+        {/* ── Help (lightweight — remount is fine) ── */}
         {activeTab === 'help' && (
           <Suspense fallback={<TabFallback />}>
             <HelpTab />
           </Suspense>
         )}
+
+        {/* ── Profile (lightweight — remount is fine) ── */}
         {activeTab === 'profile' && (
           <Suspense fallback={<TabFallback />}>
             <ProfileTab
@@ -440,7 +465,7 @@ const styles = {
     borderRadius: '50%', display: 'flex',
     alignItems: 'center', justifyContent: 'center', lineHeight: 1,
   },
-  content: { flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: 'calc(90px + env(safe-area-inset-bottom, 0px))' },
+  content: { flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: 'calc(62px + env(safe-area-inset-bottom, 0px))' },
   chatToggleRow: {
     display: 'flex', gap: 0, padding: '8px 16px',
     background: 'var(--card)', borderBottom: '1px solid var(--border)',

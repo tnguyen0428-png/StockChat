@@ -32,42 +32,64 @@ export function GroupProvider({ session, children }) {
   // ── Presence: track who's online ──
   useEffect(() => {
     if (!session?.user?.id) return;
+    let cancelled = false;
 
     const presenceChannel = supabase.channel('uptik-presence', {
       config: { presence: { key: session.user.id } },
     });
 
     presenceChannel.on('presence', { event: 'sync' }, () => {
+      if (cancelled) return;
       const state = presenceChannel.presenceState();
       setOnlineUsers(new Set(Object.keys(state)));
     });
 
     presenceChannel.subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await presenceChannel.track({
-          user_id: session.user.id,
-          online_at: new Date().toISOString(),
-        });
+      if (status === 'SUBSCRIBED' && !cancelled) {
+        try {
+          await presenceChannel.track({
+            user_id: session.user.id,
+            online_at: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.warn('[Presence] track failed:', err.message);
+        }
       }
     });
 
-    return () => supabase.removeChannel(presenceChannel);
+    return () => {
+      cancelled = true;
+      presenceChannel.untrack().catch(() => {}).finally(() => {
+        supabase.removeChannel(presenceChannel);
+      });
+    };
   }, [session?.user?.id]);
 
   const loadAll = async () => {
     setLoading(true);
-    await Promise.all([loadProfile(), loadPublicGroups(), loadDMConversations()]);
+    // Use allSettled so one failure doesn't block the entire app.
+    // Each loader already handles its own errors internally.
+    const results = await Promise.allSettled([loadProfile(), loadPublicGroups(), loadDMConversations()]);
+    results.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        const names = ['loadProfile', 'loadPublicGroups', 'loadDMConversations'];
+        console.error(`[GroupContext] ${names[i]} failed:`, r.reason);
+      }
+    });
     setLoading(false);
   };
 
   const loadProfile = async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*, group_members(*, groups(*))')
-      .eq('id', session.user.id)
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*, group_members(*, groups(*))')
+        .eq('id', session.user.id)
+        .maybeSingle();
 
-    if (data) {
+      if (error) { console.error('[GroupContext] loadProfile query error:', error.message); return; }
+      if (!data) return;
+
       setProfile(data);
       const groups = (data.group_members || [])
         .map(gm => gm.groups)
@@ -79,12 +101,12 @@ export function GroupProvider({ session, children }) {
       if (priv) setPrivateGroup(priv);
 
       // Restore last active group
-      const savedId = localStorage.getItem('uptik_active_group');
+      let savedId;
+      try { savedId = localStorage.getItem('uptik_active_group'); } catch {}
       const saved = savedId ? groups.find(g => g.id === savedId) : null;
       if (saved) {
         setActiveGroup(saved);
       } else if (savedId) {
-        // Fallback: group may not be in member list yet (just joined)
         const { data: fallbackGroup } = await supabase
           .from('groups')
           .select('*')
@@ -92,16 +114,23 @@ export function GroupProvider({ session, children }) {
           .maybeSingle();
         if (fallbackGroup) setActiveGroup(fallbackGroup);
       }
+    } catch (err) {
+      console.error('[GroupContext] loadProfile crashed:', err);
     }
   };
 
   const loadPublicGroups = async () => {
-    const { data } = await supabase
-      .from('groups')
-      .select('*')
-      .eq('is_public', true)
-      .order('created_at', { ascending: true });
-    if (data) setPublicGroups(data);
+    try {
+      const { data, error } = await supabase
+        .from('groups')
+        .select('*')
+        .eq('is_public', true)
+        .order('created_at', { ascending: true });
+      if (error) { console.error('[GroupContext] loadPublicGroups error:', error.message); return; }
+      if (data) setPublicGroups(data);
+    } catch (err) {
+      console.error('[GroupContext] loadPublicGroups crashed:', err);
+    }
   };
 
   const enterGroup = async (group) => {
@@ -361,7 +390,7 @@ export function GroupProvider({ session, children }) {
   };
 
   // ── DM: Close active DM ──
-  const closeDM = () => setActiveDM(null);
+  const closeDM = useCallback(() => setActiveDM(null), []);
 
   const refreshGroups = async () => {
     await loadAll();

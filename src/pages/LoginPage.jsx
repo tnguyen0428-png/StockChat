@@ -149,9 +149,10 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
       const { error } = await signIn(email.trim(), password);
       if (error) {
         setError('Invalid email or password. Please try again.');
-      } else {
-        navigate('/app');
       }
+      // Don't navigate here — App.jsx onAuthStateChange will set session,
+      // which triggers <Navigate to="/app"> in the /login route automatically.
+      // Navigating manually causes a flash because session hasn't propagated yet.
     } else {
       const { error } = await signUp(email.trim(), password, username.trim());
       if (error) {
@@ -313,7 +314,7 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
 // ── STYLES ──
 const styles = {
   page: {
-    minHeight: '100vh',
+    minHeight: '100dvh',
     background: 'var(--bg)',
     display: 'flex',
     flexDirection: 'column',

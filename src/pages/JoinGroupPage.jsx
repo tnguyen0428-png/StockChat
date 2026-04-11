@@ -155,7 +155,7 @@ export default function JoinGroupPage({ session }) {
 
 const styles = {
   page: {
-    minHeight: '100vh',
+    minHeight: '100dvh',
     background: '#132d52',
     display: 'flex',
     alignItems: 'center',

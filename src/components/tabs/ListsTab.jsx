@@ -99,13 +99,14 @@ export default function ListsTab({ session, profile, group, isAdmin }) {
       .filter(s => s.id !== stock.id)
       .sort((a, b) => a.ranking - b.ranking);
     if (remaining.length) {
-      const results = await Promise.all(
+      const results = await Promise.allSettled(
         remaining.map((s, i) =>
           supabase.from('curated_stocks').update({ ranking: i + 1 }).eq('id', s.id)
         )
       );
       results.forEach((r, i) => {
-        if (r.error) console.error(`[ListsTab] Re-rank stock ${remaining[i].id} failed:`, r.error.message);
+        if (r.status === 'rejected') console.error(`[ListsTab] Re-rank stock ${remaining[i].id} failed:`, r.reason);
+        else if (r.value?.error) console.error(`[ListsTab] Re-rank stock ${remaining[i].id} failed:`, r.value.error.message);
       });
     }
     if (expanded === stock.id) setExpanded(null);

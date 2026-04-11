@@ -669,14 +669,16 @@ export default function ProfileTab({ session, profile, group, isAdmin, onSignOut
 
   useEffect(() => {
     if (!session?.user?.id) return;
+    let cancelled = false;
     (async () => {
       const { data } = await supabase
         .from('profiles')
         .select('notif_prefs')
         .eq('id', session.user.id)
         .single();
-      if (data?.notif_prefs) setNotifications(data.notif_prefs);
+      if (!cancelled && data?.notif_prefs) setNotifications(data.notif_prefs);
     })();
+    return () => { cancelled = true; };
   }, [session?.user?.id]);
 
   const copyInviteLink = () => {
