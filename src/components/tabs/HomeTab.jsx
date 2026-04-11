@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
 import { isWeekend, isMarketHoliday, isMarketOpen, isAfterHours } from '../../utils/marketUtils';
 import { askUpTikAI } from '../../lib/aiAgent';
+import { getBatchQuotes } from '../../lib/polygonQuote';
 import CreateGroupModal from '../shared/CreateGroupModal';
 import InviteModal from '../shared/InviteModal';
 import StickerPicker, { STICKERS, isSticker, getStickerId } from '../shared/StickerPicker';
@@ -254,25 +255,17 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
   }, []);
 
   const fetchOnboardPrices = async () => {
-    if (!FMP_KEY) return;
+    if (!POLYGON_KEY) return;
     const allTickers = [
       ...ONBOARD_TRENDING.map(t => t.symbol),
       ...ONBOARD_SECTORS.flatMap(s => s.tickers),
     ];
     const unique = [...new Set(allTickers)];
     try {
-      const results = await Promise.allSettled(
-        unique.map(t =>
-          fetch(`https://financialmodelingprep.com/stable/quote?symbol=${t}&apikey=${FMP_KEY}`)
-            .then(r => r.json())
-        )
-      );
+      const quotes = await getBatchQuotes(unique);
       const prices = {};
-      results.forEach(r => {
-        if (r.status === 'fulfilled' && Array.isArray(r.value) && r.value[0]) {
-          const q = r.value[0];
-          if (q.symbol && q.price) prices[q.symbol] = { price: q.price, change: q.changePercentage };
-        }
+      Object.entries(quotes).forEach(([symbol, q]) => {
+        if (q && q.price) prices[symbol] = { price: q.price, change: q.changePct };
       });
       setOnboardPrices(prices);
     } catch (err) {

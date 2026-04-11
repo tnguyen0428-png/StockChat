@@ -77,7 +77,7 @@ function detectBehaviorBadges(userId, allTrades) {
   return badges;
 }
 
-export default function PortfolioTab({ session }) {
+export default function PortfolioTab({ session, darkMode: parentDarkMode, setDarkMode: parentSetDarkMode }) {
   const { profile } = useGroup();
 
   const [portfolio, setPortfolio] = useState(null);
@@ -120,7 +120,11 @@ export default function PortfolioTab({ session }) {
   const [riskLevel, setRiskLevel] = useState({ level: 'Low', bars: 2, color: '#2a7d4b', note: '' });
   const [showPortfolio, setShowPortfolio] = useState(false);
   const [showAllRankings, setShowAllRankings] = useState(false);
-  const [darkMode, setDarkMode] = useState(true);
+  const [localDarkMode, setLocalDarkMode] = useState(() => {
+    try { return localStorage.getItem('uptik_darkMode') === 'true'; } catch { return false; }
+  });
+  const darkMode = parentDarkMode !== undefined ? parentDarkMode : localDarkMode;
+  const setDarkMode = parentSetDarkMode || setLocalDarkMode;
 
   // Leaderboard v2 state
   const [chatReactions, setChatReactions] = useState({});

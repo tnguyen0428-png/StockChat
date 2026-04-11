@@ -514,12 +514,15 @@ function SmartBetCard({ bet, isExpanded, onToggle, t: theme }) {
 }
 
 // ===== MAIN =====
-export default function AlertsTab({ session, group }) {
+export default function AlertsTab({ session, group, darkMode: parentDarkMode, setDarkMode: parentSetDarkMode }) {
   const { isAdmin } = useGroup();
   const [view, setView] = useState("loading");
-  const [darkMode, setDarkMode] = useState(() => {
+  // Use parent dark mode state if provided (from DashboardPage), fall back to local
+  const [localDarkMode, setLocalDarkMode] = useState(() => {
     try { return localStorage.getItem('uptik_darkMode') === 'true'; } catch { return false; }
   });
+  const darkMode = parentDarkMode !== undefined ? parentDarkMode : localDarkMode;
+  const setDarkMode = parentSetDarkMode || setLocalDarkMode;
   const t = useTheme(darkMode);
   const [filter, setFilter] = useState("All");
   const [modalAlert, setModalAlert] = useState(null);

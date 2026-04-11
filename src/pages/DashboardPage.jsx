@@ -7,6 +7,7 @@ import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useGroup } from '../context/GroupContext';
+import { DARK_THEME, LIGHT_THEME } from '../components/tabs/alertsMockData';
 
 // HomeTab is the default landing tab — load eagerly so first paint is instant
 import HomeTab from '../components/tabs/HomeTab';
@@ -18,6 +19,7 @@ const ProfileTab    = lazy(() => import('../components/tabs/ProfileTab'));
 const HelpTab       = lazy(() => import('../components/tabs/HelpTab'));
 const AITab         = lazy(() => import('../components/tabs/AITab'));
 const PortfolioTab  = lazy(() => import('../components/tabs/PortfolioTab'));
+const TrendingView  = lazy(() => import('../components/tabs/TrendingView'));
 const DMInbox       = lazy(() => import('../components/dm/DMInbox'));
 const DMChat        = lazy(() => import('../components/dm/DMChat'));
 const TabFallback = () => (
@@ -42,6 +44,17 @@ export default function DashboardPage({ session }) {
     startDM, markDMRead, closeDM, setActiveDM,
   } = useGroup();
 
+  // ── Global dark mode — persists across tab switches ──
+  const [darkMode, setDarkMode] = useState(() => {
+    try { return localStorage.getItem('uptik_darkMode') === 'true'; } catch { return false; }
+  });
+
+  useEffect(() => {
+    const theme = darkMode ? DARK_THEME : LIGHT_THEME;
+    Object.entries(theme).forEach(([k, v]) => document.documentElement.style.setProperty(k, v));
+    try { localStorage.setItem('uptik_darkMode', String(darkMode)); } catch {}
+  }, [darkMode]);
+
   const [activeTab, setActiveTab]         = useState(() => {
     const redirect = localStorage.getItem('uptik_join_redirect');
     if (redirect) {
@@ -53,7 +66,7 @@ export default function DashboardPage({ session }) {
   const [activeBroadcast, setActiveBroadcast] = useState(null);
   const [unreadAlerts, setUnreadAlerts]   = useState(false);
   const [unreadChat, setUnreadChat]       = useState(false);
-  const [chatMode, setChatMode]           = useState('groups'); // 'groups' | 'dms' | 'dm-chat'
+  const [chatMode, setChatMode]           = useState('chat'); // 'chat' | 'trending' | 'dms' | 'dm-chat'
   const [startingDM, setStartingDM]       = useState(false);
   const dismissTimerRef = useRef(null);
 
@@ -139,7 +152,7 @@ export default function DashboardPage({ session }) {
 
   const handleBackFromDM = () => {
     closeDM();
-    setChatMode('dms');
+    setChatMode('chat');
   };
 
   const handleSignOut = async () => {
@@ -155,10 +168,10 @@ export default function DashboardPage({ session }) {
       setActiveTab('home');
     } else if (tab === 'chat') {
       setActiveTab('chat');
-      // Reset to groups view when tapping Chat tab (unless already in chat)
+      // Reset to chat view when tapping Chat tab (unless already in chat)
       if (chatMode === 'dm-chat') {
         closeDM();
-        setChatMode('groups');
+        setChatMode('chat');
       }
     } else {
       setActiveTab(tab);
@@ -269,19 +282,25 @@ export default function DashboardPage({ session }) {
         )}
         {activeTab === 'alerts' && (
           <Suspense fallback={<TabFallback />}>
-            <AlertsTab session={session} group={activeGroup} />
+            <AlertsTab session={session} group={activeGroup} darkMode={darkMode} setDarkMode={setDarkMode} />
           </Suspense>
         )}
         {activeTab === 'chat' && (
           <>
-            {/* Groups | DMs toggle — only show when not in active DM chat */}
+            {/* Chat | Trending | DMs toggle — only show when not in active DM chat */}
             {chatMode !== 'dm-chat' && (
               <div style={styles.chatToggleRow}>
                 <div
-                  style={{ ...styles.chatTogglePill, ...(chatMode === 'groups' ? styles.chatToggleActive : {}) }}
-                  onClick={() => setChatMode('groups')}
+                  style={{ ...styles.chatTogglePill, ...(chatMode === 'chat' ? styles.chatToggleActive : {}) }}
+                  onClick={() => setChatMode('chat')}
                 >
-                  Groups
+                  Chat
+                </div>
+                <div
+                  style={{ ...styles.chatTogglePill, ...(chatMode === 'trending' ? styles.chatToggleActive : {}) }}
+                  onClick={() => setChatMode('trending')}
+                >
+                  Trending
                 </div>
                 <div
                   style={{ ...styles.chatTogglePill, ...(chatMode === 'dms' ? styles.chatToggleActive : {}), position: 'relative' }}
@@ -296,7 +315,7 @@ export default function DashboardPage({ session }) {
             )}
 
             {/* Group Chat view */}
-            {chatMode === 'groups' && activeGroup && (
+            {chatMode === 'chat' && activeGroup && (
               <Suspense fallback={<TabFallback />}>
                 <ChatTab
                   session={session}
@@ -309,10 +328,17 @@ export default function DashboardPage({ session }) {
                 />
               </Suspense>
             )}
-            {chatMode === 'groups' && !activeGroup && (
+            {chatMode === 'chat' && !activeGroup && (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ fontSize: 14, color: 'var(--text3)' }}>Loading chat...</div>
               </div>
+            )}
+
+            {/* Trending view */}
+            {chatMode === 'trending' && (
+              <Suspense fallback={<TabFallback />}>
+                <TrendingView session={session} group={activeGroup} />
+              </Suspense>
             )}
 
             {/* DM Inbox view */}
@@ -345,7 +371,7 @@ export default function DashboardPage({ session }) {
         {activeTab === 'challenge' && (
           <div style={{ flex: 1, overflow: 'auto' }}>
             <Suspense fallback={<TabFallback />}>
-              <PortfolioTab session={session} />
+              <PortfolioTab session={session} darkMode={darkMode} setDarkMode={setDarkMode} />
             </Suspense>
           </div>
         )}
