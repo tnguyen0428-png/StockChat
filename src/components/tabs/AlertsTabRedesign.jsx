@@ -99,7 +99,7 @@ function mapAlert(a) {
     { label: 'Volume', value: volRatio ? `${Number(volRatio).toFixed(1)}x` : '—' },
     { label: 'Price', value: price ? `$${Number(price).toFixed(2)}` : '—' },
     { label: 'Change', value: `${changePct >= 0 ? '+' : ''}${changePct.toFixed(1)}%`, color: changePct >= 0 },
-    { label: 'Type', value: TYPE_CONFIG[type]?.label || type },
+    { label: 'Signal', value: a.notes ? a.notes.slice(0, 20) : (volRatio ? volRatio + 'x avg' : '—') },
   ];
 
   return {
@@ -115,6 +115,16 @@ function chipSize(pct) {
   if (abs >= 3) return 50;
   if (abs >= 1.5) return 42;
   return 36;
+}
+
+function nextMarketDay() {
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const d = now.getDay();
+  const h = now.getHours();
+  if (d >= 1 && d <= 4) return days[d + 1];
+  if (d === 5 && h < 16) return 'today';
+  return 'Mon';
 }
 
 // ===== MAIN COMPONENT =====
@@ -193,7 +203,7 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
 
   const displayAlerts = useMemo(() => {
     if (liveAlerts.length === 0) return [];
-    return liveAlerts.map(mapAlert).filter(a => a.ticker !== '—');
+    return liveAlerts.map(mapAlert).filter(a => a.ticker !== '—' && Math.abs(a.changePct) > 0.05);
   }, [liveAlerts]);
 
   const uniqueAlerts = useMemo(() => {
@@ -221,7 +231,7 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
 
   const historyRows = useMemo(() => {
     return perfHistory.slice(0, 5).map(h => {
-      const pct = h.outcome ?? h.admin_outcome ?? 0;
+      const pct = h.return_pct ?? 0;
       const type = h.signal_type ?? h.alert_type ?? 'vol_surge';
       return {
         id: h.id,
@@ -257,7 +267,7 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
           <div style={{ fontSize: 9, color: t.text3, marginTop: 2 }}>
             {marketOpen
               ? <>Scanning every <span style={{ color: t.green, fontWeight: 600 }}>60s</span> · {uniqueAlerts.length} alert{uniqueAlerts.length !== 1 ? 's' : ''} live</>
-              : <>Market closed · opens <span style={{ color: t.green, fontWeight: 600 }}>Mon 9:30am</span></>
+              : <>Market closed · opens <span style={{ color: t.green, fontWeight: 600 }}>{nextMarketDay()} 9:30am</span></>
             }
           </div>
         </div>
