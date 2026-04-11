@@ -73,15 +73,18 @@ export function SentimentPill({ score, darkMode }) {
   const color = s > 55 ? '#22c55e' : s > 45 ? '#eab308' : s > 25 ? '#f97316' : '#ef4444';
   return (
     <div
-      title={`Market sentiment: ${label} (${Math.round(s)}/100)`}
+      title={`Market gauge: ${label} (${Math.round(s)}/100) — based on VIX and market sentiment`}
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
+        display: 'inline-flex', alignItems: 'center', gap: 4,
         padding: '3px 8px', borderRadius: 999,
         background: darkMode ? 'rgba(30,61,98,0.55)' : 'rgba(0,0,0,0.035)',
         border: `1px solid ${darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
-        fontFamily: "var(--font-heading)",
+        fontFamily: "'DM Sans', sans-serif",
       }}
     >
+      <span style={{ fontSize: 9, color: darkMode ? '#5a7a9a' : '#7a8ea3', fontWeight: 500 }}>
+        Mkt
+      </span>
       <span style={{ fontSize: 10, fontWeight: 600, color, letterSpacing: 0.3, textTransform: 'uppercase' }}>
         {label} {Math.round(s)}
       </span>
@@ -306,4 +309,4 @@ export function DarkModeToggle({ darkMode, onToggle, t }) {
       {darkMode ? '☀️' : '🌙'}
     </button>
   );
-}
+}
