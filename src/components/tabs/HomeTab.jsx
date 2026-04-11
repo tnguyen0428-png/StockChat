@@ -1051,11 +1051,11 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
 
           {/* Progress */}
           <div style={OB.progress}>
-            <span style={OB.count}><span style={{ color: '#1AAD5E' }}>{onboardSelected.size}</span> selected</span>
+            <span style={OB.count}><span style={{ color: 'var(--green-btn)' }}>{onboardSelected.size}</span> selected</span>
             <div style={OB.barTrack}>
               <div style={{ ...OB.barFill, width: `${Math.min((onboardSelected.size / 5) * 100, 100)}%` }} />
             </div>
-            <span style={{ fontSize: 11, color: '#7a8ea3' }}>min 1</span>
+            <span style={{ fontSize: 11, color: 'var(--text3)' }}>min 1</span>
           </div>
 
           {/* Search */}
@@ -1068,7 +1068,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               onChange={e => handleOnboardSearch(e.target.value)}
             />
             {onboardSearch && (
-              <span style={{ color: '#7a8ea3', cursor: 'pointer', fontSize: 16 }} onClick={() => { setOnboardSearch(''); setOnboardSearchResults([]); }}>×</span>
+              <span style={{ color: 'var(--text3)', cursor: 'pointer', fontSize: 16 }} onClick={() => { setOnboardSearch(''); setOnboardSearchResults([]); }}>×</span>
             )}
           </div>
 
@@ -1078,11 +1078,11 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               {onboardSearchResults.map(r => (
                 <div key={r.symbol} style={OB.searchItem}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2d4a' }}>{r.symbol}</div>
-                    <div style={{ fontSize: 10, color: '#7a8ea3' }}>{r.name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text1)' }}>{r.symbol}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text3)' }}>{r.name}</div>
                   </div>
                   {onboardSelected.has(r.symbol) ? (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#1AAD5E', padding: '4px 12px' }}>Added ✓</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--green-btn)', padding: '4px 12px' }}>Added ✓</span>
                   ) : (
                     <button style={OB.searchAddBtn} onClick={() => toggleOnboardTicker(r.symbol)}>+ Add</button>
                   )}
@@ -1090,7 +1090,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
               ))}
             </div>
           )}
-          {onboardSearchLoading && <div style={{ padding: '8px 20px', fontSize: 11, color: '#7a8ea3' }}>Searching...</div>}
+          {onboardSearchLoading && <div style={{ padding: '8px 20px', fontSize: 11, color: 'var(--text3)' }}>Searching...</div>}
 
           {/* Scrollable picks area */}
           <div style={OB.scrollArea}>
@@ -1112,7 +1112,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                     >
                       <span style={OB.tcTicker}>{t.symbol}</span>
                       {chg != null && (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: chg >= 0 ? '#1AAD5E' : '#e05252' }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: chg >= 0 ? '#1AAD5E' : 'var(--red)' }}>
                           {chg >= 0 ? '+' : ''}{chg.toFixed(2)}%
                         </span>
                       )}
@@ -1339,7 +1339,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                   {sectorLabels.map(label => (
                     <div
                       key={label}
-                      style={{ ...S.sectorDropItem, ...(researchSector === label ? { color: '#1AAD5E', fontWeight: 600 } : {}) }}
+                      style={{ ...S.sectorDropItem, ...(researchSector === label ? { color: 'var(--green-btn)', fontWeight: 600 } : {}) }}
                       onClick={() => {
                         setShowSectorDropdown(false);
                         loadResearch(label);
@@ -1375,11 +1375,11 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
 
               <div style={S.stocksScroll}>
                 {researchLoading ? (
-                  <div style={{ padding: 16, textAlign: 'center', color: '#7a8ea3', fontSize: 13 }}>Loading...</div>
+                  <div style={{ padding: 16, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>Loading...</div>
                 ) : researchStocks.length === 0 ? (
                   researchSector === '__mylist__' ? (
                     <div style={{ padding: '16px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 13, color: '#7a8ea3', marginBottom: 10 }}>No tickers in your list yet</div>
+                      <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 10 }}>No tickers in your list yet</div>
                       <div style={S.wlPopRow}>
                         <span style={S.wlPopLabel}>Popular:</span>
                         {POPULAR_TICKERS.map(t => (
@@ -1388,7 +1388,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                       </div>
                     </div>
                   ) : (
-                    <div style={{ padding: 16, textAlign: 'center', color: '#7a8ea3', fontSize: 13 }}>
+                    <div style={{ padding: 16, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>
                       No rankings available for {researchSector} yet
                     </div>
                   )
@@ -1408,32 +1408,32 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                           {isMyList ? (
                             <>
                               <span style={{ ...S.stocksRowTk, flex: 1 }}>{stock.ticker}</span>
-                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, color: '#7a8ea3' }}>
+                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, color: 'var(--text3)' }}>
                                 {priceData ? `$${priceData.price.toFixed(2)}` : '—'}
                               </span>
-                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, fontWeight: 600, color: isUp ? '#1AAD5E' : chg < 0 ? '#e05252' : '#7a8ea3' }}>
+                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, fontWeight: 600, color: isUp ? '#1AAD5E' : chg < 0 ? 'var(--red)' : '#7a8ea3' }}>
                                 {chg != null ? `${isUp ? '+' : ''}${chg.toFixed(2)}%` : '—'}
                               </span>
                               <span
-                                style={{ width: 24, textAlign: 'center', fontSize: 14, color: '#d8e2ed', cursor: 'pointer' }}
+                                style={{ width: 24, textAlign: 'center', fontSize: 14, color: 'var(--border)', cursor: 'pointer' }}
                                 onClick={(e) => { e.stopPropagation(); removeFromWatchlist(stock.id, stock.ticker); }}
                               >×</span>
                             </>
                           ) : (
                             <>
-                              <span style={{ width: 28, fontSize: 11, fontWeight: 700, color: '#7a8ea3' }}>#{stock.ranking}</span>
+                              <span style={{ width: 28, fontSize: 11, fontWeight: 700, color: 'var(--text3)' }}>#{stock.ranking}</span>
                               <span style={{ ...S.stocksRowTk, flex: 1 }}>{stock.ticker}</span>
                               <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
                                 {stock.score != null && (
                                   <span style={{
                                     fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
                                     background: stock.score >= 70 ? 'rgba(140,217,160,0.15)' : stock.score >= 50 ? 'rgba(255,193,7,0.15)' : 'rgba(224,82,82,0.1)',
-                                    color: stock.score >= 70 ? '#1AAD5E' : stock.score >= 50 ? '#b8860b' : '#e05252',
+                                    color: stock.score >= 70 ? '#1AAD5E' : stock.score >= 50 ? 'var(--yellow)' : 'var(--red)',
                                   }}>{stock.score}</span>
                                 )}
-                                <span style={{ fontSize: 10, color: '#d8e2ed' }}>{isOpen ? '▲' : '▼'}</span>
+                                <span style={{ fontSize: 10, color: 'var(--border)' }}>{isOpen ? '▲' : '▼'}</span>
                               </span>
-                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, color: '#7a8ea3' }}>
+                              <span style={{ width: 60, textAlign: 'right', fontSize: 11, color: 'var(--text3)' }}>
                                 {priceData ? `$${priceData.price.toFixed(2)}` : '—'}
                               </span>
                             </>
@@ -1441,9 +1441,9 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                         </div>
                         {!isMyList && isOpen && (
                           <div style={S.stocksExpand}>
-                            {stock.notes && <div style={{ fontSize: 11, color: '#1a2d4a', lineHeight: 1.5 }}>{stock.notes}</div>}
+                            {stock.notes && <div style={{ fontSize: 11, color: 'var(--text1)', lineHeight: 1.5 }}>{stock.notes}</div>}
                             {stock.thesis && <div style={{ fontSize: 11, color: '#5a6f85', lineHeight: 1.5, marginTop: 4 }}>{stock.thesis}</div>}
-                            {!stock.thesis && !stock.notes && <div style={{ fontSize: 11, color: '#7a8ea3', fontStyle: 'italic' }}>No analysis available yet</div>}
+                            {!stock.thesis && !stock.notes && <div style={{ fontSize: 11, color: 'var(--text3)', fontStyle: 'italic' }}>No analysis available yet</div>}
                           </div>
                         )}
                       </div>
@@ -1465,10 +1465,10 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                       autoFocus
                     />
                   ) : (
-                    <span style={{ fontSize: 12, color: '#7a8ea3', flex: 1, cursor: 'pointer' }} onClick={() => setShowSearch(true)}>+ Add ticker...</span>
+                    <span style={{ fontSize: 12, color: 'var(--text3)', flex: 1, cursor: 'pointer' }} onClick={() => setShowSearch(true)}>+ Add ticker...</span>
                   )}
                   <span
-                    style={{ fontSize: 12, fontWeight: 600, color: '#1AAD5E', cursor: 'pointer' }}
+                    style={{ fontSize: 12, fontWeight: 600, color: 'var(--green-btn)', cursor: 'pointer' }}
                     onClick={() => {
                       if (showSearch) { setShowSearch(false); setSearchQuery(''); setSearchResults([]); }
                       else setShowSearch(true);
@@ -1482,11 +1482,11 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                   {searchResults.map(r => (
                     <div key={r.symbol} style={{ display: 'flex', alignItems: 'center', padding: '6px 12px', borderBottom: '1px solid #f5f7fa' }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: '#1a2d4a' }}>{r.symbol}</div>
-                        <div style={{ fontSize: 9, color: '#7a8ea3' }}>{r.name}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text1)' }}>{r.symbol}</div>
+                        <div style={{ fontSize: 9, color: 'var(--text3)' }}>{r.name}</div>
                       </div>
                       {r.alreadyAdded ? (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: '#7a8ea3' }}>Added ✓</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Added ✓</span>
                       ) : (
                         <button style={{ background: '#1AAD5E', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                           onClick={() => { addToWatchlist(r.symbol); setSearchResults(prev => prev.map(s => s.symbol === r.symbol ? { ...s, alreadyAdded: true } : s)); }}
@@ -1497,7 +1497,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                 </div>
               )}
               {researchSector === '__mylist__' && showSearch && searchLoading && (
-                <div style={{ padding: '6px 0', fontSize: 11, color: '#7a8ea3', textAlign: 'center' }}>Searching...</div>
+                <div style={{ padding: '6px 0', fontSize: 11, color: 'var(--text3)', textAlign: 'center' }}>Searching...</div>
               )}
             </div>
           )}
@@ -1538,7 +1538,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                   }} />
                 ))
               ) : (
-                <div style={{ padding: 16, textAlign: 'center', color: '#7a8ea3', fontSize: 13 }}>
+                <div style={{ padding: 16, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>
                   No recent messages
                 </div>
               )}
@@ -1577,7 +1577,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
                     border: '1px solid #d8e2ed',
                     fontSize: 11,
                     fontWeight: 500,
-                    color: '#1a2d4a',
+                    color: 'var(--text1)',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
                   }}
@@ -1764,9 +1764,9 @@ function UptikCardInline({ card }) {
     background: '#eef2f7',
     borderRadius: 10,
     margin: '6px 0 8px',
-    fontFamily: "'Outfit', sans-serif",
+    fontFamily: "var(--font-heading)",
     overflow: 'hidden',
-    color: '#1a2d4a',
+    color: 'var(--text1)',
     border: '1px solid #d8e2ed',
   };
   const head = {
@@ -1775,7 +1775,7 @@ function UptikCardInline({ card }) {
     borderBottom: '1px solid #d8e2ed',
   };
   const ticker = { fontWeight: 700, fontSize: 15, color: '#8B5CF6', letterSpacing: 0.4 };
-  const price = { fontWeight: 700, fontSize: 14, color: '#1a2d4a' };
+  const price = { fontWeight: 700, fontSize: 14, color: 'var(--text1)' };
 
   if (card.type === 'earnings') {
     const qs = card.quarters || [];
@@ -1796,8 +1796,8 @@ function UptikCardInline({ card }) {
                 borderBottom: i < qs.length - 1 ? '1px solid #d8e2ed' : 'none',
                 fontSize: 13,
               }}>
-                <span style={{ color: '#7a8ea3', fontWeight: 500 }}>{q.label}</span>
-                <span style={{ color: beat ? '#1AAD5E' : '#e05252', fontWeight: 600 }}>
+                <span style={{ color: 'var(--text3)', fontWeight: 500 }}>{q.label}</span>
+                <span style={{ color: beat ? '#1AAD5E' : 'var(--red)', fontWeight: 600 }}>
                   ${Number(q.actual).toFixed(2)} vs ${Number(q.est).toFixed(2)} ({sign}{Number(q.beatPct).toFixed(1)}%)
                 </span>
               </div>
@@ -1808,7 +1808,7 @@ function UptikCardInline({ card }) {
           <div style={{
             padding: '8px 14px',
             fontSize: 11, fontWeight: 600,
-            color: '#7a8ea3',
+            color: 'var(--text3)',
             letterSpacing: 0.5,
             textTransform: 'uppercase',
             borderTop: '1px solid #d8e2ed',
@@ -1827,8 +1827,8 @@ function UptikCardInline({ card }) {
           <span style={ticker}>{card.ticker}</span>
           <span style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
             {card.price != null && <span style={price}>${Number(card.price).toFixed(2)}</span>}
-            {card.volume && <span style={{ fontSize: 11, color: '#7a8ea3' }}>Vol {card.volume}</span>}
-            {card.isClosed && <span style={{ fontSize: 11, color: '#7a8ea3' }}>· Closed</span>}
+            {card.volume && <span style={{ fontSize: 11, color: 'var(--text3)' }}>Vol {card.volume}</span>}
+            {card.isClosed && <span style={{ fontSize: 11, color: 'var(--text3)' }}>· Closed</span>}
           </span>
         </div>
       </div>
@@ -1845,25 +1845,25 @@ function UptikCardInline({ card }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 14px', padding: '10px 14px' }}>
           {card.pe != null && (
             <div style={{ fontSize: 12 }}>
-              <span style={{ color: '#7a8ea3' }}>P/E </span>
+              <span style={{ color: 'var(--text3)' }}>P/E </span>
               <span style={{ color: '#e6ecf5', fontWeight: 600 }}>{card.pe}</span>
             </div>
           )}
           {card.peg != null && (
             <div style={{ fontSize: 12 }}>
-              <span style={{ color: '#7a8ea3' }}>PEG </span>
+              <span style={{ color: 'var(--text3)' }}>PEG </span>
               <span style={{ color: '#e6ecf5', fontWeight: 600 }}>{card.peg}</span>
             </div>
           )}
           {card.netMargin != null && (
             <div style={{ fontSize: 12 }}>
-              <span style={{ color: '#7a8ea3' }}>Margin </span>
+              <span style={{ color: 'var(--text3)' }}>Margin </span>
               <span style={{ color: '#e6ecf5', fontWeight: 600 }}>{card.netMargin}%</span>
             </div>
           )}
           {card.salesGrowth != null && (
             <div style={{ fontSize: 12 }}>
-              <span style={{ color: '#7a8ea3' }}>Sales </span>
+              <span style={{ color: 'var(--text3)' }}>Sales </span>
               <span style={{ color: '#22c55e', fontWeight: 600 }}>+{card.salesGrowth}%</span>
             </div>
           )}
@@ -1907,7 +1907,7 @@ const S = {
   logoRow: { display: 'flex', alignItems: 'baseline' },
   logoUp: { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
   logoTik: { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
-  logoAlerts: { fontSize: 11, fontWeight: 400, color: '#d4e4f2', letterSpacing: 1.5, fontFamily: "'Outfit', sans-serif", marginTop: -3, paddingLeft: 26 },
+  logoAlerts: { fontSize: 11, fontWeight: 400, color: '#d4e4f2', letterSpacing: 1.5, fontFamily: "var(--font-heading)", marginTop: -3, paddingLeft: 26 },
   hRight: { display: 'flex', alignItems: 'center', gap: 8 },
   statusPill: {
     display: 'flex', alignItems: 'center', gap: 4,
@@ -1926,7 +1926,7 @@ const S = {
     borderRadius: 12, boxShadow: '0 6px 24px rgba(0,0,0,0.5)', zIndex: 200, overflow: 'hidden',
   },
   pmName: { fontSize: 13, fontWeight: 600, color: '#e0e0e0', padding: '9px 12px 8px', borderBottom: '1px solid rgba(255,255,255,0.1)' },
-  pmItem: { fontSize: 13, fontWeight: 500, color: '#1AAD5E', padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)' },
+  pmItem: { fontSize: 13, fontWeight: 500, color: 'var(--green-btn)', padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)' },
 
   // ── Market Ticker Bar ──
   combinedBar: { background: '#1a3a5e', flexShrink: 0 },
@@ -1953,7 +1953,7 @@ const S = {
   wlPopRow: { display: 'flex', gap: 5, justifyContent: 'center', flexWrap: 'wrap' },
   wlPopLabel: { fontSize: 11, color: '#3e5568', marginRight: 2, alignSelf: 'center' },
   wlPopChip: {
-    fontSize: 12, fontWeight: 600, color: '#1AAD5E',
+    fontSize: 12, fontWeight: 600, color: 'var(--green-btn)',
     background: 'rgba(26,173,94,0.08)', border: '1px solid rgba(26,173,94,0.2)',
     borderRadius: 8, padding: '4px 10px', cursor: 'pointer',
   },
@@ -1962,27 +1962,27 @@ const S = {
   // ── Briefing ──
   briefSection: { padding: '12px 14px 8px' },
   briefHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  briefTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', letterSpacing: '-0.01em' },
-  briefTime: { fontSize: 11, color: '#7a8ea3' },
-  briefToggle: { fontSize: 12, color: '#1AAD5E', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' },
+  briefTitle: { fontSize: 15, fontWeight: 700, color: 'var(--text1)', letterSpacing: '-0.01em' },
+  briefTime: { fontSize: 11, color: 'var(--text3)' },
+  briefToggle: { fontSize: 12, color: 'var(--green-btn)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' },
   briefCard: {
     background: '#fff', border: '1px solid #d8e2ed', borderRadius: 12,
     padding: '10px 12px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10,
   },
-  bfTickers: { fontSize: 11, fontWeight: 700, color: '#1AAD5E', marginBottom: 2 },
-  bfTitle: { fontSize: 13, color: '#1a2d4a', fontWeight: 500, lineHeight: 1.3 },
-  bfLink: { color: '#1AAD5E', fontSize: 12, fontWeight: 600, textDecoration: 'none', flexShrink: 0 },
-  briefEmpty: { background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 12, padding: 16, textAlign: 'center', fontSize: 13, color: '#7a8ea3' },
+  bfTickers: { fontSize: 11, fontWeight: 700, color: 'var(--green-btn)', marginBottom: 2 },
+  bfTitle: { fontSize: 13, color: 'var(--text1)', fontWeight: 500, lineHeight: 1.3 },
+  bfLink: { color: 'var(--green-btn)', fontSize: 12, fontWeight: 600, textDecoration: 'none', flexShrink: 0 },
+  briefEmpty: { background: '#f8fafc', border: '1px solid #d8e2ed', borderRadius: 12, padding: 16, textAlign: 'center', fontSize: 13, color: 'var(--text3)' },
 
   // ── Stocks section (inline) ──
   stocksSection: { padding: '0 16px 8px' },
   stocksHeader: { marginBottom: 6 },
-  stocksTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', fontFamily: "'Outfit', sans-serif" },
+  stocksTitle: { fontSize: 15, fontWeight: 700, color: 'var(--text1)', fontFamily: "var(--font-heading)" },
   stocksBtns: { display: 'flex', gap: 8 },
   stocksBtn: {
     padding: '7px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
     cursor: 'pointer', border: '1px solid #8cd9a0', background: 'rgba(140,217,160,0.08)',
-    color: '#1AAD5E', fontFamily: "'DM Sans', sans-serif",
+    color: 'var(--green-btn)', fontFamily: "var(--font)",
   },
   stocksBtnActive: { background: '#1AAD5E', color: '#fff', borderColor: '#1AAD5E' },
   sectorDropdown: {
@@ -1992,8 +1992,8 @@ const S = {
     zIndex: 100, minWidth: 140,
   },
   sectorDropItem: {
-    padding: '10px 16px', fontSize: 13, color: '#1a2d4a', cursor: 'pointer',
-    borderBottom: '1px solid #f5f7fa', fontFamily: "'DM Sans', sans-serif",
+    padding: '10px 16px', fontSize: 13, color: 'var(--text1)', cursor: 'pointer',
+    borderBottom: '1px solid #f5f7fa', fontFamily: "var(--font)",
   },
   stocksCard: {
     background: '#fff', border: '1px solid #d8e2ed', borderRadius: 10,
@@ -2004,7 +2004,7 @@ const S = {
     borderBottom: '1px solid #d8e2ed', background: '#fafbfc',
   },
   stocksColLabel: {
-    fontSize: 9, fontWeight: 600, color: '#7a8ea3',
+    fontSize: 9, fontWeight: 600, color: 'var(--text3)',
     textTransform: 'uppercase', letterSpacing: 0.5,
   },
   stocksScroll: { maxHeight: 200, overflowY: 'auto' },
@@ -2012,7 +2012,7 @@ const S = {
     display: 'flex', alignItems: 'center', padding: '7px 10px',
     borderBottom: '1px solid #f5f7fa', cursor: 'pointer',
   },
-  stocksRowTk: { fontSize: 13, fontWeight: 600, color: '#1a2d4a' },
+  stocksRowTk: { fontSize: 13, fontWeight: 600, color: 'var(--text1)' },
   stocksExpand: {
     padding: '8px 10px 8px 38px', background: '#f8fafc',
     borderBottom: '1px solid #f0f4f8',
@@ -2024,14 +2024,14 @@ const S = {
   },
   stocksAddInput: {
     flex: 1, border: 'none', outline: 'none', fontSize: 13,
-    color: '#1a2d4a', background: 'transparent', fontFamily: "'DM Sans', sans-serif",
+    color: 'var(--text1)', background: 'transparent', fontFamily: "var(--font)",
   },
 
   // ── Chat section ──
   chatSection: { padding: '12px 14px 8px' },
   csHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  csTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 6 },
-  csLive: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#1AAD5E', fontWeight: 500 },
+  csTitle: { fontSize: 15, fontWeight: 700, color: 'var(--text1)', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 6 },
+  csLive: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--green-btn)', fontWeight: 500 },
   csLiveDot: { width: 5, height: 5, borderRadius: '50%', background: '#1AAD5E', animation: 'pulse 1.5s ease-in-out infinite' },
   privateChatBtn: {
     display: 'flex', alignItems: 'center', gap: 5,
@@ -2044,9 +2044,9 @@ const S = {
   // ── My Groups section ──
   groupSection: { padding: '12px 14px 16px' },
   groupSectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  groupSectionTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', letterSpacing: '-0.01em' },
+  groupSectionTitle: { fontSize: 15, fontWeight: 700, color: 'var(--text1)', letterSpacing: '-0.01em' },
   groupCreateBtn: {
-    fontSize: 13, fontWeight: 600, color: '#1AAD5E', background: 'none', border: 'none',
+    fontSize: 13, fontWeight: 600, color: 'var(--green-btn)', background: 'none', border: 'none',
     cursor: 'pointer', padding: '4px 0',
   },
   myGroupsPills: { display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2, justifyContent: 'center', flexWrap: 'wrap' },
@@ -2054,7 +2054,7 @@ const S = {
     flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
     borderRadius: 12, border: '1px solid #d8e2ed', background: '#fff', cursor: 'pointer',
   },
-  myGroupName: { fontSize: 14, fontWeight: 600, color: '#1a2d4a' },
+  myGroupName: { fontSize: 14, fontWeight: 600, color: 'var(--text1)' },
   groupCta: {
     display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
     background: 'linear-gradient(135deg, #f0f7f3 0%, #e8f4ec 100%)', borderRadius: 12,
@@ -2066,7 +2066,7 @@ const S = {
     border: '1px solid #c8e6d0',
   },
   groupCtaText: { flex: 1 },
-  groupCtaTitle: { fontSize: 15, fontWeight: 700, color: '#1a2d4a', marginBottom: 2 },
+  groupCtaTitle: { fontSize: 15, fontWeight: 700, color: 'var(--text1)', marginBottom: 2 },
   groupCtaSub: { fontSize: 12, color: '#5a8a6a', lineHeight: 1.3 },
 
   chatCard: {
@@ -2090,9 +2090,9 @@ const S = {
   },
   ccTop: { display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 1 },
   ccName: { fontSize: 13, fontWeight: 600 },
-  ccTime: { fontSize: 11, color: '#7a8ea3', marginLeft: 'auto' },
+  ccTime: { fontSize: 11, color: 'var(--text3)', marginLeft: 'auto' },
   ccText: { fontSize: 13, color: '#4a6178', lineHeight: 1.4 },
-  ccTk: { color: '#1AAD5E', fontWeight: 600 },
+  ccTk: { color: 'var(--green-btn)', fontWeight: 600 },
   // ccFooter replaced by fixedChatBar
   ccAiBtn: {
     width: 36, height: 36, borderRadius: '50%',
@@ -2114,7 +2114,7 @@ const S = {
   },
   ccInput: {
     flex: 1, background: 'transparent', border: 'none',
-    padding: '8px 0 8px 16px', fontSize: 15, color: '#1a2d4a',
+    padding: '8px 0 8px 16px', fontSize: 15, color: 'var(--text1)',
     fontFamily: 'inherit', outline: 'none', height: '100%',
   },
   ccMic: {
@@ -2168,7 +2168,7 @@ const S = {
   },
   searchInputLight: {
     flex: 1, background: 'none', border: 'none', outline: 'none',
-    fontFamily: 'inherit', fontSize: 13, color: '#1a2d4a',
+    fontFamily: 'inherit', fontSize: 13, color: 'var(--text1)',
   },
   searchResultsLight: {
     marginTop: 6, background: '#f8fafc',
@@ -2179,7 +2179,7 @@ const S = {
     borderBottom: '1px solid #f0f3f6', cursor: 'pointer',
   },
   siAddBtnLight: {
-    fontSize: 12, fontWeight: 600, color: '#1AAD5E', background: 'rgba(26,173,94,0.08)',
+    fontSize: 12, fontWeight: 600, color: 'var(--green-btn)', background: 'rgba(26,173,94,0.08)',
     border: '1px solid rgba(26,173,94,0.2)', borderRadius: 12, padding: '4px 12px', cursor: 'pointer',
     fontFamily: 'inherit',
   },
@@ -2214,7 +2214,7 @@ const OB = {
   },
   searchInput: {
     flex: 1, background: 'none', border: 'none', outline: 'none',
-    fontFamily: 'inherit', fontSize: 13, color: '#1a2d4a',
+    fontFamily: 'inherit', fontSize: 13, color: 'var(--text1)',
   },
   searchResults: {
     margin: '6px 20px 0', background: '#fff', border: '1px solid #d8e2ed',
@@ -2225,7 +2225,7 @@ const OB = {
     borderBottom: '1px solid #f0f3f6',
   },
   searchAddBtn: {
-    fontSize: 11, fontWeight: 600, color: '#1AAD5E', background: 'rgba(26,173,94,0.08)',
+    fontSize: 11, fontWeight: 600, color: 'var(--green-btn)', background: 'rgba(26,173,94,0.08)',
     border: '1px solid rgba(26,173,94,0.2)', borderRadius: 8, padding: '4px 12px',
     cursor: 'pointer', fontFamily: 'inherit',
   },
@@ -2234,7 +2234,7 @@ const OB = {
 
   section: { padding: '12px 20px 4px' },
   sectionTitle: {
-    fontSize: 12, fontWeight: 700, color: '#7a8ea3', textTransform: 'uppercase',
+    fontSize: 12, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase',
     letterSpacing: '0.08em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6,
   },
 
@@ -2254,20 +2254,20 @@ const OB = {
   sectorStocks: { display: 'flex', gap: 6, flexWrap: 'wrap' },
   sectorStock: {
     padding: '6px 12px', borderRadius: 12, background: '#fff', border: '1px solid #d8e2ed',
-    fontSize: 12, fontWeight: 600, color: '#1a2d4a', cursor: 'pointer', transition: 'all 0.2s',
+    fontSize: 12, fontWeight: 600, color: 'var(--text1)', cursor: 'pointer', transition: 'all 0.2s',
     display: 'flex', alignItems: 'center', gap: 5,
   },
-  sectorStockSel: { borderColor: '#1AAD5E', background: 'rgba(26,173,94,0.08)', color: '#1AAD5E' },
+  sectorStockSel: { borderColor: 'var(--green-btn)', background: 'rgba(26,173,94,0.08)', color: 'var(--green-btn)' },
 
   footer: { padding: '12px 20px 20px', display: 'flex', flexDirection: 'column', gap: 8 },
   cta: {
     width: '100%', padding: 14, border: 'none', borderRadius: 14,
     fontFamily: 'inherit', fontSize: 15, fontWeight: 700, cursor: 'pointer',
-    background: '#1AAD5E', color: '#fff', boxShadow: '0 4px 16px rgba(26,173,94,0.25)',
+    background: 'var(--green-btn)', color: '#fff', boxShadow: '0 4px 16px rgba(26,173,94,0.25)',
     transition: 'all 0.2s',
   },
   skip: {
-    textAlign: 'center', fontSize: 13, color: '#7a8ea3', cursor: 'pointer',
+    textAlign: 'center', fontSize: 13, color: 'var(--text3)', cursor: 'pointer',
     padding: 4, fontWeight: 500,
   },
 };

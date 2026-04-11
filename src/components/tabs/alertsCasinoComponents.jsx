@@ -79,7 +79,7 @@ export function SentimentPill({ score, darkMode }) {
         padding: '3px 8px', borderRadius: 999,
         background: darkMode ? 'rgba(30,61,98,0.55)' : 'rgba(0,0,0,0.035)',
         border: `1px solid ${darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
-        fontFamily: "'Outfit', sans-serif",
+        fontFamily: "var(--font-heading)",
       }}
     >
       <span style={{ fontSize: 10, fontWeight: 600, color, letterSpacing: 0.3, textTransform: 'uppercase' }}>
@@ -126,16 +126,16 @@ export function PokerChip({ alert, isSelected, onTap, size, t }) {
           position: 'absolute', top: -5,
           background: t.gold, color: '#0a1628',
           fontSize: 6, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
-          fontFamily: "'Outfit', sans-serif", letterSpacing: '0.5px', cursor: 'help',
+          fontFamily: "var(--font-heading)", letterSpacing: '0.5px', cursor: 'help',
         }} title="Alert of the Day — highest-conviction pick right now">AOTD</div>
       )}
-      <span style={{ fontSize: tickerSize, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif", lineHeight: 1, position: 'relative' }}>{alert.ticker}</span>
+      <span style={{ fontSize: tickerSize, fontWeight: 700, color: t.text1, fontFamily: "var(--font-heading)", lineHeight: 1, position: 'relative' }}>{alert.ticker}</span>
       <span style={{ fontSize: pctSize, fontWeight: 700, color: borderColor, lineHeight: 1.2, position: 'relative' }}>{pctText}</span>
       {(alert.created_at || alert.createdAt) && (
         <span style={{
           position: 'absolute', top: '100%', marginTop: 2, left: '50%', transform: 'translateX(-50%)',
           fontSize: 8, fontWeight: 600, color: t.text3, whiteSpace: 'nowrap',
-          fontFamily: "'DM Sans', sans-serif", letterSpacing: '0.2px',
+          fontFamily: "var(--font)", letterSpacing: '0.2px',
         }}>{timeAgo(alert.created_at || alert.createdAt)}</span>
       )}
     </div>
@@ -171,10 +171,10 @@ export function MysteryChip({ type, isSelected, onTap, size, t }) {
           position: 'absolute', top: -5,
           background: t.gold, color: '#0a1628',
           fontSize: 6, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
-          fontFamily: "'Outfit', sans-serif", letterSpacing: '0.5px', cursor: 'help',
+          fontFamily: "var(--font-heading)", letterSpacing: '0.5px', cursor: 'help',
         }} title="Alert of the Day — highest-conviction pick right now">AOTD</div>
       )}
-      <span style={{ fontSize: tickerSize, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif", lineHeight: 1, position: 'relative' }}>{label}</span>
+      <span style={{ fontSize: tickerSize, fontWeight: 700, color: t.text1, fontFamily: "var(--font-heading)", lineHeight: 1, position: 'relative' }}>{label}</span>
       <span style={{ fontSize: 9, fontWeight: 600, color: borderColor, lineHeight: 1, position: 'relative', marginTop: 2 }}>{emoji}</span>
     </div>
   );
