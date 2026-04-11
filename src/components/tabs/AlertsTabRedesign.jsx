@@ -313,8 +313,8 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
                 <div style={{
                   width: size, height: size, borderRadius: '50%',
                   background: isUp
-                    ? 'radial-gradient(circle at 35% 35%, #6aff9e, #1a8a45)'
-                    : 'radial-gradient(circle at 35% 35%, #ff8a8a, #a03030)',
+                    ? 'radial-gradient(circle at 40% 40%, #7dffb0, #2ebd68)'
+                    : 'radial-gradient(circle at 40% 40%, #ff9e9e, #c94444)',
                   border: `2px solid ${isUp ? '#5eed8a' : '#F09595'}`,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                   boxShadow: isSelected ? `0 0 0 3px rgba(123,140,222,0.5)` : undefined,
