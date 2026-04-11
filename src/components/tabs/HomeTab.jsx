@@ -1525,7 +1525,7 @@ export default function HomeTab({ session, onGroupSelect, onSignOut, onProfilePr
       transition: 'all 0.2s',
     },
     ccAiBtnOff: {
-      background: t.card, color: '#fff', border: '1px solid rgba(139,92,246,0.3)',
+      background: darkMode ? t.card : '#8B5CF6', color: '#fff', border: `1px solid ${darkMode ? 'rgba(139,92,246,0.3)' : '#8B5CF6'}`,
     },
     ccAiBtnActive: {
       background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)',
