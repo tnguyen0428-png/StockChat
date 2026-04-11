@@ -85,7 +85,7 @@ const UptikCard = ({ card }) => {
 };
 
 // ── Message Item ──
-const MSG_COLLAPSE_LEN = 280;
+const MSG_COLLAPSE_LEN = 150;
 
 const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiven, onTapUsername, isGrouped }) => {
   const [expanded, setExpanded] = useState(false);
@@ -373,6 +373,15 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
 
     return () => supabase.removeChannel(channel);
   }, [group?.id]);
+
+  // Scroll to bottom on initial load (once messages are ready)
+  const hasScrolledInit = useRef(false);
+  useEffect(() => {
+    const el = messagesAreaRef.current;
+    if (!el || messages.length === 0 || hasScrolledInit.current) return;
+    hasScrolledInit.current = true;
+    requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+  }, [messages.length]);
 
   // Hard-pin scroll to bottom on any new message or AI loading state.
   // Uses the container directly + ResizeObserver so tall AI answers that

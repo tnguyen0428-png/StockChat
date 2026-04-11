@@ -13,197 +13,193 @@ const styles = {
   container: {
     flex: 1,
     backgroundColor: 'var(--bg)',
-    padding: '16px',
+    padding: '12px 14px',
     overflowY: 'auto',
     minHeight: 0,
   },
   header: {
-    marginBottom: '24px',
+    display: 'flex',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: '12px',
   },
   title: {
-    fontSize: '24px',
-    fontWeight: '600',
+    fontSize: '14px',
+    fontWeight: '700',
     color: 'var(--text1)',
     margin: 0,
-    marginBottom: '4px',
+    fontFamily: "'Outfit', sans-serif",
   },
   subtitle: {
-    fontSize: '14px',
-    color: 'var(--text2)',
+    fontSize: '10px',
+    color: 'var(--text3)',
     margin: 0,
   },
   filterRow: {
     display: 'flex',
-    gap: '8px',
-    marginBottom: '24px',
-    flexWrap: 'wrap',
+    gap: '6px',
+    marginBottom: '12px',
   },
   filterPill: {
-    padding: '8px 16px',
-    borderRadius: '20px',
+    padding: '5px 12px',
+    borderRadius: '16px',
     border: '1px solid var(--border)',
     backgroundColor: 'transparent',
-    color: 'var(--text2)',
+    color: 'var(--text3)',
     cursor: 'pointer',
-    fontSize: '13px',
+    fontSize: '11px',
     fontWeight: '500',
-    transition: 'all 0.2s ease',
+    fontFamily: 'var(--font)',
+    transition: 'all 0.15s',
   },
   filterPillActive: {
-    backgroundColor: 'var(--border)',
-    color: 'var(--text1)',
-    border: '1px solid var(--border)',
+    backgroundColor: 'var(--btn-active, #132d52)',
+    color: '#fff',
+    border: '1px solid var(--btn-active, #132d52)',
+    fontWeight: '600',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
   },
   cardList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '6px',
   },
   card: {
     backgroundColor: 'var(--card)',
     border: '1px solid var(--border)',
-    borderRadius: '12px',
-    padding: '16px',
-    transition: 'all 0.2s ease',
+    borderRadius: '10px',
+    padding: '10px 12px',
+    transition: 'border-color 0.15s',
     cursor: 'pointer',
-  },
-  cardHover: {
-    borderColor: '#2e5a8f',
   },
   cardHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    marginBottom: '12px',
+    gap: '8px',
   },
   rankBadge: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '18px',
+    width: '22px',
+    fontSize: '13px',
     fontWeight: '700',
+    textAlign: 'center',
     flexShrink: 0,
   },
   tickerLogo: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '8px',
+    width: '30px',
+    height: '30px',
+    borderRadius: '7px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '12px',
+    fontSize: '10px',
     fontWeight: '700',
     color: '#fff',
     flexShrink: 0,
   },
   cardInfo: {
     flex: 1,
+    minWidth: 0,
   },
   cardTopRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '4px',
+    alignItems: 'center',
   },
   tickerName: {
-    fontSize: '14px',
-    fontWeight: '600',
+    fontSize: '13px',
+    fontWeight: '700',
     color: 'var(--text1)',
     margin: 0,
   },
   companyName: {
-    fontSize: '12px',
-    color: 'var(--text2)',
+    fontSize: '10px',
+    color: 'var(--text3)',
     margin: 0,
-    marginTop: '2px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
   priceSection: {
     textAlign: 'right',
+    flexShrink: 0,
   },
   price: {
-    fontSize: '16px',
+    fontSize: '13px',
     fontWeight: '600',
     color: 'var(--text1)',
     margin: 0,
   },
   changePct: {
-    fontSize: '13px',
+    fontSize: '11px',
     fontWeight: '500',
     margin: 0,
-    marginTop: '2px',
   },
   bottomRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    justifyContent: 'space-between',
-    paddingTop: '12px',
-    borderTop: '1px solid var(--border)',
+    gap: '6px',
+    marginTop: '5px',
   },
   sentimentBar: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '4px',
     flex: 1,
   },
   sentimentBarContainer: {
-    flex: 1,
-    height: '6px',
+    width: '40px',
+    height: '3px',
     backgroundColor: 'var(--border)',
-    borderRadius: '3px',
+    borderRadius: '2px',
     overflow: 'hidden',
+    flexShrink: 0,
   },
   sentimentBarFill: {
     height: '100%',
     backgroundColor: 'var(--green)',
-    transition: 'width 0.2s ease',
+    borderRadius: '2px',
   },
   sentimentPercent: {
-    fontSize: '12px',
-    color: 'var(--text2)',
-    minWidth: '36px',
-    textAlign: 'right',
+    fontSize: '10px',
+    color: 'var(--text3)',
+    fontWeight: '600',
   },
   statsSection: {
     display: 'flex',
-    gap: '16px',
-    fontSize: '12px',
+    gap: '8px',
+    fontSize: '10px',
+    marginLeft: 'auto',
   },
   statItem: {
     display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: '3px',
   },
   statLabel: {
     color: 'var(--text3)',
-    fontSize: '11px',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    marginBottom: '2px',
+    fontSize: '9px',
   },
   statValue: {
-    color: 'var(--text1)',
+    color: 'var(--text2)',
     fontWeight: '600',
+    fontSize: '10px',
   },
   emptyState: {
     textAlign: 'center',
-    padding: '48px 24px',
+    padding: '32px 20px',
     color: 'var(--text2)',
   },
   emptyStateIcon: {
-    fontSize: '48px',
-    marginBottom: '16px',
-  },
-  emptyStateText: {
-    fontSize: '16px',
-    margin: 0,
+    fontSize: '32px',
     marginBottom: '8px',
   },
-  emptyStateHint: {
+  emptyStateText: {
     fontSize: '13px',
+    margin: 0,
+    marginBottom: '4px',
+  },
+  emptyStateHint: {
+    fontSize: '11px',
     color: 'var(--text3)',
     margin: 0,
   },
@@ -211,15 +207,15 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '48px 24px',
+    padding: '32px 20px',
   },
   spinner: {
-    width: '32px',
-    height: '32px',
-    border: '3px solid var(--border)',
-    borderTop: '3px solid var(--text1)',
+    width: '22px',
+    height: '22px',
+    border: '2px solid var(--border)',
+    borderTop: '2px solid var(--green)',
     borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
+    animation: 'spin 0.7s linear infinite',
   },
 };
 
@@ -420,22 +416,10 @@ export default function TrendingView({ session, group }) {
     const logoColor = getLogoColor(ticker.ticker);
 
     return (
-      <div
-        key={ticker.ticker}
-        style={{
-          ...styles.card,
-          ':hover': { ...styles.cardHover },
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = '#2e5a8f';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = 'var(--border)';
-        }}
-      >
-        {/* Header: rank + logo + ticker info + price */}
+      <div key={ticker.ticker} style={styles.card}>
+        {/* Single compact row: rank + logo + name/company + price */}
         <div style={styles.cardHeader}>
-          <div style={{ ...styles.rankBadge, color: rankColor, fontSize: '20px' }}>
+          <div style={{ ...styles.rankBadge, color: rankColor }}>
             {rank}
           </div>
           <div style={{ ...styles.tickerLogo, backgroundColor: logoColor }}>
@@ -443,7 +427,7 @@ export default function TrendingView({ session, group }) {
           </div>
           <div style={styles.cardInfo}>
             <div style={styles.cardTopRow}>
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <h3 style={styles.tickerName}>{ticker.ticker}</h3>
                 <p style={styles.companyName}>{ticker.name}</p>
               </div>
@@ -457,34 +441,28 @@ export default function TrendingView({ session, group }) {
           </div>
         </div>
 
-        {/* Bottom row: sentiment bar + stats */}
+        {/* Compact inline stats row */}
         <div style={styles.bottomRow}>
           <div style={styles.sentimentBar}>
             <div style={styles.sentimentBarContainer}>
-              <div
-                style={{
-                  ...styles.sentimentBarFill,
-                  width: `${ticker.bullPct}%`,
-                }}
-              />
+              <div style={{ ...styles.sentimentBarFill, width: `${ticker.bullPct}%` }} />
             </div>
             <span style={styles.sentimentPercent}>{ticker.bullPct.toFixed(0)}%</span>
           </div>
-
           <div style={styles.statsSection}>
             {ticker.avgTarget && (
               <div style={styles.statItem}>
-                <span style={styles.statLabel}>Target</span>
+                <span style={styles.statLabel}>PT</span>
                 <span style={styles.statValue}>${formatPrice(ticker.avgTarget)}</span>
               </div>
             )}
             <div style={styles.statItem}>
-              <span style={styles.statLabel}>Mentions</span>
               <span style={styles.statValue}>{ticker.mentions}</span>
+              <span style={styles.statLabel}>mentions</span>
             </div>
             <div style={styles.statItem}>
-              <span style={styles.statLabel}>Votes</span>
               <span style={styles.statValue}>{ticker.bulls + ticker.bears}</span>
+              <span style={styles.statLabel}>votes</span>
             </div>
           </div>
         </div>

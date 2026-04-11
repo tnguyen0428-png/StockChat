@@ -86,6 +86,7 @@ const TickerMentionCard = memo(({ ticker, groupId, userId }) => {
   const [target, setTarget] = useState(null);
   const [myVote, setMyVote] = useState(null);
   const [voting, setVoting] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     getTickerQuote(sym).then(d => { if (d) setPrice(d); });
@@ -123,10 +124,30 @@ const TickerMentionCard = memo(({ ticker, groupId, userId }) => {
   const changeColor = price?.changePct >= 0 ? 'var(--green)' : '#F09595';
   const bg = logoColor(sym);
 
+  // ── Compact pill (default) ──
+  if (!expanded) {
+    return (
+      <div style={s.pill} onClick={() => setExpanded(true)}>
+        <div style={{ ...s.pillLogo, backgroundColor: bg }}>{sym.substring(0, 2)}</div>
+        <span style={s.pillSym}>{sym}</span>
+        {price && (
+          <>
+            <span style={s.pillPrice}>${price.price?.toFixed(2)}</span>
+            <span style={{ ...s.pillChange, color: changeColor }}>
+              {price.changePct >= 0 ? '+' : ''}{price.changePct?.toFixed(2)}%
+            </span>
+          </>
+        )}
+        <span style={s.pillChevron}>›</span>
+      </div>
+    );
+  }
+
+  // ── Expanded card (tap to collapse) ──
   return (
     <div style={s.card}>
-      {/* Top row: logo + ticker + price */}
-      <div style={s.topRow}>
+      {/* Top row: logo + ticker + price + collapse */}
+      <div style={s.topRow} onClick={() => setExpanded(false)}>
         <div style={{ ...s.logo, backgroundColor: bg }}>
           {sym.substring(0, 2)}
         </div>
@@ -186,12 +207,55 @@ export default TickerMentionCard;
 
 // ── Styles ──
 const s = {
+  pill: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    background: 'var(--card)',
+    border: '1px solid var(--border)',
+    borderRadius: 20,
+    padding: '4px 10px 4px 4px',
+    marginTop: 4,
+    cursor: 'pointer',
+    transition: 'background 0.15s',
+  },
+  pillLogo: {
+    width: 22,
+    height: 22,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 8,
+    fontWeight: 700,
+    color: '#fff',
+    flexShrink: 0,
+  },
+  pillSym: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: 'var(--text1)',
+  },
+  pillPrice: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: 'var(--text2)',
+  },
+  pillChange: {
+    fontSize: 11,
+    fontWeight: 600,
+  },
+  pillChevron: {
+    fontSize: 14,
+    color: 'var(--text3)',
+    marginLeft: 2,
+  },
   card: {
     background: 'var(--card)',
     border: '1px solid var(--border)',
     borderRadius: 10,
     padding: '10px 12px',
-    marginTop: 6,
+    marginTop: 4,
     marginBottom: 2,
   },
   topRow: {
