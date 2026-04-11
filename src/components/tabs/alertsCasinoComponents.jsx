@@ -3,7 +3,7 @@
 // Casino-themed components for AlertsTab redesign
 // ============================================
 
-import { useState, useEffect } from 'react';
+// React import kept minimal — hooks used by consumers, not this file
 
 // ── Relative time helper ──
 export function timeAgo(ts) {
@@ -33,7 +33,7 @@ export function useTheme(darkMode) {
     greenBg: 'rgba(93,202,165,0.1)', redBg: 'rgba(240,149,149,0.1)',
     goldBg: 'rgba(212,160,23,0.1)', purpleBg: 'rgba(167,139,250,0.1)',
     blueBg: 'rgba(123,140,222,0.1)', pinkBg: 'rgba(244,114,182,0.1)',
-    btnActive: '#1a3d6e', shadow: '0 1px 3px rgba(0,0,0,.2)',
+    btnActive: '#1a3d6e', btnText: '#0a1628', shadow: '0 1px 3px rgba(0,0,0,.2)',
   } : {
     bg: '#eef2f7', card: '#ffffff', cardHover: '#f8fafc',
     surface: '#f8fafc', surfaceAlt: '#f0f4f8',
@@ -44,7 +44,7 @@ export function useTheme(darkMode) {
     greenBg: 'rgba(26,173,94,0.08)', redBg: 'rgba(224,82,82,0.08)',
     goldBg: 'rgba(212,160,23,0.08)', purpleBg: 'rgba(139,92,246,0.08)',
     blueBg: 'rgba(74,144,217,0.08)', pinkBg: 'rgba(236,72,153,0.08)',
-    btnActive: '#1e293b', shadow: '0 1px 3px rgba(0,0,0,.06)',
+    btnActive: '#1e293b', btnText: '#ffffff', shadow: '0 1px 3px rgba(0,0,0,.06)',
   };
 }
 

@@ -9,10 +9,13 @@ import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
 import CreateGroupModal from './CreateGroupModal';
 import InviteModal from './InviteModal';
+import { DarkModeToggle, useTheme } from '../tabs/alertsCasinoComponents';
+import { isMarketOpen, isAfterHours } from '../../utils/marketUtils';
 
 
-export default function Header({ group, profile, isAdmin, isModerator, activeTab, allGroups, onGroupSwitch, onGroupNameUpdate, onSignOut, onHomePress, onProfilePress }) {
+export default function Header({ group, profile, isAdmin, isModerator, activeTab, allGroups, onGroupSwitch, onGroupNameUpdate, onSignOut, onHomePress, onProfilePress, darkMode, setDarkMode }) {
   const { sectorGroups, customGroups } = useGroup();
+  const t = useTheme(darkMode);
 
   const [editing, setEditing]           = useState(false);
   const [editName, setEditName]         = useState('');
@@ -29,7 +32,6 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
   const avatarRef    = useRef(null);
 
   const canEdit        = isAdmin || isModerator;
-  const hasMultiGroup  = (allGroups || []).length > 1 || customGroups.length > 0;
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -84,8 +86,6 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
     setShowDropdown(false);
     onGroupSwitch?.(g);
   };
-
-  if (activeTab === 'home') return null;
 
   if (activeTab === 'chat') {
     return (
@@ -231,6 +231,11 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
     );
   }
 
+  const mktOpen = isMarketOpen();
+  const mktAH = !mktOpen && isAfterHours();
+  const mktLabel = mktOpen ? 'LIVE' : mktAH ? 'AH' : 'CLOSED';
+  const mktColor = mktOpen ? '#8cd9a0' : '#ef5350';
+
   return (
     <div style={styles.header}>
       <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 0 }} onClick={() => onHomePress?.()}>
@@ -249,6 +254,11 @@ export default function Header({ group, profile, isAdmin, isModerator, activeTab
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={styles.statusPill}>
+            <div style={{ ...styles.statusDot, background: mktColor }} />
+            <span style={{ ...styles.statusText, color: mktColor }}>{mktLabel}</span>
+          </div>
+          <DarkModeToggle darkMode={darkMode} onToggle={() => setDarkMode(d => !d)} t={t} />
           {/* Bell icon */}
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
@@ -544,6 +554,12 @@ const styles = {
     fontFamily: 'var(--font)',
   },
   // ── Default header ──
+  statusPill: {
+    display: 'flex', alignItems: 'center', gap: 4,
+    background: 'rgba(255,255,255,0.1)', padding: '2px 7px', borderRadius: 8,
+  },
+  statusDot: { width: 5, height: 5, borderRadius: '50%' },
+  statusText: { fontSize: 10, fontWeight: 600, letterSpacing: '0.04em' },
   logoRow:    { display: 'flex', alignItems: 'baseline' },
   logoUp:     { fontSize: 20, fontWeight: 500, color: '#8cd9a0' },
   logoTik:    { fontSize: 20, fontWeight: 500, color: '#f0ede8' },
@@ -551,11 +567,6 @@ const styles = {
     fontSize: 11, fontWeight: 400, color: '#d4e4f2', letterSpacing: 1.5,
     fontFamily: "'Outfit', sans-serif",
     marginTop: -3, paddingLeft: 26,
-  },
-  slogan: {
-    fontSize: 12, fontWeight: 300, fontStyle: 'italic',
-    color: '#f0ede8', letterSpacing: 1,
-    fontFamily: "'Outfit', sans-serif",
   },
   avatar: {
     width: 28, height: 28, borderRadius: '50%',
