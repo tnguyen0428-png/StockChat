@@ -278,9 +278,7 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
       </div>
 
       {/* ═══ CHIP ZONE ═══ */}
-      {showEducation ? (
-        <EducationZone t={t} />
-      ) : (
+      {hasAlerts && (
         <div style={{
           position: 'relative',
           height: selectedAlert ? 100 : 170,
@@ -349,6 +347,9 @@ export default function AlertsTab({ session, group, darkMode: parentDarkMode, se
           </div>
         </div>
       )}
+
+      {/* ═══ EDUCATION — always visible ═══ */}
+      <EducationZone t={t} />
 
       {/* ═══ HISTORY ═══ */}
       {historyRows.length > 0 && (
