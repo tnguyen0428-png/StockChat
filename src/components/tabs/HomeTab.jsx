@@ -96,6 +96,21 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
   const chatStripRef = useRef(null);
   const chatSectionRef = useRef(null);
   const chatBarRef = useRef(null);
+  const contentRef = useRef(null);
+
+  // ── iOS keyboard gap fix ──
+  // On iOS Safari the keyboard doesn't shrink the layout viewport, so flex
+  // containers keep their full height and a gap appears between the chat
+  // messages and the input bar. Fix: when the input is focused, scroll the
+  // content container to the bottom so messages sit right above the input.
+  const handleChatInputFocus = useCallback(() => {
+    // Small delay lets iOS Safari finish its viewport adjustment
+    setTimeout(() => {
+      if (contentRef.current) {
+        contentRef.current.scrollTop = contentRef.current.scrollHeight;
+      }
+    }, 300);
+  }, []);
 
   // ── Voice input (Web Speech API) ──
   const toggleListening = () => {
@@ -1104,7 +1119,7 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
       </div>
 
       {/* ═══ SCROLLABLE CONTENT ═══ */}
-      <div style={S.content}>
+      <div ref={contentRef} style={S.content}>
 
         {/* ── STOCKS (Watchlist first for engagement) ── */}
         <div style={S.stocksSection}>
@@ -1450,6 +1465,7 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
             placeholder={aiMode ? 'Ask AI about any stock...' : 'Chat with the community...'}
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
+            onFocus={handleChatInputFocus}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleHomeSend(); } }}
           />
           <div

@@ -74,29 +74,6 @@ export default function DashboardPage({ session }) {
   const [startingDM, setStartingDM]       = useState(false);
   const dismissTimerRef = useRef(null);
 
-  // ── iOS Safari viewport fix ──
-  // 100vh = "large viewport" on iOS Safari (address bar collapsed).
-  // Fix: set page height to window.innerHeight on mount, which gives the
-  // correct visible height with the address bar. Only update on real
-  // window resizes and orientation changes — NOT on visualViewport changes,
-  // because those fire when the keyboard opens and would over-shrink the page
-  // (iOS Safari already scrolls the page up for the keyboard on its own).
-  const pageRef = useRef(null);
-  useEffect(() => {
-    const setVH = () => {
-      if (!pageRef.current) return;
-      pageRef.current.style.height = `${window.innerHeight}px`;
-    };
-    const onOrientation = () => setTimeout(setVH, 150);
-    setVH();
-    window.addEventListener('resize', setVH);
-    window.addEventListener('orientationchange', onOrientation);
-    return () => {
-      window.removeEventListener('resize', setVH);
-      window.removeEventListener('orientationchange', onOrientation);
-    };
-  }, []);
-
   // ── Hide BottomNav when iOS/Android keyboard is open ──
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const initialVH = useRef(window.innerHeight);
@@ -265,7 +242,7 @@ export default function DashboardPage({ session }) {
   }
 
   return (
-    <div ref={pageRef} style={styles.page}>
+    <div style={styles.page}>
 
       <Header
         group={activeGroup}
@@ -471,8 +448,7 @@ export default function DashboardPage({ session }) {
 
 const styles = {
   page: {
-    height: '100vh', /* fallback; overridden by JS for iOS Safari address bar */
-    background: 'var(--bg)',
+    height: '100vh', background: 'var(--bg)',
     display: 'flex', flexDirection: 'column',
     overflow: 'hidden', maxWidth: 480,
     margin: '0 auto', position: 'relative',
