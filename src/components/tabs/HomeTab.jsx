@@ -6,20 +6,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
-import { getBatchQuotes } from '../../lib/polygonQuote';
 import CreateGroupModal from '../shared/CreateGroupModal';
 import InviteModal from '../shared/InviteModal';
 import StickerPicker from '../shared/StickerPicker';
 import { useTheme } from './alertsCasinoComponents';
 
 // ── Extracted modules ──
-import { POPULAR_TICKERS, ONBOARD_TRENDING, ONBOARD_SECTORS } from './homeConstants';
-import { POLYGON_KEY } from '../../lib/constants';
-import { safeGet, safeSet } from '../../lib/safeStorage';
-import { getHomeStyles, getOnboardingStyles } from './homeStyles';
+import { safeGet } from '../../lib/safeStorage';
+import { getHomeStyles } from './homeStyles';
 import BriefCard from '../home/BriefCard';
 import ChatBubble from '../home/ChatBubble';
-import OnboardingOverlay from './OnboardingOverlay';
 
 // ── Hooks ──
 import { useMarketData } from '../../hooks/useMarketData';
@@ -76,15 +72,6 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
   const [showCreateGroup, setShowCreateGroup]   = useState(false);
   const [showInviteGroup, setShowInviteGroup]   = useState(null);
 
-  // ── Onboarding state (first-login flow) ──
-  const [showOnboarding, setShowOnboarding]     = useState(false);
-  const [onboardSelected, setOnboardSelected]   = useState(new Set());
-  const [onboardPrices, setOnboardPrices]       = useState({});
-  const [onboardSearch, setOnboardSearch]        = useState('');
-  const [onboardSearchResults, setOnboardSearchResults] = useState([]);
-  const [onboardSearchLoading, setOnboardSearchLoading] = useState(false);
-  const onboardSearchTimeout = useRef(null);
-
   // ── UI refs ──
   const contentRef    = useRef(null);
   const outerWrapRef  = useRef(null);
@@ -129,23 +116,6 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
     return () => { cancelled = true; };
   }, []);
 
-  // ── First-login detection: show onboarding if watchlist is empty & never dismissed ──
-  useEffect(() => {
-    const checkOnboarding = async () => {
-      const dismissed = safeGet('uptik_onboarding_done');
-      if (dismissed) return;
-      const { count } = await supabase
-        .from('user_watchlist')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', session.user.id);
-      if (count === 0) {
-        setShowOnboarding(true);
-        fetchOnboardPrices();
-      }
-    };
-    checkOnboarding();
-  }, []);
-
   // ═══════════════════════════════════════
   // BRIEFING
   // ═══════════════════════════════════════
@@ -161,93 +131,6 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
     } catch (err) {
       console.error('[Briefing] Load error:', err.message);
     }
-  };
-
-  // ═══════════════════════════════════════
-  // ONBOARDING
-  // ═══════════════════════════════════════
-  const fetchOnboardPrices = async () => {
-    if (!POLYGON_KEY) return;
-    const allTickers = [
-      ...ONBOARD_TRENDING.map(t => t.symbol),
-      ...ONBOARD_SECTORS.flatMap(s => s.tickers),
-    ];
-    const unique = [...new Set(allTickers)];
-    try {
-      const quotes = await getBatchQuotes(unique);
-      const prices = {};
-      Object.entries(quotes).forEach(([symbol, q]) => {
-        if (q && q.price) prices[symbol] = { price: q.price, change: q.changePct };
-      });
-      setOnboardPrices(prices);
-    } catch (err) {
-      console.error('[Onboard] Price fetch error:', err.message);
-    }
-  };
-
-  const toggleOnboardTicker = (symbol) => {
-    setOnboardSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(symbol)) next.delete(symbol);
-      else next.add(symbol);
-      return next;
-    });
-  };
-
-  const handleOnboardSearch = (val) => {
-    setOnboardSearch(val);
-    if (onboardSearchTimeout.current) clearTimeout(onboardSearchTimeout.current);
-    if (val.length < 1) { setOnboardSearchResults([]); return; }
-    setOnboardSearchLoading(true);
-    onboardSearchTimeout.current = setTimeout(async () => {
-      try {
-        const upper = val.toUpperCase();
-        const majorExchanges = new Set(['XNYS', 'XNAS', 'XASE']);
-        const [exactRes, searchRes] = await Promise.all([
-          fetch(`https://api.polygon.io/v3/reference/tickers?ticker=${upper}&active=true&apiKey=${POLYGON_KEY}`),
-          fetch(`https://api.polygon.io/v3/reference/tickers?search=${val}&active=true&market=stocks&locale=us&limit=8&apiKey=${POLYGON_KEY}`),
-        ]);
-        const [exactData, searchData] = await Promise.all([exactRes.json(), searchRes.json()]);
-        const filtered = (searchData.results || []).filter(t =>
-          majorExchanges.has(t.primary_exchange)
-        );
-        const seen = new Set();
-        const merged = [];
-        for (const t of [...(exactData.results || []), ...filtered]) {
-          if (!seen.has(t.ticker)) {
-            seen.add(t.ticker);
-            merged.push(t);
-          }
-        }
-        setOnboardSearchResults(merged.slice(0, 6).map(t => ({
-          symbol: t.ticker, name: t.name,
-        })));
-      } catch { setOnboardSearchResults([]); }
-      setOnboardSearchLoading(false);
-    }, 300);
-  };
-
-  const finishOnboarding = async () => {
-    const tickers = [...onboardSelected];
-    safeSet('uptik_onboarding_done', '1');
-    setShowOnboarding(false);
-    if (tickers.length > 0) {
-      const inserts = tickers.map(symbol => ({
-        user_id: session.user.id,
-        symbol,
-      }));
-      const { data } = await supabase.from('user_watchlist').insert(inserts).select();
-      if (data) {
-        setWatchlist(data);
-        fetchResearchPrices(tickers);
-        showToast(`${tickers.length} stock${tickers.length > 1 ? 's' : ''} added to Watchlist!`);
-      }
-    }
-  };
-
-  const skipOnboarding = () => {
-    safeSet('uptik_onboarding_done', '1');
-    setShowOnboarding(false);
   };
 
   // ═══════════════════════════════════════
@@ -308,7 +191,6 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
 
   // ── Styles (extracted to homeStyles.js) ──
   const S = getHomeStyles(t);
-  const OB = getOnboardingStyles(t);
 
   return (
     <div ref={outerWrapRef} style={S.outerWrap}>
@@ -318,24 +200,6 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
         <div style={S.toast}>
           <span style={{ fontSize: 14 }}>✓</span> {toast}
         </div>
-      )}
-
-      {/* ═══ ONBOARDING OVERLAY (first login only) ═══ */}
-      {showOnboarding && (
-        <OnboardingOverlay
-          OB={OB} t={t}
-          onboardSelected={onboardSelected}
-          toggleOnboardTicker={toggleOnboardTicker}
-          onboardSearch={onboardSearch}
-          handleOnboardSearch={handleOnboardSearch}
-          onboardSearchResults={onboardSearchResults}
-          setOnboardSearch={setOnboardSearch}
-          setOnboardSearchResults={setOnboardSearchResults}
-          onboardSearchLoading={onboardSearchLoading}
-          onboardPrices={onboardPrices}
-          finishOnboarding={finishOnboarding}
-          skipOnboarding={skipOnboarding}
-        />
       )}
 
       {/* ═══ MARKET TICKER SCROLL ═══ */}
@@ -473,14 +337,8 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
                   <div style={{ padding: 16, textAlign: 'center', color: t.text3, fontSize: 13 }}>Loading...</div>
                 ) : researchStocks.length === 0 ? (
                   researchSector === '__mylist__' ? (
-                    <div style={{ padding: '16px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 13, color: t.text3, marginBottom: 10 }}>No tickers in your list yet</div>
-                      <div style={S.wlPopRow}>
-                        <span style={S.wlPopLabel}>Popular:</span>
-                        {POPULAR_TICKERS.map(t => (
-                          <span key={t} style={{ ...S.wlPopChip, ...(addingTicker === t ? { opacity: 0.5 } : {}) }} onClick={() => addToWatchlist(t)}>{t}</span>
-                        ))}
-                      </div>
+                    <div style={{ padding: '16px', textAlign: 'center', color: t.text3, fontSize: 13 }}>
+                      No tickers in your list yet
                     </div>
                   ) : (
                     <div style={{ padding: 16, textAlign: 'center', color: t.text3, fontSize: 13 }}>
