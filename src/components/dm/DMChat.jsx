@@ -395,20 +395,21 @@ export default function DMChat({ session, dm, onBack }) {
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const NAV_H = 62; // BottomNav height (58) + padding (4)
-    const initialHeight = vv.height;
     const onResize = () => {
       if (!dmWrapRef.current) return;
-      const top = dmWrapRef.current.getBoundingClientRect().top;
-      const keyboardOpen = vv.height < initialHeight * 0.75;
-      const bottom = keyboardOpen ? 0 : NAV_H;
-      const available = vv.height - top - bottom;
-      dmWrapRef.current.style.height = `${Math.max(available, 120)}px`;
-      dmWrapRef.current.style.maxHeight = `${Math.max(available, 120)}px`;
+      const keyboardOpen = vv.height < window.innerHeight * 0.75;
+      if (keyboardOpen) {
+        const top = dmWrapRef.current.getBoundingClientRect().top;
+        const available = vv.height - top;
+        dmWrapRef.current.style.height = `${Math.max(available, 120)}px`;
+        dmWrapRef.current.style.maxHeight = `${Math.max(available, 120)}px`;
+      } else {
+        dmWrapRef.current.style.height = '';
+        dmWrapRef.current.style.maxHeight = '';
+      }
     };
     vv.addEventListener('resize', onResize);
     vv.addEventListener('scroll', onResize);
-    onResize();
     return () => {
       vv.removeEventListener('resize', onResize);
       vv.removeEventListener('scroll', onResize);
@@ -849,8 +850,7 @@ const styles = {
   },
   inputBar: {
     background: 'var(--card)', borderTop: '1px solid var(--border)',
-    padding: '8px 12px', paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))',
-    display: 'flex', gap: 6,
+    padding: '8px 12px', display: 'flex', gap: 6,
     alignItems: 'center', flexShrink: 0,
   },
   input: {

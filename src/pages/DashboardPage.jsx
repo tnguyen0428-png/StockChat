@@ -276,7 +276,7 @@ export default function DashboardPage({ session }) {
            position, subscriptions, and in-progress state survive tab switches. */}
       <div style={{
         ...styles.content,
-        ...(activeTab === 'chat' ? { overflow: 'hidden', paddingBottom: 0 } : {}),
+        ...(activeTab === 'chat' ? { overflow: 'hidden' } : {}),
       }}>
 
         {/* ── Home (eagerly loaded) ── */}

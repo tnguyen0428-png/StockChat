@@ -332,25 +332,27 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   useEffect(() => { messagesRef.current = messages; }, [messages]);
 
   // ── iOS/Android keyboard handling via visualViewport ──
+  // Only override height when the software keyboard is open;
+  // otherwise let CSS flex + paddingBottom handle layout normally.
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const NAV_H = 62; // BottomNav height (58) + padding (4)
-    const initialHeight = vv.height;
     const onResize = () => {
       if (!wrapRef.current) return;
-      const top = wrapRef.current.getBoundingClientRect().top;
-      const keyboardOpen = vv.height < initialHeight * 0.75;
-      // When keyboard is open: fill exactly to visual viewport (no nav, keyboard covers it)
-      // When keyboard is closed: fill to viewport minus the fixed bottom nav
-      const bottom = keyboardOpen ? 0 : NAV_H;
-      const available = vv.height - top - bottom;
-      wrapRef.current.style.height = `${Math.max(available, 120)}px`;
-      wrapRef.current.style.maxHeight = `${Math.max(available, 120)}px`;
+      // Compare visualViewport to window.innerHeight (stable on mobile)
+      const keyboardOpen = vv.height < window.innerHeight * 0.75;
+      if (keyboardOpen) {
+        const top = wrapRef.current.getBoundingClientRect().top;
+        const available = vv.height - top;
+        wrapRef.current.style.height = `${Math.max(available, 120)}px`;
+        wrapRef.current.style.maxHeight = `${Math.max(available, 120)}px`;
+      } else {
+        wrapRef.current.style.height = '';
+        wrapRef.current.style.maxHeight = '';
+      }
     };
     vv.addEventListener('resize', onResize);
     vv.addEventListener('scroll', onResize);
-    onResize();
     return () => {
       vv.removeEventListener('resize', onResize);
       vv.removeEventListener('scroll', onResize);
@@ -776,8 +778,7 @@ const styles = {
   },
   inputBar: {
     background: 'var(--card)', borderTop: '1px solid var(--border)',
-    padding: '8px 12px', paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))',
-    display: 'flex',
+    padding: '8px 12px', display: 'flex',
     gap: 6, alignItems: 'center', flexShrink: 0,
   },
   emojiToggle: {
