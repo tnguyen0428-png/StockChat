@@ -395,13 +395,16 @@ export default function DMChat({ session, dm, onBack }) {
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
+    const NAV_H = 62; // BottomNav height (58) + padding (4)
+    const initialHeight = vv.height;
     const onResize = () => {
-      if (dmWrapRef.current) {
-        const top = dmWrapRef.current.getBoundingClientRect().top;
-        const available = vv.height - top;
-        dmWrapRef.current.style.height = `${Math.max(available, 120)}px`;
-        dmWrapRef.current.style.maxHeight = `${Math.max(available, 120)}px`;
-      }
+      if (!dmWrapRef.current) return;
+      const top = dmWrapRef.current.getBoundingClientRect().top;
+      const keyboardOpen = vv.height < initialHeight * 0.75;
+      const bottom = keyboardOpen ? 0 : NAV_H;
+      const available = vv.height - top - bottom;
+      dmWrapRef.current.style.height = `${Math.max(available, 120)}px`;
+      dmWrapRef.current.style.maxHeight = `${Math.max(available, 120)}px`;
     };
     vv.addEventListener('resize', onResize);
     vv.addEventListener('scroll', onResize);

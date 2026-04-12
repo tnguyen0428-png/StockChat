@@ -335,18 +335,21 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
+    const NAV_H = 62; // BottomNav height (58) + padding (4)
+    const initialHeight = vv.height;
     const onResize = () => {
-      if (wrapRef.current) {
-        // Use visualViewport height minus the wrap's top offset to get available space
-        const top = wrapRef.current.getBoundingClientRect().top;
-        const available = vv.height - top;
-        wrapRef.current.style.height = `${Math.max(available, 120)}px`;
-        wrapRef.current.style.maxHeight = `${Math.max(available, 120)}px`;
-      }
+      if (!wrapRef.current) return;
+      const top = wrapRef.current.getBoundingClientRect().top;
+      const keyboardOpen = vv.height < initialHeight * 0.75;
+      // When keyboard is open: fill exactly to visual viewport (no nav, keyboard covers it)
+      // When keyboard is closed: fill to viewport minus the fixed bottom nav
+      const bottom = keyboardOpen ? 0 : NAV_H;
+      const available = vv.height - top - bottom;
+      wrapRef.current.style.height = `${Math.max(available, 120)}px`;
+      wrapRef.current.style.maxHeight = `${Math.max(available, 120)}px`;
     };
     vv.addEventListener('resize', onResize);
     vv.addEventListener('scroll', onResize);
-    // Run once on mount to set initial size
     onResize();
     return () => {
       vv.removeEventListener('resize', onResize);
