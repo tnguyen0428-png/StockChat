@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-
-const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
+import { POLYGON_KEY } from '../lib/constants';
 
 export function useWatchlist(session) {
   const [watchlist, setWatchlist]         = useState([]);

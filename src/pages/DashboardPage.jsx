@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useGroup } from '../context/GroupContext';
 import { DARK_THEME, LIGHT_THEME } from '../components/tabs/alertsMockData';
+import { safeGet, safeSet, safeRemove } from '../lib/safeStorage';
 
 // HomeTab is the default landing tab — load eagerly so first paint is instant
 import HomeTab from '../components/tabs/HomeTab';
@@ -45,24 +46,20 @@ export default function DashboardPage({ session }) {
   } = useGroup();
 
   // ── Global dark mode — persists across tab switches ──
-  const [darkMode, setDarkMode] = useState(() => {
-    try { return localStorage.getItem('uptik_darkMode') === 'true'; } catch { return false; }
-  });
+  const [darkMode, setDarkMode] = useState(() => safeGet('uptik_darkMode') === 'true');
 
   useEffect(() => {
     const theme = darkMode ? DARK_THEME : LIGHT_THEME;
     Object.entries(theme).forEach(([k, v]) => document.documentElement.style.setProperty(k, v));
-    try { localStorage.setItem('uptik_darkMode', String(darkMode)); } catch {}
+    safeSet('uptik_darkMode', String(darkMode));
   }, [darkMode]);
 
   const [activeTab, setActiveTab]         = useState(() => {
-    try {
-      const redirect = localStorage.getItem('uptik_join_redirect');
-      if (redirect) {
-        localStorage.removeItem('uptik_join_redirect');
-        return redirect;
-      }
-    } catch { /* localStorage unavailable — iOS private browsing */ }
+    const redirect = safeGet('uptik_join_redirect');
+    if (redirect) {
+      safeRemove('uptik_join_redirect');
+      return redirect;
+    }
     return 'home';
   });
   // Track which tabs have been visited so we can lazy-mount but never unmount
@@ -77,7 +74,6 @@ export default function DashboardPage({ session }) {
   // ── Keyboard detection + single viewport handler ──
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [vpStyle, setVpStyle] = useState({});
-  const [debugInfo, setDebugInfo] = useState('');
   const initialVH = useRef(window.innerHeight);
   const pageRef = useRef(null);
   useEffect(() => {
@@ -86,11 +82,6 @@ export default function DashboardPage({ session }) {
     const update = (e) => {
       const isKB = vv.height < initialVH.current * 0.75;
       setKeyboardOpen(isKB);
-      // Debug — visible on screen so we can see what iOS reports
-      setDebugInfo(
-        `evt:${e?.type || '?'} vvH:${Math.round(vv.height)} vvOT:${Math.round(vv.offsetTop)} ` +
-        `initVH:${initialVH.current} iH:${window.innerHeight} isKB:${isKB}`
-      );
       if (isKB) {
         setVpStyle({
           position: 'fixed',
@@ -268,18 +259,6 @@ export default function DashboardPage({ session }) {
 
   return (
     <div ref={pageRef} style={{ ...styles.page, ...vpStyle }}>
-
-      {/* DEBUG — remove after fixing keyboard issue */}
-      {debugInfo && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999,
-          background: 'rgba(255,0,0,0.9)', color: '#fff', fontSize: 10,
-          padding: '2px 6px', fontFamily: 'monospace', whiteSpace: 'nowrap',
-          pointerEvents: 'none',
-        }}>
-          {debugInfo}
-        </div>
-      )}
 
       <Header
         group={activeGroup}

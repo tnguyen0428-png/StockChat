@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-
-const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
+import { safeGet, safeSet, safeRemove } from '../lib/safeStorage';
+import { FMP_KEY } from '../lib/constants';
 
 const SHORT_SECTOR = {
   'Communication Services': 'Communication', 'Communication': 'Communication',
@@ -23,7 +23,7 @@ function watchlistToResearchStocks(watchlist) {
 }
 
 export function useSectorResearch(watchlist) {
-  const savedSector = localStorage.getItem('uptik_last_sector');
+  const savedSector = safeGet('uptik_last_sector');
   const [researchSector, setResearchSectorRaw]  = useState(savedSector || null);
   const [researchStocks, setResearchStocks]     = useState([]);
   const [researchLoading, setResearchLoading]   = useState(false);
@@ -35,8 +35,8 @@ export function useSectorResearch(watchlist) {
   // Persist sector selection to localStorage
   const setResearchSector = (val) => {
     setResearchSectorRaw(val);
-    if (val) localStorage.setItem('uptik_last_sector', val);
-    else localStorage.removeItem('uptik_last_sector');
+    if (val) safeSet('uptik_last_sector', val);
+    else safeRemove('uptik_last_sector');
   };
 
   // Close sector dropdown on outside click

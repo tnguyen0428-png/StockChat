@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { isWeekend, isMarketHoliday, isMarketOpen, isAfterHours } from '../utils/marketUtils';
-
-const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
-const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
+import { POLYGON_KEY, FMP_KEY } from '../lib/constants';
 
 const FUTURES_MAP = {
   'ES=F': 'S&P Fut',

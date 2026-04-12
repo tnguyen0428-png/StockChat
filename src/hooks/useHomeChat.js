@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { askUpTikAI } from '../lib/aiAgent';
+import { safeGet, safeSet, safeRemove } from '../lib/safeStorage';
 
 export function useHomeChat(session, profile, publicGroups, watchlist) {
   const [chatMessages, setChatMessages] = useState([]);
   const [homeGroup, setHomeGroup]       = useState(null);
-  const [chatInput, setChatInputRaw]    = useState(() => localStorage.getItem('uptik_chat_draft') || '');
+  const [chatInput, setChatInputRaw]    = useState(() => safeGet('uptik_chat_draft') || '');
   const [chatSending, setChatSending]   = useState(false);
-  const [aiMode, setAiMode]             = useState(() => localStorage.getItem('uptik_ai_mode') === '1');
+  const [aiMode, setAiMode]             = useState(() => safeGet('uptik_ai_mode') === '1');
   const [chatExpanded, setChatExpanded] = useState(false);
   const [aiLoading, setAiLoading]       = useState(false);
   const [aiLastTicker, setAiLastTicker] = useState(null);
@@ -20,13 +21,13 @@ export function useHomeChat(session, profile, publicGroups, watchlist) {
 
   const setChatInput = (val) => {
     setChatInputRaw(val);
-    if (val) localStorage.setItem('uptik_chat_draft', val);
-    else localStorage.removeItem('uptik_chat_draft');
+    if (val) safeSet('uptik_chat_draft', val);
+    else safeRemove('uptik_chat_draft');
   };
 
   // Persist AI mode preference
   useEffect(() => {
-    localStorage.setItem('uptik_ai_mode', aiMode ? '1' : '0');
+    safeSet('uptik_ai_mode', aiMode ? '1' : '0');
   }, [aiMode]);
 
   // Cleanup speech recognition on unmount
@@ -62,13 +63,10 @@ export function useHomeChat(session, profile, publicGroups, watchlist) {
       else scroller.scrollTop = scroller.scrollHeight;
     };
     const raf = requestAnimationFrame(pin);
-    const t1 = setTimeout(pin, 80);
-    const t2 = setTimeout(pin, 250);
-    const t3 = setTimeout(pin, 600);
-    const t4 = setTimeout(pin, 1200);
+    const t1 = setTimeout(pin, 200);
     return () => {
       cancelAnimationFrame(raf);
-      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4);
+      clearTimeout(t1);
     };
   }, [chatMessages.length, aiLoading]);
 
@@ -123,23 +121,14 @@ export function useHomeChat(session, profile, publicGroups, watchlist) {
     if (!target) return;
     try {
       const msgLimit = expanded ? 25 : 5;
-      let { data, error } = await supabase
+      const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
         .eq('group_id', target.id)
         .order('created_at', { ascending: false })
         .limit(msgLimit);
       if (error) throw error;
-      if (!data || data.length === 0) {
-        const { data: fallback, error: fbErr } = await supabase
-          .from('chat_messages')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(msgLimit);
-        if (fbErr) throw fbErr;
-        data = fallback;
-      }
-      if (data) setChatMessages(data.reverse());
+      if (data && data.length > 0) setChatMessages(data.reverse());
     } catch (err) {
       console.error('[HomeChat] loadChatMessages failed:', err.message);
     }
