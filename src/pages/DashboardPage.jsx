@@ -76,23 +76,34 @@ export default function DashboardPage({ session }) {
 
   // ── iOS Safari viewport fix ──
   // 100vh = "large viewport" on iOS Safari (address bar collapsed).
-  // When address bar is visible, bottom content gets hidden behind it.
-  // Fix: inject a CSS custom property using window.innerHeight which iOS
-  // Safari correctly reports as the *visible* viewport.
+  // window.innerHeight doesn't fire resize on iOS keyboard open.
+  // Fix: use visualViewport.height which iOS Safari reports correctly
+  // for both address bar AND keyboard changes.
   const pageRef = useRef(null);
   useEffect(() => {
+    const vv = window.visualViewport;
     const setVH = () => {
-      if (pageRef.current) {
-        pageRef.current.style.height = `${window.innerHeight}px`;
-      }
+      if (!pageRef.current) return;
+      // visualViewport.height = exact visible area (accounts for keyboard + address bar)
+      // Falls back to window.innerHeight for browsers without visualViewport
+      const h = vv ? vv.height : window.innerHeight;
+      pageRef.current.style.height = `${h}px`;
     };
     const onOrientation = () => setTimeout(setVH, 150);
     setVH();
     window.addEventListener('resize', setVH);
     window.addEventListener('orientationchange', onOrientation);
+    if (vv) {
+      vv.addEventListener('resize', setVH);
+      vv.addEventListener('scroll', setVH);
+    }
     return () => {
       window.removeEventListener('resize', setVH);
       window.removeEventListener('orientationchange', onOrientation);
+      if (vv) {
+        vv.removeEventListener('resize', setVH);
+        vv.removeEventListener('scroll', setVH);
+      }
     };
   }, []);
 
