@@ -327,53 +327,9 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const messagesAreaRef = useRef(null);
   const inputRef       = useRef(null);
   const wrapRef        = useRef(null);
-  const initialVH      = useRef(window.innerHeight);
   const sendingRef     = useRef(false);
   const messagesRef    = useRef(messages);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
-
-  // ── iOS keyboard handling via visualViewport ──
-  // iOS Safari scrolls the visual viewport instead of resizing (offsetTop > 0).
-  // Android resizes natively — skip there. Uses rAF + caching to prevent shakiness.
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    let rafId = 0;
-    let lastH = '';
-    const onResize = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        if (!wrapRef.current) return;
-        if (wrapRef.current.offsetParent === null) return;
-        const keyboardOpen = vv.height < initialVH.current * 0.75;
-        if (keyboardOpen && vv.offsetTop > 0) {
-          const layoutTop = wrapRef.current.getBoundingClientRect().top;
-          const visibleTop = layoutTop - vv.offsetTop;
-          const h = `${Math.max(vv.height - visibleTop, 120)}px`;
-          if (h !== lastH) {
-            lastH = h;
-            wrapRef.current.style.height = h;
-            wrapRef.current.style.maxHeight = h;
-          }
-        } else if (lastH !== '') {
-          lastH = '';
-          wrapRef.current.style.height = '';
-          wrapRef.current.style.maxHeight = '';
-        }
-      });
-    };
-    vv.addEventListener('resize', onResize);
-    vv.addEventListener('scroll', onResize);
-    return () => {
-      cancelAnimationFrame(rafId);
-      vv.removeEventListener('resize', onResize);
-      vv.removeEventListener('scroll', onResize);
-      if (wrapRef.current) {
-        wrapRef.current.style.height = '';
-        wrapRef.current.style.maxHeight = '';
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (!session?.user?.id) return;

@@ -384,7 +384,6 @@ export default function DMChat({ session, dm, onBack }) {
   const inputRef = useRef(null);
   const lastTickerRef = useRef(null);
   const dmWrapRef = useRef(null);
-  const initialVH = useRef(window.innerHeight);
   const channelRef = useRef(null);
 
   // ── Typing indicator state ──
@@ -392,48 +391,6 @@ export default function DMChat({ session, dm, onBack }) {
   const typingTimeoutRef = useRef(null);
   const lastTypingBroadcast = useRef(0);
 
-  // ── iOS keyboard handling via visualViewport ──
-  // iOS Safari scrolls the visual viewport instead of resizing (offsetTop > 0).
-  // Android resizes natively — skip there. Uses rAF + caching to prevent shakiness.
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    let rafId = 0;
-    let lastH = '';
-    const onResize = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        if (!dmWrapRef.current) return;
-        if (dmWrapRef.current.offsetParent === null) return;
-        const keyboardOpen = vv.height < initialVH.current * 0.75;
-        if (keyboardOpen && vv.offsetTop > 0) {
-          const layoutTop = dmWrapRef.current.getBoundingClientRect().top;
-          const visibleTop = layoutTop - vv.offsetTop;
-          const h = `${Math.max(vv.height - visibleTop, 120)}px`;
-          if (h !== lastH) {
-            lastH = h;
-            dmWrapRef.current.style.height = h;
-            dmWrapRef.current.style.maxHeight = h;
-          }
-        } else if (lastH !== '') {
-          lastH = '';
-          dmWrapRef.current.style.height = '';
-          dmWrapRef.current.style.maxHeight = '';
-        }
-      });
-    };
-    vv.addEventListener('resize', onResize);
-    vv.addEventListener('scroll', onResize);
-    return () => {
-      cancelAnimationFrame(rafId);
-      vv.removeEventListener('resize', onResize);
-      vv.removeEventListener('scroll', onResize);
-      if (dmWrapRef.current) {
-        dmWrapRef.current.style.height = '';
-        dmWrapRef.current.style.maxHeight = '';
-      }
-    };
-  }, []);
 
   // ── Read receipt state ──
   const [otherReadAt, setOtherReadAt] = useState(null);

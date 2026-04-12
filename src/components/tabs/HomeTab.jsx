@@ -98,55 +98,6 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
   const chatBarRef = useRef(null);
   const contentRef = useRef(null);
   const outerWrapRef = useRef(null);
-  const initialVH = useRef(window.innerHeight);
-
-  // ── iOS keyboard handling via visualViewport ──
-  // iOS Safari scrolls the visual viewport instead of resizing it (offsetTop > 0).
-  // Android Chrome resizes natively — skip override there to avoid fighting the browser.
-  // Uses rAF + height caching to prevent layout thrashing / shakiness on scroll.
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    let rafId = 0;
-    let lastH = '';
-    const onResize = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        if (!outerWrapRef.current) return;
-        if (outerWrapRef.current.offsetParent === null) return;
-        const keyboardOpen = vv.height < initialVH.current * 0.75;
-        if (keyboardOpen && vv.offsetTop > 0) {
-          const layoutTop = outerWrapRef.current.getBoundingClientRect().top;
-          const visibleTop = layoutTop - vv.offsetTop;
-          const h = `${Math.max(vv.height - visibleTop, 120)}px`;
-          // Only touch the DOM if the value actually changed
-          if (h !== lastH) {
-            lastH = h;
-            outerWrapRef.current.style.height = h;
-            outerWrapRef.current.style.maxHeight = h;
-            if (contentRef.current) {
-              contentRef.current.scrollTop = contentRef.current.scrollHeight;
-            }
-          }
-        } else if (lastH !== '') {
-          lastH = '';
-          outerWrapRef.current.style.height = '';
-          outerWrapRef.current.style.maxHeight = '';
-        }
-      });
-    };
-    vv.addEventListener('resize', onResize);
-    vv.addEventListener('scroll', onResize);
-    return () => {
-      cancelAnimationFrame(rafId);
-      vv.removeEventListener('resize', onResize);
-      vv.removeEventListener('scroll', onResize);
-      if (outerWrapRef.current) {
-        outerWrapRef.current.style.height = '';
-        outerWrapRef.current.style.maxHeight = '';
-      }
-    };
-  }, []);
 
   // Also scroll content to bottom when input is tapped (backup for iOS timing)
   const handleChatInputFocus = useCallback(() => {

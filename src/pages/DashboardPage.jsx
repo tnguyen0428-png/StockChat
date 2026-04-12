@@ -74,18 +74,39 @@ export default function DashboardPage({ session }) {
   const [startingDM, setStartingDM]       = useState(false);
   const dismissTimerRef = useRef(null);
 
-  // ── Hide BottomNav when iOS/Android keyboard is open ──
+  // ── Keyboard detection + single viewport height handler ──
+  // Instead of per-tab visualViewport hacks with getBoundingClientRect(),
+  // set ONE CSS custom property (--app-height) on the page container.
+  // The flex layout handles the rest — no scroll listeners, no feedback loops.
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const initialVH = useRef(window.innerHeight);
+  const pageRef = useRef(null);
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    // Use the initial innerHeight (captured before any keyboard) as baseline.
-    // On iOS Safari, window.innerHeight shrinks with the keyboard, so comparing
-    // vv.height against it would never detect the keyboard.
-    const onResize = () => setKeyboardOpen(vv.height < initialVH.current * 0.75);
+    let lastH = '';
+    const onResize = () => {
+      const isKB = vv.height < initialVH.current * 0.75;
+      setKeyboardOpen(isKB);
+      // Resize the page container to match the visual viewport.
+      // On iOS Safari the layout viewport doesn't shrink with the keyboard,
+      // so 100vh stays too tall. This keeps the flex children (header, content,
+      // input bar) fitting inside the visible area with zero per-tab JS.
+      if (pageRef.current) {
+        const h = `${vv.height}px`;
+        if (h !== lastH) {
+          lastH = h;
+          pageRef.current.style.height = h;
+        }
+      }
+    };
+    // Only listen to 'resize' — NOT 'scroll'. On iOS Safari, visualViewport
+    // scroll events fire during content scrolling and cause feedback loops.
     vv.addEventListener('resize', onResize);
-    return () => vv.removeEventListener('resize', onResize);
+    return () => {
+      vv.removeEventListener('resize', onResize);
+      if (pageRef.current) pageRef.current.style.height = '';
+    };
   }, []);
 
   // Listen for broadcasts
@@ -242,7 +263,7 @@ export default function DashboardPage({ session }) {
   }
 
   return (
-    <div style={styles.page}>
+    <div ref={pageRef} style={styles.page}>
 
       <Header
         group={activeGroup}
@@ -448,7 +469,7 @@ export default function DashboardPage({ session }) {
 
 const styles = {
   page: {
-    height: '100vh', background: 'var(--bg)',
+    height: '100dvh', background: 'var(--bg)',
     display: 'flex', flexDirection: 'column',
     overflow: 'hidden', maxWidth: 480,
     margin: '0 auto', position: 'relative',
