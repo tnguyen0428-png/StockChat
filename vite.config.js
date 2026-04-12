@@ -4,5 +4,5 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  cacheDir: '/tmp/vite-cache',
+  cacheDir: '/tmp/vite-cache3',
 })

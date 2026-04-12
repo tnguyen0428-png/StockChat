@@ -383,12 +383,38 @@ export default function DMChat({ session, dm, onBack }) {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const lastTickerRef = useRef(null);
+  const dmWrapRef = useRef(null);
   const channelRef = useRef(null);
 
   // ── Typing indicator state ──
   const [otherTyping, setOtherTyping] = useState(false);
   const typingTimeoutRef = useRef(null);
   const lastTypingBroadcast = useRef(0);
+
+  // ── iOS/Android keyboard handling via visualViewport ──
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      if (dmWrapRef.current) {
+        const top = dmWrapRef.current.getBoundingClientRect().top;
+        const available = vv.height - top;
+        dmWrapRef.current.style.height = `${Math.max(available, 120)}px`;
+        dmWrapRef.current.style.maxHeight = `${Math.max(available, 120)}px`;
+      }
+    };
+    vv.addEventListener('resize', onResize);
+    vv.addEventListener('scroll', onResize);
+    onResize();
+    return () => {
+      vv.removeEventListener('resize', onResize);
+      vv.removeEventListener('scroll', onResize);
+      if (dmWrapRef.current) {
+        dmWrapRef.current.style.height = '';
+        dmWrapRef.current.style.maxHeight = '';
+      }
+    };
+  }, []);
 
   // ── Read receipt state ──
   const [otherReadAt, setOtherReadAt] = useState(null);
@@ -672,7 +698,7 @@ export default function DMChat({ session, dm, onBack }) {
   const showSeen = lastSentMsg && otherReadAt && new Date(otherReadAt) >= new Date(lastSentMsg.created_at);
 
   return (
-    <div style={styles.wrap}>
+    <div ref={dmWrapRef} style={styles.wrap}>
       {/* Header with online status */}
       <div style={styles.header}>
         <div style={styles.backBtn} onClick={onBack}>
@@ -820,7 +846,8 @@ const styles = {
   },
   inputBar: {
     background: 'var(--card)', borderTop: '1px solid var(--border)',
-    padding: '8px 12px', display: 'flex', gap: 6,
+    padding: '8px 12px', paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))',
+    display: 'flex', gap: 6,
     alignItems: 'center', flexShrink: 0,
   },
   input: {

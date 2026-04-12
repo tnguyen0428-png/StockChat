@@ -274,7 +274,10 @@ export default function DashboardPage({ session }) {
 
       {/* Tab Content — tabs use display:none instead of unmounting so scroll
            position, subscriptions, and in-progress state survive tab switches. */}
-      <div style={styles.content}>
+      <div style={{
+        ...styles.content,
+        ...(activeTab === 'chat' ? { overflow: 'hidden', paddingBottom: 0 } : {}),
+      }}>
 
         {/* ── Home (eagerly loaded) ── */}
         <div style={{ display: activeTab === 'home' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflowX: 'hidden', overflowY: 'hidden', paddingBottom: 58 }}>
@@ -309,7 +312,7 @@ export default function DashboardPage({ session }) {
 
         {/* ── Chat ── */}
         {mountedTabs.has('chat') && (
-          <div style={{ display: activeTab === 'chat' ? 'flex' : 'none', flex: 1, flexDirection: 'column' }}>
+          <div style={{ display: activeTab === 'chat' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
             {/* Chat | Trending | DMs toggle — only show when not in active DM chat */}
             {chatMode !== 'dm-chat' && (
               <div style={styles.chatToggleRow}>

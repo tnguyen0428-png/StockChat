@@ -326,9 +326,37 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const messagesEndRef = useRef(null);
   const messagesAreaRef = useRef(null);
   const inputRef       = useRef(null);
+  const wrapRef        = useRef(null);
   const sendingRef     = useRef(false);
   const messagesRef    = useRef(messages);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
+
+  // ── iOS/Android keyboard handling via visualViewport ──
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      if (wrapRef.current) {
+        // Use visualViewport height minus the wrap's top offset to get available space
+        const top = wrapRef.current.getBoundingClientRect().top;
+        const available = vv.height - top;
+        wrapRef.current.style.height = `${Math.max(available, 120)}px`;
+        wrapRef.current.style.maxHeight = `${Math.max(available, 120)}px`;
+      }
+    };
+    vv.addEventListener('resize', onResize);
+    vv.addEventListener('scroll', onResize);
+    // Run once on mount to set initial size
+    onResize();
+    return () => {
+      vv.removeEventListener('resize', onResize);
+      vv.removeEventListener('scroll', onResize);
+      if (wrapRef.current) {
+        wrapRef.current.style.height = '';
+        wrapRef.current.style.maxHeight = '';
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -527,7 +555,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   }
 
   return (
-    <div style={styles.wrap}>
+    <div ref={wrapRef} style={styles.wrap}>
 
       {/* Ticker Banner */}
       <TickerBanner groupId={group.id} />
@@ -745,7 +773,8 @@ const styles = {
   },
   inputBar: {
     background: 'var(--card)', borderTop: '1px solid var(--border)',
-    padding: '8px 12px', display: 'flex',
+    padding: '8px 12px', paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))',
+    display: 'flex',
     gap: 6, alignItems: 'center', flexShrink: 0,
   },
   emojiToggle: {
