@@ -5,6 +5,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { safeGet, safeSet, safeRemove } from '../lib/safeStorage';
 
 const GroupContext = createContext(null);
 
@@ -101,18 +102,29 @@ export function GroupProvider({ session, children }) {
       if (priv) setPrivateGroup(priv);
 
       // Restore last active group
-      let savedId;
-      try { savedId = localStorage.getItem('uptik_active_group'); } catch {}
+      const savedId = safeGet('uptik_active_group');
       const saved = savedId ? groups.find(g => g.id === savedId) : null;
       if (saved) {
         setActiveGroup(saved);
       } else if (savedId) {
+        // Group exists but user isn't a member yet (e.g. just joined via invite link)
         const { data: fallbackGroup } = await supabase
           .from('groups')
           .select('*')
           .eq('id', savedId)
           .maybeSingle();
-        if (fallbackGroup) setActiveGroup(fallbackGroup);
+        if (fallbackGroup) {
+          // Auto-join so membership is recorded and the sidebar populates
+          const { error: joinError } = await supabase
+            .from('group_members')
+            .upsert({ group_id: savedId, user_id: session.user.id, role: 'member' }, { onConflict: 'group_id,user_id' });
+          if (joinError) console.error('[GroupContext] Auto-join fallback failed:', joinError.message);
+          else await loadProfile(); // re-sync so allGroups includes the new membership
+          setActiveGroup(fallbackGroup);
+        } else {
+          // Group no longer exists — clear the stale reference
+          safeRemove('uptik_active_group');
+        }
       }
     } catch (err) {
       console.error('[GroupContext] loadProfile crashed:', err);
@@ -146,7 +158,7 @@ export function GroupProvider({ session, children }) {
       else await loadProfile();
     }
     setActiveGroup(group);
-    localStorage.setItem('uptik_active_group', group.id);
+    safeSet('uptik_active_group', group.id);
   };
 
   // ── Custom Group: Create ──
@@ -203,7 +215,7 @@ export function GroupProvider({ session, children }) {
     // If leaving the active group, clear it
     if (activeGroup?.id === groupId) {
       setActiveGroup(null);
-      localStorage.removeItem('uptik_active_group');
+      safeRemove('uptik_active_group');
     }
 
     await loadProfile();

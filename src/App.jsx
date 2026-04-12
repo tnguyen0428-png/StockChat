@@ -6,6 +6,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
+import { safeGet, safeSet, safeRemove } from './lib/safeStorage';
 
 // Pages
 import LoginPage     from './pages/LoginPage';
@@ -92,7 +93,7 @@ export default function App() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, newSession) => {
+      async (event, newSession) => {
         // Ignore events that arrive before getSession resolves — they carry
         // the same data and setting state twice causes a flash.
         if (!initialised) return;
@@ -112,24 +113,24 @@ export default function App() {
           return;
         }
 
-        setSession(newSession);
-
-        // Handle pending invite after sign-in
+        // Handle pending invite after sign-in — await RPC before propagating session
+        // so GroupContext sees the membership immediately on first load.
         if (event === 'SIGNED_IN' && newSession) {
-          try {
-            const pendingCode = localStorage.getItem('uptik_pending_invite');
-            if (pendingCode) {
-              localStorage.removeItem('uptik_pending_invite');
-              supabase.rpc('join_custom_group', { p_invite_code: pendingCode })
-                .then(({ data, error }) => {
-                  if (error) { console.error('[App] Pending invite join failed:', error.message); return; }
-                  if (data?.success && data.group_id) {
-                    try { localStorage.setItem('uptik_active_group', data.group_id); } catch {}
-                  }
-                });
-            }
-          } catch { /* localStorage unavailable (iOS private browsing) */ }
+          const pendingCode = safeGet('uptik_pending_invite');
+          if (pendingCode) {
+            safeRemove('uptik_pending_invite');
+            try {
+              const { data, error } = await supabase.rpc('join_custom_group', { p_invite_code: pendingCode });
+              if (error) console.error('[App] Pending invite join failed:', error.message);
+              else if (data?.success && data.group_id) {
+                safeSet('uptik_active_group', data.group_id);
+                safeSet('uptik_join_redirect', 'chat');
+              }
+            } catch (err) { console.error('[App] Pending invite RPC crashed:', err); }
+          }
         }
+
+        setSession(newSession);
       }
     );
 
