@@ -342,6 +342,8 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     if (!vv) return;
     const onResize = () => {
       if (!wrapRef.current) return;
+      // Skip when this tab is hidden (display:none) — getBoundingClientRect returns zeros
+      if (wrapRef.current.offsetParent === null) return;
       const keyboardOpen = vv.height < initialVH.current * 0.75;
       if (keyboardOpen && vv.offsetTop > 0) {
         // iOS: viewport scrolled, need manual height override

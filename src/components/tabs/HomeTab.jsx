@@ -108,6 +108,8 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
     if (!vv) return;
     const onResize = () => {
       if (!outerWrapRef.current) return;
+      // Skip when this tab is hidden (display:none) — getBoundingClientRect returns zeros
+      if (outerWrapRef.current.offsetParent === null) return;
       const keyboardOpen = vv.height < initialVH.current * 0.75;
       if (keyboardOpen && vv.offsetTop > 0) {
         // iOS: viewport scrolled, need manual height override
