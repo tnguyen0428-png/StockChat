@@ -56,10 +56,15 @@ export function useSectorResearch(watchlist) {
   // Load available sectors on mount
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('curated_stocks').select('sector');
-      if (data) {
-        const unique = [...new Set(data.map(s => s.sector).filter(Boolean))];
-        setResearchSectors(unique);
+      try {
+        const { data, error } = await supabase.from('curated_stocks').select('sector');
+        if (error) throw error;
+        if (data) {
+          const unique = [...new Set(data.map(s => s.sector).filter(Boolean))];
+          setResearchSectors(unique);
+        }
+      } catch (err) {
+        console.error('[SectorResearch] Failed to load sectors:', err.message);
       }
     })();
   }, []);

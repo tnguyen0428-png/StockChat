@@ -20,13 +20,19 @@ export function useWatchlist(session) {
 
   // Returns the loaded data so the caller can coordinate initial research sync
   const loadWatchlist = async () => {
-    const { data } = await supabase
-      .from('user_watchlist')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: true });
-    if (data) setWatchlist(data);
-    return data;
+    try {
+      const { data, error } = await supabase
+        .from('user_watchlist')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      if (data) setWatchlist(data);
+      return data;
+    } catch (err) {
+      console.error('[Watchlist] loadWatchlist failed:', err.message);
+      return null;
+    }
   };
 
   // Returns the new row so the caller can trigger fetchResearchPrices
@@ -34,24 +40,35 @@ export function useWatchlist(session) {
     const upper = symbol.toUpperCase().trim();
     if (!upper || watchlist.find(w => w.symbol === upper)) return null;
     setAddingTicker(upper);
-    const { data, error } = await supabase
-      .from('user_watchlist')
-      .insert({ user_id: session.user.id, symbol: upper })
-      .select()
-      .single();
-    if (data && !error) {
-      setWatchlist(prev => [...prev, data]);
-      showToast(`${upper} added to My List`);
+    try {
+      const { data, error } = await supabase
+        .from('user_watchlist')
+        .insert({ user_id: session.user.id, symbol: upper })
+        .select()
+        .single();
+      if (error) { console.error('[Watchlist] addToWatchlist error:', error.message); return null; }
+      if (data) {
+        setWatchlist(prev => [...prev, data]);
+        showToast(`${upper} added to My List`);
+      }
+      return data;
+    } catch (err) {
+      console.error('[Watchlist] addToWatchlist failed:', err.message);
+      return null;
+    } finally {
+      setAddingTicker(null);
     }
-    setAddingTicker(null);
-    return data;
   };
 
   const removeFromWatchlist = async (id, symbol) => {
-    const { error } = await supabase.from('user_watchlist').delete().eq('id', id);
-    if (error) { console.error('[HomeTab] Remove watchlist failed:', error.message); return; }
-    setWatchlist(prev => prev.filter(w => w.id !== id));
-    showToast(`${symbol} removed`);
+    try {
+      const { error } = await supabase.from('user_watchlist').delete().eq('id', id);
+      if (error) { console.error('[Watchlist] removeFromWatchlist error:', error.message); return; }
+      setWatchlist(prev => prev.filter(w => w.id !== id));
+      showToast(`${symbol} removed`);
+    } catch (err) {
+      console.error('[Watchlist] removeFromWatchlist failed:', err.message);
+    }
   };
 
   const searchTickers = useCallback(async (query) => {
@@ -78,7 +95,8 @@ export function useWatchlist(session) {
         name: t.name,
         alreadyAdded: watchlist.some(w => w.symbol === t.ticker),
       })));
-    } catch {
+    } catch (err) {
+      console.error('[Watchlist] searchTickers failed:', err.message);
       setSearchResults([]);
     }
     setSearchLoading(false);

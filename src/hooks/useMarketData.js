@@ -255,20 +255,29 @@ export function useMarketData() {
       }
 
       setMarketPulse(pulse);
-    } catch {}
+    } catch (err) {
+      console.error('[MarketData] loadMarketPulse failed:', err.message);
+    }
   };
 
   const loadMarketIndicators = async () => {
-    const { data } = await supabase
-      .from('market_indicators')
-      .select('*')
-      .order('position', { ascending: true });
-    if (data && data.length > 0) {
-      setMarketIndicators(data);
-      await loadMarketPulse(data);
-      const status = getMarketStatus();
-      if (status !== 'open') await loadFutures();
-    } else {
+    try {
+      const { data, error } = await supabase
+        .from('market_indicators')
+        .select('*')
+        .order('position', { ascending: true });
+      if (error) throw error;
+      if (data && data.length > 0) {
+        setMarketIndicators(data);
+        await loadMarketPulse(data);
+        const status = getMarketStatus();
+        if (status !== 'open') await loadFutures();
+      } else {
+        await loadFMPFallback();
+      }
+    } catch (err) {
+      console.error('[MarketData] loadMarketIndicators failed:', err.message);
+      // Best-effort fallback so the ticker bar isn't empty
       await loadFMPFallback();
     }
   };

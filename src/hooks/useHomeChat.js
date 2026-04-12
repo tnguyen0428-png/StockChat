@@ -75,15 +75,21 @@ export function useHomeChat(session, profile, publicGroups, watchlist) {
   // Resolve UpTik Public group
   useEffect(() => {
     const findGroup = async () => {
-      const fromCtx = publicGroups.find(g => g.name === 'UpTik Public');
-      if (fromCtx) { setHomeGroup(fromCtx); return; }
-      const { data } = await supabase
-        .from('groups')
-        .select('*')
-        .eq('name', 'UpTik Public')
-        .single();
-      if (data) setHomeGroup(data);
-      else if (publicGroups[0]) setHomeGroup(publicGroups[0]);
+      try {
+        const fromCtx = publicGroups.find(g => g.name === 'UpTik Public');
+        if (fromCtx) { setHomeGroup(fromCtx); return; }
+        const { data, error } = await supabase
+          .from('groups')
+          .select('*')
+          .eq('name', 'UpTik Public')
+          .single();
+        if (error && error.code !== 'PGRST116') throw error; // ignore "not found"
+        if (data) setHomeGroup(data);
+        else if (publicGroups[0]) setHomeGroup(publicGroups[0]);
+      } catch (err) {
+        console.error('[HomeChat] findGroup failed:', err.message);
+        if (publicGroups[0]) setHomeGroup(publicGroups[0]);
+      }
     };
     findGroup();
   }, [publicGroups]);
@@ -115,22 +121,28 @@ export function useHomeChat(session, profile, publicGroups, watchlist) {
   const loadChatMessages = async (groupOverride, expanded) => {
     const target = groupOverride || homeGroup || publicGroups.find(g => g.name === 'UpTik Public') || publicGroups[0];
     if (!target) return;
-    const msgLimit = expanded ? 25 : 5;
-    let { data } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('group_id', target.id)
-      .order('created_at', { ascending: false })
-      .limit(msgLimit);
-    if (!data || data.length === 0) {
-      const { data: fallback } = await supabase
+    try {
+      const msgLimit = expanded ? 25 : 5;
+      let { data, error } = await supabase
         .from('chat_messages')
         .select('*')
+        .eq('group_id', target.id)
         .order('created_at', { ascending: false })
         .limit(msgLimit);
-      data = fallback;
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        const { data: fallback, error: fbErr } = await supabase
+          .from('chat_messages')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(msgLimit);
+        if (fbErr) throw fbErr;
+        data = fallback;
+      }
+      if (data) setChatMessages(data.reverse());
+    } catch (err) {
+      console.error('[HomeChat] loadChatMessages failed:', err.message);
     }
-    if (data) setChatMessages(data.reverse());
   };
 
   const handleHomeSend = async () => {
