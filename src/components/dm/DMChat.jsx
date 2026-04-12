@@ -852,12 +852,13 @@ const styles = {
     background: 'var(--card)', borderTop: '1px solid var(--border)',
     padding: '8px 12px', display: 'flex', gap: 6,
     alignItems: 'center', flexShrink: 0,
+    overflow: 'hidden', boxSizing: 'border-box', width: '100%',
   },
   input: {
-    flex: 1, background: 'var(--card2)',
+    flex: 1, minWidth: 0, background: 'var(--card2)',
     border: '1.5px solid var(--border)', color: 'var(--text1)',
     padding: '10px 14px', borderRadius: 20,
-    fontFamily: 'var(--font)', fontSize: 15, outline: 'none',
+    fontFamily: 'var(--font)', fontSize: 15, outline: 'none', boxSizing: 'border-box',
   },
   sendBtn: {
     background: '#132d52', border: 'none', color: '#fff',

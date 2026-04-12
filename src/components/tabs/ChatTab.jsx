@@ -780,17 +780,18 @@ const styles = {
     background: 'var(--card)', borderTop: '1px solid var(--border)',
     padding: '8px 12px', display: 'flex',
     gap: 6, alignItems: 'center', flexShrink: 0,
+    overflow: 'hidden', boxSizing: 'border-box', width: '100%',
   },
   emojiToggle: {
     background: 'none', border: 'none',
     fontSize: 20, cursor: 'pointer', flexShrink: 0, padding: 2,
   },
   input: {
-    flex: 1, background: 'var(--card2)',
+    flex: 1, minWidth: 0, background: 'var(--card2)',
     border: '1.5px solid var(--border)',
     color: 'var(--text1)', padding: '9px 14px',
     borderRadius: 20, fontFamily: 'var(--font)',
-    fontSize: 13, outline: 'none',
+    fontSize: 13, outline: 'none', boxSizing: 'border-box',
   },
   sendBtn: {
     background: 'var(--green)', border: 'none', color: '#fff',
