@@ -154,6 +154,16 @@ BEGIN
   INSERT INTO dm_participants (group_id, user_id, other_user_id)
   VALUES (new_group_id, user_b, user_a);
 
+  -- Also insert group_members so RLS policies on chat_messages work.
+  -- Without these, users can't SELECT/INSERT messages in the DM group.
+  INSERT INTO group_members (group_id, user_id, role)
+  VALUES (new_group_id, user_a, 'member')
+  ON CONFLICT (group_id, user_id) DO NOTHING;
+
+  INSERT INTO group_members (group_id, user_id, role)
+  VALUES (new_group_id, user_b, 'member')
+  ON CONFLICT (group_id, user_id) DO NOTHING;
+
   RETURN new_group_id;
 END;
 $$;

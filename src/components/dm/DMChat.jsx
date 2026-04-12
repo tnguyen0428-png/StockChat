@@ -499,7 +499,26 @@ export default function DMChat({ session, dm, onBack }) {
         table: 'chat_messages',
         filter: `group_id=eq.${groupId}`,
       }, (payload) => {
-        setMessages(prev => [...prev, payload.new]);
+        setMessages(prev => {
+          // Deduplicate: if we already have this message (optimistic or real), replace/skip
+          const exists = prev.some(m => m.id === payload.new.id);
+          if (exists) return prev;
+          // Also replace any optimistic message from the same sender with matching text
+          const hasOptimistic = prev.some(m =>
+            String(m.id).startsWith('optimistic-') &&
+            m.user_id === payload.new.user_id &&
+            m.text === payload.new.text
+          );
+          if (hasOptimistic) {
+            return prev.map(m =>
+              String(m.id).startsWith('optimistic-') &&
+              m.user_id === payload.new.user_id &&
+              m.text === payload.new.text
+                ? payload.new : m
+            );
+          }
+          return [...prev, payload.new];
+        });
         // Only mark-as-read + broadcast when the message is from the OTHER user.
         // Our own echo doesn't need to trigger a read receipt back to ourselves.
         if (payload.new?.user_id && payload.new.user_id !== currentUserId) {
@@ -622,15 +641,36 @@ export default function DMChat({ session, dm, onBack }) {
 
     setInputText('');
 
-    // Insert user message
-    await supabase.from('chat_messages').insert({
+    // Optimistic update — show the message immediately in the sender's UI.
+    // The real-time subscription may not fire for the sender if RLS blocks
+    // the SELECT (DMs use dm_participants, not group_members).
+    const optimisticMsg = {
+      id: `optimistic-${Date.now()}`,
       group_id: groupId,
       user_id: session.user.id,
       username: profile?.username || 'You',
       user_color: profile?.color || '#5eed8a',
       text,
       type: 'user',
-    });
+      created_at: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+
+    // Insert user message into DB
+    const { data: inserted } = await supabase.from('chat_messages').insert({
+      group_id: groupId,
+      user_id: session.user.id,
+      username: profile?.username || 'You',
+      user_color: profile?.color || '#5eed8a',
+      text,
+      type: 'user',
+    }).select().single();
+
+    // Replace optimistic message with the real one (to get the real id)
+    if (inserted) {
+      setMessages(prev => prev.map(m => m.id === optimisticMsg.id ? inserted : m));
+    }
 
     // If @AI, fire off AI response
     if (isAIRequest && cleanText) {
