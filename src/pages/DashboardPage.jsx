@@ -77,15 +77,13 @@ export default function DashboardPage({ session }) {
   // ── Keyboard detection + single viewport handler ──
   // One handler at the page level replaces all per-tab visualViewport hacks.
   //
-  // iOS Safari does two things when the keyboard opens:
-  //   1. Shrinks vv.height  (→ resize event)
-  //   2. Scrolls the visual viewport down by vv.offsetTop (→ scroll event)
-  // Android only does #1 (offsetTop stays 0).
+  // When the keyboard opens on iOS Safari, the visual viewport shrinks AND
+  // scrolls (offsetTop > 0). On Android it only shrinks (offsetTop stays 0).
   //
-  // IMPORTANT: We use React state (not direct DOM manipulation) for viewport
-  // styles because setKeyboardOpen() triggers a re-render that re-applies
-  // style={styles.page}, which would overwrite any pageRef.style.height set
-  // via JS. Keeping everything in React state avoids this fight.
+  // We switch the page to position:fixed and pin it to the visible area using
+  // top: offsetTop + height: vv.height. This takes it out of document flow
+  // entirely, so no parent clipping, no transform issues, no document scroll
+  // interference. When keyboard closes, we revert to the default styles.
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [vpStyle, setVpStyle] = useState({});
   const initialVH = useRef(window.innerHeight);
@@ -96,14 +94,21 @@ export default function DashboardPage({ session }) {
     const update = () => {
       const isKB = vv.height < initialVH.current * 0.75;
       setKeyboardOpen(isKB);
-      // Height — shrink the page to fit the visual viewport
-      // Transform — on iOS Safari the visual viewport scrolls when the
-      // keyboard opens (offsetTop > 0). Shift the page down to align.
-      // On Android/desktop offsetTop is always 0 → no transform.
-      setVpStyle({
-        height: `${vv.height}px`,
-        ...(vv.offsetTop ? { transform: `translateY(${vv.offsetTop}px)` } : {}),
-      });
+      if (isKB) {
+        // Keyboard open → pin the page to the visible viewport area
+        setVpStyle({
+          position: 'fixed',
+          top: `${vv.offsetTop}px`,
+          left: 0,
+          right: 0,
+          height: `${vv.height}px`,
+          maxWidth: 480,
+          margin: '0 auto',
+        });
+      } else {
+        // Keyboard closed → revert to default layout
+        setVpStyle({});
+      }
     };
     vv.addEventListener('resize', update);
     vv.addEventListener('scroll', update);
