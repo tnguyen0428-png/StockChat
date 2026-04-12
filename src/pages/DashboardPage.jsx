@@ -82,48 +82,34 @@ export default function DashboardPage({ session }) {
   //   2. Scrolls the visual viewport down by vv.offsetTop (→ scroll event)
   // Android only does #1 (offsetTop stays 0).
   //
-  // We handle both:
-  //   • height = vv.height  — shrinks the flex container to fit the visible area
-  //   • transform = translateY(offsetTop) — shifts the container down to align
-  //     with the visual viewport on iOS (GPU-accelerated, no layout reflow,
-  //     so no feedback loop unlike the old getBoundingClientRect approach)
+  // IMPORTANT: We use React state (not direct DOM manipulation) for viewport
+  // styles because setKeyboardOpen() triggers a re-render that re-applies
+  // style={styles.page}, which would overwrite any pageRef.style.height set
+  // via JS. Keeping everything in React state avoids this fight.
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [vpStyle, setVpStyle] = useState({});
   const initialVH = useRef(window.innerHeight);
   const pageRef = useRef(null);
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    let lastH = '';
-    let lastT = '';
     const update = () => {
-      if (!pageRef.current) return;
       const isKB = vv.height < initialVH.current * 0.75;
       setKeyboardOpen(isKB);
-      // Height — fit the page to the visual viewport
-      const h = `${vv.height}px`;
-      if (h !== lastH) {
-        lastH = h;
-        pageRef.current.style.height = h;
-      }
-      // Transform — on iOS Safari, the visual viewport scrolls when the
-      // keyboard opens (offsetTop > 0). Shift the page down to stay aligned.
-      // On Android/desktop offsetTop is always 0, so this is a no-op.
-      // Using transform (not top/margin) avoids layout reflow entirely.
-      const t = vv.offsetTop ? `translateY(${vv.offsetTop}px)` : '';
-      if (t !== lastT) {
-        lastT = t;
-        pageRef.current.style.transform = t;
-      }
+      // Height — shrink the page to fit the visual viewport
+      // Transform — on iOS Safari the visual viewport scrolls when the
+      // keyboard opens (offsetTop > 0). Shift the page down to align.
+      // On Android/desktop offsetTop is always 0 → no transform.
+      setVpStyle({
+        height: `${vv.height}px`,
+        ...(vv.offsetTop ? { transform: `translateY(${vv.offsetTop}px)` } : {}),
+      });
     };
     vv.addEventListener('resize', update);
     vv.addEventListener('scroll', update);
     return () => {
       vv.removeEventListener('resize', update);
       vv.removeEventListener('scroll', update);
-      if (pageRef.current) {
-        pageRef.current.style.height = '';
-        pageRef.current.style.transform = '';
-      }
     };
   }, []);
 
@@ -281,7 +267,7 @@ export default function DashboardPage({ session }) {
   }
 
   return (
-    <div ref={pageRef} style={styles.page}>
+    <div ref={pageRef} style={{ ...styles.page, ...vpStyle }}>
 
       <Header
         group={activeGroup}
