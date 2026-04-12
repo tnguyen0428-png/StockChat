@@ -327,26 +327,31 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const messagesAreaRef = useRef(null);
   const inputRef       = useRef(null);
   const wrapRef        = useRef(null);
+  const initialVH      = useRef(window.innerHeight);
   const sendingRef     = useRef(false);
   const messagesRef    = useRef(messages);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
 
-  // ── iOS/Android keyboard handling via visualViewport ──
-  // Only override height when the software keyboard is open;
-  // otherwise let CSS flex + paddingBottom handle layout normally.
+  // ── iOS keyboard handling via visualViewport ──
+  // iOS Safari doesn't resize the layout viewport when the keyboard opens —
+  // it scrolls the visual viewport instead (vv.offsetTop > 0). We must
+  // manually shrink the container to fit. Android Chrome resizes the viewport
+  // natively, so we skip the override there to avoid fighting with the browser.
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
     const onResize = () => {
       if (!wrapRef.current) return;
-      // Compare visualViewport to window.innerHeight (stable on mobile)
-      const keyboardOpen = vv.height < window.innerHeight * 0.5;
-      if (keyboardOpen) {
-        const top = wrapRef.current.getBoundingClientRect().top;
-        const available = vv.height - top;
+      const keyboardOpen = vv.height < initialVH.current * 0.75;
+      if (keyboardOpen && vv.offsetTop > 0) {
+        // iOS: viewport scrolled, need manual height override
+        const layoutTop = wrapRef.current.getBoundingClientRect().top;
+        const visibleTop = layoutTop - vv.offsetTop;
+        const available = vv.height - visibleTop;
         wrapRef.current.style.height = `${Math.max(available, 120)}px`;
         wrapRef.current.style.maxHeight = `${Math.max(available, 120)}px`;
       } else {
+        // Android / keyboard closed: let native resize + flex handle it
         wrapRef.current.style.height = '';
         wrapRef.current.style.maxHeight = '';
       }

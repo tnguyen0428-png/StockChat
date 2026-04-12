@@ -97,14 +97,49 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
   const chatSectionRef = useRef(null);
   const chatBarRef = useRef(null);
   const contentRef = useRef(null);
+  const outerWrapRef = useRef(null);
+  const initialVH = useRef(window.innerHeight);
 
-  // ── iOS keyboard gap fix ──
-  // On iOS Safari the keyboard doesn't shrink the layout viewport, so flex
-  // containers keep their full height and a gap appears between the chat
-  // messages and the input bar. Fix: when the input is focused, scroll the
-  // content container to the bottom so messages sit right above the input.
+  // ── iOS keyboard handling via visualViewport ──
+  // iOS Safari scrolls the visual viewport instead of resizing it (offsetTop > 0).
+  // Android Chrome resizes natively — skip override there to avoid fighting the browser.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      if (!outerWrapRef.current) return;
+      const keyboardOpen = vv.height < initialVH.current * 0.75;
+      if (keyboardOpen && vv.offsetTop > 0) {
+        // iOS: viewport scrolled, need manual height override
+        const layoutTop = outerWrapRef.current.getBoundingClientRect().top;
+        const visibleTop = layoutTop - vv.offsetTop;
+        const available = vv.height - visibleTop;
+        outerWrapRef.current.style.height = `${Math.max(available, 120)}px`;
+        outerWrapRef.current.style.maxHeight = `${Math.max(available, 120)}px`;
+        // Also scroll content to bottom so messages are near the input bar
+        if (contentRef.current) {
+          contentRef.current.scrollTop = contentRef.current.scrollHeight;
+        }
+      } else {
+        // Android / keyboard closed: let native resize + flex handle it
+        outerWrapRef.current.style.height = '';
+        outerWrapRef.current.style.maxHeight = '';
+      }
+    };
+    vv.addEventListener('resize', onResize);
+    vv.addEventListener('scroll', onResize);
+    return () => {
+      vv.removeEventListener('resize', onResize);
+      vv.removeEventListener('scroll', onResize);
+      if (outerWrapRef.current) {
+        outerWrapRef.current.style.height = '';
+        outerWrapRef.current.style.maxHeight = '';
+      }
+    };
+  }, []);
+
+  // Also scroll content to bottom when input is tapped (backup for iOS timing)
   const handleChatInputFocus = useCallback(() => {
-    // Small delay lets iOS Safari finish its viewport adjustment
     setTimeout(() => {
       if (contentRef.current) {
         contentRef.current.scrollTop = contentRef.current.scrollHeight;
@@ -1047,7 +1082,7 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
   const OB = getOnboardingStyles(t);
 
   return (
-    <div style={S.outerWrap}>
+    <div ref={outerWrapRef} style={S.outerWrap}>
 
       {/* ═══ TOAST ═══ */}
       {toast && (

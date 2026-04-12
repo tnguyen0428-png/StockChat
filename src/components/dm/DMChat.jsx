@@ -384,6 +384,7 @@ export default function DMChat({ session, dm, onBack }) {
   const inputRef = useRef(null);
   const lastTickerRef = useRef(null);
   const dmWrapRef = useRef(null);
+  const initialVH = useRef(window.innerHeight);
   const channelRef = useRef(null);
 
   // ── Typing indicator state ──
@@ -391,19 +392,24 @@ export default function DMChat({ session, dm, onBack }) {
   const typingTimeoutRef = useRef(null);
   const lastTypingBroadcast = useRef(0);
 
-  // ── iOS/Android keyboard handling via visualViewport ──
+  // ── iOS keyboard handling via visualViewport ──
+  // iOS Safari scrolls the visual viewport instead of resizing it (offsetTop > 0).
+  // Android Chrome resizes natively — skip override there to avoid fighting the browser.
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
     const onResize = () => {
       if (!dmWrapRef.current) return;
-      const keyboardOpen = vv.height < window.innerHeight * 0.5;
-      if (keyboardOpen) {
-        const top = dmWrapRef.current.getBoundingClientRect().top;
-        const available = vv.height - top;
+      const keyboardOpen = vv.height < initialVH.current * 0.75;
+      if (keyboardOpen && vv.offsetTop > 0) {
+        // iOS: viewport scrolled, need manual height override
+        const layoutTop = dmWrapRef.current.getBoundingClientRect().top;
+        const visibleTop = layoutTop - vv.offsetTop;
+        const available = vv.height - visibleTop;
         dmWrapRef.current.style.height = `${Math.max(available, 120)}px`;
         dmWrapRef.current.style.maxHeight = `${Math.max(available, 120)}px`;
       } else {
+        // Android / keyboard closed: let native resize + flex handle it
         dmWrapRef.current.style.height = '';
         dmWrapRef.current.style.maxHeight = '';
       }
