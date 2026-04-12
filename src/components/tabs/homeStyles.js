@@ -36,6 +36,7 @@ export function getHomeStyles(t) {
       position: 'relative', zIndex: 50,
       borderTop: `1px solid ${t.border}`,
       pointerEvents: 'auto',
+      overflow: 'hidden', boxSizing: 'border-box', width: '100%',
     },
 
     // ── Watchlist / My List helpers ──
@@ -195,14 +196,16 @@ export function getHomeStyles(t) {
       color: '#fff', boxShadow: '0 0 8px rgba(139,92,246,0.4)',
     },
     ccInputWrap: {
-      flex: 1, display: 'flex', alignItems: 'center',
+      flex: 1, minWidth: 0, display: 'flex', alignItems: 'center',
       background: t.card, border: `1.5px solid ${t.border}`,
       borderRadius: 20, height: 42, paddingRight: 4,
+      boxSizing: 'border-box',
     },
     ccInput: {
-      flex: 1, background: 'transparent', border: 'none',
+      flex: 1, minWidth: 0, background: 'transparent', border: 'none',
       padding: '8px 0 8px 16px', fontSize: 15, color: t.text1,
       fontFamily: 'inherit', outline: 'none', height: '100%',
+      boxSizing: 'border-box',
     },
     ccMic: {
       width: 32, height: 32, borderRadius: '50%', background: 'transparent',
