@@ -397,7 +397,7 @@ export default function DMChat({ session, dm, onBack }) {
     if (!vv) return;
     const onResize = () => {
       if (!dmWrapRef.current) return;
-      const keyboardOpen = vv.height < window.innerHeight * 0.75;
+      const keyboardOpen = vv.height < window.innerHeight * 0.5;
       if (keyboardOpen) {
         const top = dmWrapRef.current.getBoundingClientRect().top;
         const available = vv.height - top;

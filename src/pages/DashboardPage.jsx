@@ -276,11 +276,11 @@ export default function DashboardPage({ session }) {
            position, subscriptions, and in-progress state survive tab switches. */}
       <div style={{
         ...styles.content,
-        ...(activeTab === 'chat' ? { overflow: 'hidden' } : {}),
+        ...(activeTab === 'chat' || activeTab === 'home' ? { overflow: 'hidden', paddingBottom: 0 } : {}),
       }}>
 
         {/* ── Home (eagerly loaded) ── */}
-        <div style={{ display: activeTab === 'home' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflowX: 'hidden', overflowY: 'hidden' }}>
+        <div style={{ display: activeTab === 'home' ? 'flex' : 'none', flex: 1, flexDirection: 'column', minHeight: 0, paddingBottom: 'calc(62px + env(safe-area-inset-bottom, 0px))' }}>
           <HomeTab
             session={session}
             onGroupSelect={handleGroupSelect}

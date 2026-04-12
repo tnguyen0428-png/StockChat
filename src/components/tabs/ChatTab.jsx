@@ -340,7 +340,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     const onResize = () => {
       if (!wrapRef.current) return;
       // Compare visualViewport to window.innerHeight (stable on mobile)
-      const keyboardOpen = vv.height < window.innerHeight * 0.75;
+      const keyboardOpen = vv.height < window.innerHeight * 0.5;
       if (keyboardOpen) {
         const top = wrapRef.current.getBoundingClientRect().top;
         const available = vv.height - top;
