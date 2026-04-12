@@ -74,12 +74,38 @@ export default function DashboardPage({ session }) {
   const [startingDM, setStartingDM]       = useState(false);
   const dismissTimerRef = useRef(null);
 
+  // ── iOS Safari viewport fix ──
+  // 100vh = "large viewport" on iOS Safari (address bar collapsed).
+  // When address bar is visible, bottom content gets hidden behind it.
+  // Fix: inject a CSS custom property using window.innerHeight which iOS
+  // Safari correctly reports as the *visible* viewport.
+  const pageRef = useRef(null);
+  useEffect(() => {
+    const setVH = () => {
+      if (pageRef.current) {
+        pageRef.current.style.height = `${window.innerHeight}px`;
+      }
+    };
+    const onOrientation = () => setTimeout(setVH, 150);
+    setVH();
+    window.addEventListener('resize', setVH);
+    window.addEventListener('orientationchange', onOrientation);
+    return () => {
+      window.removeEventListener('resize', setVH);
+      window.removeEventListener('orientationchange', onOrientation);
+    };
+  }, []);
+
   // ── Hide BottomNav when iOS/Android keyboard is open ──
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const initialVH = useRef(window.innerHeight);
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const onResize = () => setKeyboardOpen(vv.height < window.innerHeight * 0.75);
+    // Use the initial innerHeight (captured before any keyboard) as baseline.
+    // On iOS Safari, window.innerHeight shrinks with the keyboard, so comparing
+    // vv.height against it would never detect the keyboard.
+    const onResize = () => setKeyboardOpen(vv.height < initialVH.current * 0.75);
     vv.addEventListener('resize', onResize);
     return () => vv.removeEventListener('resize', onResize);
   }, []);
@@ -238,7 +264,7 @@ export default function DashboardPage({ session }) {
   }
 
   return (
-    <div style={styles.page}>
+    <div ref={pageRef} style={styles.page}>
 
       <Header
         group={activeGroup}
@@ -444,7 +470,8 @@ export default function DashboardPage({ session }) {
 
 const styles = {
   page: {
-    height: '100dvh', background: 'var(--bg)',
+    height: '100vh', /* fallback; overridden by JS for iOS Safari address bar */
+    background: 'var(--bg)',
     display: 'flex', flexDirection: 'column',
     overflow: 'hidden', maxWidth: 480,
     margin: '0 auto', position: 'relative',
