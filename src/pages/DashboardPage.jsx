@@ -75,27 +75,23 @@ export default function DashboardPage({ session }) {
   const dismissTimerRef = useRef(null);
 
   // ── Keyboard detection + single viewport handler ──
-  // One handler at the page level replaces all per-tab visualViewport hacks.
-  //
-  // When the keyboard opens on iOS Safari, the visual viewport shrinks AND
-  // scrolls (offsetTop > 0). On Android it only shrinks (offsetTop stays 0).
-  //
-  // We switch the page to position:fixed and pin it to the visible area using
-  // top: offsetTop + height: vv.height. This takes it out of document flow
-  // entirely, so no parent clipping, no transform issues, no document scroll
-  // interference. When keyboard closes, we revert to the default styles.
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [vpStyle, setVpStyle] = useState({});
+  const [debugInfo, setDebugInfo] = useState('');
   const initialVH = useRef(window.innerHeight);
   const pageRef = useRef(null);
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const update = () => {
+    const update = (e) => {
       const isKB = vv.height < initialVH.current * 0.75;
       setKeyboardOpen(isKB);
+      // Debug — visible on screen so we can see what iOS reports
+      setDebugInfo(
+        `evt:${e?.type || '?'} vvH:${Math.round(vv.height)} vvOT:${Math.round(vv.offsetTop)} ` +
+        `initVH:${initialVH.current} iH:${window.innerHeight} isKB:${isKB}`
+      );
       if (isKB) {
-        // Keyboard open → pin the page to the visible viewport area
         setVpStyle({
           position: 'fixed',
           top: `${vv.offsetTop}px`,
@@ -106,7 +102,6 @@ export default function DashboardPage({ session }) {
           margin: '0 auto',
         });
       } else {
-        // Keyboard closed → revert to default layout
         setVpStyle({});
       }
     };
@@ -273,6 +268,18 @@ export default function DashboardPage({ session }) {
 
   return (
     <div ref={pageRef} style={{ ...styles.page, ...vpStyle }}>
+
+      {/* DEBUG — remove after fixing keyboard issue */}
+      {debugInfo && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999,
+          background: 'rgba(255,0,0,0.9)', color: '#fff', fontSize: 10,
+          padding: '2px 6px', fontFamily: 'monospace', whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+        }}>
+          {debugInfo}
+        </div>
+      )}
 
       <Header
         group={activeGroup}
