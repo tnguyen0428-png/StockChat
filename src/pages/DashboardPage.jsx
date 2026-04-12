@@ -274,13 +274,10 @@ export default function DashboardPage({ session }) {
 
       {/* Tab Content — tabs use display:none instead of unmounting so scroll
            position, subscriptions, and in-progress state survive tab switches. */}
-      <div style={{
-        ...styles.content,
-        ...(activeTab === 'chat' || activeTab === 'home' ? { overflow: 'hidden', paddingBottom: 0 } : {}),
-      }}>
+      <div style={styles.content}>
 
         {/* ── Home (eagerly loaded) ── */}
-        <div style={{ display: activeTab === 'home' ? 'flex' : 'none', flex: 1, flexDirection: 'column', minHeight: 0, paddingBottom: 'calc(62px + env(safe-area-inset-bottom, 0px))' }}>
+        <div style={{ display: activeTab === 'home' ? 'flex' : 'none', flex: 1, flexDirection: 'column' }}>
           <HomeTab
             session={session}
             onGroupSelect={handleGroupSelect}
