@@ -87,7 +87,7 @@ const styles = {
     alignItems: 'center',
     paddingBottom: 'max(4px, env(safe-area-inset-bottom))',
     boxShadow: '0 -1px 4px rgba(19,45,82,0.04)',
-    position: 'fixed', bottom: 0, left: 0, right: 0,
+    flexShrink: 0,
     width: '100%', maxWidth: 480, margin: '0 auto',
     zIndex: 9999,
   },

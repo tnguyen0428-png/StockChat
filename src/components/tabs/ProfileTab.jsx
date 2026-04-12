@@ -811,7 +811,7 @@ export default function ProfileTab({ session, profile, group, isAdmin, onSignOut
 
 // NOTE: stub styles reconstructed after a file truncation. Polish to taste.
 const styles = {
-  scroll:        { padding: 16, paddingBottom: 80, overflowY: 'auto', height: '100%' },
+  scroll:        { padding: 16, paddingBottom: 16, overflowY: 'auto', height: '100%' },
   profileCard:   { display: 'flex', alignItems: 'center', gap: 14, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginBottom: 16 },
   avatarWrap:    { flexShrink: 0 },
   avatar:        { width: 56, height: 56, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, background: 'var(--card2)', border: '2px solid var(--green)' },

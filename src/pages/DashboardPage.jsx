@@ -465,7 +465,7 @@ const styles = {
     borderRadius: '50%', display: 'flex',
     alignItems: 'center', justifyContent: 'center', lineHeight: 1,
   },
-  content: { flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: 'calc(62px + env(safe-area-inset-bottom, 0px))' },
+  content: { flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' },
   chatToggleRow: {
     display: 'flex', gap: 0, padding: '6px 14px',
     background: 'var(--card)', borderBottom: '1px solid var(--border)',
