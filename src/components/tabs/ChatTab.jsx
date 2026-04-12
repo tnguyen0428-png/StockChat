@@ -333,34 +333,39 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   useEffect(() => { messagesRef.current = messages; }, [messages]);
 
   // ── iOS keyboard handling via visualViewport ──
-  // iOS Safari doesn't resize the layout viewport when the keyboard opens —
-  // it scrolls the visual viewport instead (vv.offsetTop > 0). We must
-  // manually shrink the container to fit. Android Chrome resizes the viewport
-  // natively, so we skip the override there to avoid fighting with the browser.
+  // iOS Safari scrolls the visual viewport instead of resizing (offsetTop > 0).
+  // Android resizes natively — skip there. Uses rAF + caching to prevent shakiness.
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
+    let rafId = 0;
+    let lastH = '';
     const onResize = () => {
-      if (!wrapRef.current) return;
-      // Skip when this tab is hidden (display:none) — getBoundingClientRect returns zeros
-      if (wrapRef.current.offsetParent === null) return;
-      const keyboardOpen = vv.height < initialVH.current * 0.75;
-      if (keyboardOpen && vv.offsetTop > 0) {
-        // iOS: viewport scrolled, need manual height override
-        const layoutTop = wrapRef.current.getBoundingClientRect().top;
-        const visibleTop = layoutTop - vv.offsetTop;
-        const available = vv.height - visibleTop;
-        wrapRef.current.style.height = `${Math.max(available, 120)}px`;
-        wrapRef.current.style.maxHeight = `${Math.max(available, 120)}px`;
-      } else {
-        // Android / keyboard closed: let native resize + flex handle it
-        wrapRef.current.style.height = '';
-        wrapRef.current.style.maxHeight = '';
-      }
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        if (!wrapRef.current) return;
+        if (wrapRef.current.offsetParent === null) return;
+        const keyboardOpen = vv.height < initialVH.current * 0.75;
+        if (keyboardOpen && vv.offsetTop > 0) {
+          const layoutTop = wrapRef.current.getBoundingClientRect().top;
+          const visibleTop = layoutTop - vv.offsetTop;
+          const h = `${Math.max(vv.height - visibleTop, 120)}px`;
+          if (h !== lastH) {
+            lastH = h;
+            wrapRef.current.style.height = h;
+            wrapRef.current.style.maxHeight = h;
+          }
+        } else if (lastH !== '') {
+          lastH = '';
+          wrapRef.current.style.height = '';
+          wrapRef.current.style.maxHeight = '';
+        }
+      });
     };
     vv.addEventListener('resize', onResize);
     vv.addEventListener('scroll', onResize);
     return () => {
+      cancelAnimationFrame(rafId);
       vv.removeEventListener('resize', onResize);
       vv.removeEventListener('scroll', onResize);
       if (wrapRef.current) {

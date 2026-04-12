@@ -103,34 +103,42 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
   // ── iOS keyboard handling via visualViewport ──
   // iOS Safari scrolls the visual viewport instead of resizing it (offsetTop > 0).
   // Android Chrome resizes natively — skip override there to avoid fighting the browser.
+  // Uses rAF + height caching to prevent layout thrashing / shakiness on scroll.
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
+    let rafId = 0;
+    let lastH = '';
     const onResize = () => {
-      if (!outerWrapRef.current) return;
-      // Skip when this tab is hidden (display:none) — getBoundingClientRect returns zeros
-      if (outerWrapRef.current.offsetParent === null) return;
-      const keyboardOpen = vv.height < initialVH.current * 0.75;
-      if (keyboardOpen && vv.offsetTop > 0) {
-        // iOS: viewport scrolled, need manual height override
-        const layoutTop = outerWrapRef.current.getBoundingClientRect().top;
-        const visibleTop = layoutTop - vv.offsetTop;
-        const available = vv.height - visibleTop;
-        outerWrapRef.current.style.height = `${Math.max(available, 120)}px`;
-        outerWrapRef.current.style.maxHeight = `${Math.max(available, 120)}px`;
-        // Also scroll content to bottom so messages are near the input bar
-        if (contentRef.current) {
-          contentRef.current.scrollTop = contentRef.current.scrollHeight;
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        if (!outerWrapRef.current) return;
+        if (outerWrapRef.current.offsetParent === null) return;
+        const keyboardOpen = vv.height < initialVH.current * 0.75;
+        if (keyboardOpen && vv.offsetTop > 0) {
+          const layoutTop = outerWrapRef.current.getBoundingClientRect().top;
+          const visibleTop = layoutTop - vv.offsetTop;
+          const h = `${Math.max(vv.height - visibleTop, 120)}px`;
+          // Only touch the DOM if the value actually changed
+          if (h !== lastH) {
+            lastH = h;
+            outerWrapRef.current.style.height = h;
+            outerWrapRef.current.style.maxHeight = h;
+            if (contentRef.current) {
+              contentRef.current.scrollTop = contentRef.current.scrollHeight;
+            }
+          }
+        } else if (lastH !== '') {
+          lastH = '';
+          outerWrapRef.current.style.height = '';
+          outerWrapRef.current.style.maxHeight = '';
         }
-      } else {
-        // Android / keyboard closed: let native resize + flex handle it
-        outerWrapRef.current.style.height = '';
-        outerWrapRef.current.style.maxHeight = '';
-      }
+      });
     };
     vv.addEventListener('resize', onResize);
     vv.addEventListener('scroll', onResize);
     return () => {
+      cancelAnimationFrame(rafId);
       vv.removeEventListener('resize', onResize);
       vv.removeEventListener('scroll', onResize);
       if (outerWrapRef.current) {
