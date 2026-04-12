@@ -1380,7 +1380,7 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
               {chatMessages.length > 0 ? (
                 // No FadingMessage — auto-disappearing messages fight stickiness
                 // and any refetch path resurrects them with fresh timers, looking broken.
-                chatMessages.slice(0, 2).map((msg, i) => (
+                chatMessages.slice(-2).map((msg, i) => (
                   <ChatBubble key={msg.id || i} msg={msg} myId={session?.user?.id} S={S} t={t} onTapUsername={(userId, username) => {
                     if (onStartDM) { onStartDM(userId, username); onTabChange?.('chat'); }
                   }} />
