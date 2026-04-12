@@ -74,6 +74,16 @@ export default function DashboardPage({ session }) {
   const [startingDM, setStartingDM]       = useState(false);
   const dismissTimerRef = useRef(null);
 
+  // ── Hide BottomNav when iOS/Android keyboard is open ──
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => setKeyboardOpen(vv.height < window.innerHeight * 0.75);
+    vv.addEventListener('resize', onResize);
+    return () => vv.removeEventListener('resize', onResize);
+  }, []);
+
   // Listen for broadcasts
   useEffect(() => {
     if (!activeGroup?.id) return;
@@ -418,13 +428,15 @@ export default function DashboardPage({ session }) {
         )}
       </div>
 
-      <BottomNav
-        activeTab={activeTab === 'home' ? 'home' : activeTab}
-        onTabChange={handleTabChange}
-        unreadAlerts={unreadAlerts}
-        unreadChat={unreadChat}
-        dmUnreadCount={dmUnreadCount}
-      />
+      {!keyboardOpen && (
+        <BottomNav
+          activeTab={activeTab === 'home' ? 'home' : activeTab}
+          onTabChange={handleTabChange}
+          unreadAlerts={unreadAlerts}
+          unreadChat={unreadChat}
+          dmUnreadCount={dmUnreadCount}
+        />
+      )}
 
     </div>
   );
