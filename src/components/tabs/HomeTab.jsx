@@ -13,10 +13,12 @@ import StickerPicker from '../shared/StickerPicker';
 import { useTheme } from './alertsCasinoComponents';
 
 // ── Extracted modules ──
-import { POLYGON_KEY, POPULAR_TICKERS, ONBOARD_TRENDING, ONBOARD_SECTORS } from './homeConstants';
+import { POPULAR_TICKERS, ONBOARD_TRENDING, ONBOARD_SECTORS } from './homeConstants';
+import { POLYGON_KEY } from '../../lib/constants';
 import { safeGet, safeSet } from '../../lib/safeStorage';
 import { getHomeStyles, getOnboardingStyles } from './homeStyles';
-import { BriefCard, ChatBubble } from './HomeSubComponents';
+import BriefCard from '../home/BriefCard';
+import ChatBubble from '../home/ChatBubble';
 import OnboardingOverlay from './OnboardingOverlay';
 
 // ── Hooks ──

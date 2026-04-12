@@ -3,9 +3,6 @@
 // Shared constants for HomeTab and its sub-components
 // ============================================
 
-export const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
-export const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
-
 // ── Popular tickers for new user onboarding ──
 export const POPULAR_TICKERS = ['NVDA', 'AAPL', 'TSLA', 'AMD', 'SPY', 'META'];
 
