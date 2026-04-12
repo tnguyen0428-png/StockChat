@@ -280,7 +280,7 @@ export default function DashboardPage({ session }) {
       }}>
 
         {/* ── Home (eagerly loaded) ── */}
-        <div style={{ display: activeTab === 'home' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflowX: 'hidden', overflowY: 'hidden', paddingBottom: 58 }}>
+        <div style={{ display: activeTab === 'home' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflowX: 'hidden', overflowY: 'hidden' }}>
           <HomeTab
             session={session}
             onGroupSelect={handleGroupSelect}
