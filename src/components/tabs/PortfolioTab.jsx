@@ -842,11 +842,17 @@ export default function PortfolioTab({ session, darkMode }) {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 16 }}>🏆</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: t.text1 }}>Portfolio Challenge</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: t.text1 }}>Paper Trading</span>
               <span style={{ fontSize: 9, fontWeight: 600, color: t.green, background: t.greenBg, padding: '2px 6px', borderRadius: 4 }}>S1</span>
             </div>
-            <div style={{ fontSize: 10, color: t.text2, marginTop: 2, marginLeft: 24 }}>Trade with $50K fake money · learn together</div>
+            <div style={{ fontSize: 10, color: t.text2, marginTop: 2, marginLeft: 24 }}>Practice trading with virtual money — no real money involved</div>
           </div>
+        </div>
+
+        {/* Info banner */}
+        <div style={{ background: t.greenBg || 'rgba(90,238,138,0.08)', borderRadius: 8, padding: '8px 12px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${t.border}` }}>
+          <span style={{ fontSize: 14 }}>💡</span>
+          <span style={{ fontSize: 11, color: t.text2, lineHeight: 1.4 }}>This is a <b style={{ color: t.text1 }}>paper trading simulator</b>. You start with $50K virtual cash to practice buying and selling stocks. No real money is used.</span>
         </div>
 
         {/* TOP BAR */}
@@ -854,8 +860,8 @@ export default function PortfolioTab({ session, darkMode }) {
           <div style={s.barNew}>
             <span style={{ fontSize: 20, flexShrink: 0 }}>🏆</span>
             <div style={s.barNewText}>
-              <div style={s.barNewTitle}>Paper Trading Challenge</div>
-              <div style={s.barNewSub}><b style={{ color: t.green }}>$50K fake money</b> · compete with your crew</div>
+              <div style={s.barNewTitle}>Practice Trading</div>
+              <div style={s.barNewSub}><b style={{ color: t.green }}>$50K virtual cash</b> · learn risk-free with your group</div>
             </div>
             <div style={s.barNewBtn} onClick={() => setShowPortfolio(true)}>Join →</div>
           </div>
@@ -886,7 +892,7 @@ export default function PortfolioTab({ session, darkMode }) {
             </div>
             <div style={s.portSecLabel}>Positions · {trades.length}</div>
             {trades.length === 0 ? (
-              <div style={{ fontSize: 11, color: t.text3, padding: '8px 12px' }}>No positions yet — add a ticker below</div>
+              <div style={{ fontSize: 11, color: t.text3, padding: '8px 12px' }}>You haven't made any trades yet. Search for a stock below and tap Buy to start practicing!</div>
             ) : trades.map(trade => {
               const curPrice = prices[trade.ticker] || Number(trade.entry_price);
               const entryPrice = Number(trade.entry_price);

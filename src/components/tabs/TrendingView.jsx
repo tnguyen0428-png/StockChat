@@ -475,8 +475,8 @@ export default function TrendingView({ session, group }) {
     return (
       <div style={styles.container}>
         <div style={styles.header}>
-          <h1 style={styles.title}>Group Trending</h1>
-          <p style={styles.subtitle}>Auto-ranked by mentions & sentiment</p>
+          <h1 style={styles.title}>Most Discussed</h1>
+          <p style={styles.subtitle}>Stocks the community is talking about right now</p>
         </div>
         <div style={styles.loadingSpinner}>
           <div style={styles.spinner} />
@@ -490,8 +490,8 @@ export default function TrendingView({ session, group }) {
     return (
       <div style={styles.container}>
         <div style={styles.header}>
-          <h1 style={styles.title}>Group Trending</h1>
-          <p style={styles.subtitle}>Auto-ranked by mentions & sentiment</p>
+          <h1 style={styles.title}>Most Discussed</h1>
+          <p style={styles.subtitle}>Stocks the community is talking about right now</p>
         </div>
 
         <div style={styles.filterRow}>
@@ -511,8 +511,8 @@ export default function TrendingView({ session, group }) {
 
         <div style={styles.emptyState}>
           <div style={styles.emptyStateIcon}>📊</div>
-          <p style={styles.emptyStateText}>No tickers trending yet.</p>
-          <p style={styles.emptyStateHint}>Mention $TICKER in chat to get started.</p>
+          <p style={styles.emptyStateText}>No stocks trending yet</p>
+          <p style={styles.emptyStateHint}>When people mention stocks like $AAPL in chat, they'll show up here ranked by popularity.</p>
         </div>
       </div>
     );
@@ -522,8 +522,8 @@ export default function TrendingView({ session, group }) {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h1 style={styles.title}>Group Trending</h1>
-        <p style={styles.subtitle}>Auto-ranked by mentions & sentiment</p>
+        <h1 style={styles.title}>Most Discussed</h1>
+        <p style={styles.subtitle}>Stocks the community is talking about right now</p>
       </div>
 
       <div style={styles.filterRow}>

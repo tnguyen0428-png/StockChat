@@ -541,7 +541,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
         <div ref={messagesAreaRef} style={styles.messagesArea}>
           {messages.length === 0 && (
             <div style={styles.emptyState}>
-              <div style={styles.emptyText}>No messages yet — say hello!</div>
+              <div style={styles.emptyText}>Be the first to start the conversation! Try mentioning a stock like $AAPL or ask @AI a question.</div>
             </div>
           )}
           {messages.map((msg, idx) => {
@@ -606,7 +606,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
           value={inputText}
           onChange={e => setInputText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={aiMode ? 'Ask UpTik AI...' : 'Message... $TICKER or @AI'}
+          placeholder={aiMode ? 'Ask AI about any stock...' : 'Chat with your group...'}
           enterKeyHint="send"
           autoComplete="off"
           autoCorrect="off"

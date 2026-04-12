@@ -11,31 +11,14 @@ import { askUpTikAI } from '../../lib/aiAgent';
 import { getBatchQuotes } from '../../lib/polygonQuote';
 import CreateGroupModal from '../shared/CreateGroupModal';
 import InviteModal from '../shared/InviteModal';
-import StickerPicker, { STICKERS, isSticker, getStickerId } from '../shared/StickerPicker';
+import StickerPicker from '../shared/StickerPicker';
 import { useTheme } from './alertsCasinoComponents';
 
-const POLYGON_KEY = import.meta.env.VITE_POLYGON_API_KEY;
-const FMP_KEY = import.meta.env.VITE_FMP_API_KEY;
-
-// ── Popular tickers for new user onboarding ──
-const POPULAR_TICKERS = ['NVDA', 'AAPL', 'TSLA', 'AMD', 'SPY', 'META'];
-
-// ── Onboarding sector picks ──
-const ONBOARD_TRENDING = [
-  { symbol: 'NVDA', name: 'Nvidia' },
-  { symbol: 'TSLA', name: 'Tesla' },
-  { symbol: 'AAPL', name: 'Apple' },
-  { symbol: 'AMD', name: 'AMD' },
-  { symbol: 'SPY', name: 'S&P 500 ETF' },
-  { symbol: 'META', name: 'Meta' },
-];
-const ONBOARD_SECTORS = [
-  { name: 'Technology', color: '#4CAF50', tickers: ['MSFT', 'GOOG', 'AMZN', 'CRM', 'INTC'] },
-  { name: 'Energy', color: '#FF9800', tickers: ['XOM', 'CVX', 'OXY', 'SLB'] },
-  { name: 'Healthcare', color: '#E91E63', tickers: ['JNJ', 'UNH', 'PFE', 'ABBV'] },
-  { name: 'Finance', color: '#2196F3', tickers: ['JPM', 'BAC', 'GS', 'V'] },
-  { name: 'Consumer', color: '#9C27B0', tickers: ['DIS', 'NKE', 'SBUX', 'MCD'] },
-];
+// ── Extracted modules ──
+import { POLYGON_KEY, FMP_KEY, POPULAR_TICKERS, ONBOARD_TRENDING, ONBOARD_SECTORS, FUTURES_MAP } from './homeConstants';
+import { getHomeStyles, getOnboardingStyles } from './homeStyles';
+import { BriefCard, ChatBubble } from './HomeSubComponents';
+import OnboardingOverlay from './OnboardingOverlay';
 
 export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToChatRef, onOpenDMs, onStartDM, darkMode }) {
   const { publicGroups, privateGroup, activeGroup, profile, customGroups } = useGroup();
@@ -245,7 +228,6 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
   // ── First-login detection: show onboarding if watchlist is empty & never dismissed ──
   useEffect(() => {
     const checkOnboarding = async () => {
-      return; // disabled for now — re-enable by removing this line
       const dismissed = localStorage.getItem('uptik_onboarding_done');
       if (dismissed) return;
       // Check if user has any watchlist items
@@ -337,7 +319,7 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
       if (data) {
         setWatchlist(data);
         fetchResearchPrices(tickers);
-        showToast(`${tickers.length} stock${tickers.length > 1 ? 's' : ''} added to My List!`);
+        showToast(`${tickers.length} stock${tickers.length > 1 ? 's' : ''} added to Watchlist!`);
       }
     }
   };
@@ -623,16 +605,6 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
   // MARKET PULSE (kept from original)
   // ═══════════════════════════════════════
   // ── Futures / off-hours ticker ──
-  // Uses FMP real index + commodity quotes (^GSPC, ^IXIC, ^DJI, GCUSD, CLUSD)
-  // Shows percentage only — no full price (these are index levels, not tradeable prices)
-  const FUTURES_MAP = {
-    'ES=F':  'S&P Fut',
-    'NQ=F':  'Nas Fut',
-    'YM=F':  'Dow Fut',
-    'GC=F':  'Gold',
-    'CL=F':  'Oil',
-  };
-
   const loadFutures = async () => {
     console.log('[Futures] Loading real futures data...');
 
@@ -918,7 +890,7 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
       const newList = [...watchlist, data];
       setWatchlist(newList);
       fetchResearchPrices([upper]);
-      showToast(`${upper} added to My List`);
+      showToast(`${upper} added to Watchlist`);
       // If My List is active, refresh the displayed stocks
       if (researchSector === '__mylist__') {
         setResearchStocks(newList.map((w, i) => ({
@@ -1055,611 +1027,9 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
   // ═══════════════════════════════════════
 
 
-  // ═══════════════════════════════════════
-  // SUB-COMPONENTS
-  // ═══════════════════════════════════════
-
-  function BriefCard({ article }) {
-    return (
-      <div style={S.briefCard}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {article.tickers?.length > 0 && (
-            <div style={S.bfTickers}>{Array.isArray(article.tickers) ? article.tickers.join(' · ') : article.tickers}</div>
-          )}
-          <div style={S.bfTitle}>{article.title}</div>
-        </div>
-        {article.url && (
-          <a href={article.url} target="_blank" rel="noopener noreferrer" style={S.bfLink}>Read →</a>
-        )}
-      </div>
-    );
-  }
-
-  function ChatBubble({ msg, myId, onTapUsername }) {
-    const name = msg.username || msg.profiles?.username || 'User';
-    const colors = ['#1AAD5E', '#7B68EE', '#FF7043', '#4CAF50', '#E91E63', '#FF9800'];
-    const isAI = msg.user_id === 'user_ai' || msg.type === 'ai';
-    const isMe = !isAI && myId && msg.user_id === myId;
-    const canTap = !isAI && !isMe && onTapUsername;
-    const color = isAI ? '#8B5CF6' : (msg.user_color || colors[name.charCodeAt(0) % colors.length]);
-    const timeAgo = getTimeAgo(msg.created_at);
-
-    const rawText = msg.text || msg.content || '';
-
-    // Sticker messages — render emoji inline
-    if (isSticker(rawText)) {
-      const s = STICKERS.find(st => st.id === getStickerId(rawText));
-      return (
-        <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', padding: '4px 12px', margin: '0 6px' }}>
-          {!isMe && <div style={{ ...S.ccAv, background: color, marginRight: 8 }}>{name[0].toUpperCase()}</div>}
-          <span style={{ fontSize: 32, lineHeight: 1 }} title={s?.label}>{s?.emoji || '?'}</span>
-        </div>
-      );
-    }
-
-    // For AI messages, parse the ```uptik {json}``` envelope into a clean card + prose
-    let card = null;
-    let proseText = rawText;
-    if (isAI) {
-      const m = rawText.match(/`{1,3}\s*uptik\s*([\s\S]*?)`{3}/i);
-      if (m) {
-        try {
-          const jsonStr = m[1].trim().replace(/,\s*([}\]])/g, '$1');
-          card = JSON.parse(jsonStr);
-        } catch (e) { card = null; }
-        proseText = rawText.replace(m[0], '').trim();
-      }
-      proseText = proseText.replace(/^`+\s*/, '').replace(/`+$/, '').trim();
-    }
-
-    const segments = isAI ? proseText.split(/\s*•\s+/) : [proseText];
-    const intro = segments[0] || '';
-    const bullets = isAI ? segments.slice(1).map(s => s.trim()).filter(Boolean) : [];
-
-    const renderInline = (txt) => txt.split(/(\$[A-Z]{1,5})/g).map((p, i) =>
-      p.startsWith('$') && /^\$[A-Z]{1,5}$/.test(p) ? <span key={i} style={S.ccTk}>{p}</span> : p
-    );
-
-    // User's own messages — same left-aligned style as others
-    if (isMe) {
-      return (
-        <div style={S.ccMsg}>
-          <div style={{ ...S.ccAv, background: color }}>{name[0].toUpperCase()}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={S.ccTop}>
-              <span style={{ ...S.ccName, color }}>{name}</span>
-              <span style={S.ccTime}>{timeAgo}</span>
-            </div>
-            <div style={{
-            fontSize: 13,
-            lineHeight: 1.4,
-            color: t.text1,
-            fontFamily: 'inherit',
-            wordBreak: 'break-word',
-          }}>
-            {renderInline(proseText)}
-          </div>
-          </div>
-        </div>
-      );
-    }
-
-    // Left-align for AI and other users
-    return (
-      <div style={S.ccMsg}>
-        <div style={{ ...S.ccAv, background: color }}>{name[0].toUpperCase()}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={S.ccTop}>
-            <span
-              style={{
-                ...S.ccName, color,
-                ...(canTap ? { cursor: 'pointer', textDecoration: 'underline', textDecorationColor: color, textUnderlineOffset: 2, opacity: 0.9 } : {}),
-              }}
-              onClick={() => { if (canTap) onTapUsername(msg.user_id, name); }}
-            >{name}</span>
-            <span style={S.ccTime}>{timeAgo}</span>
-          </div>
-          {card && <UptikCardInline card={card} />}
-          {intro && (
-            <div style={S.ccText}>{renderInline(intro)}</div>
-          )}
-          {bullets.length > 0 && (
-            <ul style={{ margin: '6px 0 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {bullets.map((b, i) => (
-                <li key={i} style={{ ...S.ccText, lineHeight: 1.5 }}>{renderInline(b)}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Dark navy table card — single mental model, full beat-streak at a glance
-  function UptikCardInline({ card }) {
-    if (!card || !card.type) return null;
-    const wrap = {
-      background: t.surface,
-      borderRadius: 10,
-      margin: '6px 0 8px',
-      fontFamily: "var(--font-heading)",
-      overflow: 'hidden',
-      color: t.text1,
-      border: `1px solid ${t.border}`,
-    };
-    const head = {
-      display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
-      padding: '10px 14px',
-      borderBottom: `1px solid ${t.border}`,
-    };
-    const ticker = { fontWeight: 700, fontSize: 15, color: '#8B5CF6', letterSpacing: 0.4 };
-    const price = { fontWeight: 700, fontSize: 14, color: t.text1 };
-
-    if (card.type === 'earnings') {
-      const qs = card.quarters || [];
-      return (
-        <div style={wrap}>
-          <div style={head}>
-            <span style={ticker}>{card.ticker}</span>
-            {card.price != null && <span style={price}>${Number(card.price).toFixed(3)}</span>}
-          </div>
-          <div>
-            {qs.map((q, i) => {
-              const beat = Number(q.beatPct) >= 0;
-              const sign = beat ? '+' : '';
-              return (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '8px 14px',
-                  borderBottom: i < qs.length - 1 ? `1px solid ${t.border}` : 'none',
-                  fontSize: 13,
-                }}>
-                  <span style={{ color: t.text3, fontWeight: 500 }}>{q.label}</span>
-                  <span style={{ color: beat ? '#1AAD5E' : 'var(--red)', fontWeight: 600 }}>
-                    ${Number(q.actual).toFixed(2)} vs ${Number(q.est).toFixed(2)} ({sign}{Number(q.beatPct).toFixed(1)}%)
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          {card.nextEarnings && (
-            <div style={{
-              padding: '8px 14px',
-              fontSize: 11, fontWeight: 600,
-              color: t.text3,
-              letterSpacing: 0.5,
-              textTransform: 'uppercase',
-              borderTop: `1px solid ${t.border}`,
-            }}>
-              Next: {card.nextEarnings}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (card.type === 'price') {
-      return (
-        <div style={wrap}>
-          <div style={{ ...head, borderBottom: 'none' }}>
-            <span style={ticker}>{card.ticker}</span>
-            <span style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
-              {card.price != null && <span style={price}>${Number(card.price).toFixed(2)}</span>}
-              {card.volume && <span style={{ fontSize: 11, color: t.text3 }}>Vol {card.volume}</span>}
-              {card.isClosed && <span style={{ fontSize: 11, color: t.text3 }}>· Closed</span>}
-            </span>
-          </div>
-        </div>
-      );
-    }
-
-    if (card.type === 'valuation') {
-      return (
-        <div style={wrap}>
-          <div style={head}>
-            <span style={ticker}>{card.ticker}</span>
-            {card.price != null && <span style={price}>${Number(card.price).toFixed(2)}</span>}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 14px', padding: '10px 14px' }}>
-            {card.pe != null && (
-              <div style={{ fontSize: 12 }}>
-                <span style={{ color: t.text3 }}>P/E </span>
-                <span style={{ color: t.text1, fontWeight: 600 }}>{card.pe}</span>
-              </div>
-            )}
-            {card.peg != null && (
-              <div style={{ fontSize: 12 }}>
-                <span style={{ color: t.text3 }}>PEG </span>
-                <span style={{ color: t.text1, fontWeight: 600 }}>{card.peg}</span>
-              </div>
-            )}
-            {card.netMargin != null && (
-              <div style={{ fontSize: 12 }}>
-                <span style={{ color: t.text3 }}>Margin </span>
-                <span style={{ color: t.text1, fontWeight: 600 }}>{card.netMargin}%</span>
-              </div>
-            )}
-            {card.salesGrowth != null && (
-              <div style={{ fontSize: 12 }}>
-                <span style={{ color: t.text3 }}>Sales </span>
-                <span style={{ color: '#5eed8a', fontWeight: 600 }}>+{card.salesGrowth}%</span>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    return null;
-  }
-
-  function getTimeAgo(timestamp) {
-    const diff = (Date.now() - new Date(timestamp).getTime()) / 1000;
-    if (diff < 60) return 'now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return `${Math.floor(diff / 86400)}d ago`;
-  }
-
-  // ═══════════════════════════════════════
-  // STYLES
-  // ═══════════════════════════════════════
-  const S = {
-    outerWrap: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 },
-
-    // ── Toast ──
-    toast: {
-      position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)',
-      background: '#1AAD5E', color: '#fff', fontSize: 13, fontWeight: 600,
-      padding: '8px 16px', borderRadius: 20, boxShadow: '0 4px 12px rgba(26,173,94,0.3)',
-      display: 'flex', alignItems: 'center', gap: 6, zIndex: 10000,
-    },
-
-    // ── Market Ticker Bar ──
-    combinedBar: { background: '#1a3a5e', flexShrink: 0 },
-    barContent: { padding: '8px 0', minHeight: 34 },
-    barScroll: { overflow: 'hidden', display: 'flex', alignItems: 'center' },
-    pulseItem: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 14px' },
-    pulseName: { fontSize: 13, fontWeight: 600, color: '#b8cde0', letterSpacing: 0.3 },
-    pulsePrice: { fontSize: 13, fontWeight: 700 },
-    pulseVal: { fontSize: 12, fontWeight: 600 },
-
-    // ── Content (scrollable area) ──
-    content: { flex: 1, overflowY: 'auto', paddingBottom: 8, background: t.bg, position: 'relative', zIndex: 1 },
-    sectionDivider: { height: 1, background: t.border, margin: '0 14px' },
-
-    fixedChatBar: {
-      flexShrink: 0,
-      padding: '12px 14px 14px', background: t.surface,
-      display: 'flex', alignItems: 'center', gap: 10,
-      position: 'relative', zIndex: 50,
-      borderTop: `1px solid ${t.border}`,
-      pointerEvents: 'auto',
-    },
-
-    // ── Watchlist / My List helpers ──
-    wlPopRow: { display: 'flex', gap: 5, justifyContent: 'center', flexWrap: 'wrap' },
-    wlPopLabel: { fontSize: 11, color: t.text2, marginRight: 2, alignSelf: 'center' },
-    wlPopChip: {
-      fontSize: 12, fontWeight: 600, color: t.green,
-      background: 'rgba(94,237,138,0.1)', border: '1px solid rgba(26,173,94,0.2)',
-      borderRadius: 8, padding: '4px 10px', cursor: 'pointer',
-    },
-
-
-    // ── Briefing ──
-    briefSection: { padding: '12px 14px 8px' },
-    briefHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    briefTitle: { fontSize: 15, fontWeight: 700, color: t.text1, letterSpacing: '-0.01em' },
-    briefTime: { fontSize: 11, color: t.text3 },
-    briefToggle: { fontSize: 12, color: t.green, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' },
-    briefCard: {
-      background: t.card, border: `1px solid ${t.border}`, borderRadius: 12,
-      padding: '10px 12px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10,
-    },
-    bfTickers: { fontSize: 11, fontWeight: 700, color: t.green, marginBottom: 2 },
-    bfTitle: { fontSize: 13, color: t.text1, fontWeight: 500, lineHeight: 1.3 },
-    bfLink: { color: t.green, fontSize: 12, fontWeight: 600, textDecoration: 'none', flexShrink: 0 },
-    briefEmpty: { background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, padding: 16, textAlign: 'center', fontSize: 13, color: t.text3 },
-
-    // ── Stocks section (inline) ──
-    stocksSection: { padding: '0 16px 8px' },
-    stocksHeader: { marginBottom: 6 },
-    stocksTitle: { fontSize: 15, fontWeight: 700, color: t.text1, fontFamily: "var(--font-heading)" },
-    stocksBtns: { display: 'flex', gap: 8 },
-    stocksBtn: {
-      padding: '7px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-      cursor: 'pointer', border: '1px solid #8cd9a0', background: 'rgba(140,217,160,0.08)',
-      color: t.green, fontFamily: "var(--font)",
-    },
-    stocksBtnActive: { background: '#1AAD5E', color: '#fff', borderColor: '#1AAD5E' },
-    sectorDropdown: {
-      position: 'absolute', left: 0, top: '100%', marginTop: 4,
-      background: t.card, border: `1px solid ${t.border}`, borderRadius: 10,
-      boxShadow: '0 4px 16px rgba(0,0,0,0.4)', overflow: 'hidden',
-      zIndex: 100, minWidth: 140,
-    },
-    sectorDropItem: {
-      padding: '10px 16px', fontSize: 13, color: t.text1, cursor: 'pointer',
-      borderBottom: `1px solid ${t.border}`, fontFamily: "var(--font)",
-    },
-    stocksCard: {
-      background: t.card, border: `1px solid ${t.border}`, borderRadius: 10,
-      overflow: 'hidden', marginTop: 8,
-    },
-    stocksHeaderRow: {
-      display: 'flex', alignItems: 'center', padding: '6px 10px',
-      borderBottom: `1px solid ${t.border}`, background: t.surface,
-    },
-    stocksColLabel: {
-      fontSize: 9, fontWeight: 600, color: t.text3,
-      textTransform: 'uppercase', letterSpacing: 0.5,
-    },
-    stocksScroll: { maxHeight: 200, overflowY: 'auto' },
-    stocksRow: {
-      display: 'flex', alignItems: 'center', padding: '7px 10px',
-      borderBottom: `1px solid ${t.border}`, cursor: 'pointer',
-    },
-    stocksRowTk: { fontSize: 13, fontWeight: 600, color: t.text1 },
-    stocksExpand: {
-      padding: '8px 10px 8px 38px', background: t.surface,
-      borderBottom: `1px solid ${t.border}`,
-    },
-    stocksAddBar: {
-      display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-      borderTop: `1px solid ${t.border}`, background: t.surface,
-      borderRadius: '0 0 10px 10px',
-    },
-    stocksAddInput: {
-      flex: 1, border: 'none', outline: 'none', fontSize: 13,
-      color: t.text1, background: 'transparent', fontFamily: "var(--font)",
-    },
-
-    // ── Chat section ──
-    chatSection: { padding: '12px 14px 8px' },
-    csHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    csTitle: { fontSize: 15, fontWeight: 700, color: t.text1, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 6 },
-    csLive: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: t.green, fontWeight: 500 },
-    csLiveDot: { width: 5, height: 5, borderRadius: '50%', background: '#1AAD5E', animation: 'pulse 1.5s ease-in-out infinite' },
-    privateChatBtn: {
-      display: 'flex', alignItems: 'center', gap: 5,
-      fontSize: 12, fontWeight: 600, color: '#fff',
-      background: '#1AAD5E', border: 'none', borderRadius: 14,
-      padding: '5px 12px', cursor: 'pointer',
-      fontFamily: 'inherit',
-    },
-
-    // ── My Groups section ──
-    groupSection: { padding: '12px 14px 16px' },
-    groupSectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-    groupSectionTitle: { fontSize: 15, fontWeight: 700, color: t.text1, letterSpacing: '-0.01em' },
-    groupCreateBtn: {
-      fontSize: 13, fontWeight: 600, color: t.green, background: 'none', border: 'none',
-      cursor: 'pointer', padding: '4px 0',
-    },
-    myGroupsPills: { display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2, justifyContent: 'center', flexWrap: 'wrap' },
-    myGroupPill: {
-      flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
-      borderRadius: 12, border: `1px solid ${t.border}`, background: t.card, cursor: 'pointer',
-    },
-    myGroupName: { fontSize: 14, fontWeight: 600, color: t.text1 },
-    groupCta: {
-      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-      background: `linear-gradient(135deg, ${t.surface} 0%, ${t.card} 100%)`, borderRadius: 12,
-      border: `1px solid ${t.border}`, cursor: 'pointer',
-    },
-    groupCtaIcon: {
-      width: 40, height: 40, borderRadius: '50%', background: t.card,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-      border: `1px solid ${t.border}`,
-    },
-    groupCtaText: { flex: 1 },
-    groupCtaTitle: { fontSize: 15, fontWeight: 700, color: t.text1, marginBottom: 2 },
-    groupCtaSub: { fontSize: 12, color: t.text2, lineHeight: 1.3 },
-
-    chatCard: {
-      background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden',
-    },
-    ccMsgs: { padding: 6, display: 'flex', flexDirection: 'column', gap: 6 },
-    ccMsg: {
-      padding: '10px 12px',
-      background: 'rgba(139,92,246,0.08)',
-      borderRadius: 10,
-      display: 'flex', gap: 8, alignItems: 'flex-start',
-    },
-    ccFooter: {
-      padding: '8px 12px', background: t.surface,
-      display: 'flex', alignItems: 'center', gap: 8,
-      borderTop: `1px solid ${t.border}`,
-    },
-    ccAv: {
-      width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', fontSize: 11, fontWeight: 600, color: '#fff', flexShrink: 0,
-    },
-    ccTop: { display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 1 },
-    ccName: { fontSize: 13, fontWeight: 600 },
-    ccTime: { fontSize: 11, color: t.text3, marginLeft: 'auto' },
-    ccText: { fontSize: 13, color: t.text1, lineHeight: 1.4 },
-    ccTk: { color: t.green, fontWeight: 600 },
-    // ccFooter replaced by fixedChatBar
-    ccAiBtn: {
-      width: 36, height: 36, borderRadius: '50%',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
-      transition: 'all 0.2s',
-    },
-    ccAiBtnOff: {
-      background: t.surface, color: t.purple, border: `1px solid ${t.border}`,
-    },
-    ccAiBtnActive: {
-      background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)',
-      color: '#fff', boxShadow: '0 0 8px rgba(139,92,246,0.4)',
-    },
-    ccInputWrap: {
-      flex: 1, display: 'flex', alignItems: 'center',
-      background: t.card, border: `1.5px solid ${t.border}`,
-      borderRadius: 20, height: 42, paddingRight: 4,
-    },
-    ccInput: {
-      flex: 1, background: 'transparent', border: 'none',
-      padding: '8px 0 8px 16px', fontSize: 15, color: t.text1,
-      fontFamily: 'inherit', outline: 'none', height: '100%',
-    },
-    ccMic: {
-      width: 32, height: 32, borderRadius: '50%', background: 'transparent',
-      border: 'none', cursor: 'pointer', flexShrink: 0,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      transition: 'all 0.2s',
-    },
-    ccMicActive: {
-      background: '#EF4444',
-      boxShadow: '0 0 10px rgba(239,68,68,0.4)',
-      animation: 'pulse 1.2s ease-in-out infinite',
-    },
-    ccSend: {
-      width: 38, height: 38, borderRadius: '50%', background: '#1AAD5E',
-      border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    },
-
-    // ── My List styles ──
-    wlRemoveBtn: {
-      minWidth: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      cursor: 'pointer', borderRadius: '50%',
-      transition: 'opacity 0.15s', opacity: 0.7,
-    },
-    wlAddSection: {
-      padding: '8px 12px',
-      background: t.card, border: `1px solid ${t.border}`, borderTop: 'none',
-      borderRadius: '0 0 12px 12px', marginTop: -1,
-    },
-    wlAddSearchBar: {
-      display: 'flex', alignItems: 'center', gap: 8,
-      background: t.surface, border: `1.5px solid ${t.border}`, borderRadius: 12,
-      padding: '8px 12px', cursor: 'text',
-    },
-    wlAddBtn: {
-      flexShrink: 0, marginLeft: 'auto',
-      fontSize: 12, fontWeight: 600, color: '#fff',
-      background: '#1AAD5E', border: 'none',
-      borderRadius: 14, padding: '5px 12px', cursor: 'pointer',
-    },
-
-    // ── Search overlay (light theme) ──
-    searchOverlay: {
-      padding: '10px 14px', background: t.card, border: `1px solid ${t.border}`,
-      borderRadius: 12, margin: '8px 14px 0',
-    },
-    searchBarLight: {
-      display: 'flex', alignItems: 'center', gap: 8,
-      background: t.surface, border: `1px solid ${t.border}`,
-      borderRadius: 12, padding: '7px 12px',
-    },
-    searchInputLight: {
-      flex: 1, background: 'none', border: 'none', outline: 'none',
-      fontFamily: 'inherit', fontSize: 13, color: t.text1,
-    },
-    searchResultsLight: {
-      marginTop: 6, background: t.card,
-      border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden',
-    },
-    searchItemLight: {
-      padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      borderBottom: `1px solid ${t.border}`, cursor: 'pointer',
-    },
-    siAddBtnLight: {
-      fontSize: 12, fontWeight: 600, color: t.green, background: 'rgba(26,173,94,0.08)',
-      border: '1px solid rgba(26,173,94,0.2)', borderRadius: 12, padding: '4px 12px', cursor: 'pointer',
-      fontFamily: 'inherit',
-    },
-
-  };
-
-  // ═══════════════════════════════════════
-  // ONBOARDING STYLES
-  // ═══════════════════════════════════════
-  const OB = {
-    overlay: {
-      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(238,242,247,0.98)', zIndex: 100,
-      display: 'flex', flexDirection: 'column', overflowY: 'auto',
-    },
-    header: { textAlign: 'center', padding: '28px 20px 4px' },
-    wave: { fontSize: 32, marginBottom: 4 },
-    title: { fontSize: 22, fontWeight: 700, color: '#132d52', marginBottom: 4, letterSpacing: '-0.02em' },
-    sub: { fontSize: 13, color: '#5a7080', lineHeight: 1.5, maxWidth: 320, margin: '0 auto' },
-
-    progress: {
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-      padding: '10px 20px 4px',
-    },
-    count: { fontSize: 12, fontWeight: 600, color: '#132d52' },
-    barTrack: { flex: 1, maxWidth: 180, height: 4, background: '#d8e2ed', borderRadius: 4, overflow: 'hidden' },
-    barFill: { height: '100%', background: '#1AAD5E', borderRadius: 4, transition: 'width 0.4s ease' },
-
-    search: {
-      margin: '8px 20px 0', display: 'flex', alignItems: 'center', gap: 8,
-      background: '#fff', border: '1.5px solid #d8e2ed', borderRadius: 12, padding: '10px 14px',
-    },
-    searchInput: {
-      flex: 1, background: 'none', border: 'none', outline: 'none',
-      fontFamily: 'inherit', fontSize: 13, color: t.text1,
-    },
-    searchResults: {
-      margin: '6px 20px 0', background: '#fff', border: '1px solid #d8e2ed',
-      borderRadius: 10, overflow: 'hidden',
-    },
-    searchItem: {
-      padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      borderBottom: '1px solid #f0f3f6',
-    },
-    searchAddBtn: {
-      fontSize: 11, fontWeight: 600, color: t.green, background: 'rgba(26,173,94,0.08)',
-      border: '1px solid rgba(26,173,94,0.2)', borderRadius: 8, padding: '4px 12px',
-      cursor: 'pointer', fontFamily: 'inherit',
-    },
-
-    scrollArea: { flex: 1, overflowY: 'auto', paddingBottom: 8 },
-
-    section: { padding: '12px 20px 4px' },
-    sectionTitle: {
-      fontSize: 12, fontWeight: 700, color: t.text3, textTransform: 'uppercase',
-      letterSpacing: '0.08em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6,
-    },
-
-    trendingGrid: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-    trendingChip: {
-      display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 12,
-      background: '#fff', border: '1.5px solid #d8e2ed', cursor: 'pointer', transition: 'all 0.2s',
-    },
-    trendingChipSel: { borderColor: '#1AAD5E', background: 'rgba(26,173,94,0.06)' },
-  trendingChipSel: { borderColor: '#1AAD5E', background: 'rgba(26,173,94,0.06)' },
-    tcTicker: { fontSize: 13, fontWeight: 700, color: '#132d52' },
-
-    sectorGroup: { marginBottom: 14 },
-    sectorLabel: {
-      fontSize: 11, fontWeight: 600, color: '#5a7080', marginBottom: 6, paddingLeft: 2,
-      display: 'flex', alignItems: 'center', gap: 5,
-    },
-    sectorStocks: { display: 'flex', gap: 6, flexWrap: 'wrap' },
-    sectorStock: {
-      padding: '6px 12px', borderRadius: 12, background: '#fff', border: '1px solid #d8e2ed',
-      fontSize: 12, fontWeight: 600, color: t.text1, cursor: 'pointer', transition: 'all 0.2s',
-      display: 'flex', alignItems: 'center', gap: 5,
-    },
-    sectorStockSel: { borderColor: 'var(--green-btn)', background: 'rgba(26,173,94,0.08)', color: t.green },
-
-    footer: { padding: '12px 20px 20px', display: 'flex', flexDirection: 'column', gap: 8 },
-    cta: {
-      width: '100%', padding: 14, border: 'none', borderRadius: 14,
-      fontFamily: 'inherit', fontSize: 15, fontWeight: 700, cursor: 'pointer',
-      background: 'var(--green-btn)', color: '#fff', boxShadow: '0 4px 16px rgba(26,173,94,0.25)',
-      transition: 'all 0.2s',
-    },
-    skip: {
-      textAlign: 'center', fontSize: 13, color: t.text3, cursor: 'pointer',
-      padding: 4, fontWeight: 500,
-    },
-  };
+  // ── Styles (extracted to homeStyles.js) ──
+  const S = getHomeStyles(t);
+  const OB = getOnboardingStyles(t);
 
   return (
     <div style={S.outerWrap}>
@@ -1673,132 +1043,20 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
 
       {/* ═══ ONBOARDING OVERLAY (first login only) ═══ */}
       {showOnboarding && (
-        <div style={OB.overlay}>
-          {/* Welcome */}
-          <div style={OB.header}>
-            <div style={OB.wave}>👋</div>
-            <div style={OB.title}>Welcome to UpTik!</div>
-            <div style={OB.sub}>Pick some stocks to watch. You'll get live prices, alerts, and see what the community says about them.</div>
-          </div>
-
-          {/* Progress */}
-          <div style={OB.progress}>
-            <span style={OB.count}><span style={{ color: t.green }}>{onboardSelected.size}</span> selected</span>
-            <div style={OB.barTrack}>
-              <div style={{ ...OB.barFill, width: `${Math.min((onboardSelected.size / 5) * 100, 100)}%` }} />
-            </div>
-            <span style={{ fontSize: 11, color: t.text3 }}>min 1</span>
-          </div>
-
-          {/* Search */}
-          <div style={OB.search}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.text3} strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-            <input
-              style={OB.searchInput}
-              placeholder="Search any ticker or company..."
-              value={onboardSearch}
-              onChange={e => handleOnboardSearch(e.target.value)}
-            />
-            {onboardSearch && (
-              <span style={{ color: t.text3, cursor: 'pointer', fontSize: 16 }} onClick={() => { setOnboardSearch(''); setOnboardSearchResults([]); }}>×</span>
-            )}
-          </div>
-
-          {/* Search results */}
-          {onboardSearchResults.length > 0 && (
-            <div style={OB.searchResults}>
-              {onboardSearchResults.map(r => (
-                <div key={r.symbol} style={OB.searchItem}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1 }}>{r.symbol}</div>
-                    <div style={{ fontSize: 10, color: t.text3 }}>{r.name}</div>
-                  </div>
-                  {onboardSelected.has(r.symbol) ? (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: t.green, padding: '4px 12px' }}>Added ✓</span>
-                  ) : (
-                    <button style={OB.searchAddBtn} onClick={() => toggleOnboardTicker(r.symbol)}>+ Add</button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          {onboardSearchLoading && <div style={{ padding: '8px 20px', fontSize: 11, color: t.text3 }}>Searching...</div>}
-
-          {/* Scrollable picks area */}
-          <div style={OB.scrollArea}>
-            {/* Trending */}
-            <div style={OB.section}>
-              <div style={OB.sectionTitle}>
-                <span style={{ fontSize: 14 }}>🔥</span> Trending Now
-              </div>
-              <div style={OB.trendingGrid}>
-                {ONBOARD_TRENDING.map(t => {
-                  const sel = onboardSelected.has(t.symbol);
-                  const p = onboardPrices[t.symbol];
-                  const chg = p?.change;
-                  return (
-                    <div
-                      key={t.symbol}
-                      style={{ ...OB.trendingChip, ...(sel ? OB.trendingChipSel : {}) }}
-                      onClick={() => toggleOnboardTicker(t.symbol)}
-                    >
-                      <span style={OB.tcTicker}>{t.symbol}</span>
-                      {chg != null && (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: chg >= 0 ? '#1AAD5E' : 'var(--red)' }}>
-                          {chg >= 0 ? '+' : ''}{chg.toFixed(2)}%
-                        </span>
-                      )}
-                      <span style={{ fontSize: sel ? 13 : 16, color: sel ? '#1AAD5E' : t.text3 }}>
-                        {sel ? '✓' : '+'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Sectors */}
-            <div style={OB.section}>
-              <div style={OB.sectionTitle}>
-                <span style={{ fontSize: 14 }}>📊</span> Browse by Sector
-              </div>
-              {ONBOARD_SECTORS.map(sector => (
-                <div key={sector.name} style={OB.sectorGroup}>
-                  <div style={OB.sectorLabel}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: sector.color, display: 'inline-block' }} />
-                    {sector.name}
-                  </div>
-                  <div style={OB.sectorStocks}>
-                    {sector.tickers.map(t => {
-                      const sel = onboardSelected.has(t);
-                      return (
-                        <div
-                          key={t}
-                          style={{ ...OB.sectorStock, ...(sel ? OB.sectorStockSel : {}) }}
-                          onClick={() => toggleOnboardTicker(t)}
-                        >
-                          {t} <span style={{ fontSize: 13, color: sel ? '#1AAD5E' : '#c0c8d0' }}>{sel ? '✓' : '+'}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Footer CTA */}
-          <div style={OB.footer}>
-            <button
-              style={{ ...OB.cta, ...(onboardSelected.size === 0 ? { opacity: 0.5 } : {}) }}
-              onClick={finishOnboarding}
-              disabled={onboardSelected.size === 0}
-            >
-              Build My Watchlist{onboardSelected.size > 0 ? ` (${onboardSelected.size})` : ''} →
-            </button>
-            <div style={OB.skip} onClick={skipOnboarding}>Skip for now</div>
-          </div>
-        </div>
+        <OnboardingOverlay
+          OB={OB} t={t}
+          onboardSelected={onboardSelected}
+          toggleOnboardTicker={toggleOnboardTicker}
+          onboardSearch={onboardSearch}
+          handleOnboardSearch={handleOnboardSearch}
+          onboardSearchResults={onboardSearchResults}
+          setOnboardSearch={setOnboardSearch}
+          setOnboardSearchResults={setOnboardSearchResults}
+          onboardSearchLoading={onboardSearchLoading}
+          onboardPrices={onboardPrices}
+          finishOnboarding={finishOnboarding}
+          skipOnboarding={skipOnboarding}
+        />
       )}
 
       {/* ═══ MARKET TICKER SCROLL ═══ */}
@@ -1848,43 +1106,7 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
       {/* ═══ SCROLLABLE CONTENT ═══ */}
       <div style={S.content}>
 
-        {/* Search overlay moved inline into My List card below */}
-
-        {/* ── DAILY BRIEFING (collapsible) ── */}
-        <div style={S.briefSection}>
-          <div style={S.briefHeader}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={S.briefTitle}>Daily Briefing</span>
-              {briefing && (
-                <span style={S.briefTime}>
-                  {new Date(briefing.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} EST
-                </span>
-              )}
-            </div>
-            {briefingArticles.length > 1 && (
-              <button style={S.briefToggle} onClick={() => setBriefingExpanded(p => !p)}>
-                {briefingExpanded ? 'Less ▲' : `+${briefingArticles.length - 1} more ▼`}
-              </button>
-            )}
-          </div>
-
-          {briefingArticles.length > 0 ? (
-            <>
-              {/* Always show first article */}
-              <BriefCard article={briefingArticles[0]} />
-              {/* Show rest when expanded */}
-              {briefingExpanded && briefingArticles.slice(1).map((a, i) => (
-                <BriefCard key={i} article={a} />
-              ))}
-            </>
-          ) : (
-            <div style={S.briefEmpty}>No briefing posted yet today</div>
-          )}
-        </div>
-
-        <div style={S.sectionDivider} />
-
-        {/* ── STOCKS ── */}
+        {/* ── STOCKS (Watchlist first for engagement) ── */}
         <div style={S.stocksSection}>
           <div style={S.stocksHeader}>
             <span style={S.stocksTitle}>Stocks</span>
@@ -1909,7 +1131,7 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
                 }
               }}
             >
-              My List{hasWatchlist ? ` (${watchlist.length})` : ''}
+              Watchlist{hasWatchlist ? ` (${watchlist.length})` : ''}
             </div>
             <div style={{ position: 'relative' }}>
               <div
@@ -2099,11 +1321,43 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
 
         <div style={S.sectionDivider} />
 
-        {/* ── LIVE CHAT — UpTik Public only ── */}
+        {/* ── TODAY'S MARKET (briefing, collapsed by default) ── */}
+        <div style={S.briefSection}>
+          <div style={S.briefHeader}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={S.briefTitle}>Today's Market</span>
+              {briefing && (
+                <span style={S.briefTime}>
+                  {new Date(briefing.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} EST
+                </span>
+              )}
+            </div>
+            {briefingArticles.length > 1 && (
+              <button style={S.briefToggle} onClick={() => setBriefingExpanded(p => !p)}>
+                {briefingExpanded ? 'Less ▲' : `+${briefingArticles.length - 1} more ▼`}
+              </button>
+            )}
+          </div>
+
+          {briefingArticles.length > 0 ? (
+            <>
+              <BriefCard article={briefingArticles[0]} S={S} />
+              {briefingExpanded && briefingArticles.slice(1).map((a, i) => (
+                <BriefCard key={i} article={a} S={S} />
+              ))}
+            </>
+          ) : (
+            <div style={S.briefEmpty}>No briefing posted yet today</div>
+          )}
+        </div>
+
+        <div style={S.sectionDivider} />
+
+        {/* ── COMMUNITY CHAT ── */}
         <div ref={chatSectionRef} style={S.chatSection}>
           <div style={S.csHeader}>
             <div style={S.csTitle}>
-              Live Chat
+              Community Chat
               <div style={S.csLive}>
                 <div style={S.csLiveDot} />
                 {uptikPublic ? 'live' : ''}
@@ -2126,14 +1380,14 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
               {chatMessages.length > 0 ? (
                 // No FadingMessage — auto-disappearing messages fight stickiness
                 // and any refetch path resurrects them with fresh timers, looking broken.
-                chatMessages.map((msg, i) => (
-                  <ChatBubble key={msg.id || i} msg={msg} myId={session?.user?.id} onTapUsername={(userId, username) => {
+                chatMessages.slice(0, 2).map((msg, i) => (
+                  <ChatBubble key={msg.id || i} msg={msg} myId={session?.user?.id} S={S} t={t} onTapUsername={(userId, username) => {
                     if (onStartDM) { onStartDM(userId, username); onTabChange?.('chat'); }
                   }} />
                 ))
               ) : (
                 <div style={{ padding: 16, textAlign: 'center', color: t.text3, fontSize: 13 }}>
-                  No recent messages
+                  No messages yet — type below to start chatting!
                 </div>
               )}
               {aiLoading && (
@@ -2193,7 +1447,7 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
           <input
             ref={chatInputRef}
             style={S.ccInput}
-            placeholder={aiMode ? 'Ask AI anything...' : 'Message UpTik Public...'}
+            placeholder={aiMode ? 'Ask AI about any stock...' : 'Chat with the community...'}
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleHomeSend(); } }}

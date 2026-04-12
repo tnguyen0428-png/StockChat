@@ -470,6 +470,7 @@ const styles = {
     display: 'flex', gap: 0, padding: '6px 14px',
     background: 'var(--card)', borderBottom: '1px solid var(--border)',
     flexShrink: 0,
+    position: 'sticky', top: 0, zIndex: 10,
   },
   chatTogglePill: {
     flex: 1, textAlign: 'center', padding: '7px 0',
