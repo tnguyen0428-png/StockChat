@@ -74,10 +74,19 @@ export default function DashboardPage({ session }) {
   const [startingDM, setStartingDM]       = useState(false);
   const dismissTimerRef = useRef(null);
 
-  // ── Keyboard detection + single viewport height handler ──
-  // Instead of per-tab visualViewport hacks with getBoundingClientRect(),
-  // set ONE CSS custom property (--app-height) on the page container.
-  // The flex layout handles the rest — no scroll listeners, no feedback loops.
+  // ── Keyboard detection + single viewport handler ──
+  // One handler at the page level replaces all per-tab visualViewport hacks.
+  //
+  // iOS Safari does two things when the keyboard opens:
+  //   1. Shrinks vv.height  (→ resize event)
+  //   2. Scrolls the visual viewport down by vv.offsetTop (→ scroll event)
+  // Android only does #1 (offsetTop stays 0).
+  //
+  // We handle both:
+  //   • height = vv.height  — shrinks the flex container to fit the visible area
+  //   • transform = translateY(offsetTop) — shifts the container down to align
+  //     with the visual viewport on iOS (GPU-accelerated, no layout reflow,
+  //     so no feedback loop unlike the old getBoundingClientRect approach)
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const initialVH = useRef(window.innerHeight);
   const pageRef = useRef(null);
@@ -85,27 +94,36 @@ export default function DashboardPage({ session }) {
     const vv = window.visualViewport;
     if (!vv) return;
     let lastH = '';
-    const onResize = () => {
+    let lastT = '';
+    const update = () => {
+      if (!pageRef.current) return;
       const isKB = vv.height < initialVH.current * 0.75;
       setKeyboardOpen(isKB);
-      // Resize the page container to match the visual viewport.
-      // On iOS Safari the layout viewport doesn't shrink with the keyboard,
-      // so 100vh stays too tall. This keeps the flex children (header, content,
-      // input bar) fitting inside the visible area with zero per-tab JS.
-      if (pageRef.current) {
-        const h = `${vv.height}px`;
-        if (h !== lastH) {
-          lastH = h;
-          pageRef.current.style.height = h;
-        }
+      // Height — fit the page to the visual viewport
+      const h = `${vv.height}px`;
+      if (h !== lastH) {
+        lastH = h;
+        pageRef.current.style.height = h;
+      }
+      // Transform — on iOS Safari, the visual viewport scrolls when the
+      // keyboard opens (offsetTop > 0). Shift the page down to stay aligned.
+      // On Android/desktop offsetTop is always 0, so this is a no-op.
+      // Using transform (not top/margin) avoids layout reflow entirely.
+      const t = vv.offsetTop ? `translateY(${vv.offsetTop}px)` : '';
+      if (t !== lastT) {
+        lastT = t;
+        pageRef.current.style.transform = t;
       }
     };
-    // Only listen to 'resize' — NOT 'scroll'. On iOS Safari, visualViewport
-    // scroll events fire during content scrolling and cause feedback loops.
-    vv.addEventListener('resize', onResize);
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
     return () => {
-      vv.removeEventListener('resize', onResize);
-      if (pageRef.current) pageRef.current.style.height = '';
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      if (pageRef.current) {
+        pageRef.current.style.height = '';
+        pageRef.current.style.transform = '';
+      }
     };
   }, []);
 
