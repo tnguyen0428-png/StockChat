@@ -460,7 +460,7 @@ function EducationZone({ t }) {
 
   return (
     <div style={{ background: t.surface, borderRadius: 10, border: `1px solid ${t.border}`, padding: '12px 10px', marginBottom: 10 }}>
-      <div style={{ fontSize: 13, fontWeight: 500, color: t.text1, textAlign: 'center', marginBottom: 10, fontFamily: "'Outfit', sans-serif" }}>
+      <div style={{ fontSize: 15, fontWeight: 500, color: t.text1, textAlign: 'center', marginBottom: 10, fontFamily: "'Outfit', sans-serif" }}>
         How alerts work
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'flex-start' }}>
@@ -471,31 +471,31 @@ function EducationZone({ t }) {
               style={{ flex: 1, background: p.bg, borderRadius: 8, border: `0.5px solid ${p.border}`, overflow: 'hidden', cursor: 'pointer' }}>
               <div style={{ padding: '8px 8px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: p.color, fontFamily: "'Outfit', sans-serif" }}>{p.title}</div>
-                  <div style={{ fontSize: 9, color: t.text3, marginTop: 2 }}>{p.subtitle}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: p.color, fontFamily: "'Outfit', sans-serif" }}>{p.title}</div>
+                  <div style={{ fontSize: 11, color: t.text3, marginTop: 2 }}>{p.subtitle}</div>
                 </div>
                 <div style={{ fontSize: 11, color: t.text3, transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</div>
               </div>
               <div style={{ maxHeight: isOpen ? 500 : 0, overflow: 'hidden', transition: 'max-height 0.3s ease' }}>
                 <div style={{ padding: '0 8px 8px', borderTop: `0.5px solid ${p.divider}` }}>
-                  <div style={{ fontSize: 11, color: t.text2, lineHeight: 1.6, marginTop: 6 }}>
+                  <div style={{ fontSize: 13, color: t.text2, lineHeight: 1.6, marginTop: 6 }}>
                     <span style={{ fontWeight: 500, color: t.text1 }}>What it does:</span> {p.what}
                   </div>
-                  <div style={{ fontSize: 11, color: t.text2, lineHeight: 1.6, marginTop: 4 }}>
+                  <div style={{ fontSize: 13, color: t.text2, lineHeight: 1.6, marginTop: 4 }}>
                     <span style={{ fontWeight: 500, color: t.text1 }}>Why it matters:</span> {p.why}
                   </div>
-                  <div style={{ marginTop: 6, fontSize: 11, fontWeight: 500, color: t.text1, textTransform: 'uppercase', letterSpacing: 0.4 }}>What we scan for</div>
+                  <div style={{ marginTop: 6, fontSize: 13, fontWeight: 500, color: t.text1, textTransform: 'uppercase', letterSpacing: 0.4 }}>What we scan for</div>
                   <div style={{ marginTop: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
                     {p.scans.map(([label, desc]) => (
-                      <div key={label} style={{ display: 'flex', alignItems: 'baseline', gap: 5, fontSize: 11, color: t.text2 }}>
+                      <div key={label} style={{ display: 'flex', alignItems: 'baseline', gap: 5, fontSize: 13, color: t.text2 }}>
                         <div style={{ width: 4, height: 4, borderRadius: '50%', background: p.color, flexShrink: 0, marginTop: 5 }} />
                         <span><span style={{ color: p.color, fontWeight: 500 }}>{label}</span> — {desc}</span>
                       </div>
                     ))}
                   </div>
                   <div style={{ marginTop: 6, padding: '5px 7px', background: p.exBg, borderRadius: 6, border: `0.5px solid ${p.exBorder}` }}>
-                    <div style={{ fontSize: 9, color: t.text3, fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2 }}>Example</div>
-                    <div style={{ fontSize: 11, color: t.text2 }}>{p.example}</div>
+                    <div style={{ fontSize: 11, color: t.text3, fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2 }}>Example</div>
+                    <div style={{ fontSize: 13, color: t.text2 }}>{p.example}</div>
                   </div>
                 </div>
               </div>
@@ -512,11 +512,11 @@ function EducationZone({ t }) {
         ].map(c => (
           <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <div style={{ width: c.size, height: c.size, borderRadius: '50%', background: c.bg, border: `1.5px solid ${c.border}` }} />
-            <span style={{ fontSize: 11, color: t.text3 }}>{c.label}</span>
+            <span style={{ fontSize: 12, color: t.text3 }}>{c.label}</span>
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 11, color: t.text3, textAlign: 'center', marginTop: 6 }}>
+      <div style={{ fontSize: 12, color: t.text3, textAlign: 'center', marginTop: 6 }}>
         Scanners run during market hours · 9:30am–4pm EST
       </div>
     </div>
