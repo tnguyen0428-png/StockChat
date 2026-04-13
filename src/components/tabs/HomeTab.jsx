@@ -311,8 +311,8 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                 margin: '10px 14px 4px',
                 background: t.card,
                 border: `1px solid ${t.border}`,
-                borderRadius: 14,
-                padding: '12px 14px 10px',
+                borderRadius: 12,
+                padding: '12px 14px',
                 cursor: 'pointer',
               }}
               onClick={() => onTabChange?.('challenge')}
@@ -320,44 +320,43 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
                   width: 44, height: 44, borderRadius: 22,
-                  background: myRank === 1 ? 'rgba(255,215,0,0.15)' : 'rgba(26,173,94,0.12)',
-                  border: `2px solid ${myRank === 1 ? '#FFD700' : t.green}`,
+                  background: 'rgba(26,173,94,0.12)',
+                  border: `2px solid ${t.green}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>
-                  <span style={{ fontSize: 15, fontWeight: 800, color: myRank === 1 ? '#FFD700' : t.green }}>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: t.green }}>
                     {myRank ? `#${myRank}` : '—'}
                   </span>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, color: t.text3, marginBottom: 1 }}>Welcome back,</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: t.text1 }}>{username}</div>
+                  <div style={{ fontSize: 10, color: t.text3, marginBottom: 1 }}>Welcome back,</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: t.text1, marginBottom: 4 }}>{username}</div>
+                  {aheadUser && (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, color: t.text3 }}>
+                          Rival: <span style={{ color: t.text3 }}>@{aheadUser.username}</span>
+                        </span>
+                        <span style={{ fontSize: 11, color: '#ff9040', fontWeight: 600 }}>-{aheadUser.gap}%</span>
+                      </div>
+                      <div style={{ height: 3, borderRadius: 2, background: t.border, overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', borderRadius: 2,
+                          width: `${aheadUser.progress}%`,
+                          background: t.green,
+                          transition: 'width 0.6s ease',
+                        }} />
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: isPositive ? t.green : '#ff6b6b' }}>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: t.green }}>
                     {isPositive ? '+' : ''}{(totalReturn || 0).toFixed(2)}%
                   </div>
                   <div style={{ fontSize: 10, color: t.text3 }}>Total return</div>
                 </div>
               </div>
-
-              {aheadUser && (
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: 11, color: t.text3 }}>
-                      Rival: <span style={{ color: t.text2, fontWeight: 600 }}>@{aheadUser.username}</span>
-                    </span>
-                    <span style={{ fontSize: 11, color: '#ff9040', fontWeight: 600 }}>-{aheadUser.gap}%</span>
-                  </div>
-                  <div style={{ height: 4, borderRadius: 2, background: t.border, overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%', borderRadius: 2,
-                      width: `${aheadUser.progress}%`,
-                      background: `linear-gradient(90deg, ${t.green}, #5eed8a)`,
-                      transition: 'width 0.6s ease',
-                    }} />
-                  </div>
-                </div>
-              )}
             </div>
           ) : (
             /* ── New user ── */
@@ -365,8 +364,8 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
               style={{
                 margin: '10px 14px 4px',
                 background: 'linear-gradient(135deg, #0d2a4a 0%, #1a3a5e 60%, #0d3d2a 100%)',
-                borderRadius: 14,
-                padding: '14px 14px 14px',
+                borderRadius: 12,
+                padding: '14px 14px',
                 cursor: 'pointer',
                 overflow: 'hidden',
               }}
@@ -375,20 +374,24 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                 <span style={{ fontSize: 26, lineHeight: 1, flexShrink: 0 }}>🏆</span>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 3 }}>Learn to Invest</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginBottom: 10 }}>
-                    Practice with $50K virtual cash — zero risk
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 3 }}>Learn to Invest</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginBottom: 8 }}>
+                    <span style={{ color: t.green, fontWeight: 600 }}>$50K virtual cash</span> — zero risk
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>📊 Curated picks from our analysts</div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>📈 Live prices &amp; real-time signals</div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>🏅 Compete on the leaderboard</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                    {['📊 Curated picks', '📈 Live data', '🏅 Leaderboard'].map(chip => (
+                      <span key={chip} style={{
+                        fontSize: 10, color: 'rgba(255,255,255,0.8)',
+                        background: 'rgba(255,255,255,0.1)', borderRadius: 6,
+                        padding: '3px 7px',
+                      }}>{chip}</span>
+                    ))}
                   </div>
                   <div style={{
                     display: 'inline-flex', alignItems: 'center',
                     background: t.green, color: '#fff',
-                    padding: '8px 16px', borderRadius: 20,
-                    fontSize: 13, fontWeight: 700,
+                    padding: '8px 16px', borderRadius: 8,
+                    fontSize: 12, fontWeight: 700,
                   }}>
                     Start Investing →
                   </div>
@@ -412,41 +415,22 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
               {hotMovers.map((mover, i) => {
                 const isPopular = mover.change_pct === null && mover.change === null;
                 const chg = isPopular ? null : Number(mover.change_pct ?? mover.change ?? 0);
-                const up = chg !== null && chg >= 0;
-                const label = SIGNAL_LABELS[mover.signal_type] || '';
                 const priceData = researchPrices[mover.ticker];
                 return (
                   <div key={i} style={{
                     flexShrink: 0, width: 100, borderRadius: 10,
                     background: t.card, border: `1px solid ${t.border}`,
-                    overflow: 'hidden',
+                    padding: '8px 8px',
                   }}>
-                    <div style={{ height: 3, background: isPopular ? t.border : (up ? t.green : '#ff6b6b') }} />
-                    <div style={{ padding: '8px 8px 8px' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginBottom: 2 }}>{mover.ticker}</div>
-                      {isPopular ? (
-                        <div style={{ fontSize: 11, fontWeight: 600, color: t.text3, marginBottom: 4 }}>
-                          {mover._watchCount} watching
-                        </div>
-                      ) : (
-                        <div style={{ fontSize: 12, fontWeight: 600, color: up ? t.green : '#ff6b6b', marginBottom: 4 }}>
-                          {up ? '+' : ''}{chg.toFixed(2)}%
-                        </div>
-                      )}
-                      {priceData && (
-                        <div style={{ fontSize: 11, color: t.text3, marginBottom: 3 }}>
-                          ${priceData.price.toFixed(2)}
-                        </div>
-                      )}
-                      {label && !isPopular && (
-                        <div style={{
-                          fontSize: 9, fontWeight: 600, color: '#D4A017',
-                          background: 'rgba(212,160,23,0.12)', borderRadius: 4,
-                          padding: '1px 4px', display: 'inline-block',
-                          textTransform: 'uppercase', letterSpacing: 0.3,
-                        }}>{label}</div>
-                      )}
+                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginBottom: 2 }}>{mover.ticker}</div>
+                    <div style={{ fontSize: 11, color: t.text3, marginBottom: 3 }}>
+                      {isPopular ? `${mover._watchCount || 0} watching` : `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`}
                     </div>
+                    {priceData && (
+                      <div style={{ fontSize: 10, color: t.text2 }}>
+                        ${priceData.price.toFixed(2)}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -456,9 +440,6 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
 
         {/* ── STOCKS ── */}
         <div style={S.stocksSection}>
-          <div style={S.stocksHeader}>
-            <span style={S.stocksTitle}>Stocks &amp; Research</span>
-          </div>
           <div style={S.stocksBtns}>
             <div
               style={{ ...S.stocksBtn, ...(researchSector === '__mylist__' ? S.stocksBtnActive : {}) }}
@@ -537,7 +518,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                 )}
               </div>
 
-              <div style={S.stocksScroll}>
+              <div style={{ ...S.stocksScroll, maxHeight: 'none' }}>
                 {researchLoading ? (
                   <div style={{ padding: 16, textAlign: 'center', color: t.text3, fontSize: 13 }}>Loading...</div>
                 ) : researchStocks.length === 0 ? (
@@ -586,7 +567,8 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                     </div>
                   )
                 ) : (
-                  researchStocks.map((stock, i) => {
+                  <>
+                  {researchStocks.slice(0, 4).map((stock, i) => {
                     const isOpen = researchExpanded === stock.id;
                     const isMyList = researchSector === '__mylist__';
                     const priceData = researchPrices[stock.ticker];
@@ -641,7 +623,16 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                         )}
                       </div>
                     );
-                  })
+                  })}
+                  {researchStocks.length > 4 && (
+                    <div
+                      style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, color: t.green, cursor: 'pointer', textAlign: 'center' }}
+                      onClick={() => onTabChange?.('alerts')}
+                    >
+                      +{researchStocks.length - 4} more
+                    </div>
+                  )}
+                  </>
                 )}
               </div>
 
@@ -702,7 +693,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
         <div style={S.briefSection}>
           <div style={S.briefHeader}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={S.briefTitle}>Daily Briefing</span>
+              <span style={S.briefTitle}>Today's Market</span>
               {briefing && (
                 <span style={S.briefTime}>
                   {new Date(briefing.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} EST
@@ -728,33 +719,34 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
           )}
         </div>
 
-        {/* ═══ DISCOVER ═══ */}
+        {/* ═══ HOW UPTIK WORKS ═══ */}
         <div style={{ padding: '8px 14px 14px' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: t.text1, marginBottom: 8 }}>
-            {hasJoinedChallenge ? 'Quick access' : "What's inside"}
-          </div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: t.text1, marginBottom: 8 }}>How UpTik works</div>
           <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden' }}>
             {[
-              { icon: '💬', title: 'Group Chat', subtitle: 'Discuss stocks with traders', tab: 'chat' },
-              { icon: '✦', title: 'AI Analyst', subtitle: 'Get AI-powered insights', tab: 'chat' },
-              { icon: '⚡', title: 'Smart Alerts', subtitle: 'Breakout & signal alerts', tab: 'alerts' },
-            ].map((item, i, arr) => (
+              { num: 1, color: '#1AAD5E', title: 'Build your watchlist', desc: 'Track stocks with live prices & fundamentals' },
+              { num: 2, color: '#FFB020', title: 'Join the Challenge', desc: 'Practice with $50K virtual cash — compete with your crew' },
+              { num: 3, color: '#42A5F5', title: 'Explore sector picks', desc: 'Prescreened stocks ranked by our analysts' },
+              { num: 4, color: '#8B5CF6', title: 'Learn as a team', desc: 'Chat, share ideas, and grow together' },
+            ].map((step, i, arr) => (
               <div
                 key={i}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
+                  display: 'flex', alignItems: 'flex-start', gap: 12,
                   padding: '12px 14px',
                   borderBottom: i < arr.length - 1 ? `1px solid ${t.border}` : 'none',
-                  cursor: 'pointer',
                 }}
-                onClick={() => onTabChange?.(item.tab)}
               >
-                <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{item.icon}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: t.text1 }}>{item.title}</div>
-                  <div style={{ fontSize: 11, color: t.text3 }}>{item.subtitle}</div>
+                <div style={{
+                  width: 26, height: 26, borderRadius: 13, flexShrink: 0,
+                  background: step.color, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{step.num}</span>
                 </div>
-                <span style={{ fontSize: 18, color: t.text3 }}>›</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginBottom: 2 }}>{step.title}</div>
+                  <div style={{ fontSize: 11, color: t.text3, lineHeight: 1.4 }}>{step.desc}</div>
+                </div>
               </div>
             ))}
           </div>

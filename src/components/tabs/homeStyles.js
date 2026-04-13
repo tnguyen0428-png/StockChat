@@ -48,10 +48,10 @@ export function getHomeStyles(t) {
     stocksSection: { padding: '0 14px 6px' },
     stocksHeader: { marginBottom: 6 },
     stocksTitle: { fontSize: 14, fontWeight: 700, color: t.text1, fontFamily: "var(--font-heading)" },
-    stocksBtns: { display: 'flex', gap: 8 },
+    stocksBtns: { display: 'flex', gap: 8, marginBottom: 8 },
     stocksBtn: {
-      padding: '7px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-      cursor: 'pointer', border: '1px solid #8cd9a0', background: 'rgba(140,217,160,0.08)',
+      padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+      cursor: 'pointer', border: '1px solid rgba(26,173,94,0.4)', background: 'rgba(26,173,94,0.06)',
       color: t.green, fontFamily: "var(--font)",
     },
     stocksBtnActive: { background: '#1AAD5E', color: '#fff', borderColor: '#1AAD5E' },
@@ -79,7 +79,7 @@ export function getHomeStyles(t) {
     },
     stocksScroll: { maxHeight: 200, overflowY: 'auto' },
     stocksRow: {
-      display: 'flex', alignItems: 'center', padding: '7px 10px',
+      display: 'flex', alignItems: 'center', padding: '5px 10px',
       borderBottom: `1px solid ${t.border}`, cursor: 'pointer',
     },
     stocksRowTk: { fontSize: 13, fontWeight: 600, color: t.text1 },
