@@ -1,15 +1,37 @@
 // ============================================
 // UPTIKALERTS — ChatHeader.jsx
 // Header shown inside a group conversation
-// Layout: ← | Group Name / member count | [Invite]
+// Layout: ← | Icon + Group Name / member count | [Invite]
 // ============================================
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 
+function GlobeSVG() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+      stroke="#b0c4d8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+}
+
+function LockSVG({ color }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
 export default function ChatHeader({ convo, onBack, onInvite, isAdmin, isModerator }) {
-  const name = convo?.name || 'Chat';
   const isPublic = convo?.is_public;
+  const displayName = isPublic ? 'Public Chat' : (convo?.name || 'Chat');
+  const groupColor = convo?.color || '#7B68EE';
   const [memberCount, setMemberCount] = useState(null);
 
   useEffect(() => {
@@ -25,23 +47,20 @@ export default function ChatHeader({ convo, onBack, onInvite, isAdmin, isModerat
     <div style={styles.header}>
       <button style={styles.backBtn} onClick={onBack}>
         <svg
-          width="18" height="18" viewBox="0 0 24 24"
-          fill="none" stroke="currentColor"
+          width="20" height="20" viewBox="0 0 24 24"
+          fill="none" stroke="#fff"
           strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-          style={{ display: 'block' }}
         >
           <path d="M15 18l-6-6 6-6" />
         </svg>
       </button>
 
+      <div style={styles.iconWrap}>
+        {isPublic ? <GlobeSVG /> : <LockSVG color={groupColor} />}
+      </div>
+
       <div style={styles.titleWrap}>
-        <div style={styles.nameRow}>
-          <span style={styles.name} title={name}>{name}</span>
-          {isPublic
-            ? <span style={styles.publicBadge}>PUBLIC</span>
-            : <span style={styles.lockIcon}>🔒</span>
-          }
-        </div>
+        <span style={styles.name} title={displayName}>{displayName}</span>
         {memberCount != null && (
           <div style={styles.memberCount}>{memberCount} members</div>
         )}
@@ -62,37 +81,36 @@ const styles = {
   header: {
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
+    gap: 10,
     padding: '8px 12px',
     background: '#132d52',
     borderBottom: '1px solid rgba(255,255,255,0.08)',
     flexShrink: 0,
-    minHeight: 52,
+    minHeight: 56,
   },
   backBtn: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(255,255,255,0.1)',
+    background: 'transparent',
     border: 'none',
     color: '#fff',
     cursor: 'pointer',
-    padding: 6,
-    borderRadius: 8,
+    padding: 4,
+    flexShrink: 0,
+  },
+  iconWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     flexShrink: 0,
   },
   titleWrap: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
     justifyContent: 'center',
     minWidth: 0,
-  },
-  nameRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
   },
   name: {
     fontSize: 15,
@@ -102,29 +120,14 @@ const styles = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
-  publicBadge: {
-    fontSize: 9,
-    fontWeight: 700,
-    letterSpacing: 0.5,
-    color: '#5eed8a',
-    background: 'rgba(94,237,138,0.15)',
-    padding: '2px 6px',
-    borderRadius: 4,
-    textTransform: 'uppercase',
-    flexShrink: 0,
-  },
-  lockIcon: {
-    fontSize: 12,
-    flexShrink: 0,
-  },
   memberCount: {
     fontSize: 11,
-    color: 'rgba(255,255,255,0.6)',
+    color: '#b0c4d8',
     marginTop: 1,
   },
   inviteBtn: {
-    padding: '5px 14px',
-    background: 'rgba(255,255,255,0.15)',
+    padding: '6px 14px',
+    background: '#22c55e',
     color: '#fff',
     border: 'none',
     borderRadius: 8,

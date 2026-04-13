@@ -260,7 +260,7 @@ export default function DashboardPage({ session }) {
   return (
     <div ref={pageRef} style={{ ...styles.page, ...vpStyle }}>
 
-      {!(activeTab === 'chat' && chatView === 'group') && (
+      {activeTab !== 'chat' && (
         <Header
           profile={profile}
           onSignOut={handleSignOut}

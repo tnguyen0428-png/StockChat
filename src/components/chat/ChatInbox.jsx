@@ -1,12 +1,12 @@
 // ============================================
 // UPTIKALERTS — ChatInbox.jsx
-// Groups-only inbox with "+ New" dropdown
+// Single-card inbox: public group + collapsible private chats
 // ============================================
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
-import { safeGet, safeSet } from '../../lib/safeStorage';
+import { safeSet } from '../../lib/safeStorage';
 import { styles } from './chatInboxStyles';
 
 // ── Helpers ──────────────────────────────────
@@ -23,55 +23,80 @@ function formatTime(ts) {
 }
 
 function truncate(text, max = 38) {
-  if (!text) return 'No messages yet';
+  if (!text) return '';
   return text.length > max ? text.slice(0, max) + '…' : text;
 }
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+function sanitizePreview(text) {
+  if (!text) return 'No messages yet';
+  // Strip ```uptik ... ``` AI response blocks
+  let s = text.replace(/```uptik[\s\S]*?```/gi, '[AI response]');
+  // If it collapsed to just [AI response], return early
+  if (s.trim() === '[AI response]') return '[AI response]';
+  // Strip remaining code blocks
+  s = s.replace(/```[\s\S]*?```/g, '[code]');
+  // Strip markdown syntax chars
+  s = s.replace(/[*_~`>#]/g, '');
+  // Collapse whitespace/newlines
+  s = s.replace(/\s+/g, ' ').trim();
+  return s || 'No messages yet';
+}
+
+// ── SVG Icons ────────────────────────────────
+
+function GlobeSVG({ size = 20, color = '#fff' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+}
+
+function LockSVG({ size = 16, color = '#7B68EE' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
+function ChevronSVG({ open }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d={open ? 'M18 15l-6-6-6 6' : 'M6 9l6 6 6-6'} />
+    </svg>
+  );
+}
 
 // ── Group Row ─────────────────────────────────
 
-function GroupRow({ group, preview, isUnread, isActive, onOpen, memberCount }) {
-  const color = group.color || '#7B68EE';
+function GroupRow({ group, preview, isActive, onOpen, icon }) {
+  const sanitized = sanitizePreview(preview?.text);
+  const previewText = preview
+    ? `${preview.username}: ${truncate(sanitized)}`
+    : 'No messages yet';
+
   return (
     <div
-      style={{
-        ...styles.row,
-        ...(isUnread ? styles.rowUnread : {}),
-        ...(isActive ? styles.rowActive : {}),
-      }}
+      style={{ ...styles.row, ...(isActive ? styles.rowActive : {}) }}
       onClick={() => onOpen(group)}
     >
-      <div style={{ ...styles.groupAvatar, background: color }}>
-        {group.name[0].toUpperCase()}
-      </div>
-
+      <div style={styles.iconWrap}>{icon}</div>
       <div style={styles.rowContent}>
         <div style={styles.nameRow}>
-          <span style={{ ...styles.name, ...(isUnread ? { fontWeight: 700 } : {}) }}>
-            {group.name}
+          <span style={styles.name}>
+            {group.is_public ? 'Public Chat' : group.name}
           </span>
-          <div style={styles.timeLockRow}>
-            {group.is_public
-              ? <span style={styles.publicBadge}>PUBLIC</span>
-              : <span style={styles.lockIcon}>🔒</span>
-            }
-            <span style={styles.time}>{formatTime(preview?.created_at)}</span>
-          </div>
+          <span style={styles.time}>{formatTime(preview?.created_at)}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ ...styles.preview, ...(isUnread ? styles.previewUnread : {}) }}>
-            {preview
-              ? `${preview.username}: ${truncate(preview.text)}`
-              : 'No messages yet'}
-          </div>
-          {memberCount != null && (
-            <span style={styles.memberCount}>{memberCount} members</span>
-          )}
-        </div>
+        <div style={styles.preview}>{previewText}</div>
       </div>
-
-      {isUnread && <div style={styles.unreadDot} />}
     </div>
   );
 }
@@ -83,25 +108,7 @@ export default function ChatInbox({ session, onOpenGroup, onCreateGroup, onJoinG
 
   const [groupPreviews, setGroupPreviews] = useState({});
   const [memberCounts, setMemberCounts] = useState({});
-  const [showStaleGroups, setShowStaleGroups] = useState(false);
-  const [showNewMenu, setShowNewMenu] = useState(false);
-  const menuRef = useRef(null);
-
-  // Outside-click to close dropdown
-  useEffect(() => {
-    if (!showNewMenu) return;
-    const handler = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setShowNewMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    document.addEventListener('touchstart', handler);
-    return () => {
-      document.removeEventListener('mousedown', handler);
-      document.removeEventListener('touchstart', handler);
-    };
-  }, [showNewMenu]);
+  const [privateExpanded, setPrivateExpanded] = useState(false);
 
   // Batch-fetch latest message per group
   useEffect(() => {
@@ -141,159 +148,76 @@ export default function ChatInbox({ session, onOpenGroup, onCreateGroup, onJoinG
       });
   }, [allGroups]);
 
-  const isGroupUnread = useCallback((groupId) => {
-    const lastMsg = groupPreviews[groupId];
-    if (!lastMsg) return false;
-    const lastVisited = safeGet(`uptik_last_visited_${groupId}`);
-    if (!lastVisited) return true;
-    return new Date(lastMsg.created_at) > new Date(lastVisited);
-  }, [groupPreviews]);
-
-  const isGroupStale = useCallback((groupId) => {
-    const lastMsg = groupPreviews[groupId];
-    if (!lastMsg) return true;
-    return Date.now() - new Date(lastMsg.created_at).getTime() > WEEK_MS;
-  }, [groupPreviews]);
-
-  const sortGroups = useCallback((groups) => {
-    return [...groups].sort((a, b) => {
-      const aU = isGroupUnread(a.id), bU = isGroupUnread(b.id);
-      if (aU !== bU) return aU ? -1 : 1;
-      const aT = groupPreviews[a.id]?.created_at
-        ? new Date(groupPreviews[a.id].created_at).getTime() : 0;
-      const bT = groupPreviews[b.id]?.created_at
-        ? new Date(groupPreviews[b.id].created_at).getTime() : 0;
-      return bT - aT;
-    });
-  }, [isGroupUnread, groupPreviews]);
-
-  const sortedSector = sortGroups(sectorGroups);
-  const sortedCustom = sortGroups(customGroups);
-  const activeSector = sortedSector.filter(g => !isGroupStale(g.id));
-  const staleSector  = sortedSector.filter(g => isGroupStale(g.id));
-  const activeCustom = sortedCustom.filter(g => !isGroupStale(g.id));
-  const staleCustom  = sortedCustom.filter(g => isGroupStale(g.id));
-  const staleCount   = staleSector.length + staleCustom.length;
-
   const handleOpenGroup = (group) => {
     safeSet(`uptik_last_visited_${group.id}`, new Date().toISOString());
     onOpenGroup(group);
   };
 
-  const hasAnyGroups = sectorGroups.length > 0 || customGroups.length > 0;
-  const hasPrivateGroup = customGroups.length > 0;
+  const showNewGroupBtn = privateExpanded || customGroups.length === 0;
 
   return (
     <div style={styles.container}>
-      {/* Header */}
+      {/* Navy Header */}
       <div style={styles.header}>
         <span style={styles.headerTitle}>Chats</span>
-        <div ref={menuRef} style={{ position: 'relative' }}>
-          <button style={styles.newBtn} onClick={() => setShowNewMenu(v => !v)}>
-            + New
-          </button>
-          {showNewMenu && (
-            <div style={styles.newDropdown}>
-              <div style={styles.dropdownItem} onClick={() => { setShowNewMenu(false); onCreateGroup(); }}>
-                Create Private Group
-              </div>
-              <div style={{ ...styles.dropdownItem, borderBottom: 'none' }} onClick={() => { setShowNewMenu(false); onJoinGroup(); }}>
-                Join with Code
-              </div>
-            </div>
-          )}
-        </div>
       </div>
 
       <div style={styles.scrollArea}>
+        {/* Single card */}
+        <div style={styles.card}>
 
-        {/* Nudge card — shown when user has no private groups */}
-        {!hasPrivateGroup && (
-          <div style={styles.nudgeCard}>
-            <div style={styles.nudgeIcon}>🔒</div>
-            <div style={styles.nudgeTitle}>Start a private group</div>
-            <div style={styles.nudgeHint}>Invite friends and trade ideas privately</div>
-            <button style={styles.nudgeBtn} onClick={onCreateGroup}>Create Group</button>
+          {/* Public group rows */}
+          {sectorGroups.map(g => (
+            <GroupRow
+              key={g.id}
+              group={g}
+              preview={groupPreviews[g.id]}
+              isActive={activeGroup?.id === g.id}
+              onOpen={handleOpenGroup}
+              icon={<GlobeSVG size={20} color="#4a90d9" />}
+            />
+          ))}
+
+          {/* Private Chats divider */}
+          <div
+            style={styles.privateDivider}
+            onClick={() => setPrivateExpanded(v => !v)}
+          >
+            <LockSVG size={14} color="#64748b" />
+            <span style={styles.privateDividerText}>
+              Private Chats ({customGroups.length})
+            </span>
+            <span style={styles.chevron}>
+              <ChevronSVG open={privateExpanded} />
+            </span>
           </div>
-        )}
 
-        {/* ── GROUP CHATS ── */}
-        {hasAnyGroups && (
-          <>
-            <div style={styles.sectionLabel}>Group Chats</div>
-
-            {activeSector.map(g => (
+          {/* Private group rows */}
+          {privateExpanded && customGroups.map(g => {
+            const color = g.color || '#7B68EE';
+            return (
               <GroupRow
                 key={g.id}
                 group={g}
                 preview={groupPreviews[g.id]}
-                isUnread={isGroupUnread(g.id)}
                 isActive={activeGroup?.id === g.id}
                 onOpen={handleOpenGroup}
-                memberCount={memberCounts[g.id]}
+                icon={<LockSVG size={18} color={color} />}
               />
-            ))}
+            );
+          })}
 
-            {activeCustom.map(g => (
-              <GroupRow
-                key={g.id}
-                group={g}
-                preview={groupPreviews[g.id]}
-                isUnread={isGroupUnread(g.id)}
-                isActive={activeGroup?.id === g.id}
-                onOpen={handleOpenGroup}
-                memberCount={memberCounts[g.id]}
-              />
-            ))}
+          {/* + New Group button */}
+          {showNewGroupBtn && (
+            <div style={styles.newGroupRow}>
+              <button style={styles.newGroupBtn} onClick={onCreateGroup}>
+                + New Group
+              </button>
+            </div>
+          )}
+        </div>
 
-            {staleCount > 0 && (
-              <>
-                <div style={styles.toggleRow} onClick={() => setShowStaleGroups(v => !v)}>
-                  <span style={styles.toggleText}>
-                    {showStaleGroups ? '▲' : '▼'} {staleCount} more group{staleCount !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                {showStaleGroups && (
-                  <>
-                    {staleSector.map(g => (
-                      <GroupRow
-                        key={g.id}
-                        group={g}
-                        preview={groupPreviews[g.id]}
-                        isUnread={isGroupUnread(g.id)}
-                        isActive={activeGroup?.id === g.id}
-                        onOpen={handleOpenGroup}
-                        memberCount={memberCounts[g.id]}
-                      />
-                    ))}
-                    {staleCustom.map(g => (
-                      <GroupRow
-                        key={g.id}
-                        group={g}
-                        preview={groupPreviews[g.id]}
-                        isUnread={isGroupUnread(g.id)}
-                        isActive={activeGroup?.id === g.id}
-                        onOpen={handleOpenGroup}
-                        memberCount={memberCounts[g.id]}
-                      />
-                    ))}
-                  </>
-                )}
-              </>
-            )}
-          </>
-        )}
-
-        {/* Empty state */}
-        {!hasAnyGroups && (
-          <div style={styles.empty}>
-            <div style={styles.emptyIcon}>💬</div>
-            <div style={styles.emptyTitle}>No chats yet</div>
-            <div style={styles.emptyHint}>Create or join a group to get started</div>
-          </div>
-        )}
-
-        <div style={{ height: 16 }} />
+        <div style={{ height: 24 }} />
       </div>
     </div>
   );
