@@ -1,31 +1,23 @@
 // ============================================
-// UPTIKALERTS — HomeTab.jsx (Redesigned V1)
-// Slim header → thin pulse → watchlist → briefing → live chat w/ AI
+// UPTIKALERTS — HomeTab.jsx
+// Slim header → thin pulse → watchlist → briefing
 // ============================================
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useGroup } from '../../context/GroupContext';
-import CreateGroupModal from '../shared/CreateGroupModal';
-import InviteModal from '../shared/InviteModal';
-import StickerPicker from '../shared/StickerPicker';
 import { useTheme } from './alertsCasinoComponents';
 
 // ── Extracted modules ──
 import { safeGet } from '../../lib/safeStorage';
 import { getHomeStyles } from './homeStyles';
 import BriefCard from '../home/BriefCard';
-import ChatBubble from '../home/ChatBubble';
 
 // ── Hooks ──
 import { useMarketData } from '../../hooks/useMarketData';
 import { useWatchlist } from '../../hooks/useWatchlist';
 import { useSectorResearch } from '../../hooks/useSectorResearch';
-import { useHomeChat } from '../../hooks/useHomeChat';
 
-export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToChatRef, onOpenDMs, onStartDM, darkMode }) {
-  const { publicGroups, privateGroup, activeGroup, profile, customGroups } = useGroup();
-
+export default function HomeTab({ session, onTabChange, darkMode }) {
   const t = useTheme(darkMode);
 
   // ── Market data ──
@@ -51,50 +43,13 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
     sectorLabels, loadResearch, fetchResearchPrices,
   } = useSectorResearch(watchlist);
 
-  // ── Chat ──
-  const {
-    chatMessages,
-    homeGroup, setHomeGroup,
-    chatInput, setChatInput,
-    chatSending,
-    aiMode, setAiMode,
-    chatExpanded,
-    aiLoading, isListening,
-    chatInputRef, chatStripRef, chatSectionRef,
-    handleHomeSend, handleHomeSendSticker, toggleListening,
-  } = useHomeChat(session, profile, publicGroups, watchlist);
-
   // ── Briefing state ──
   const [briefing, setBriefing]                 = useState(null);
   const [briefingExpanded, setBriefingExpanded] = useState(false);
 
-  // ── Group creation modals ──
-  const [showCreateGroup, setShowCreateGroup]   = useState(false);
-  const [showInviteGroup, setShowInviteGroup]   = useState(null);
-
   // ── UI refs ──
-  const contentRef    = useRef(null);
   const outerWrapRef  = useRef(null);
-  const chatBarRef    = useRef(null);
   const searchRef     = useRef(null);
-
-  // Scroll content to bottom when input is tapped (backup for iOS timing)
-  const handleChatInputFocus = useCallback(() => {
-    setTimeout(() => {
-      if (contentRef.current) {
-        contentRef.current.scrollTop = contentRef.current.scrollHeight;
-      }
-    }, 300);
-  }, []);
-
-  // Expose scrollToChat for parent (when Chat bottom nav is tapped)
-  useEffect(() => {
-    if (scrollToChatRef) {
-      scrollToChatRef.current = () => {
-        chatSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
-      };
-    }
-  }, [scrollToChatRef]);
 
   // ═══════════════════════════════════════
   // INITIAL LOAD
@@ -166,8 +121,6 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
   // During market hours: only show market data (no futures)
   // Outside market hours: merge in futures/fallback data
   const activePulse = marketStatus === 'open' ? marketPulse : { ...marketPulse, ...futuresData };
-
-  const uptikPublic = publicGroups.find(g => g.name === 'UpTik Public');
 
   const briefingArticles = briefing?.tags?.length > 0
     ? briefing.tags
@@ -247,7 +200,7 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
       </div>
 
       {/* ═══ SCROLLABLE CONTENT ═══ */}
-      <div ref={contentRef} style={S.content}>
+      <div style={S.content}>
 
         {/* ── STOCKS (Watchlist first for engagement) ── */}
         <div style={S.stocksSection}>
@@ -488,140 +441,7 @@ export default function HomeTab({ session, onGroupSelect, onTabChange, scrollToC
           )}
         </div>
 
-        <div style={S.sectionDivider} />
-
-        {/* ── COMMUNITY CHAT ── */}
-        <div ref={chatSectionRef} style={S.chatSection}>
-          <div style={S.csHeader}>
-            <div style={S.csTitle}>
-              Community Chat
-              <div style={S.csLive}>
-                <div style={S.csLiveDot} />
-                {uptikPublic ? 'live' : ''}
-              </div>
-            </div>
-            <button
-              style={S.privateChatBtn}
-              onClick={() => onOpenDMs?.()}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-              </svg>
-              Private Chat
-            </button>
-          </div>
-
-          {/* Chat messages — UpTik Public feed */}
-          <div style={S.chatCard}>
-            <div ref={chatStripRef} style={{ ...S.ccMsgs, ...(chatExpanded ? { maxHeight: 400, overflow: 'hidden auto' } : {}) }}>
-              {chatMessages.length > 0 ? (
-                // No FadingMessage — auto-disappearing messages fight stickiness
-                // and any refetch path resurrects them with fresh timers, looking broken.
-                chatMessages.slice(-2).map((msg, i) => (
-                  <ChatBubble key={msg.id || i} msg={msg} myId={session?.user?.id} S={S} t={t} onTapUsername={(userId, username) => {
-                    if (onStartDM) { onStartDM(userId, username); onTabChange?.('chat'); }
-                  }} />
-                ))
-              ) : (
-                <div style={{ padding: 16, textAlign: 'center', color: t.text3, fontSize: 13 }}>
-                  No messages yet — type below to start chatting!
-                </div>
-              )}
-              {aiLoading && (
-                <div style={{ padding: '8px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <div style={{ ...S.ccAv, ...S.ccAiBtnActive, width: 28, height: 28 }}>AI</div>
-                  <span style={{ fontSize: 13, color: '#8B5CF6', fontStyle: 'italic' }}>Thinking...</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ═══ SUGGESTION CHIPS — context-aware cold-start prompts ═══ */}
-        {aiMode && !chatInput && (() => {
-          const wl = (watchlist || []).slice(0, 2).map(w => (w.symbol || w.ticker || '').toUpperCase()).filter(Boolean);
-          const chips = [];
-          if (wl[0]) chips.push(`Summarize ${wl[0]}`);
-          chips.push('Top movers today');
-          if (wl[1]) chips.push(`${wl[1]} earnings`);
-          else chips.push('Earnings this week');
-          return (
-            <div style={{
-              display: 'flex', gap: 6, overflowX: 'auto', padding: '6px 12px 0',
-              scrollbarWidth: 'none', msOverflowStyle: 'none',
-            }}>
-              {chips.slice(0, 3).map((c, i) => (
-                <div
-                  key={i}
-                  onClick={() => { setChatInput(c); chatInputRef.current?.focus(); }}
-                  style={{
-                    flexShrink: 0,
-                    padding: '5px 12px',
-                    borderRadius: 14,
-                    background: t.card,
-                    border: `1px solid ${t.border}`,
-                    fontSize: 11,
-                    fontWeight: 500,
-                    color: t.text1,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}
-                >{c}</div>
-              ))}
-            </div>
-          );
-        })()}
-
       </div>
-
-      {/* ═══ CHAT INPUT — pinned outside scroll area ═══ */}
-      <div ref={chatBarRef} style={S.fixedChatBar}>
-        <div
-          style={{ ...S.ccAiBtn, ...(aiMode ? S.ccAiBtnActive : S.ccAiBtnOff) }}
-          onClick={() => setAiMode(prev => !prev)}
-        >AI</div>
-        <div style={{ ...S.ccInputWrap, ...(aiMode ? { border: '1.5px solid #8B5CF6' } : {}) }}>
-          <input
-            ref={chatInputRef}
-            style={S.ccInput}
-            placeholder={aiMode ? 'Ask AI about any stock...' : 'Chat with the community...'}
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onFocus={handleChatInputFocus}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleHomeSend(); } }}
-          />
-          <div
-            style={{ ...S.ccMic, ...(isListening ? S.ccMicActive : {}) }}
-            onClick={() => toggleListening(showToast)}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isListening ? '#fff' : t.text3} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="9" y="1" width="6" height="11" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
-            </svg>
-          </div>
-        </div>
-        <StickerPicker onSend={handleHomeSendSticker} size="md" />
-        <button
-          style={{ ...S.ccSend, opacity: chatInput.trim() ? 1 : 0.4, ...(aiMode ? { background: '#8B5CF6' } : {}) }}
-          onClick={handleHomeSend}
-          disabled={!chatInput.trim() || chatSending}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        </button>
-      </div>
-
-      {/* ── Modals ── */}
-      <CreateGroupModal
-        open={showCreateGroup}
-        onClose={() => setShowCreateGroup(false)}
-        onCreated={(group) => {
-          setShowCreateGroup(false);
-          setShowInviteGroup(group);
-        }}
-      />
-      <InviteModal
-        group={showInviteGroup}
-        onClose={() => setShowInviteGroup(null)}
-      />
     </div>
   );
 }

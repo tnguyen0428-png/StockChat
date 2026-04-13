@@ -202,9 +202,6 @@ export default function DashboardPage({ session }) {
     navigate('/login');
   };
 
-  // Ref so HomeTab can expose its scrollToChat function
-  const scrollToChatRef = useRef(null);
-
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
     // When tapping Chat tab while already on Chat, cycle: dm-chat → dms → chat
@@ -217,9 +214,6 @@ export default function DashboardPage({ session }) {
     }
   }, []);
 
-  const handleGroupSelect = (group) => {
-    enterGroup(group);
-  };
 
   function broadcastColor(type) {
     const colors = { BULLISH: '#1AAD5E', BEARISH: '#E05252', WATCHLIST: '#D4A017', INFO: '#4A90D9' };
@@ -310,11 +304,7 @@ export default function DashboardPage({ session }) {
         <div style={{ display: activeTab === 'home' ? 'flex' : 'none', flex: 1, flexDirection: 'column' }}>
           <HomeTab
             session={session}
-            onGroupSelect={handleGroupSelect}
             onTabChange={handleTabChange}
-            scrollToChatRef={scrollToChatRef}
-            onOpenDMs={() => { setActiveTab('chat'); setChatMode('dms'); }}
-            onStartDM={handleStartDM}
             darkMode={darkMode}
           />
         </div>
