@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { isMarketOpen } from '../../utils/marketUtils';
 
 export default function SellModal({ session, trade, onClose, onComplete }) {
   const [selling, setSelling] = useState(false);
@@ -20,6 +21,10 @@ export default function SellModal({ session, trade, onClose, onComplete }) {
 
   const handleSell = async () => {
     if (selling) return;
+    if (!isMarketOpen()) {
+      setError('Market is closed — trades execute during market hours (9:30am-4pm EST)');
+      return;
+    }
     setSelling(true);
     setError('');
 

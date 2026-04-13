@@ -30,7 +30,7 @@ export default function PortfolioTab({ session, darkMode }) {
     selectedTicker, showPresets, customAmount, setCustomAmount,
     showCustom, setShowCustom, buyError, buying,
     handleSelectTicker, executeBuy, clearSelection, onSellComplete,
-    totalPositionsValue, cashBalance, totalValue, totalReturn, isPositive,
+    totalPositionsValue, cashBalance, totalValue, totalReturn, isPositive, marketOpen,
   } = portfolio;
 
   const {
@@ -161,6 +161,13 @@ export default function PortfolioTab({ session, darkMode }) {
               </div>
             </div>
             <div style={{ ...s.barPortBtn, ...(showPortfolio ? s.barPortBtnOpen : {}) }} onClick={() => setShowPortfolio(p => !p)}>Portfolio {showPortfolio ? '▲' : '▼'}</div>
+          </div>
+        )}
+
+        {/* MARKET CLOSED BANNER */}
+        {!marketOpen && (
+          <div style={{ background: 'rgba(212,160,23,0.12)', border: '1px solid rgba(212,160,23,0.25)', borderRadius: 8, padding: '8px 12px', marginBottom: 8, fontSize: 11, color: '#D4A017', textAlign: 'center' }}>
+            Market closed — trades execute during market hours (9:30am-4pm EST)
           </div>
         )}
 

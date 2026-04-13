@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { FMP_KEY, STARTING_CASH } from '../lib/constants';
+import { isMarketOpen } from '../utils/marketUtils';
 
 export function usePortfolio(session) {
   const [portfolio, setPortfolio]           = useState(null);
@@ -178,6 +179,10 @@ export function usePortfolio(session) {
 
   // ── Buy — accepts optional afterBuy callback for post-buy refreshes ──
   const executeBuy = async (dollarAmount, afterBuy) => {
+    if (!isMarketOpen()) {
+      setBuyError('Market is closed — trades execute during market hours (9:30am-4pm EST)');
+      return;
+    }
     const currentCash = Number(portfolio?.cash_balance || 0);
     if (!selectedTicker?.price || dollarAmount <= 0 || buying) return;
     if (dollarAmount > currentCash) {
@@ -291,6 +296,7 @@ export function usePortfolio(session) {
   const totalValue  = cashBalance + totalPositionsValue;
   const totalReturn = ((totalValue - STARTING_CASH) / STARTING_CASH) * 100;
   const isPositive  = totalReturn >= 0;
+  const marketOpen  = isMarketOpen();
 
   return {
     portfolio, trades, prices, lastUpdated, loadingData,
@@ -305,6 +311,6 @@ export function usePortfolio(session) {
     buyError, buying,
     loadPortfolio, fetchPrices, loadClosedTrades,
     handleSelectTicker, executeBuy, clearSelection, onSellComplete,
-    totalPositionsValue, cashBalance, totalValue, totalReturn, isPositive,
+    totalPositionsValue, cashBalance, totalValue, totalReturn, isPositive, marketOpen,
   };
 }
