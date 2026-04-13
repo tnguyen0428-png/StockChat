@@ -1,6 +1,6 @@
 // ============================================
 // UPTIKALERTS — HomeTab.jsx
-// Slim header → thin pulse → watchlist → briefing
+// Slim header → ticker strip → status card → hot movers → watchlist → briefing
 // ============================================
 
 import { useState, useEffect, useRef } from 'react';
@@ -16,22 +16,40 @@ import BriefCard from '../home/BriefCard';
 import { useMarketData } from '../../hooks/useMarketData';
 import { useWatchlist } from '../../hooks/useWatchlist';
 import { useSectorResearch } from '../../hooks/useSectorResearch';
+import { useLeaderboard } from '../../hooks/useLeaderboard';
+import { usePortfolio } from '../../hooks/usePortfolio';
+import { useGroup } from '../../context/GroupContext';
+
+const SIGNAL_LABELS = {
+  gap_up: 'Gap Up',
+  vol_surge: 'Vol Surge',
+  ma_cross: 'MA Cross',
+  high_52w: '52W High',
+  flow_signal: 'Flow',
+};
+
+const QUICK_ADD = ['NVDA', 'AAPL', 'TSLA', 'AMD', 'SPY', 'META'];
 
 export default function HomeTab({ session, onTabChange, darkMode }) {
   const t = useTheme(darkMode);
+  const { profile } = useGroup();
 
   // ── Market data ──
   const { marketPulse, marketIndicators, futuresData, futuresLabels, marketStatus, loadMarketIndicators } = useMarketData();
 
+  // ── Portfolio & Leaderboard ──
+  const { trades, prices, totalReturn, loadingData: portfolioLoading } = usePortfolio(session);
+  const { myRank, aheadUser, loadLeaderboard } = useLeaderboard(session, trades, prices);
+
   // ── Watchlist ──
   const {
-    watchlist, setWatchlist,
+    watchlist,
     showSearch, setShowSearch,
     searchQuery, setSearchQuery,
     searchResults, setSearchResults,
-    searchLoading, addingTicker, toast,
+    searchLoading, toast,
     loadWatchlist, addToWatchlist, removeFromWatchlist,
-    handleSearchChange, showToast,
+    handleSearchChange,
   } = useWatchlist(session);
 
   // ── Sector research ──
@@ -47,9 +65,12 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   const [briefing, setBriefing]                 = useState(null);
   const [briefingExpanded, setBriefingExpanded] = useState(false);
 
+  // ── Hot movers ──
+  const [hotMovers, setHotMovers] = useState([]);
+
   // ── UI refs ──
-  const outerWrapRef  = useRef(null);
-  const searchRef     = useRef(null);
+  const outerWrapRef = useRef(null);
+  const searchRef    = useRef(null);
 
   // ═══════════════════════════════════════
   // INITIAL LOAD
@@ -60,6 +81,8 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
       await Promise.allSettled([
         loadBriefing(),
         loadMarketIndicators(),
+        loadLeaderboard(),
+        loadHotMovers(),
         loadWatchlist().then(() => {
           if (cancelled) return;
           const saved = safeGet('uptik_last_sector');
@@ -70,6 +93,33 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
     init();
     return () => { cancelled = true; };
   }, []);
+
+  // ═══════════════════════════════════════
+  // HOT MOVERS
+  // ═══════════════════════════════════════
+  const loadHotMovers = async () => {
+    try {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const { data: alerts } = await supabase
+        .from('breakout_alerts')
+        .select('ticker, signal_type, change_pct, change')
+        .gte('created_at', todayStart.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (alerts && alerts.length > 0) {
+        const seen = new Map();
+        alerts.forEach(a => { if (!seen.has(a.ticker)) seen.set(a.ticker, a); });
+        setHotMovers([...seen.values()].slice(0, 5));
+      } else {
+        // Fallback: aggregate from watchlist tickers already loaded (no extra query)
+        // Will be populated on next render once watchlist loads
+      }
+    } catch (err) {
+      console.error('[HomeTab] loadHotMovers failed:', err.message);
+    }
+  };
 
   // ═══════════════════════════════════════
   // BRIEFING
@@ -91,9 +141,12 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   // ═══════════════════════════════════════
   // DERIVED DATA
   // ═══════════════════════════════════════
+  const hasJoinedChallenge = trades.length > 0;
+  const isPositive = (totalReturn || 0) >= 0;
+  const username = profile?.username || 'Trader';
+
   const DEFAULT_ITEMS = [{ label: 'S&P 500', key: 'SPY' }, { label: 'Nasdaq', key: 'QQQ' }, { label: 'Dow', key: 'DIA' }];
 
-  // Keywords that identify futures/commodities indicators — hide these during market hours
   const FUTURES_KEYWORDS = ['futures', 'fut', 'gold', 'silver', 'oil', 'vix', 'gc=f', 'cl=f', 'si=f', 'es=f', 'nq=f', 'ym=f'];
   const isFuturesItem = (item) => {
     const label = (item.label || '').toLowerCase();
@@ -103,7 +156,6 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
 
   const pulseItems = (() => {
     if (marketStatus === 'open') {
-      // Filter out futures/commodities from DB indicators during market hours
       if (marketIndicators.length > 0) {
         const stockOnly = marketIndicators
           .filter(m => !isFuturesItem({ label: m.label, key: m.ticker }))
@@ -112,14 +164,11 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
       }
       return DEFAULT_ITEMS;
     }
-    // Outside market hours: show everything (futures + commodities welcome)
     if (futuresLabels.length > 0) return futuresLabels;
     if (marketIndicators.length > 0) return marketIndicators.map(m => ({ label: m.label, key: m.ticker }));
     return DEFAULT_ITEMS;
   })();
 
-  // During market hours: only show market data (no futures)
-  // Outside market hours: merge in futures/fallback data
   const activePulse = marketStatus === 'open' ? marketPulse : { ...marketPulse, ...futuresData };
 
   const briefingArticles = briefing?.tags?.length > 0
@@ -129,7 +178,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
           const clean = line.replace(/^•\s*/, '');
           const tickerMatch = clean.match(/\(([^)]+)\)$/);
           return {
-            tickers: tickerMatch ? tickerMatch[1].split(',').map(t => t.trim()) : [],
+            tickers: tickerMatch ? tickerMatch[1].split(',').map(tk => tk.trim()) : [],
             title: tickerMatch ? clean.replace(/\s*\([^)]+\)$/, '') : clean,
             url: null,
           };
@@ -138,11 +187,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
 
   const hasWatchlist = watchlist.length > 0;
 
-  // ═══════════════════════════════════════
-  // RENDER
-  // ═══════════════════════════════════════
-
-  // ── Styles (extracted to homeStyles.js) ──
+  // ── Styles ──
   const S = getHomeStyles(t);
 
   return (
@@ -165,7 +210,6 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                 const d = activePulse[item.key];
                 const chg = d?.change;
                 const price = d?.price;
-                const pts = d?.pointChange;
                 const isFut = d?.isFutures || isFuturesItem(item);
                 const arrow = chg > 0 ? '▲' : chg < 0 ? '▼' : '';
                 const color = chg > 0 ? '#5eed8a' : chg < 0 ? '#ff6b6b' : '#8a9bb0';
@@ -173,7 +217,6 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                   <span key={i} style={S.pulseItem}>
                     <span style={S.pulseName}>{item.label}</span>
                     {isFut ? (
-                      /* Futures: show points + percentage */
                       <span style={{ ...S.pulseVal, color, fontSize: 14, fontWeight: 600 }}>
                         {d ? (() => {
                           const points = Math.abs((chg / 100) * price);
@@ -181,7 +224,6 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                         })() : '--'}
                       </span>
                     ) : (
-                      /* Stocks: show full price + percentage */
                       <>
                         <span style={{ ...S.pulsePrice, color: '#dbe6f0' }}>
                           {price ? price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}
@@ -202,7 +244,146 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
       {/* ═══ SCROLLABLE CONTENT ═══ */}
       <div style={S.content}>
 
-        {/* ── STOCKS (Watchlist first for engagement) ── */}
+        {/* ═══ PERSONAL STATUS CARD ═══ */}
+        {!portfolioLoading && (
+          hasJoinedChallenge ? (
+            /* ── Returning user ── */
+            <div
+              style={{
+                margin: '12px 14px 4px',
+                background: t.card,
+                border: `1px solid ${t.border}`,
+                borderRadius: 14,
+                padding: '14px 14px 12px',
+                cursor: 'pointer',
+              }}
+              onClick={() => onTabChange?.('challenge')}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: 22,
+                  background: myRank === 1 ? 'rgba(255,215,0,0.15)' : 'rgba(26,173,94,0.12)',
+                  border: `2px solid ${myRank === 1 ? '#FFD700' : t.green}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: myRank === 1 ? '#FFD700' : t.green }}>
+                    {myRank ? `#${myRank}` : '—'}
+                  </span>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: t.text3, marginBottom: 1 }}>Welcome back,</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: t.text1 }}>{username}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: isPositive ? t.green : '#ff6b6b' }}>
+                    {isPositive ? '+' : ''}{(totalReturn || 0).toFixed(2)}%
+                  </div>
+                  <div style={{ fontSize: 10, color: t.text3 }}>Total return</div>
+                </div>
+              </div>
+
+              {aheadUser && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 11, color: t.text3 }}>
+                      Rival: <span style={{ color: t.text2, fontWeight: 600 }}>@{aheadUser.username}</span>
+                    </span>
+                    <span style={{ fontSize: 11, color: '#ff9040', fontWeight: 600 }}>-{aheadUser.gap}%</span>
+                  </div>
+                  <div style={{ height: 4, borderRadius: 2, background: t.border, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', borderRadius: 2,
+                      width: `${aheadUser.progress}%`,
+                      background: `linear-gradient(90deg, ${t.green}, #5eed8a)`,
+                      transition: 'width 0.6s ease',
+                    }} />
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ── New user ── */
+            <div
+              style={{
+                margin: '12px 14px 4px',
+                background: 'linear-gradient(135deg, #0d2a4a 0%, #1a3a5e 60%, #0d3d2a 100%)',
+                borderRadius: 14,
+                padding: '18px 16px 16px',
+                cursor: 'pointer',
+                overflow: 'hidden',
+              }}
+              onClick={() => onTabChange?.('challenge')}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <span style={{ fontSize: 32, lineHeight: 1, flexShrink: 0 }}>🏆</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', marginBottom: 3 }}>Learn to Invest</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginBottom: 10 }}>
+                    Practice with $50K virtual cash — zero risk
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>📊 Curated picks from our analysts</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>📈 Live prices &amp; real-time signals</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>🏅 Compete on the leaderboard</div>
+                  </div>
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center',
+                    background: t.green, color: '#fff',
+                    padding: '8px 16px', borderRadius: 20,
+                    fontSize: 13, fontWeight: 700,
+                  }}>
+                    Start Investing →
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        )}
+
+        {/* ═══ HOT TODAY ═══ */}
+        {hotMovers.length > 0 && (
+          <div style={{ padding: '12px 14px 4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: t.text1 }}>Hot Today</span>
+              <span
+                style={{ fontSize: 12, fontWeight: 600, color: t.green, cursor: 'pointer' }}
+                onClick={() => onTabChange?.('alerts')}
+              >See all</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
+              {hotMovers.map((mover, i) => {
+                const chg = Number(mover.change_pct ?? mover.change ?? 0);
+                const up = chg >= 0;
+                const label = SIGNAL_LABELS[mover.signal_type] || '';
+                return (
+                  <div key={i} style={{
+                    flexShrink: 0, width: 88, borderRadius: 10,
+                    background: t.card, border: `1px solid ${t.border}`,
+                    overflow: 'hidden',
+                  }}>
+                    <div style={{ height: 3, background: up ? t.green : '#ff6b6b' }} />
+                    <div style={{ padding: '8px 8px 8px' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginBottom: 2 }}>{mover.ticker}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: up ? t.green : '#ff6b6b', marginBottom: 4 }}>
+                        {up ? '+' : ''}{chg.toFixed(2)}%
+                      </div>
+                      {label && (
+                        <div style={{
+                          fontSize: 9, fontWeight: 600, color: t.text3,
+                          background: t.surface, borderRadius: 4,
+                          padding: '1px 4px', display: 'inline-block',
+                          textTransform: 'uppercase', letterSpacing: 0.3,
+                        }}>{label}</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── STOCKS ── */}
         <div style={S.stocksSection}>
           <div style={S.stocksHeader}>
             <span style={S.stocksTitle}>Stocks</span>
@@ -290,12 +471,47 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                   <div style={{ padding: 16, textAlign: 'center', color: t.text3, fontSize: 13 }}>Loading...</div>
                 ) : researchStocks.length === 0 ? (
                   researchSector === '__mylist__' ? (
-                    <div style={{ padding: '16px', textAlign: 'center', color: t.text3, fontSize: 13 }}>
-                      No tickers in your list yet
+                    /* ── Watchlist empty state ── */
+                    <div style={{ padding: '16px 14px' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: t.text1, marginBottom: 4 }}>Build your watchlist</div>
+                      <div style={{ fontSize: 12, color: t.text3, marginBottom: 10 }}>
+                        Track stocks you care about and follow live prices.
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {QUICK_ADD.map(ticker => (
+                          <div
+                            key={ticker}
+                            style={{
+                              padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
+                              border: `1px solid ${t.green}`, color: t.green,
+                              fontSize: 12, fontWeight: 600,
+                              background: 'rgba(26,173,94,0.06)',
+                            }}
+                            onClick={() => addToWatchlist(ticker)}
+                          >
+                            + {ticker}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ) : (
-                    <div style={{ padding: 16, textAlign: 'center', color: t.text3, fontSize: 13 }}>
-                      No rankings available for {researchSector} yet
+                    /* ── Sectors empty state ── */
+                    <div style={{ padding: '16px 14px' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: t.text1, marginBottom: 4 }}>
+                        We do the research
+                      </div>
+                      <div style={{ fontSize: 12, color: t.text3, lineHeight: 1.5, marginBottom: 10 }}>
+                        Our analysts curate the top picks in {researchSector} — ranked by signal strength and conviction.
+                      </div>
+                      <div
+                        style={{
+                          display: 'inline-flex', alignItems: 'center',
+                          fontSize: 12, fontWeight: 600, color: t.green, cursor: 'pointer',
+                        }}
+                        onClick={() => onTabChange?.('alerts')}
+                      >
+                        Explore {researchSector} →
+                      </div>
                     </div>
                   )
                 ) : (
@@ -411,7 +627,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
 
         <div style={S.sectionDivider} />
 
-        {/* ── TODAY'S MARKET (briefing, collapsed by default) ── */}
+        {/* ── TODAY'S MARKET (briefing) ── */}
         <div style={S.briefSection}>
           <div style={S.briefHeader}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
