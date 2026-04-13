@@ -308,11 +308,11 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
             /* ── Returning user ── */
             <div
               style={{
-                margin: '12px 14px 4px',
+                margin: '10px 14px 4px',
                 background: t.card,
                 border: `1px solid ${t.border}`,
                 borderRadius: 14,
-                padding: '14px 14px 12px',
+                padding: '12px 14px 10px',
                 cursor: 'pointer',
               }}
               onClick={() => onTabChange?.('challenge')}
@@ -363,23 +363,23 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
             /* ── New user ── */
             <div
               style={{
-                margin: '12px 14px 4px',
+                margin: '10px 14px 4px',
                 background: 'linear-gradient(135deg, #0d2a4a 0%, #1a3a5e 60%, #0d3d2a 100%)',
                 borderRadius: 14,
-                padding: '18px 16px 16px',
+                padding: '14px 14px 14px',
                 cursor: 'pointer',
                 overflow: 'hidden',
               }}
               onClick={() => onTabChange?.('challenge')}
             >
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                <span style={{ fontSize: 32, lineHeight: 1, flexShrink: 0 }}>🏆</span>
+                <span style={{ fontSize: 26, lineHeight: 1, flexShrink: 0 }}>🏆</span>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', marginBottom: 3 }}>Learn to Invest</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 3 }}>Learn to Invest</div>
                   <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginBottom: 10 }}>
                     Practice with $50K virtual cash — zero risk
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
                     <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>📊 Curated picks from our analysts</div>
                     <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>📈 Live prices &amp; real-time signals</div>
                     <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>🏅 Compete on the leaderboard</div>
@@ -400,9 +400,9 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
 
         {/* ═══ HOT TODAY ═══ */}
         {hotMovers.length > 0 && (
-          <div style={{ padding: '12px 14px 4px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: t.text1 }}>Hot Today 🔥</span>
+          <div style={{ padding: '6px 14px 4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: t.text1 }}>Hot Today 🔥</span>
               <span
                 style={{ fontSize: 12, fontWeight: 600, color: t.green, cursor: 'pointer' }}
                 onClick={() => onTabChange?.('alerts')}
@@ -417,7 +417,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                 const priceData = researchPrices[mover.ticker];
                 return (
                   <div key={i} style={{
-                    flexShrink: 0, width: 105, borderRadius: 10,
+                    flexShrink: 0, width: 100, borderRadius: 10,
                     background: t.card, border: `1px solid ${t.border}`,
                     overflow: 'hidden',
                   }}>
@@ -457,7 +457,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
         {/* ── STOCKS ── */}
         <div style={S.stocksSection}>
           <div style={S.stocksHeader}>
-            <span style={S.stocksTitle}>Stocks</span>
+            <span style={S.stocksTitle}>Stocks &amp; Research</span>
           </div>
           <div style={S.stocksBtns}>
             <div
@@ -702,7 +702,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
         <div style={S.briefSection}>
           <div style={S.briefHeader}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={S.briefTitle}>Today's Market</span>
+              <span style={S.briefTitle}>Daily Briefing</span>
               {briefing && (
                 <span style={S.briefTime}>
                   {new Date(briefing.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} EST
@@ -726,6 +726,38 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
           ) : (
             <div style={S.briefEmpty}>No briefing posted yet today</div>
           )}
+        </div>
+
+        {/* ═══ DISCOVER ═══ */}
+        <div style={{ padding: '8px 14px 14px' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: t.text1, marginBottom: 8 }}>
+            {hasJoinedChallenge ? 'Quick access' : "What's inside"}
+          </div>
+          <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden' }}>
+            {[
+              { icon: '💬', title: 'Group Chat', subtitle: 'Discuss stocks with traders', tab: 'chat' },
+              { icon: '✦', title: 'AI Analyst', subtitle: 'Get AI-powered insights', tab: 'chat' },
+              { icon: '⚡', title: 'Smart Alerts', subtitle: 'Breakout & signal alerts', tab: 'alerts' },
+            ].map((item, i, arr) => (
+              <div
+                key={i}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 14px',
+                  borderBottom: i < arr.length - 1 ? `1px solid ${t.border}` : 'none',
+                  cursor: 'pointer',
+                }}
+                onClick={() => onTabChange?.(item.tab)}
+              >
+                <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{item.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: t.text1 }}>{item.title}</div>
+                  <div style={{ fontSize: 11, color: t.text3 }}>{item.subtitle}</div>
+                </div>
+                <span style={{ fontSize: 18, color: t.text3 }}>›</span>
+              </div>
+            ))}
+          </div>
         </div>
 
       </div>

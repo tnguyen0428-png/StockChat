@@ -18,7 +18,7 @@ export function getHomeStyles(t) {
 
     // ── Market Ticker Bar ──
     combinedBar: { background: '#1a3a5e', flexShrink: 0 },
-    barContent: { padding: '8px 0', minHeight: 34 },
+    barContent: { padding: '6px 0', minHeight: 34 },
     barScroll: { overflow: 'hidden', display: 'flex', alignItems: 'center' },
     pulseItem: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 14px' },
     pulseName: { fontSize: 13, fontWeight: 600, color: '#b8cde0', letterSpacing: 0.3 },
@@ -30,9 +30,9 @@ export function getHomeStyles(t) {
     sectionDivider: { height: 1, background: t.border, margin: '0 14px' },
 
     // ── Briefing ──
-    briefSection: { padding: '12px 14px 8px' },
+    briefSection: { padding: '8px 14px 6px' },
     briefHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    briefTitle: { fontSize: 15, fontWeight: 700, color: t.text1, letterSpacing: '-0.01em' },
+    briefTitle: { fontSize: 14, fontWeight: 700, color: t.text1, letterSpacing: '-0.01em' },
     briefTime: { fontSize: 11, color: t.text3 },
     briefToggle: { fontSize: 12, color: t.green, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' },
     briefCard: {
@@ -45,9 +45,9 @@ export function getHomeStyles(t) {
     briefEmpty: { background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, padding: 16, textAlign: 'center', fontSize: 13, color: t.text3 },
 
     // ── Stocks section (inline) ──
-    stocksSection: { padding: '0 16px 8px' },
+    stocksSection: { padding: '0 14px 6px' },
     stocksHeader: { marginBottom: 6 },
-    stocksTitle: { fontSize: 15, fontWeight: 700, color: t.text1, fontFamily: "var(--font-heading)" },
+    stocksTitle: { fontSize: 14, fontWeight: 700, color: t.text1, fontFamily: "var(--font-heading)" },
     stocksBtns: { display: 'flex', gap: 8 },
     stocksBtn: {
       padding: '7px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
