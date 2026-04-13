@@ -154,30 +154,23 @@ const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiv
     );
   };
 
-  const bodyStyle = {
-    ...styles.msgBody,
-    ...(isAdmin ? styles.adminBody : {}),
-    ...(isAI    ? styles.aiBody    : {}),
-  };
-
-  // Sticker messages — render emoji inline (with avatar)
+  // Sticker messages — render emoji inline (no avatar)
   if (isSticker(msg.text)) {
     const s = STICKERS.find(st => st.id === getStickerId(msg.text));
     const stickerColor = msg.user_color || '#2a7d4b';
-    const stickerInitials = (msg.username || '?').slice(0, 2).toUpperCase();
     return (
-      <div style={styles.msg}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-          {!isGrouped ? (
-            <div style={{ ...styles.avatar, background: `${stickerColor}22`, color: stickerColor, flexShrink: 0 }}>
-              {stickerInitials}
-            </div>
-          ) : <div style={{ width: 28, flexShrink: 0 }} />}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {!isGrouped && <span style={{ fontSize: 10, fontWeight: 600, color: stickerColor, marginBottom: 2 }}>{msg.username}</span>}
-            <span style={{ fontSize: 32, lineHeight: 1 }} title={s?.label}>{s?.emoji || '?'}</span>
+      <div style={{
+        background: 'var(--card)', border: '1px solid var(--border)',
+        borderRadius: 10, padding: '8px 10px',
+        marginTop: isGrouped ? 2 : 6,
+      }}>
+        {!isGrouped && (
+          <div style={styles.msgTop}>
+            <span style={{ ...styles.msgName, color: stickerColor }}>{msg.username}</span>
+            <span style={{ ...styles.msgTime, marginLeft: 'auto' }}>{formatTime(msg.created_at)}</span>
           </div>
-        </div>
+        )}
+        <span style={{ fontSize: 32, lineHeight: 1 }} title={s?.label}>{s?.emoji || '?'}</span>
       </div>
     );
   }
@@ -191,68 +184,56 @@ const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiv
     : msg.text;
 
   return (
-    <div style={{ ...styles.msg, ...(isGrouped ? { paddingTop: 0 } : {}) }}>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-        {/* Avatar — hidden spacer when grouped */}
-        {!isGrouped ? (
-          <div style={{
-            ...styles.avatar,
-            background: isAI ? 'rgba(139,92,246,0.15)' : `${nameColor}22`,
-            color: nameColor,
-            flexShrink: 0,
-          }}>
-            {isAI ? '✦' : initials}
-          </div>
-        ) : <div style={{ width: 28, flexShrink: 0 }} />}
-        <div style={{ ...bodyStyle, flex: 1, minWidth: 0 }}>
-          {!isGrouped && (
-            <div style={styles.msgTop}>
-              <span style={{ ...styles.msgName, color: nameColor }}>
-                {msg.username}
-              </span>
-              {isAdmin && <span style={styles.adminBadge}>Admin</span>}
-              {isAI    && <span style={styles.aiBadge}>AI</span>}
-              <span style={styles.msgTime}>{formatTime(msg.created_at)}</span>
-            </div>
-          )}
-          <div style={styles.msgText}>
-            {isAI ? renderAIBody(msg.text) : parseText(displayText)}
-            {isLong && (
-              <span
-                onClick={() => setExpanded(e => !e)}
-                style={{ color: 'var(--green)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginLeft: 4 }}
-              >
-                {expanded ? 'show less' : 'show more'}
-              </span>
-            )}
-          </div>
-        {/* Ticker mention cards — show inline card for each $TICKER */}
-        {!isAI && uniqueTickers.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-            {uniqueTickers.map(t => (
-              <TickerMentionCard
-                key={t}
-                ticker={t}
-                groupId={groupId || msg.group_id}
-                userId={currentUserId}
-              />
-            ))}
-          </div>
-        )}
-        {isAI && onFeedback && (
-          <div style={styles.feedbackRow}>
-            {feedbackGiven ? (
-              <span style={styles.feedbackThanks}>{feedbackGiven === 'up' ? '👍' : '👎'} Thanks!</span>
-            ) : (
-              <>
-                <button onClick={() => onFeedback(msg.id, 'up')} style={styles.feedbackBtn}>👍</button>
-                <button onClick={() => onFeedback(msg.id, 'down')} style={styles.feedbackBtn}>👎</button>
-              </>
-            )}
-          </div>
-        )}
+    <div style={{
+      background: isAI ? 'rgba(139,92,246,0.04)' : 'var(--card)',
+      border: isAI ? '1px solid rgba(139,92,246,0.15)' : '1px solid var(--border)',
+      borderRadius: 10, padding: '8px 10px',
+      marginTop: isGrouped ? 2 : 6,
+    }}>
+      {!isGrouped && (
+        <div style={styles.msgTop}>
+          <span style={{ ...styles.msgName, color: nameColor }}>{msg.username}</span>
+          {isAdmin && <span style={styles.adminBadge}>Admin</span>}
+          {isAI    && <span style={styles.aiBadge}>AI</span>}
+          <span style={{ ...styles.msgTime, marginLeft: 'auto' }}>{formatTime(msg.created_at)}</span>
         </div>
+      )}
+      <div style={styles.msgText}>
+        {isAI ? renderAIBody(msg.text) : parseText(displayText)}
+        {isLong && (
+          <span
+            onClick={() => setExpanded(e => !e)}
+            style={{ color: 'var(--green)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginLeft: 4 }}
+          >
+            {expanded ? 'show less' : 'show more'}
+          </span>
+        )}
       </div>
+      {/* Ticker mention cards — show inline card for each $TICKER */}
+      {!isAI && uniqueTickers.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+          {uniqueTickers.map(t => (
+            <TickerMentionCard
+              key={t}
+              ticker={t}
+              groupId={groupId || msg.group_id}
+              userId={currentUserId}
+            />
+          ))}
+        </div>
+      )}
+      {isAI && onFeedback && (
+        <div style={styles.feedbackRow}>
+          {feedbackGiven ? (
+            <span style={styles.feedbackThanks}>{feedbackGiven === 'up' ? '👍' : '👎'} Thanks!</span>
+          ) : (
+            <>
+              <button onClick={() => onFeedback(msg.id, 'up')} style={styles.feedbackBtn}>👍</button>
+              <button onClick={() => onFeedback(msg.id, 'down')} style={styles.feedbackBtn}>👎</button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 });
@@ -630,24 +611,6 @@ const styles = {
     padding: '8px 14px',
     WebkitOverflowScrolling: 'touch',
   },
-  msg: { padding: '4px 0' },
-  avatar: {
-    width: 28, height: 28, borderRadius: '50%',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 10, fontWeight: 700, letterSpacing: 0.3,
-    marginTop: 2,
-  },
-  msgBody: { flex: 1 },
-  adminBody: {
-    background: 'var(--green-bg)',
-    border: '1px solid rgba(26,173,94,0.12)',
-    borderRadius: 10, padding: '8px 10px',
-  },
-  aiBody: {
-    background: 'rgba(139,92,246,0.06)',
-    border: '1px solid rgba(139,92,246,0.15)',
-    borderRadius: 10, padding: '8px 10px',
-  },
   feedbackRow: {
     display: 'flex', alignItems: 'center', gap: 6,
     marginTop: 6, paddingTop: 6,
@@ -664,9 +627,9 @@ const styles = {
   },
   msgTop: {
     display: 'flex', alignItems: 'center',
-    gap: 5, marginBottom: 2, flexWrap: 'wrap',
+    gap: 5, marginBottom: 4, flexWrap: 'wrap',
   },
-  msgName: { fontSize: 12, fontWeight: 600 },
+  msgName: { fontSize: 13, fontWeight: 600 },
   msgTime: { fontSize: 10, color: 'var(--text3)' },
   adminBadge: {
     background: 'var(--green-bg)', color: 'var(--green)',
@@ -676,7 +639,7 @@ const styles = {
   },
   aiBadge: {
     background: 'rgba(139,92,246,0.12)', color: '#8B5CF6',
-    fontSize: 9, fontWeight: 700, padding: '1px 5px',
+    fontSize: 8, fontWeight: 700, padding: '1px 5px',
     borderRadius: 3, textTransform: 'uppercase',
     letterSpacing: '0.4px', border: '1px solid rgba(139,92,246,0.15)',
   },
@@ -686,9 +649,9 @@ const styles = {
   },
   tickerMention: {
     background: 'rgba(212,160,23,0.1)', color: '#D4A017',
-    fontSize: 12, fontWeight: 600,
+    fontSize: 13, fontWeight: 600,
     padding: '1px 5px', borderRadius: 4,
-    border: '1px solid rgba(212,160,23,0.15)',
+    border: '1px solid rgba(212,160,23,0.25)',
   },
   inputBar: {
     background: 'var(--card)', borderTop: '1px solid var(--border)',
@@ -748,7 +711,7 @@ const selectorStyles = {
     transition: 'background 0.15s',
   },
   iconWrap: {
-    width: 32, height: 32, borderRadius: 8,
+    width: 34, height: 34, borderRadius: 10,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
   },
@@ -763,7 +726,7 @@ const selectorStyles = {
     cursor: 'pointer',
     borderTop: '1px solid var(--border)',
   },
-  dividerText: { fontSize: 11, fontWeight: 600, color: 'var(--text3)', flex: 1 },
+  dividerText: { fontSize: 13, fontWeight: 600, color: 'var(--text3)', flex: 1 },
   newGroupBtn: {
     width: '100%', padding: '7px',
     borderRadius: 8, fontSize: 12, fontWeight: 600,
