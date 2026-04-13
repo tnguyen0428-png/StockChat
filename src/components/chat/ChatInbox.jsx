@@ -104,7 +104,7 @@ function GroupRow({ group, preview, isActive, onOpen, icon }) {
 // ── Main Component ────────────────────────────
 
 export default function ChatInbox({ session, onOpenGroup, onCreateGroup, onJoinGroup }) {
-  const { sectorGroups, customGroups, allGroups, activeGroup } = useGroup();
+  const { publicGroups, customGroups, allGroups, activeGroup } = useGroup();
 
   const [groupPreviews, setGroupPreviews] = useState({});
   const [memberCounts, setMemberCounts] = useState({});
@@ -112,7 +112,8 @@ export default function ChatInbox({ session, onOpenGroup, onCreateGroup, onJoinG
 
   // Batch-fetch latest message per group
   useEffect(() => {
-    const ids = allGroups.map(g => g.id);
+    const idSet = new Set([...allGroups.map(g => g.id), ...publicGroups.map(g => g.id)]);
+    const ids = [...idSet];
     if (!ids.length) return;
 
     supabase
@@ -128,11 +129,12 @@ export default function ChatInbox({ session, onOpenGroup, onCreateGroup, onJoinG
         }
         setGroupPreviews(map);
       });
-  }, [allGroups]);
+  }, [allGroups, publicGroups]);
 
   // Batch-fetch member counts per group
   useEffect(() => {
-    const ids = allGroups.map(g => g.id);
+    const idSet = new Set([...allGroups.map(g => g.id), ...publicGroups.map(g => g.id)]);
+    const ids = [...idSet];
     if (!ids.length) return;
 
     supabase
@@ -146,7 +148,7 @@ export default function ChatInbox({ session, onOpenGroup, onCreateGroup, onJoinG
         }
         setMemberCounts(counts);
       });
-  }, [allGroups]);
+  }, [allGroups, publicGroups]);
 
   const handleOpenGroup = (group) => {
     safeSet(`uptik_last_visited_${group.id}`, new Date().toISOString());
@@ -167,7 +169,7 @@ export default function ChatInbox({ session, onOpenGroup, onCreateGroup, onJoinG
         <div style={styles.card}>
 
           {/* Public group rows */}
-          {sectorGroups.map(g => (
+          {publicGroups.map(g => (
             <GroupRow
               key={g.id}
               group={g}

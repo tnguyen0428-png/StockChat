@@ -46,9 +46,12 @@ export function GroupProvider({ session, children }) {
       if (!data) return;
 
       setProfile(data);
-      const groups = (data.group_members || [])
+      const rawGroups = (data.group_members || [])
         .map(gm => gm.groups)
         .filter(Boolean);
+      // Deduplicate by id (duplicate group_members rows cause repeated entries)
+      const seen = new Set();
+      const groups = rawGroups.filter(g => seen.has(g.id) ? false : seen.add(g.id));
       setAllGroups(groups);
 
       // Find private group
