@@ -258,9 +258,22 @@ const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiv
 });
 
 // ── Main ChatTab ──
-export default function ChatTab({ session, profile, group, isAdmin, isModerator, setUnreadChat }) {
+export default function ChatTab({ session, profile, group, isAdmin, isModerator, setUnreadChat, allGroups, publicGroups, customGroups, enterGroup, onCreateGroup, onJoinGroup }) {
   const { activeGroup } = useGroup();
   const [watchlist, setWatchlist] = useState([]);
+  const [privateExpanded, setPrivateExpanded] = useState(false);
+  const [memberCounts, setMemberCounts] = useState({});
+
+  useEffect(() => {
+    const ids = [...(publicGroups || []), ...(customGroups || [])].map(g => g.id);
+    if (!ids.length) return;
+    supabase.from('group_members').select('group_id').in('group_id', ids)
+      .then(({ data }) => {
+        const counts = {};
+        (data || []).forEach(m => { counts[m.group_id] = (counts[m.group_id] || 0) + 1; });
+        setMemberCounts(counts);
+      });
+  }, [publicGroups, customGroups]);
   const [messages, setMessages]     = useState([]);
   const [inputText, setInputText]   = useState('');
   const [aiLoading, setAiLoading]   = useState(false);
@@ -452,16 +465,78 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  if (!group) {
-    return (
-      <div style={styles.loadingWrap}>
-        <div style={styles.emptyText}>Select a group from the Home tab to start chatting.</div>
-      </div>
-    );
-  }
+  const mainPublic = (publicGroups || []).find(g => g.name === 'UpTik Public') || (publicGroups || [])[0];
+  const privateGroups = customGroups || [];
 
   return (
     <div ref={wrapRef} style={styles.wrap}>
+
+      {/* ── Group Selector Card ── */}
+      <div style={selectorStyles.card}>
+        {/* Public Chat row */}
+        {mainPublic && (
+          <div
+            onClick={() => enterGroup(mainPublic)}
+            style={{ ...selectorStyles.row, background: group?.id === mainPublic.id ? 'rgba(26,173,94,0.08)' : 'transparent' }}
+          >
+            <div style={{ ...selectorStyles.iconWrap, background: 'rgba(26,173,94,0.15)' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1AAD5E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+            </div>
+            <div style={selectorStyles.rowText}>
+              <div style={selectorStyles.rowName}>Public Chat</div>
+              {memberCounts[mainPublic.id] > 0 && <div style={selectorStyles.rowSub}>{memberCounts[mainPublic.id]} members</div>}
+            </div>
+            {group?.id === mainPublic.id && <div style={{ ...selectorStyles.activeDot, background: '#1AAD5E' }} />}
+          </div>
+        )}
+
+        {/* Private Chats divider */}
+        <div onClick={() => setPrivateExpanded(e => !e)} style={selectorStyles.divider}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <span style={selectorStyles.dividerText}>
+            Private Chats{privateGroups.length > 0 ? ` (${privateGroups.length})` : ''}
+          </span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2.5"
+            style={{ transform: privateExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+
+        {/* Private group rows + New Group button */}
+        {privateExpanded && (
+          <>
+            {privateGroups.map(g => {
+              const color = g.color || '#7B68EE';
+              return (
+                <div
+                  key={g.id}
+                  onClick={() => enterGroup(g)}
+                  style={{ ...selectorStyles.row, background: group?.id === g.id ? `${color}15` : 'transparent' }}
+                >
+                  <div style={{ ...selectorStyles.iconWrap, background: `${color}20` }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                  </div>
+                  <div style={selectorStyles.rowText}>
+                    <div style={selectorStyles.rowName}>{g.name}</div>
+                    {memberCounts[g.id] > 0 && <div style={selectorStyles.rowSub}>{memberCounts[g.id]} members</div>}
+                  </div>
+                  {group?.id === g.id && <div style={{ ...selectorStyles.activeDot, background: color }} />}
+                </div>
+              );
+            })}
+            <div style={{ padding: '8px 12px' }}>
+              <button onClick={onCreateGroup} style={selectorStyles.newGroupBtn}>+ New Group</button>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Chat view */}
       {loading ? (
@@ -654,5 +729,46 @@ const styles = {
   aiDot: {
     width: 5, height: 5, borderRadius: '50%',
     background: '#8B5CF6', animation: 'pulse 1.2s infinite',
+  },
+};
+
+const selectorStyles = {
+  card: {
+    margin: '8px 10px 0',
+    background: 'var(--card)',
+    border: '1px solid var(--border)',
+    borderRadius: 10,
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  row: {
+    padding: '10px 12px',
+    display: 'flex', alignItems: 'center', gap: 10,
+    cursor: 'pointer',
+    transition: 'background 0.15s',
+  },
+  iconWrap: {
+    width: 32, height: 32, borderRadius: 8,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  rowText: { flex: 1, minWidth: 0 },
+  rowName: { fontSize: 13, fontWeight: 600, color: 'var(--text1)' },
+  rowSub: { fontSize: 11, color: 'var(--text3)', marginTop: 1 },
+  activeDot: { width: 6, height: 6, borderRadius: '50%', flexShrink: 0 },
+  divider: {
+    background: 'var(--bg2, rgba(0,0,0,0.04))',
+    padding: '7px 12px',
+    display: 'flex', alignItems: 'center', gap: 6,
+    cursor: 'pointer',
+    borderTop: '1px solid var(--border)',
+  },
+  dividerText: { fontSize: 11, fontWeight: 600, color: 'var(--text3)', flex: 1 },
+  newGroupBtn: {
+    width: '100%', padding: '7px',
+    borderRadius: 8, fontSize: 12, fontWeight: 600,
+    border: '1px dashed var(--border)',
+    background: 'transparent', color: 'var(--text2)',
+    cursor: 'pointer',
   },
 };

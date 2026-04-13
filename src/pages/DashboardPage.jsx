@@ -13,10 +13,7 @@ import { safeGet, safeSet, safeRemove } from '../lib/safeStorage';
 // HomeTab is the default landing tab — load eagerly so first paint is instant
 import HomeTab from '../components/tabs/HomeTab';
 
-// Chat conversation header — small, load eagerly
-import ChatHeader from '../components/chat/ChatHeader';
-
-// Join-group modal — shown from inbox
+// Join-group modal — shown from chat tab
 import JoinGroupModal from '../components/chat/JoinGroupModal';
 
 // Everything else is lazy — split into separate chunks, fetched on first tab visit
@@ -25,7 +22,6 @@ const ChatTab      = lazy(() => import('../components/tabs/ChatTab'));
 const ProfileTab   = lazy(() => import('../components/tabs/ProfileTab'));
 const HelpTab      = lazy(() => import('../components/tabs/HelpTab'));
 const PortfolioTab = lazy(() => import('../components/tabs/PortfolioTab'));
-const ChatInbox    = lazy(() => import('../components/chat/ChatInbox'));
 
 const TabFallback = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
@@ -41,7 +37,7 @@ export default function DashboardPage({ session }) {
   const navigate = useNavigate();
   const {
     profile, activeGroup, allGroups,
-    publicGroups, privateGroup,
+    publicGroups, customGroups,
     isAdmin, isModerator, loading,
     enterGroup, refreshGroups,
     createCustomGroup,
@@ -56,18 +52,14 @@ export default function DashboardPage({ session }) {
     safeSet('uptik_darkMode', String(darkMode));
   }, [darkMode]);
 
-  // Compute initial tab + chat view from join redirect (read once, clear once)
-  const [{ activeTabInit, chatViewInit }] = useState(() => {
+  // Compute initial tab from join redirect (read once, clear once)
+  const [activeTabInit] = useState(() => {
     const redirect = safeGet('uptik_join_redirect');
     if (redirect) safeRemove('uptik_join_redirect');
-    return {
-      activeTabInit: redirect || 'home',
-      chatViewInit: redirect === 'chat' ? 'group' : 'inbox',
-    };
+    return redirect || 'home';
   });
 
   const [activeTab, setActiveTab]   = useState(activeTabInit);
-  const [chatView, setChatView]     = useState(chatViewInit); // 'inbox' | 'group'
   const [showJoinModal, setShowJoinModal] = useState(false);
 
   // Track which tabs have been visited so we can lazy-mount but never unmount
@@ -176,35 +168,17 @@ export default function DashboardPage({ session }) {
   }, [publicGroups, loading, activeGroup]);
 
   // ── Group Handlers ──
-  const handleOpenGroup = (group) => {
-    enterGroup(group);
-    setChatView('group');
-  };
-
   const handleCreateGroup = async () => {
     const name = window.prompt('Group name:');
     if (!name?.trim()) return;
     const { group, error } = await createCustomGroup(name.trim());
     if (error) { alert(error); return; }
-    if (group) {
-      enterGroup(group);
-      setChatView('group');
-    }
+    if (group) enterGroup(group);
   };
 
   const handleGroupJoined = async ({ id }) => {
     safeSet('uptik_active_group', id);
     await refreshGroups();
-    setChatView('group');
-  };
-
-  const handleInvite = () => {
-    if (!activeGroup) return;
-    const code = activeGroup.invite_code;
-    if (code) {
-      const url = `${window.location.origin}/join/${code}`;
-      navigator.clipboard?.writeText(url).catch(() => {});
-    }
   };
 
   const handleSignOut = async () => {
@@ -214,10 +188,6 @@ export default function DashboardPage({ session }) {
 
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
-    // Re-tapping Chat icon always returns to inbox
-    if (tab === 'chat') {
-      setChatView('inbox');
-    }
   }, []);
 
 
@@ -260,16 +230,14 @@ export default function DashboardPage({ session }) {
   return (
     <div ref={pageRef} style={{ ...styles.page, ...vpStyle }}>
 
-      {activeTab !== 'chat' && (
-        <Header
-          profile={profile}
-          onSignOut={handleSignOut}
-          onHomePress={() => setActiveTab('home')}
-          onProfilePress={() => setActiveTab('profile')}
-          darkMode={darkMode}
-          setDarkMode={setDarkMode}
-        />
-      )}
+      <Header
+        profile={profile}
+        onSignOut={handleSignOut}
+        onHomePress={() => setActiveTab('home')}
+        onProfilePress={() => setActiveTab('profile')}
+        darkMode={darkMode}
+        setDarkMode={setDarkMode}
+      />
 
       {/* Broadcast Banner */}
       {activeBroadcast && (() => {
@@ -322,47 +290,22 @@ export default function DashboardPage({ session }) {
         {/* ── Chat ── */}
         {mountedTabs.has('chat') && (
           <div style={{ display: activeTab === 'chat' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-
-            {/* Inbox */}
-            {chatView === 'inbox' && (
-              <Suspense fallback={<TabFallback />}>
-                <ChatInbox
-                  session={session}
-                  onOpenGroup={handleOpenGroup}
-                  onCreateGroup={handleCreateGroup}
-                  onJoinGroup={() => setShowJoinModal(true)}
-                />
-              </Suspense>
-            )}
-
-            {/* Group conversation */}
-            {chatView === 'group' && activeGroup && (
-              <>
-                <ChatHeader
-                  convo={activeGroup}
-                  onBack={() => setChatView('inbox')}
-                  onInvite={activeGroup.invite_code ? handleInvite : undefined}
-                  isAdmin={isAdmin}
-                  isModerator={isModerator}
-                />
-                <Suspense fallback={<TabFallback />}>
-                  <ChatTab
-                    session={session}
-                    profile={profile}
-                    group={activeGroup}
-                    isAdmin={isAdmin}
-                    isModerator={isModerator}
-                    setUnreadChat={setUnreadChat}
-                  />
-                </Suspense>
-              </>
-            )}
-            {chatView === 'group' && !activeGroup && (
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ fontSize: 14, color: 'var(--text3)' }}>Loading chat…</div>
-              </div>
-            )}
-
+            <Suspense fallback={<TabFallback />}>
+              <ChatTab
+                session={session}
+                profile={profile}
+                group={activeGroup}
+                isAdmin={isAdmin}
+                isModerator={isModerator}
+                setUnreadChat={setUnreadChat}
+                allGroups={allGroups}
+                publicGroups={publicGroups}
+                customGroups={customGroups}
+                enterGroup={enterGroup}
+                onCreateGroup={handleCreateGroup}
+                onJoinGroup={() => setShowJoinModal(true)}
+              />
+            </Suspense>
           </div>
         )}
 
@@ -396,7 +339,7 @@ export default function DashboardPage({ session }) {
         )}
       </div>
 
-      {!keyboardOpen && !(activeTab === 'chat' && chatView === 'group') && (
+      {!keyboardOpen && (
         <BottomNav
           activeTab={activeTab === 'home' ? 'home' : activeTab}
           onTabChange={handleTabChange}
