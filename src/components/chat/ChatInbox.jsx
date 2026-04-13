@@ -76,7 +76,7 @@ function ChevronSVG({ open }) {
 
 // ── Group Row ─────────────────────────────────
 
-function GroupRow({ group, preview, isActive, onOpen, icon }) {
+function GroupRow({ group, preview, isActive, onOpen, icon, memberCount }) {
   const sanitized = sanitizePreview(preview?.text);
   const previewText = preview
     ? `${preview.username}: ${truncate(sanitized)}`
@@ -95,7 +95,14 @@ function GroupRow({ group, preview, isActive, onOpen, icon }) {
           </span>
           <span style={styles.time}>{formatTime(preview?.created_at)}</span>
         </div>
-        <div style={styles.preview}>{previewText}</div>
+        <div style={styles.preview}>
+          {memberCount ? (
+            <span style={{ color: '#64748b', fontSize: 11, marginRight: 6 }}>
+              {memberCount} members ·
+            </span>
+          ) : null}
+          {previewText}
+        </div>
       </div>
     </div>
   );
@@ -104,7 +111,7 @@ function GroupRow({ group, preview, isActive, onOpen, icon }) {
 // ── Main Component ────────────────────────────
 
 export default function ChatInbox({ session, onOpenGroup, onCreateGroup, onJoinGroup }) {
-  const { publicGroups, customGroups, allGroups, activeGroup } = useGroup();
+  const { sectorGroups, customGroups, allGroups, activeGroup } = useGroup();
 
   const [groupPreviews, setGroupPreviews] = useState({});
   const [memberCounts, setMemberCounts] = useState({});
@@ -112,8 +119,7 @@ export default function ChatInbox({ session, onOpenGroup, onCreateGroup, onJoinG
 
   // Batch-fetch latest message per group
   useEffect(() => {
-    const idSet = new Set([...allGroups.map(g => g.id), ...publicGroups.map(g => g.id)]);
-    const ids = [...idSet];
+    const ids = allGroups.map(g => g.id);
     if (!ids.length) return;
 
     supabase
@@ -129,12 +135,11 @@ export default function ChatInbox({ session, onOpenGroup, onCreateGroup, onJoinG
         }
         setGroupPreviews(map);
       });
-  }, [allGroups, publicGroups]);
+  }, [allGroups]);
 
   // Batch-fetch member counts per group
   useEffect(() => {
-    const idSet = new Set([...allGroups.map(g => g.id), ...publicGroups.map(g => g.id)]);
-    const ids = [...idSet];
+    const ids = allGroups.map(g => g.id);
     if (!ids.length) return;
 
     supabase
@@ -148,12 +153,17 @@ export default function ChatInbox({ session, onOpenGroup, onCreateGroup, onJoinG
         }
         setMemberCounts(counts);
       });
-  }, [allGroups, publicGroups]);
+  }, [allGroups]);
 
   const handleOpenGroup = (group) => {
     safeSet(`uptik_last_visited_${group.id}`, new Date().toISOString());
     onOpenGroup(group);
   };
+
+  // Find the single main public group — prefer "UpTik Public" by name, fall back to first
+  const mainPublicGroup =
+    (sectorGroups || allGroups || []).find(g => g.name === 'UpTik Public') ||
+    (sectorGroups || [])[0];
 
   const showNewGroupBtn = privateExpanded || customGroups.length === 0;
 
@@ -168,17 +178,18 @@ export default function ChatInbox({ session, onOpenGroup, onCreateGroup, onJoinG
         {/* Single card */}
         <div style={styles.card}>
 
-          {/* Public group rows */}
-          {publicGroups.map(g => (
+          {/* Single public group row */}
+          {mainPublicGroup && (
             <GroupRow
-              key={g.id}
-              group={g}
-              preview={groupPreviews[g.id]}
-              isActive={activeGroup?.id === g.id}
+              key={mainPublicGroup.id}
+              group={mainPublicGroup}
+              preview={groupPreviews[mainPublicGroup.id]}
+              isActive={activeGroup?.id === mainPublicGroup.id}
               onOpen={handleOpenGroup}
-              icon={<GlobeSVG size={20} color="#4a90d9" />}
+              icon={<GlobeSVG size={20} color="#1AAD5E" />}
+              memberCount={memberCounts[mainPublicGroup.id]}
             />
-          ))}
+          )}
 
           {/* Private Chats divider */}
           <div
@@ -205,6 +216,7 @@ export default function ChatInbox({ session, onOpenGroup, onCreateGroup, onJoinG
                 isActive={activeGroup?.id === g.id}
                 onOpen={handleOpenGroup}
                 icon={<LockSVG size={18} color={color} />}
+                memberCount={memberCounts[g.id]}
               />
             );
           })}
