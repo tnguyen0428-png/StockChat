@@ -682,7 +682,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
         <div style={S.briefSection}>
           <div style={S.briefHeader}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={S.briefTitle}>Today's Market</span>
+              <span style={S.briefTitle}>Daily Briefing</span>
               {briefing && (
                 <span style={S.briefTime}>
                   {new Date(briefing.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} EST
