@@ -26,7 +26,6 @@ const ProfileTab   = lazy(() => import('../components/tabs/ProfileTab'));
 const HelpTab      = lazy(() => import('../components/tabs/HelpTab'));
 const PortfolioTab = lazy(() => import('../components/tabs/PortfolioTab'));
 const ChatInbox    = lazy(() => import('../components/chat/ChatInbox'));
-const DMChat       = lazy(() => import('../components/dm/DMChat'));
 
 const TabFallback = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
@@ -46,9 +45,6 @@ export default function DashboardPage({ session }) {
     isAdmin, isModerator, loading,
     enterGroup, refreshGroups,
     createCustomGroup,
-    // DM
-    dmConversations, activeDM, dmUnreadCount,
-    startDM, markDMRead, closeDM, setActiveDM,
   } = useGroup();
 
   // ── Global dark mode — persists across tab switches ──
@@ -71,7 +67,7 @@ export default function DashboardPage({ session }) {
   });
 
   const [activeTab, setActiveTab]   = useState(activeTabInit);
-  const [chatView, setChatView]     = useState(chatViewInit); // 'inbox' | 'group' | 'dm'
+  const [chatView, setChatView]     = useState(chatViewInit); // 'inbox' | 'group'
   const [showJoinModal, setShowJoinModal] = useState(false);
 
   // Track which tabs have been visited so we can lazy-mount but never unmount
@@ -79,15 +75,7 @@ export default function DashboardPage({ session }) {
   const [activeBroadcast, setActiveBroadcast] = useState(null);
   const [unreadAlerts, setUnreadAlerts]   = useState(false);
   const [unreadChat, setUnreadChat]       = useState(false);
-  const [startingDM, setStartingDM]       = useState(false);
   const dismissTimerRef = useRef(null);
-
-  // Fallback: if we end up in dm view with no activeDM, drop back to inbox
-  useEffect(() => {
-    if (chatView === 'dm' && !activeDM && !startingDM) {
-      setChatView('inbox');
-    }
-  }, [chatView, activeDM, startingDM]);
 
   // ── Keyboard detection + single viewport handler ──
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -187,29 +175,6 @@ export default function DashboardPage({ session }) {
     }
   }, [publicGroups, loading, activeGroup]);
 
-  // ── DM Handlers ──
-  const handleStartDM = async (otherUserId) => {
-    setActiveTab('chat');
-    setChatView('dm');
-    setStartingDM(true);
-    try {
-      const dm = await startDM(otherUserId);
-      if (!dm) setChatView('inbox');
-    } finally {
-      setStartingDM(false);
-    }
-  };
-
-  const handleOpenDMFromInbox = (convo) => {
-    setActiveDM(convo);
-    setChatView('dm');
-  };
-
-  const handleBackToInbox = () => {
-    closeDM();
-    setChatView('inbox');
-  };
-
   // ── Group Handlers ──
   const handleOpenGroup = (group) => {
     enterGroup(group);
@@ -252,9 +217,8 @@ export default function DashboardPage({ session }) {
     // Re-tapping Chat icon always returns to inbox
     if (tab === 'chat') {
       setChatView('inbox');
-      closeDM();
     }
-  }, [closeDM]);
+  }, []);
 
 
   function broadcastColor(type) {
@@ -296,14 +260,16 @@ export default function DashboardPage({ session }) {
   return (
     <div ref={pageRef} style={{ ...styles.page, ...vpStyle }}>
 
-      <Header
-        profile={profile}
-        onSignOut={handleSignOut}
-        onHomePress={() => setActiveTab('home')}
-        onProfilePress={() => setActiveTab('profile')}
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-      />
+      {!(activeTab === 'chat' && chatView === 'group') && (
+        <Header
+          profile={profile}
+          onSignOut={handleSignOut}
+          onHomePress={() => setActiveTab('home')}
+          onProfilePress={() => setActiveTab('profile')}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+        />
+      )}
 
       {/* Broadcast Banner */}
       {activeBroadcast && (() => {
@@ -363,7 +329,6 @@ export default function DashboardPage({ session }) {
                 <ChatInbox
                   session={session}
                   onOpenGroup={handleOpenGroup}
-                  onOpenDM={handleOpenDMFromInbox}
                   onCreateGroup={handleCreateGroup}
                   onJoinGroup={() => setShowJoinModal(true)}
                 />
@@ -388,7 +353,6 @@ export default function DashboardPage({ session }) {
                     isAdmin={isAdmin}
                     isModerator={isModerator}
                     setUnreadChat={setUnreadChat}
-                    onStartDM={handleStartDM}
                   />
                 </Suspense>
               </>
@@ -399,17 +363,6 @@ export default function DashboardPage({ session }) {
               </div>
             )}
 
-            {/* DM conversation */}
-            {chatView === 'dm' && activeDM && !startingDM && (
-              <Suspense fallback={<TabFallback />}>
-                <DMChat session={session} dm={activeDM} onBack={handleBackToInbox} />
-              </Suspense>
-            )}
-            {chatView === 'dm' && startingDM && (
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ fontSize: 13, color: 'var(--text3)' }}>Starting chat…</div>
-              </div>
-            )}
           </div>
         )}
 
@@ -443,13 +396,12 @@ export default function DashboardPage({ session }) {
         )}
       </div>
 
-      {!keyboardOpen && (
+      {!keyboardOpen && !(activeTab === 'chat' && chatView === 'group') && (
         <BottomNav
           activeTab={activeTab === 'home' ? 'home' : activeTab}
           onTabChange={handleTabChange}
           unreadAlerts={unreadAlerts}
           unreadChat={unreadChat}
-          dmUnreadCount={dmUnreadCount}
         />
       )}
 

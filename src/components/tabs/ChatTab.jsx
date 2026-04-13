@@ -8,11 +8,8 @@ import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
 import { askUpTikAI } from '../../lib/aiAgent';
 import FadingMessage from '../shared/FadingMessage';
-import TickerBanner from './TickerBanner';
 import TickerMentionCard from '../shared/TickerMentionCard';
-import StickerPicker, { STICKERS, isSticker, getStickerId } from '../shared/StickerPicker';
-
-const EMOJIS = ['🔥','📈','📉','🚀','💪','🎯','👀','💰','⚠️','✅','❌','😎','🤔','👋','🙌','😂','💎','🐂','🐻','⏰'];
+import { STICKERS, isSticker, getStickerId } from '../shared/StickerPicker';
 
 // ── UptikCard: renders the ```uptik {json}``` envelope as a clean card ──
 const UptikCard = ({ card }) => {
@@ -87,7 +84,7 @@ const UptikCard = ({ card }) => {
 // ── Message Item ──
 const MSG_COLLAPSE_LEN = 150;
 
-const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiven, onTapUsername, isGrouped }) => {
+const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiven, isGrouped }) => {
   const [expanded, setExpanded] = useState(false);
   const isAdmin = msg.is_admin;
   const isAI    = msg.user_id === 'user_ai' || msg.type === 'ai';
@@ -210,18 +207,7 @@ const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiv
         <div style={{ ...bodyStyle, flex: 1, minWidth: 0 }}>
           {!isGrouped && (
             <div style={styles.msgTop}>
-              <span
-                style={{
-                  ...styles.msgName,
-                  color: nameColor,
-                  ...((!isAI && msg.user_id !== currentUserId && onTapUsername) ? { cursor: 'pointer', textDecoration: 'underline', textDecorationColor: nameColor, textUnderlineOffset: 2 } : {}),
-                }}
-                onClick={() => {
-                  if (!isAI && msg.user_id !== currentUserId && onTapUsername) {
-                    onTapUsername(msg.user_id, msg.username);
-                  }
-                }}
-              >
+              <span style={{ ...styles.msgName, color: nameColor }}>
                 {msg.username}
               </span>
               {isAdmin && <span style={styles.adminBadge}>Admin</span>}
@@ -271,31 +257,12 @@ const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiv
   );
 });
 
-// ── Broadcast helpers ──
-function detectBroadcastType(text) {
-  const lower = text.toLowerCase();
-  const word = (w) => new RegExp(`\\b${w}\\b`).test(lower);
-  const bullish   = ['buy','call','calls','bullish','long','breakout','moon','rocket','rip','squeeze','rally','pump'];
-  const bearish   = ['sell','put','puts','bearish','short','dump','crash','drop','fade','tank'];
-  const watchlist = ['watch','watching','monitor','tracking','wait'];
-  if (bullish.some(w => word(w)))   return 'BULLISH';
-  if (bearish.some(w => word(w)))   return 'BEARISH';
-  if (watchlist.some(w => word(w)) || lower.includes('eye on')) return 'WATCHLIST';
-  return 'INFO';
-}
-
-function broadcastColor(type) {
-  const colors = { BULLISH: '#2a7d4b', BEARISH: '#E05252', WATCHLIST: '#D4A017', INFO: '#4A90D9' };
-  return colors[type] || '#2a7d4b';
-}
-
 // ── Main ChatTab ──
-export default function ChatTab({ session, profile, group, isAdmin, isModerator, setUnreadChat, onStartDM }) {
+export default function ChatTab({ session, profile, group, isAdmin, isModerator, setUnreadChat }) {
   const { activeGroup } = useGroup();
   const [watchlist, setWatchlist] = useState([]);
   const [messages, setMessages]     = useState([]);
   const [inputText, setInputText]   = useState('');
-  const [showEmoji, setShowEmoji]   = useState(false);
   const [aiLoading, setAiLoading]   = useState(false);
   const [aiLastTicker, setAiLastTicker] = useState(null);
   const [aiMode, setAiMode]         = useState(false);
@@ -337,9 +304,6 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
       .then(({ data }) => { if (data) setWatchlist(data.map(w => w.symbol)); });
   }, [session?.user?.id]);
 
-  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
-  const [broadcastText, setBroadcastText]           = useState('');
-  const [sendingBroadcast, setSendingBroadcast]     = useState(false);
 
   useEffect(() => {
     if (!group?.id) return;
@@ -452,7 +416,6 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     sendingRef.current = true;
     try {
       setInputText('');
-      setShowEmoji(false);
       inputRef.current?.blur();
       const { data, error } = await supabase.from('chat_messages').insert({
         group_id: group.id, user_id: session.user.id,
@@ -485,38 +448,8 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     }
   }, [inputText, aiMode, profile, group, isAdmin, callAI, session]);
 
-  const appendToInput = useCallback((str) => {
-    setInputText(prev => prev + str);
-    inputRef.current?.focus();
-  }, []);
-  const handleSendSticker = useCallback((sticker) => appendToInput(sticker.emoji), [appendToInput]);
-
-  const sendBroadcast = async () => {
-    if (!broadcastText.trim() || sendingBroadcast) return;
-    setSendingBroadcast(true);
-    const alertType = isAdmin ? 'INFO' : detectBroadcastType(broadcastText);
-    const { error } = await supabase.from('breakout_alerts').insert({
-      alert_type: alertType, title: broadcastText.trim(), sent_by: profile.username,
-    });
-    if (error) {
-      console.error('[ChatTab] Broadcast insert failed:', error.message);
-      setSendingBroadcast(false);
-      return;
-    }
-    setBroadcastText('');
-    setSendingBroadcast(false);
-    setShowBroadcastModal(false);
-  };
-
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
-  };
-
-  const addEmoji = appendToInput;
-
-  // ── Tap username to start DM ──
-  const handleTapUsername = (userId, username) => {
-    if (onStartDM) onStartDM(userId, username);
   };
 
   if (!group) {
@@ -529,9 +462,6 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
 
   return (
     <div ref={wrapRef} style={styles.wrap}>
-
-      {/* Ticker Banner */}
-      <TickerBanner groupId={group.id} />
 
       {/* Chat view */}
       {loading ? (
@@ -553,18 +483,18 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
             if (isAI) {
               return (
                 <FadingMessage key={msg.id} delay={60000} duration={5000} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
-                  <MessageItem msg={msg} currentUserId={session?.user?.id} groupId={group?.id} onFeedback={handleFeedback} feedbackGiven={feedbackMap[msg.id]} onTapUsername={handleTapUsername} isGrouped={isGrouped} />
+                  <MessageItem msg={msg} currentUserId={session?.user?.id} groupId={group?.id} onFeedback={handleFeedback} feedbackGiven={feedbackMap[msg.id]}isGrouped={isGrouped} />
                 </FadingMessage>
               );
             }
             if (isAIQuestion) {
               return (
                 <FadingMessage key={msg.id} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
-                  <MessageItem msg={msg} currentUserId={session?.user?.id} groupId={group?.id} onTapUsername={handleTapUsername} isGrouped={isGrouped} />
+                  <MessageItem msg={msg} currentUserId={session?.user?.id} groupId={group?.id}isGrouped={isGrouped} />
                 </FadingMessage>
               );
             }
-            return <MessageItem key={msg.id} msg={msg} currentUserId={session?.user?.id} groupId={group?.id} onTapUsername={handleTapUsername} isGrouped={isGrouped} />;
+            return <MessageItem key={msg.id} msg={msg} currentUserId={session?.user?.id} groupId={group?.id}isGrouped={isGrouped} />;
           })}
           {aiLoading && (
             <div style={styles.aiLoading}>
@@ -575,14 +505,6 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
             </div>
           )}
           <div ref={messagesEndRef} />
-        </div>
-      )}
-
-      {showEmoji && (
-        <div style={styles.emojiBar}>
-          {EMOJIS.map(e => (
-            <button key={e} style={styles.emojiBtn} onClick={() => addEmoji(e)}>{e}</button>
-          ))}
         </div>
       )}
 
@@ -612,14 +534,6 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
           autoComplete="off"
           autoCorrect="off"
         />
-        {(isAdmin || isModerator) && (
-          <div style={{ flexShrink: 0, cursor: 'pointer', opacity: 0.5 }} onClick={() => setShowBroadcastModal(true)}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" fill="#888"/>
-            </svg>
-          </div>
-        )}
-        <StickerPicker onSend={handleSendSticker} size="md" />
         <button
           style={{ ...styles.sendBtn, background: aiMode ? '#8B5CF6' : 'var(--green)', opacity: inputText.trim() ? 1 : 0.4 }}
           onClick={handleSend}
@@ -628,40 +542,6 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
           ➤
         </button>
       </div>
-
-      {/* Broadcast Modal */}
-      {showBroadcastModal && (
-        <div style={styles.modalOverlay} onClick={() => setShowBroadcastModal(false)}>
-          <div style={styles.modal} onClick={e => e.stopPropagation()}>
-            <div style={styles.modalTitle}>
-              {isAdmin ? 'Broadcast to All Groups' : 'Send Group Alert'}
-            </div>
-            <textarea
-              style={styles.modalInput}
-              placeholder="e.g. AAPL breaking out, calls looking good"
-              value={broadcastText}
-              onChange={e => setBroadcastText(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBroadcast(); } }}
-              rows={3}
-              autoFocus
-            />
-            {!isAdmin && (
-              <div style={styles.typePreview}>
-                Type: <strong style={{ color: broadcastColor(detectBroadcastType(broadcastText || '')) }}>
-                  {detectBroadcastType(broadcastText || '')}
-                </strong>
-              </div>
-            )}
-            <button
-              style={{ ...styles.modalSendBtn, opacity: sendingBroadcast || !broadcastText.trim() ? 0.6 : 1 }}
-              onClick={sendBroadcast}
-              disabled={sendingBroadcast || !broadcastText.trim()}
-            >
-              {sendingBroadcast ? 'Sending...' : isAdmin ? 'Send to All Groups' : 'Send to Group'}
-            </button>
-          </div>
-        </div>
-      )}
 
     </div>
   );
@@ -735,24 +615,11 @@ const styles = {
     padding: '1px 5px', borderRadius: 4,
     border: '1px solid rgba(212,160,23,0.15)',
   },
-  emojiBar: {
-    display: 'flex', gap: 4, padding: '6px 12px',
-    background: 'var(--card)', borderTop: '1px solid var(--border)',
-    overflowX: 'auto', flexShrink: 0, scrollbarWidth: 'none',
-  },
-  emojiBtn: {
-    fontSize: 22, cursor: 'pointer', padding: '2px 4px',
-    background: 'none', border: 'none', flexShrink: 0,
-  },
   inputBar: {
     background: 'var(--card)', borderTop: '1px solid var(--border)',
     padding: '8px 12px', display: 'flex',
     gap: 6, alignItems: 'center', flexShrink: 0,
     overflow: 'hidden', boxSizing: 'border-box', width: '100%',
-  },
-  emojiToggle: {
-    background: 'none', border: 'none',
-    fontSize: 20, cursor: 'pointer', flexShrink: 0, padding: 2,
   },
   input: {
     flex: 1, minWidth: 0, background: 'var(--card2)',
@@ -787,33 +654,5 @@ const styles = {
   aiDot: {
     width: 5, height: 5, borderRadius: '50%',
     background: '#8B5CF6', animation: 'pulse 1.2s infinite',
-  },
-  modalOverlay: {
-    position: 'fixed', inset: 0,
-    background: 'rgba(0,0,0,0.45)',
-    display: 'flex', alignItems: 'flex-end',
-    justifyContent: 'center', zIndex: 100, padding: '0 0 20px',
-  },
-  modal: {
-    background: 'var(--card)', border: '1px solid var(--border)',
-    borderRadius: 16, padding: '20px 16px 16px',
-    width: '100%', maxWidth: 460, margin: '0 12px',
-    display: 'flex', flexDirection: 'column', gap: 12,
-  },
-  modalTitle: { fontSize: 13, fontWeight: 700, color: 'var(--text1)' },
-  modalInput: {
-    width: '100%', background: 'var(--card2)',
-    border: '1.5px solid var(--border)',
-    borderRadius: 10, padding: '10px 12px',
-    fontSize: 13, color: 'var(--text1)',
-    resize: 'none', fontFamily: 'var(--font)',
-    lineHeight: 1.5, boxSizing: 'border-box',
-  },
-  typePreview: { fontSize: 10, color: 'var(--text3)', marginTop: -4 },
-  modalSendBtn: {
-    width: '100%', background: 'var(--green)', color: '#fff',
-    border: 'none', borderRadius: 10, padding: '12px 0',
-    fontSize: 13, fontWeight: 600, cursor: 'pointer',
-    transition: 'opacity 0.15s',
   },
 };

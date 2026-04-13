@@ -1,9 +1,9 @@
 // ============================================
 // UPTIKALERTS — ChatInbox.jsx
-// Unified inbox: group chats + DMs in one list
+// Groups-only inbox with "+ New" dropdown
 // ============================================
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
 import { safeGet, safeSet } from '../../lib/safeStorage';
@@ -31,7 +31,7 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ── Group Row ─────────────────────────────────
 
-function GroupRow({ group, preview, isUnread, isActive, onOpen }) {
+function GroupRow({ group, preview, isUnread, isActive, onOpen, memberCount }) {
   const color = group.color || '#7B68EE';
   return (
     <div
@@ -59,10 +59,15 @@ function GroupRow({ group, preview, isUnread, isActive, onOpen }) {
             <span style={styles.time}>{formatTime(preview?.created_at)}</span>
           </div>
         </div>
-        <div style={{ ...styles.preview, ...(isUnread ? styles.previewUnread : {}) }}>
-          {preview
-            ? `${preview.username}: ${truncate(preview.text)}`
-            : 'No messages yet'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ ...styles.preview, ...(isUnread ? styles.previewUnread : {}) }}>
+            {preview
+              ? `${preview.username}: ${truncate(preview.text)}`
+              : 'No messages yet'}
+          </div>
+          {memberCount != null && (
+            <span style={styles.memberCount}>{memberCount} members</span>
+          )}
         </div>
       </div>
 
@@ -71,62 +76,32 @@ function GroupRow({ group, preview, isUnread, isActive, onOpen }) {
   );
 }
 
-// ── DM Row ────────────────────────────────────
-
-function DMRow({ convo, profile, onlineUsers, onOpenDM }) {
-  const other = convo.otherUser;
-  const hasUnread = convo.unreadCount > 0;
-  const isOnline = onlineUsers.has(other?.id);
-  const initial = (other?.username || '?')[0].toUpperCase();
-
-  return (
-    <div
-      style={{
-        ...styles.row,
-        ...(hasUnread ? styles.rowUnread : {}),
-      }}
-      onClick={() => onOpenDM(convo)}
-    >
-      <div style={{ position: 'relative' }}>
-        <div style={{ ...styles.avatar, background: other?.color || '#5eed8a' }}>
-          {initial}
-        </div>
-        {isOnline && <div style={styles.onlineDot} />}
-      </div>
-
-      <div style={styles.rowContent}>
-        <div style={styles.nameRow}>
-          <span style={{ ...styles.name, ...(hasUnread ? { fontWeight: 700 } : {}) }}>
-            {other?.username || 'User'}
-          </span>
-          <span style={styles.time}>{formatTime(convo.lastMessage?.created_at)}</span>
-        </div>
-        <div style={{ ...styles.preview, ...(hasUnread ? styles.previewUnread : {}) }}>
-          {convo.lastMessage?.username === profile?.username ? 'You: ' : ''}
-          {truncate(convo.lastMessage?.text)}
-        </div>
-      </div>
-
-      {hasUnread && (
-        <div style={styles.badge}>
-          {convo.unreadCount > 9 ? '9+' : convo.unreadCount}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Main Component ────────────────────────────
 
-export default function ChatInbox({ session, onOpenGroup, onOpenDM, onCreateGroup, onJoinGroup }) {
-  const {
-    sectorGroups, customGroups, allGroups, activeGroup,
-    dmConversations, profile, onlineUsers,
-  } = useGroup();
+export default function ChatInbox({ session, onOpenGroup, onCreateGroup, onJoinGroup }) {
+  const { sectorGroups, customGroups, allGroups, activeGroup } = useGroup();
 
   const [groupPreviews, setGroupPreviews] = useState({});
+  const [memberCounts, setMemberCounts] = useState({});
   const [showStaleGroups, setShowStaleGroups] = useState(false);
-  const [showAllDMs, setShowAllDMs] = useState(false);
+  const [showNewMenu, setShowNewMenu] = useState(false);
+  const menuRef = useRef(null);
+
+  // Outside-click to close dropdown
+  useEffect(() => {
+    if (!showNewMenu) return;
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setShowNewMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [showNewMenu]);
 
   // Batch-fetch latest message per group
   useEffect(() => {
@@ -145,6 +120,24 @@ export default function ChatInbox({ session, onOpenGroup, onOpenDM, onCreateGrou
           if (!map[msg.group_id]) map[msg.group_id] = msg;
         }
         setGroupPreviews(map);
+      });
+  }, [allGroups]);
+
+  // Batch-fetch member counts per group
+  useEffect(() => {
+    const ids = allGroups.map(g => g.id);
+    if (!ids.length) return;
+
+    supabase
+      .from('group_members')
+      .select('group_id')
+      .in('group_id', ids)
+      .then(({ data }) => {
+        const counts = {};
+        for (const row of (data || [])) {
+          counts[row.group_id] = (counts[row.group_id] || 0) + 1;
+        }
+        setMemberCounts(counts);
       });
   }, [allGroups]);
 
@@ -174,7 +167,6 @@ export default function ChatInbox({ session, onOpenGroup, onOpenDM, onCreateGrou
     });
   }, [isGroupUnread, groupPreviews]);
 
-  // Split into active vs stale, public vs custom
   const sortedSector = sortGroups(sectorGroups);
   const sortedCustom = sortGroups(customGroups);
   const activeSector = sortedSector.filter(g => !isGroupStale(g.id));
@@ -183,34 +175,53 @@ export default function ChatInbox({ session, onOpenGroup, onOpenDM, onCreateGrou
   const staleCustom  = sortedCustom.filter(g => isGroupStale(g.id));
   const staleCount   = staleSector.length + staleCustom.length;
 
-  // DMs: unread first, then top 2 recent, rest hidden
-  const unreadDMs  = dmConversations.filter(c => c.unreadCount > 0);
-  const readDMs    = dmConversations.filter(c => c.unreadCount === 0);
-  const visibleDMs = [...unreadDMs, ...readDMs.slice(0, 2)];
-  const hiddenDMs  = readDMs.slice(2);
-
   const handleOpenGroup = (group) => {
     safeSet(`uptik_last_visited_${group.id}`, new Date().toISOString());
     onOpenGroup(group);
   };
 
   const hasAnyGroups = sectorGroups.length > 0 || customGroups.length > 0;
+  const hasPrivateGroup = customGroups.length > 0;
 
   return (
     <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
         <span style={styles.headerTitle}>Chats</span>
+        <div ref={menuRef} style={{ position: 'relative' }}>
+          <button style={styles.newBtn} onClick={() => setShowNewMenu(v => !v)}>
+            + New
+          </button>
+          {showNewMenu && (
+            <div style={styles.newDropdown}>
+              <div style={styles.dropdownItem} onClick={() => { setShowNewMenu(false); onCreateGroup(); }}>
+                Create Private Group
+              </div>
+              <div style={{ ...styles.dropdownItem, borderBottom: 'none' }} onClick={() => { setShowNewMenu(false); onJoinGroup(); }}>
+                Join with Code
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div style={styles.scrollArea}>
+
+        {/* Nudge card — shown when user has no private groups */}
+        {!hasPrivateGroup && (
+          <div style={styles.nudgeCard}>
+            <div style={styles.nudgeIcon}>🔒</div>
+            <div style={styles.nudgeTitle}>Start a private group</div>
+            <div style={styles.nudgeHint}>Invite friends and trade ideas privately</div>
+            <button style={styles.nudgeBtn} onClick={onCreateGroup}>Create Group</button>
+          </div>
+        )}
 
         {/* ── GROUP CHATS ── */}
         {hasAnyGroups && (
           <>
             <div style={styles.sectionLabel}>Group Chats</div>
 
-            {/* Active public (sector) groups */}
             {activeSector.map(g => (
               <GroupRow
                 key={g.id}
@@ -219,10 +230,10 @@ export default function ChatInbox({ session, onOpenGroup, onOpenDM, onCreateGrou
                 isUnread={isGroupUnread(g.id)}
                 isActive={activeGroup?.id === g.id}
                 onOpen={handleOpenGroup}
+                memberCount={memberCounts[g.id]}
               />
             ))}
 
-            {/* Active custom/private groups */}
             {activeCustom.map(g => (
               <GroupRow
                 key={g.id}
@@ -231,10 +242,10 @@ export default function ChatInbox({ session, onOpenGroup, onOpenDM, onCreateGrou
                 isUnread={isGroupUnread(g.id)}
                 isActive={activeGroup?.id === g.id}
                 onOpen={handleOpenGroup}
+                memberCount={memberCounts[g.id]}
               />
             ))}
 
-            {/* Stale groups toggle */}
             {staleCount > 0 && (
               <>
                 <div style={styles.toggleRow} onClick={() => setShowStaleGroups(v => !v)}>
@@ -252,6 +263,7 @@ export default function ChatInbox({ session, onOpenGroup, onOpenDM, onCreateGrou
                         isUnread={isGroupUnread(g.id)}
                         isActive={activeGroup?.id === g.id}
                         onOpen={handleOpenGroup}
+                        memberCount={memberCounts[g.id]}
                       />
                     ))}
                     {staleCustom.map(g => (
@@ -262,6 +274,7 @@ export default function ChatInbox({ session, onOpenGroup, onOpenDM, onCreateGrou
                         isUnread={isGroupUnread(g.id)}
                         isActive={activeGroup?.id === g.id}
                         onOpen={handleOpenGroup}
+                        memberCount={memberCounts[g.id]}
                       />
                     ))}
                   </>
@@ -271,42 +284,8 @@ export default function ChatInbox({ session, onOpenGroup, onOpenDM, onCreateGrou
           </>
         )}
 
-        {/* ── MESSAGES (DMs) ── */}
-        {dmConversations.length > 0 && (
-          <>
-            <div style={styles.sectionLabel}>Messages</div>
-
-            {visibleDMs.map(c => (
-              <DMRow
-                key={c.groupId}
-                convo={c}
-                profile={profile}
-                onlineUsers={onlineUsers}
-                onOpenDM={onOpenDM}
-              />
-            ))}
-
-            {hiddenDMs.length > 0 && !showAllDMs && (
-              <div style={styles.toggleRow} onClick={() => setShowAllDMs(true)}>
-                <span style={styles.toggleText}>
-                  See all messages ({hiddenDMs.length} more)
-                </span>
-              </div>
-            )}
-            {showAllDMs && hiddenDMs.map(c => (
-              <DMRow
-                key={c.groupId}
-                convo={c}
-                profile={profile}
-                onlineUsers={onlineUsers}
-                onOpenDM={onOpenDM}
-              />
-            ))}
-          </>
-        )}
-
         {/* Empty state */}
-        {!hasAnyGroups && dmConversations.length === 0 && (
+        {!hasAnyGroups && (
           <div style={styles.empty}>
             <div style={styles.emptyIcon}>💬</div>
             <div style={styles.emptyTitle}>No chats yet</div>
@@ -315,16 +294,6 @@ export default function ChatInbox({ session, onOpenGroup, onOpenDM, onCreateGrou
         )}
 
         <div style={{ height: 16 }} />
-      </div>
-
-      {/* Bottom action buttons */}
-      <div style={styles.bottomBar}>
-        <button style={styles.actionBtn} onClick={onCreateGroup}>
-          + Create Group
-        </button>
-        <button style={styles.actionBtnSecondary} onClick={onJoinGroup}>
-          Join Group
-        </button>
       </div>
     </div>
   );
