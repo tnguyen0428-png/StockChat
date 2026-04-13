@@ -560,15 +560,15 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                           display: 'inline-flex', alignItems: 'center',
                           fontSize: 12, fontWeight: 600, color: t.green, cursor: 'pointer',
                         }}
-                        onClick={() => onTabChange?.('alerts')}
+                        onClick={() => loadResearch(researchSector)}
                       >
-                        Explore {researchSector} →
+                        Load {researchSector} →
                       </div>
                     </div>
                   )
                 ) : (
                   <>
-                  {researchStocks.slice(0, 4).map((stock, i) => {
+                  {researchStocks.map((stock, i) => {
                     const isOpen = researchExpanded === stock.id;
                     const isMyList = researchSector === '__mylist__';
                     const priceData = researchPrices[stock.ticker];
@@ -624,14 +624,6 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                       </div>
                     );
                   })}
-                  {researchStocks.length > 4 && (
-                    <div
-                      style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, color: t.green, cursor: 'pointer', textAlign: 'center' }}
-                      onClick={() => onTabChange?.('alerts')}
-                    >
-                      +{researchStocks.length - 4} more
-                    </div>
-                  )}
                   </>
                 )}
               </div>
