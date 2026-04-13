@@ -7,7 +7,7 @@ import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useGroup } from '../context/GroupContext';
-import { DARK_THEME, LIGHT_THEME } from '../components/tabs/alertsMockData';
+import { DARK_THEME, LIGHT_THEME } from '../lib/constants';
 import { safeGet, safeSet, safeRemove } from '../lib/safeStorage';
 
 // HomeTab is the default landing tab — load eagerly so first paint is instant
