@@ -120,12 +120,13 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   // ═══════════════════════════════════════
   const loadHotMovers = async () => {
     try {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+      threeDaysAgo.setHours(0, 0, 0, 0);
       const { data: alerts } = await supabase
         .from('breakout_alerts')
         .select('ticker, signal_type, change_pct, change')
-        .gte('created_at', todayStart.toISOString())
+        .gte('created_at', threeDaysAgo.toISOString())
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -404,12 +405,8 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
         {/* ═══ HOT TODAY ═══ */}
         {hotMovers.length > 0 && (
           <div style={{ padding: '6px 14px 4px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <div style={{ marginBottom: 6 }}>
               <span style={{ fontSize: 14, fontWeight: 700, color: t.text1 }}>Hot Today 🔥</span>
-              <span
-                style={{ fontSize: 12, fontWeight: 600, color: t.green, cursor: 'pointer' }}
-                onClick={() => onTabChange?.('alerts')}
-              >See all</span>
             </div>
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
               {hotMovers.map((mover, i) => {
