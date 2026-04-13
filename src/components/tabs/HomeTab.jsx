@@ -69,8 +69,9 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   const [hotMovers, setHotMovers] = useState([]);
 
   // ── UI refs ──
-  const outerWrapRef = useRef(null);
-  const searchRef    = useRef(null);
+  const outerWrapRef    = useRef(null);
+  const searchRef       = useRef(null);
+  const autoExpandedRef = useRef(false);
 
   // ═══════════════════════════════════════
   // INITIAL LOAD
@@ -113,13 +114,50 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
         alerts.forEach(a => { if (!seen.has(a.ticker)) seen.set(a.ticker, a); });
         setHotMovers([...seen.values()].slice(0, 5));
       } else {
-        // Fallback: aggregate from watchlist tickers already loaded (no extra query)
-        // Will be populated on next render once watchlist loads
+        // Fallback: query user_watchlist for top 5 most-watched tickers
+        const { data: wlData } = await supabase
+          .from('user_watchlist')
+          .select('symbol');
+        if (wlData && wlData.length > 0) {
+          const counts = {};
+          wlData.forEach(row => { counts[row.symbol] = (counts[row.symbol] || 0) + 1; });
+          const sorted = Object.entries(counts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([symbol, count]) => ({
+              ticker: symbol,
+              signal_type: 'popular',
+              change_pct: null,
+              _watchCount: count,
+            }));
+          setHotMovers(sorted);
+        }
       }
     } catch (err) {
       console.error('[HomeTab] loadHotMovers failed:', err.message);
     }
   };
+
+  // Fetch prices whenever hotMovers list changes
+  useEffect(() => {
+    if (hotMovers.length > 0) {
+      fetchResearchPrices(hotMovers.map(m => m.ticker));
+    }
+  }, [hotMovers]);
+
+  // Auto-expand watchlist on first load when no sector is selected
+  useEffect(() => {
+    if (watchlist.length > 0 && researchSector === null && !autoExpandedRef.current) {
+      autoExpandedRef.current = true;
+      setResearchSector('__mylist__');
+      const wlStocks = watchlist.map((w, i) => ({
+        id: w.id, ticker: w.symbol, ranking: i + 1,
+        score: null, thesis: null, notes: null, _isWatchlist: true,
+      }));
+      setResearchStocks(wlStocks);
+      fetchResearchPrices(watchlist.map(w => w.symbol));
+    }
+  }, [watchlist]);
 
   // ═══════════════════════════════════════
   // BRIEFING
@@ -344,7 +382,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
         {hotMovers.length > 0 && (
           <div style={{ padding: '12px 14px 4px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: t.text1 }}>Hot Today</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: t.text1 }}>🔥 Hot Today</span>
               <span
                 style={{ fontSize: 12, fontWeight: 600, color: t.green, cursor: 'pointer' }}
                 onClick={() => onTabChange?.('alerts')}
@@ -352,25 +390,36 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
             </div>
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
               {hotMovers.map((mover, i) => {
-                const chg = Number(mover.change_pct ?? mover.change ?? 0);
-                const up = chg >= 0;
+                const isPopular = mover.change_pct == null;
+                const chg = isPopular ? null : Number(mover.change_pct ?? mover.change ?? 0);
+                const up = chg != null && chg >= 0;
                 const label = SIGNAL_LABELS[mover.signal_type] || '';
+                const priceData = researchPrices[mover.ticker];
                 return (
                   <div key={i} style={{
-                    flexShrink: 0, width: 88, borderRadius: 10,
+                    flexShrink: 0, width: 105, borderRadius: 10,
                     background: t.card, border: `1px solid ${t.border}`,
                     overflow: 'hidden',
                   }}>
-                    <div style={{ height: 3, background: up ? t.green : '#ff6b6b' }} />
+                    <div style={{ height: 3, background: isPopular ? t.border : up ? t.green : '#ff6b6b' }} />
                     <div style={{ padding: '8px 8px 8px' }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginBottom: 2 }}>{mover.ticker}</div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: up ? t.green : '#ff6b6b', marginBottom: 4 }}>
-                        {up ? '+' : ''}{chg.toFixed(2)}%
-                      </div>
-                      {label && (
+                      {isPopular ? (
+                        <div style={{ fontSize: 11, color: t.text3, marginBottom: 4 }}>{mover._watchCount} watching</div>
+                      ) : (
+                        <div style={{ fontSize: 12, fontWeight: 600, color: up ? t.green : '#ff6b6b', marginBottom: 4 }}>
+                          {up ? '+' : ''}{chg.toFixed(2)}%
+                        </div>
+                      )}
+                      {priceData && (
+                        <div style={{ fontSize: 11, color: t.text2, marginBottom: 3 }}>
+                          ${priceData.price.toFixed(2)}
+                        </div>
+                      )}
+                      {label && !isPopular && (
                         <div style={{
-                          fontSize: 9, fontWeight: 600, color: t.text3,
-                          background: t.surface, borderRadius: 4,
+                          fontSize: 9, fontWeight: 600, color: '#D4A017',
+                          background: 'rgba(212,160,23,0.12)', borderRadius: 4,
                           padding: '1px 4px', display: 'inline-block',
                           textTransform: 'uppercase', letterSpacing: 0.3,
                         }}>{label}</div>
