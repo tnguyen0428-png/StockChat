@@ -13,16 +13,22 @@ import { safeGet, safeSet, safeRemove } from '../lib/safeStorage';
 // HomeTab is the default landing tab — load eagerly so first paint is instant
 import HomeTab from '../components/tabs/HomeTab';
 
+// Chat conversation header — small, load eagerly
+import ChatHeader from '../components/chat/ChatHeader';
+
+// Join-group modal — shown from inbox
+import JoinGroupModal from '../components/chat/JoinGroupModal';
+
 // Everything else is lazy — split into separate chunks, fetched on first tab visit
-const AlertsTab     = lazy(() => import('../components/tabs/AlertsTabRedesign'));
-const ChatTab       = lazy(() => import('../components/tabs/ChatTab'));
-const ProfileTab    = lazy(() => import('../components/tabs/ProfileTab'));
-const HelpTab       = lazy(() => import('../components/tabs/HelpTab'));
-const AITab         = lazy(() => import('../components/tabs/AITab'));
-const PortfolioTab  = lazy(() => import('../components/tabs/PortfolioTab'));
-const TrendingView  = lazy(() => import('../components/tabs/TrendingView'));
-const DMInbox       = lazy(() => import('../components/dm/DMInbox'));
-const DMChat        = lazy(() => import('../components/dm/DMChat'));
+const AlertsTab    = lazy(() => import('../components/tabs/AlertsTabRedesign'));
+const ChatTab      = lazy(() => import('../components/tabs/ChatTab'));
+const ProfileTab   = lazy(() => import('../components/tabs/ProfileTab'));
+const HelpTab      = lazy(() => import('../components/tabs/HelpTab'));
+const AITab        = lazy(() => import('../components/tabs/AITab'));
+const PortfolioTab = lazy(() => import('../components/tabs/PortfolioTab'));
+const ChatInbox    = lazy(() => import('../components/chat/ChatInbox'));
+const DMChat       = lazy(() => import('../components/dm/DMChat'));
+
 const TabFallback = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
     <div style={{ fontSize: 12, color: 'var(--text3)' }}>Loading…</div>
@@ -30,8 +36,8 @@ const TabFallback = () => (
 );
 
 // Shared components
-import Header     from '../components/shared/Header';
-import BottomNav  from '../components/shared/BottomNav';
+import Header    from '../components/shared/Header';
+import BottomNav from '../components/shared/BottomNav';
 
 export default function DashboardPage({ session }) {
   const navigate = useNavigate();
@@ -40,6 +46,7 @@ export default function DashboardPage({ session }) {
     publicGroups, privateGroup,
     isAdmin, isModerator, loading,
     enterGroup, refreshGroups,
+    createCustomGroup,
     // DM
     dmConversations, activeDM, dmUnreadCount,
     startDM, markDMRead, closeDM, setActiveDM,
@@ -54,22 +61,34 @@ export default function DashboardPage({ session }) {
     safeSet('uptik_darkMode', String(darkMode));
   }, [darkMode]);
 
-  const [activeTab, setActiveTab]         = useState(() => {
+  // Compute initial tab + chat view from join redirect (read once, clear once)
+  const [{ activeTabInit, chatViewInit }] = useState(() => {
     const redirect = safeGet('uptik_join_redirect');
-    if (redirect) {
-      safeRemove('uptik_join_redirect');
-      return redirect;
-    }
-    return 'home';
+    if (redirect) safeRemove('uptik_join_redirect');
+    return {
+      activeTabInit: redirect || 'home',
+      chatViewInit: redirect === 'chat' ? 'group' : 'inbox',
+    };
   });
+
+  const [activeTab, setActiveTab]   = useState(activeTabInit);
+  const [chatView, setChatView]     = useState(chatViewInit); // 'inbox' | 'group' | 'dm'
+  const [showJoinModal, setShowJoinModal] = useState(false);
+
   // Track which tabs have been visited so we can lazy-mount but never unmount
   const [mountedTabs, setMountedTabs] = useState(new Set(['home']));
   const [activeBroadcast, setActiveBroadcast] = useState(null);
   const [unreadAlerts, setUnreadAlerts]   = useState(false);
   const [unreadChat, setUnreadChat]       = useState(false);
-  const [chatMode, setChatMode]           = useState('chat'); // 'chat' | 'trending' | 'dms' | 'dm-chat'
   const [startingDM, setStartingDM]       = useState(false);
   const dismissTimerRef = useRef(null);
+
+  // Fallback: if we end up in dm view with no activeDM, drop back to inbox
+  useEffect(() => {
+    if (chatView === 'dm' && !activeDM && !startingDM) {
+      setChatView('inbox');
+    }
+  }, [chatView, activeDM, startingDM]);
 
   // ── Keyboard detection + single viewport handler ──
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -79,7 +98,7 @@ export default function DashboardPage({ session }) {
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const update = (e) => {
+    const update = () => {
       const isKB = vv.height < initialVH.current * 0.75;
       setKeyboardOpen(isKB);
       if (isKB) {
@@ -170,18 +189,13 @@ export default function DashboardPage({ session }) {
   }, [publicGroups, loading, activeGroup]);
 
   // ── DM Handlers ──
-  const handleStartDM = async (otherUserId, otherUsername) => {
-    // Optimistically flip to dm-chat mode so we don't flash the Groups or
-    // Inbox view between tap and RPC resolution. A small loader covers the gap.
+  const handleStartDM = async (otherUserId) => {
     setActiveTab('chat');
-    setChatMode('dm-chat');
+    setChatView('dm');
     setStartingDM(true);
     try {
       const dm = await startDM(otherUserId);
-      if (!dm) {
-        // Creation failed — fall back to the inbox rather than stranding the user
-        setChatMode('dms');
-      }
+      if (!dm) setChatView('inbox');
     } finally {
       setStartingDM(false);
     }
@@ -189,12 +203,44 @@ export default function DashboardPage({ session }) {
 
   const handleOpenDMFromInbox = (convo) => {
     setActiveDM(convo);
-    setChatMode('dm-chat');
+    setChatView('dm');
   };
 
-  const handleBackFromDM = () => {
+  const handleBackToInbox = () => {
     closeDM();
-    setChatMode('chat');
+    setChatView('inbox');
+  };
+
+  // ── Group Handlers ──
+  const handleOpenGroup = (group) => {
+    enterGroup(group);
+    setChatView('group');
+  };
+
+  const handleCreateGroup = async () => {
+    const name = window.prompt('Group name:');
+    if (!name?.trim()) return;
+    const { group, error } = await createCustomGroup(name.trim());
+    if (error) { alert(error); return; }
+    if (group) {
+      enterGroup(group);
+      setChatView('group');
+    }
+  };
+
+  const handleGroupJoined = async ({ id }) => {
+    safeSet('uptik_active_group', id);
+    await refreshGroups();
+    setChatView('group');
+  };
+
+  const handleInvite = () => {
+    if (!activeGroup) return;
+    const code = activeGroup.invite_code;
+    if (code) {
+      const url = `${window.location.origin}/join/${code}`;
+      navigator.clipboard?.writeText(url).catch(() => {});
+    }
   };
 
   const handleSignOut = async () => {
@@ -204,15 +250,12 @@ export default function DashboardPage({ session }) {
 
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
-    // When tapping Chat tab while already on Chat, cycle: dm-chat → dms → chat
-    // This gives users a way back without accidentally destroying their DM.
+    // Re-tapping Chat icon always returns to inbox
     if (tab === 'chat') {
-      setChatMode(prev => {
-        if (prev === 'dm-chat') return 'dms';  // go to inbox, not hard-close
-        return 'chat';
-      });
+      setChatView('inbox');
+      closeDM();
     }
-  }, []);
+  }, [closeDM]);
 
 
   function broadcastColor(type) {
@@ -262,7 +305,7 @@ export default function DashboardPage({ session }) {
         activeTab={activeTab}
         allGroups={allGroups}
         onGroupSwitch={enterGroup}
-        onGroupNameUpdate={(newName) => {}}
+        onGroupNameUpdate={() => {}}
         onSignOut={handleSignOut}
         onHomePress={() => setActiveTab('home')}
         onProfilePress={() => setActiveTab('profile')}
@@ -330,80 +373,59 @@ export default function DashboardPage({ session }) {
         {/* ── Chat ── */}
         {mountedTabs.has('chat') && (
           <div style={{ display: activeTab === 'chat' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-            {/* Chat | Trending | DMs toggle — only show when not in active DM chat */}
-            {chatMode !== 'dm-chat' && (
-              <div style={styles.chatToggleRow}>
-                <div
-                  style={{ ...styles.chatTogglePill, ...(chatMode === 'chat' ? styles.chatToggleActive : {}) }}
-                  onClick={() => setChatMode('chat')}
-                >
-                  Chat
-                </div>
-                <div
-                  style={{ ...styles.chatTogglePill, ...(chatMode === 'trending' ? styles.chatToggleActive : {}) }}
-                  onClick={() => setChatMode('trending')}
-                >
-                  Trending
-                </div>
-                <div
-                  style={{ ...styles.chatTogglePill, ...(chatMode === 'dms' ? styles.chatToggleActive : {}), position: 'relative' }}
-                  onClick={() => setChatMode('dms')}
-                >
-                  DMs
-                  {dmUnreadCount > 0 && (
-                    <span style={styles.dmBadge}>{dmUnreadCount > 9 ? '9+' : dmUnreadCount}</span>
-                  )}
-                </div>
-              </div>
-            )}
 
-            {/* Group Chat view */}
-            {chatMode === 'chat' && activeGroup && (
+            {/* Inbox */}
+            {chatView === 'inbox' && (
               <Suspense fallback={<TabFallback />}>
-                <ChatTab
+                <ChatInbox
                   session={session}
-                  profile={profile}
-                  group={activeGroup}
-                  isAdmin={isAdmin}
-                  isModerator={isModerator}
-                  setUnreadChat={setUnreadChat}
-                  onStartDM={handleStartDM}
+                  onOpenGroup={handleOpenGroup}
+                  onOpenDM={handleOpenDMFromInbox}
+                  onCreateGroup={handleCreateGroup}
+                  onJoinGroup={() => setShowJoinModal(true)}
                 />
               </Suspense>
             )}
-            {chatMode === 'chat' && !activeGroup && (
+
+            {/* Group conversation */}
+            {chatView === 'group' && activeGroup && (
+              <>
+                <ChatHeader
+                  convo={activeGroup}
+                  onBack={() => setChatView('inbox')}
+                  onInvite={activeGroup.invite_code ? handleInvite : undefined}
+                  isAdmin={isAdmin}
+                  isModerator={isModerator}
+                />
+                <Suspense fallback={<TabFallback />}>
+                  <ChatTab
+                    session={session}
+                    profile={profile}
+                    group={activeGroup}
+                    isAdmin={isAdmin}
+                    isModerator={isModerator}
+                    setUnreadChat={setUnreadChat}
+                    onStartDM={handleStartDM}
+                  />
+                </Suspense>
+              </>
+            )}
+            {chatView === 'group' && !activeGroup && (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ fontSize: 14, color: 'var(--text3)' }}>Loading chat...</div>
+                <div style={{ fontSize: 14, color: 'var(--text3)' }}>Loading chat…</div>
               </div>
             )}
 
-            {/* Trending view */}
-            {chatMode === 'trending' && (
+            {/* DM conversation */}
+            {chatView === 'dm' && activeDM && !startingDM && (
               <Suspense fallback={<TabFallback />}>
-                <TrendingView session={session} group={activeGroup} />
+                <DMChat session={session} dm={activeDM} onBack={handleBackToInbox} />
               </Suspense>
             )}
-
-            {/* DM views */}
-            {chatMode === 'dms' && (
-              <Suspense fallback={<TabFallback />}>
-                <DMInbox onOpenDM={handleOpenDMFromInbox} />
-              </Suspense>
-            )}
-            {chatMode === 'dm-chat' && activeDM && !startingDM && (
-              <Suspense fallback={<TabFallback />}>
-                <DMChat session={session} dm={activeDM} onBack={handleBackFromDM} />
-              </Suspense>
-            )}
-            {chatMode === 'dm-chat' && startingDM && (
+            {chatView === 'dm' && startingDM && (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ fontSize: 13, color: 'var(--text3)' }}>Starting chat…</div>
               </div>
-            )}
-            {chatMode === 'dm-chat' && !activeDM && !startingDM && (
-              <Suspense fallback={<TabFallback />}>
-                <DMInbox onOpenDM={handleOpenDMFromInbox} />
-              </Suspense>
             )}
           </div>
         )}
@@ -448,6 +470,12 @@ export default function DashboardPage({ session }) {
         />
       )}
 
+      <JoinGroupModal
+        open={showJoinModal}
+        onClose={() => setShowJoinModal(false)}
+        onJoined={handleGroupJoined}
+      />
+
     </div>
   );
 }
@@ -488,29 +516,4 @@ const styles = {
     alignItems: 'center', justifyContent: 'center', lineHeight: 1,
   },
   content: { flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' },
-  chatToggleRow: {
-    display: 'flex', gap: 0, padding: '6px 14px',
-    background: 'var(--card)', borderBottom: '1px solid var(--border)',
-    flexShrink: 0,
-    position: 'sticky', top: 0, zIndex: 10,
-  },
-  chatTogglePill: {
-    flex: 1, textAlign: 'center', padding: '7px 0',
-    fontSize: 12, fontWeight: 500, color: 'var(--text3)',
-    cursor: 'pointer', borderRadius: 8,
-    transition: 'all 0.15s',
-  },
-  chatToggleActive: {
-    background: 'var(--btn-active, #132d52)', color: '#fff',
-    fontWeight: 600, borderRadius: 8,
-    boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
-  },
-  dmBadge: {
-    position: 'absolute', top: 2, right: 12,
-    background: '#5eed8a', color: '#0a1628',
-    fontSize: 9, fontWeight: 700,
-    minWidth: 16, height: 16, borderRadius: 8,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: '0 4px',
-  },
 };
