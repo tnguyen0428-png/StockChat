@@ -170,7 +170,8 @@ export function usePortfolio(session) {
       setShowPresets(true);
       setShowCustom(false);
       setCustomAmount('');
-    } catch {
+    } catch (err) {
+      console.error('[Portfolio] handleSelectTicker failed:', err.message);
       setBuyError("Couldn't fetch price. Try again.");
     }
   };
