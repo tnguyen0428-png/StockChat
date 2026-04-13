@@ -24,7 +24,6 @@ const AlertsTab    = lazy(() => import('../components/tabs/AlertsTabRedesign'));
 const ChatTab      = lazy(() => import('../components/tabs/ChatTab'));
 const ProfileTab   = lazy(() => import('../components/tabs/ProfileTab'));
 const HelpTab      = lazy(() => import('../components/tabs/HelpTab'));
-const AITab        = lazy(() => import('../components/tabs/AITab'));
 const PortfolioTab = lazy(() => import('../components/tabs/PortfolioTab'));
 const ChatInbox    = lazy(() => import('../components/chat/ChatInbox'));
 const DMChat       = lazy(() => import('../components/dm/DMChat'));
@@ -298,14 +297,7 @@ export default function DashboardPage({ session }) {
     <div ref={pageRef} style={{ ...styles.page, ...vpStyle }}>
 
       <Header
-        group={activeGroup}
         profile={profile}
-        isAdmin={isAdmin}
-        isModerator={isModerator}
-        activeTab={activeTab}
-        allGroups={allGroups}
-        onGroupSwitch={enterGroup}
-        onGroupNameUpdate={() => {}}
         onSignOut={handleSignOut}
         onHomePress={() => setActiveTab('home')}
         onProfilePress={() => setActiveTab('profile')}
@@ -351,15 +343,6 @@ export default function DashboardPage({ session }) {
             darkMode={darkMode}
           />
         </div>
-
-        {/* ── AI ── */}
-        {mountedTabs.has('ai') && (
-          <div style={{ display: activeTab === 'ai' ? 'flex' : 'none', flex: 1, flexDirection: 'column' }}>
-            <Suspense fallback={<TabFallback />}>
-              <AITab session={session} />
-            </Suspense>
-          </div>
-        )}
 
         {/* ── Alerts ── */}
         {mountedTabs.has('alerts') && (
