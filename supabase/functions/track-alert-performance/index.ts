@@ -7,7 +7,15 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const FMP_BASE = 'https://financialmodelingprep.com/stable';
+// Polygon is the canonical price source across the app (scan-vol-surge,
+// price-lookup, breakoutScanner). Alert entry prices come from Polygon,
+// so exit prices must come from Polygon too — otherwise vendor drift
+// contaminates every hit/miss decision.
+const POLYGON_BASE = 'https://api.polygon.io';
+
+// Polygon snapshot endpoint accepts many tickers at once; chunk to stay
+// well under any URL-length / response-size limits.
+const POLY_BATCH_SIZE = 200;
 
 // Interval configs: how many hours after alert each interval should be checked
 const INTERVAL_HOURS: Record<string, number> = {
@@ -29,24 +37,51 @@ const HIT_THRESHOLDS: Record<string, number> = {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+// Batched Polygon snapshot fetch. One HTTP call can return many tickers, so
+// for a typical cron run (a few dozen tickers) this collapses to a single
+// request — no per-ticker sleep loop, no 50 serial FMP calls.
+async function fetchCurrentPrices(
+  tickers: string[],
+  apiKey: string,
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (tickers.length === 0) return out;
 
-async function fetchPrice(ticker: string, apiKey: string): Promise<number | null> {
-  try {
-    const res = await fetch(
-      `${FMP_BASE}/quote?symbol=${ticker}&apikey=${apiKey}`
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) {
-      return data[0].price || data[0].previousClose || null;
+  // Dedupe + chunk
+  const unique = [...new Set(tickers)];
+  for (let i = 0; i < unique.length; i += POLY_BATCH_SIZE) {
+    const chunk = unique.slice(i, i + POLY_BATCH_SIZE);
+    const url =
+      `${POLYGON_BASE}/v2/snapshot/locale/us/markets/stocks/tickers` +
+      `?tickers=${chunk.join(',')}&apiKey=${apiKey}`;
+
+    try {
+      const res = await fetch(url);
+      if (res.status === 429) {
+        console.error('[perf-track] Polygon rate limit — aborting this run');
+        break;
+      }
+      if (!res.ok) {
+        console.error(`[perf-track] Polygon HTTP ${res.status}: ${res.statusText}`);
+        continue;
+      }
+
+      const data = await res.json();
+      for (const snap of data.tickers ?? []) {
+        // Prefer live last-trade → today's close → prev-day close. Same
+        // precedence as the price-lookup edge function so all consumers
+        // of "current price" see the same number.
+        const price = snap.lastTrade?.p || snap.day?.c || snap.prevDay?.c || null;
+        if (price && price > 0 && snap.ticker) {
+          out.set(snap.ticker, price);
+        }
+      }
+    } catch (err) {
+      console.error('[perf-track] Polygon fetch threw:', (err as Error).message);
     }
-    return null;
-  } catch {
-    return null;
   }
+
+  return out;
 }
 
 function round2(n: number): number {
@@ -67,8 +102,8 @@ Deno.serve(async (req) => {
       return json({ skipped: true, reason: 'weekend' });
     }
 
-    const fmpKey = Deno.env.get('FMP_API_KEY');
-    if (!fmpKey) throw new Error('Missing env var: FMP_API_KEY');
+    const polygonKey = Deno.env.get('POLYGON_API_KEY');
+    if (!polygonKey) throw new Error('Missing env var: POLYGON_API_KEY');
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -80,13 +115,15 @@ Deno.serve(async (req) => {
     // Check alert_performance_snapshots for due intervals
     // ══════════════════════════════════════════════════════════════════
 
-    // Find snapshot rows that haven't been tracked yet
+    // Find snapshot rows that haven't been tracked yet.
+    // Limit bumped from 100 → 500 to drain the backlog faster; Polygon's snapshot
+    // endpoint handles 200 tickers/call so at most 3 batched fetches per run.
     const { data: pendingSnapshots, error: snapErr } = await supabase
       .from('alert_performance_snapshots')
       .select('id, alert_id, ticker, interval_key, alert_price, created_at')
       .is('tracked_at', null)
       .order('created_at', { ascending: true })
-      .limit(100);
+      .limit(500);
 
     if (snapErr) {
       console.error('[perf-track] Failed to fetch pending snapshots:', snapErr.message);
@@ -102,17 +139,30 @@ Deno.serve(async (req) => {
 
     console.log(`[perf-track] Found ${dueSnapshots.length} due snapshots out of ${(pendingSnapshots || []).length} pending`);
 
-    // Batch by unique ticker to minimize API calls
-    const snapshotTickers = new Set(dueSnapshots.map(s => s.ticker));
-    const prices = new Map<string, number>();
+    // ── Query legacy pending rows up-front so we can batch-fetch prices once ──
+    const cutoff = new Date(now.getTime() - 20 * 60 * 60 * 1000).toISOString();
 
-    for (const ticker of snapshotTickers) {
-      const price = await fetchPrice(ticker, fmpKey);
-      if (price !== null) prices.set(ticker, price);
-      await sleep(200);
+    const { data: pending, error: fetchErr } = await supabase
+      .from('alert_performance')
+      .select('id, ticker, alert_price, alert_time')
+      .is('outcome', null)
+      .is('admin_outcome', null)
+      .lt('alert_time', cutoff)
+      .order('alert_time', { ascending: true })
+      .limit(50);
+
+    if (fetchErr) {
+      console.error('[perf-track] Legacy fetch error:', fetchErr.message);
     }
 
-    console.log(`[perf-track] Fetched prices for ${prices.size} of ${snapshotTickers.size} tickers`);
+    // One batched Polygon snapshot call covers both snapshots + legacy rows
+    const allTickers = [
+      ...dueSnapshots.map(s => s.ticker),
+      ...(pending || []).map(p => p.ticker),
+    ];
+    const prices = await fetchCurrentPrices(allTickers, polygonKey);
+    const uniqueRequested = new Set(allTickers).size;
+    console.log(`[perf-track] Polygon returned prices for ${prices.size} of ${uniqueRequested} unique tickers`);
 
     const snapshotResults = { tracked: 0, skipped: 0, errors: 0 };
     const trackedDetails: string[] = [];
@@ -149,37 +199,12 @@ Deno.serve(async (req) => {
 
     // ══════════════════════════════════════════════════════════════════
     // PART B: Legacy 24h tracking (alert_performance table)
-    // Keep this for backwards compatibility
+    // Prices were already fetched in the batched Polygon call above.
     // ══════════════════════════════════════════════════════════════════
-
-    const cutoff = new Date(now.getTime() - 20 * 60 * 60 * 1000).toISOString();
-
-    const { data: pending, error: fetchErr } = await supabase
-      .from('alert_performance')
-      .select('id, ticker, alert_price, alert_time')
-      .is('outcome', null)
-      .is('admin_outcome', null)
-      .lt('alert_time', cutoff)
-      .order('alert_time', { ascending: true })
-      .limit(50);
-
-    if (fetchErr) {
-      console.error('[perf-track] Legacy fetch error:', fetchErr.message);
-    }
 
     const legacyResults = { tracked: 0, skipped: 0, errors: 0 };
 
     if (pending && pending.length > 0) {
-      // Fetch any additional prices not already fetched
-      const legacyTickers = new Set(pending.map(p => p.ticker));
-      for (const ticker of legacyTickers) {
-        if (!prices.has(ticker)) {
-          const price = await fetchPrice(ticker, fmpKey);
-          if (price !== null) prices.set(ticker, price);
-          await sleep(200);
-        }
-      }
-
       for (const row of pending) {
         const currentPrice = prices.get(row.ticker);
         if (!currentPrice || !row.alert_price || row.alert_price <= 0) {

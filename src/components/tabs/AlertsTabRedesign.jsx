@@ -1,9 +1,15 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useTheme, SentimentPill, timeAgo } from './alertsCasinoComponents';
 import { isMarketOpen } from '../../utils/marketUtils';
 
 // ── Constants ──
+// Polygon replaced FMP as the exit-price source for alert scoring on 2026-04-14.
+// Win-rate / avg-return only pull rows scored on or after this cutoff so the
+// numbers aren't contaminated by FMP-vs-Polygon vendor drift on older rows.
+// Historical rows remain in the DB untouched — backfill later.
+const POLYGON_SCORING_CUTOFF = '2026-04-14T00:00:00Z';
+
 const TYPE_CONFIG = {
   vol_surge:   { label: 'VOL SURGE', color: '#a78bfa', bg: 'rgba(167,139,250,0.15)' },
   flow_signal: { label: 'BIG MONEY', color: '#5eed8a', bg: 'rgba(94,237,138,0.12)' },
@@ -139,7 +145,11 @@ function historyMetric(h, t) {
     const v = Number(h.volume_ratio);
     if (isFinite(v) && v > 0) return { text: `${v.toFixed(1)}x vol`, color: '#a78bfa' };
   }
-  const pct = Number(h.change_pct);
+  // gap_up stores the move in gap_pct, not change_pct — fall back to either so
+  // Recent Alerts never shows "—" for a row that actually has a move logged.
+  // Mirrors mapAlert's precedence: change → change_pct → gap_pct.
+  const rawPct = h.change ?? h.change_pct ?? h.gap_pct;
+  const pct = Number(rawPct);
   if (isFinite(pct) && pct !== 0) return { text: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, color: pct >= 0 ? t.green : t.red };
   return { text: '—', color: t.text3 };
 }
@@ -205,49 +215,97 @@ export default function AlertsTab({ session, group, darkMode }) {
   const [loading, setLoading] = useState(true);
   const [historyFilter, setHistoryFilter] = useState('all');
   const [showAllHistory, setShowAllHistory] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [connState, setConnState] = useState('connecting'); // 'live' | 'reconnecting' | 'connecting'
+  const [tick, setTick] = useState(0); // forces "Xs ago" label to re-render
+  // Tracks whether we've been disconnected so we can refetch once on re-subscribe.
+  // Held in a ref (not state) so the side effect lives outside React's render/commit
+  // cycle — avoids StrictMode double-invoking a side effect placed in a setState updater.
+  const wasDisconnectedRef = useRef(false);
 
-  // Fetch alerts + performance + market data in parallel
-  useEffect(() => {
+  // Extracted so we can refetch on focus + reconnect
+  const loadData = useCallback(async () => {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    Promise.all([
+    const [alertsRes, perfRes, marketRes] = await Promise.all([
       supabase.from('breakout_alerts').select('*')
         .gte('created_at', sevenDaysAgo.toISOString())
         .order('created_at', { ascending: false }).limit(50),
       supabase.from('alert_performance').select('*')
         .not('outcome', 'is', null)
+        .gte('tracked_at', POLYGON_SCORING_CUTOFF)   // drop FMP-era rows from win rate
         .in('signal_type', Object.keys(TYPE_CONFIG))
         .order('alert_time', { ascending: false }).limit(20),
       supabase.from('market_data').select('*'),
-    ]).then(([alertsRes, perfRes, marketRes]) => {
-      if (alertsRes.data) setLiveAlerts(alertsRes.data);
-      if (perfRes.data) setPerfHistory(perfRes.data);
-      if (marketRes.data) {
-        const fg = marketRes.data.find(r => r.key === 'fear_greed');
-        const vix = marketRes.data.find(r => r.key === 'vix_score');
-        setFearScore((fg || vix)?.value?.score ?? null);
+    ]);
+    if (alertsRes.data) setLiveAlerts(alertsRes.data);
+    if (perfRes.data) setPerfHistory(perfRes.data);
+    if (marketRes.data) {
+      const fg = marketRes.data.find(r => r.key === 'fear_greed');
+      const vix = marketRes.data.find(r => r.key === 'vix_score');
+      setFearScore((fg || vix)?.value?.score ?? null);
+    }
+    setLastUpdated(new Date());
+    setLoading(false);
+  }, []);
+
+  // Fetch alerts + performance + market data in parallel, subscribe to realtime
+  useEffect(() => {
+    loadData();
+
+    const onSubStatus = (status) => {
+      if (status === 'SUBSCRIBED') {
+        // Rejoining after a drop? Refetch once to catch anything missed while offline.
+        // Side effect lives here (not inside a setState updater) so StrictMode's
+        // double-invocation of reducers can't cause a duplicate refetch.
+        if (wasDisconnectedRef.current) {
+          wasDisconnectedRef.current = false;
+          loadData();
+        }
+        setConnState('live');
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        wasDisconnectedRef.current = true;
+        setConnState('reconnecting');
       }
-      setLoading(false);
-    });
+    };
 
     const alertCh = supabase.channel('alerts_chips_feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'breakout_alerts' }, ({ new: row }) => {
         setLiveAlerts(prev => [row, ...prev]);
-      }).subscribe();
+        setLastUpdated(new Date());
+      }).subscribe(onSubStatus);
 
     const perfCh = supabase.channel('perf_chips_feed')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'alert_performance' }, ({ eventType, new: row }) => {
         if (eventType === 'INSERT' || eventType === 'UPDATE') {
+          // Mirror the initial-fetch filter: ignore rows scored before the Polygon cutoff
+          // so backfill writes to old rows can't leak FMP-era data into the live window.
+          const trackedAt = row.tracked_at ? new Date(row.tracked_at).getTime() : 0;
+          const cutoff = new Date(POLYGON_SCORING_CUTOFF).getTime();
+          if (trackedAt && trackedAt < cutoff) return;
           setPerfHistory(prev => {
             const rest = prev.filter(p => p.id !== row.id);
             return (row.outcome || row.admin_outcome) ? [row, ...rest].slice(0, 20) : rest;
           });
+          setLastUpdated(new Date());
         }
-      }).subscribe();
+      }).subscribe(onSubStatus);
 
-    return () => { supabase.removeChannel(alertCh); supabase.removeChannel(perfCh); };
-  }, []);
+    // Catch the "tab was backgrounded / laptop slept" case — refetch on focus
+    const onFocus = () => { loadData(); };
+    window.addEventListener('focus', onFocus);
+
+    // Re-render the "Xs ago" label every 15s so it stays fresh
+    const tickInt = setInterval(() => setTick(n => n + 1), 15000);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      clearInterval(tickInt);
+      supabase.removeChannel(alertCh);
+      supabase.removeChannel(perfCh);
+    };
+  }, [loadData]);
 
   const displayAlerts = useMemo(() => {
     return liveAlerts.map(mapAlert).filter(a => a.ticker !== '—' && (Math.abs(a.changePct) > 0.05 || a.flowDollars > 0));
@@ -378,20 +436,29 @@ export default function AlertsTab({ session, group, darkMode }) {
 
       {/* ═══ STATS STRIP ═══ */}
       {alertStats.total > 0 && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-          <StatCard label="Total alerts" value={alertStats.total} color={t.text1} t={t} />
-          {alertStats.hasPerf ? (
-            <>
-              <StatCard label="Win rate" value={`${alertStats.winRate}%`} color={alertStats.winRate >= 50 ? t.green : t.red} t={t} />
-              <StatCard label="Avg return" value={`${alertStats.avgReturn >= 0 ? '+' : ''}${alertStats.avgReturn.toFixed(1)}%`} color={alertStats.avgReturn >= 0 ? t.green : t.red} t={t} />
-            </>
-          ) : (
-            <>
-              <StatCard label="Breakouts" value={alertStats.byType['52w_high'] || 0} color="#fbbf24" t={t} />
-              <StatCard label="Big money" value={alertStats.byType['flow_signal'] || 0} color="#5eed8a" t={t} />
-            </>
-          )}
-        </div>
+        <>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            <StatCard label="Total alerts" value={alertStats.total} color={t.text1} t={t} />
+            {alertStats.hasPerf ? (
+              <>
+                <StatCard label="Win rate" value={`${alertStats.winRate}%`} color={alertStats.winRate >= 50 ? t.green : t.red} t={t} />
+                <StatCard label="Avg return" value={`${alertStats.avgReturn >= 0 ? '+' : ''}${alertStats.avgReturn.toFixed(1)}%`} color={alertStats.avgReturn >= 0 ? t.green : t.red} t={t} />
+              </>
+            ) : (
+              <>
+                <StatCard label="Breakouts" value={alertStats.byType['52w_high'] || 0} color="#fbbf24" t={t} />
+                <StatCard label="Big money" value={alertStats.byType['flow_signal'] || 0} color="#5eed8a" t={t} />
+              </>
+            )}
+          </div>
+          <FreshnessBar
+            lastUpdated={lastUpdated}
+            connState={connState}
+            onRefresh={loadData}
+            tick={tick}
+            t={t}
+          />
+        </>
       )}
 
       {/* ═══ EDUCATION ═══ */}
@@ -466,6 +533,48 @@ function StatCard({ label, value, color, t }) {
     <div style={{ flex: 1, background: t.card, borderRadius: 8, padding: '8px 6px', textAlign: 'center', border: `1px solid ${t.border}` }}>
       <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3 }}>{label}</div>
       <div style={{ fontSize: 18, fontWeight: 600, color, marginTop: 2, fontFamily: "'Outfit', sans-serif" }}>{value}</div>
+    </div>
+  );
+}
+
+// Live/stale indicator — stickiness goal: one glance tells you if numbers are current.
+// eslint-disable-next-line no-unused-vars
+function FreshnessBar({ lastUpdated, connState, onRefresh, tick, t }) {
+  // Compute staleness in seconds (tick forces re-render)
+  const ageSec = lastUpdated ? Math.max(0, Math.round((Date.now() - lastUpdated.getTime()) / 1000)) : null;
+  const ageLabel = ageSec == null
+    ? '—'
+    : ageSec < 45 ? 'just now'
+    : ageSec < 3600 ? `${Math.round(ageSec / 60)}m ago`
+    : ageSec < 86400 ? `${Math.round(ageSec / 3600)}h ago`
+    : `${Math.round(ageSec / 86400)}d ago`;
+
+  const stale = ageSec != null && ageSec > 600; // >10 min = stale-looking
+  const isLive = connState === 'live' && !stale;
+  const dotColor = isLive ? t.green : (connState === 'reconnecting' || stale) ? '#fbbf24' : t.text3;
+  const statusText = connState === 'reconnecting' ? 'Reconnecting…'
+    : connState === 'connecting' ? 'Connecting…'
+    : stale ? 'Stale' : 'Live';
+
+  return (
+    <div
+      onClick={onRefresh}
+      title="Tap to refresh"
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '4px 8px', marginBottom: 10,
+        fontSize: 10, color: t.text3,
+        cursor: 'pointer', userSelect: 'none',
+      }}
+    >
+      <span style={{
+        width: 6, height: 6, borderRadius: '50%', background: dotColor,
+        boxShadow: isLive ? `0 0 4px ${dotColor}` : 'none',
+        flexShrink: 0,
+      }} />
+      <span style={{ fontWeight: 500 }}>{statusText}</span>
+      <span style={{ color: t.text3 }}>· Updated {ageLabel}</span>
+      <span style={{ marginLeft: 'auto', color: t.text3, fontSize: 11 }}>↻</span>
     </div>
   );
 }
