@@ -107,13 +107,51 @@ function nextMarketDay() {
 
 function typeFor(raw) { return TYPE_CONFIG[raw] || TYPE_CONFIG.vol_surge; }
 
+// Returns { text, color } for the rightmost metric in the history row
+function historyMetric(h, t) {
+  const type = h.signal_type;
+  if (type === 'flow_signal') {
+    const dp = Number(h.gap_pct) || 0;
+    const premium = Number(h.avg_volume) || 0;
+    const v = dp > 0 ? dp : premium;
+    if (v > 0) return { text: fmtMoney(v), color: '#5eed8a' };
+    const sweeps = Number(h.volume_ratio) || 0;
+    if (sweeps > 0) return { text: `${sweeps} sweep${sweeps > 1 ? 's' : ''}`, color: '#5eed8a' };
+    const trades = Number(h.volume) || 0;
+    if (trades > 0) return { text: `${trades} trades`, color: '#5eed8a' };
+    return { text: '—', color: t.text3 };
+  }
+  if (type === '52w_high') {
+    const p = Number(h.pct_from_high);
+    if (!isFinite(p)) return { text: '—', color: t.text3 };
+    if (p < 0.1) return { text: 'at high', color: '#fbbf24' };
+    return { text: `-${p.toFixed(1)}%`, color: '#fbbf24' };
+  }
+  if (type === 'ma_cross') {
+    const s = Number(h.short_ma), l = Number(h.long_ma);
+    if (isFinite(s) && isFinite(l) && l > 0) {
+      const diff = ((s - l) / l) * 100;
+      return { text: `${diff >= 0 ? '+' : ''}${diff.toFixed(2)}%`, color: diff >= 0 ? t.green : t.red };
+    }
+    return { text: '↑ cross', color: '#60a5fa' };
+  }
+  if (type === 'vol_surge') {
+    const v = Number(h.volume_ratio);
+    if (isFinite(v) && v > 0) return { text: `${v.toFixed(1)}x vol`, color: '#a78bfa' };
+  }
+  const pct = Number(h.change_pct);
+  if (isFinite(pct) && pct !== 0) return { text: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, color: pct >= 0 ? t.green : t.red };
+  return { text: '—', color: t.text3 };
+}
+
 function mapAlert(a) {
   const ticker = a.ticker ?? a.tickers?.[0] ?? '—';
   const type = a.signal_type ?? a.alert_type ?? 'vol_surge';
   const isFlow = type === 'flow_signal';
 
-  const change = isFlow ? (a.change ?? a.gap_pct ?? 0) : (a.change ?? a.change_pct ?? a.gap_pct ?? 0);
+  const change = isFlow ? (a.change ?? a.change_pct ?? 0) : (a.change ?? a.change_pct ?? a.gap_pct ?? 0);
   const changePct = Number(change) || 0;
+  const flowDollars = isFlow ? (Number(a.gap_pct) || 0) : 0;
   const company = a.company ?? a.name ?? '';
   const price = a.price ?? a.current_price ?? null;
   const volRatio = a.volume_ratio ?? a.rel_volume ?? null;
@@ -154,7 +192,7 @@ function mapAlert(a) {
     { label: 'Signal', value: a.notes ? a.notes.slice(0, 20) : (volRatio ? volRatio + 'x avg' : '—') },
   ];
 
-  return { id: a.id, ticker, type, isFlow, changePct, company, price, explanation, stats, created_at: a.created_at };
+  return { id: a.id, ticker, type, isFlow, changePct, flowDollars, company, price, explanation, stats, created_at: a.created_at };
 }
 
 // ===== MAIN COMPONENT =====
@@ -179,6 +217,7 @@ export default function AlertsTab({ session, group, darkMode }) {
         .order('created_at', { ascending: false }).limit(50),
       supabase.from('alert_performance').select('*')
         .not('outcome', 'is', null)
+        .in('signal_type', Object.keys(TYPE_CONFIG))
         .order('alert_time', { ascending: false }).limit(20),
       supabase.from('market_data').select('*'),
     ]).then(([alertsRes, perfRes, marketRes]) => {
@@ -211,7 +250,7 @@ export default function AlertsTab({ session, group, darkMode }) {
   }, []);
 
   const displayAlerts = useMemo(() => {
-    return liveAlerts.map(mapAlert).filter(a => a.ticker !== '—' && Math.abs(a.changePct) > 0.05);
+    return liveAlerts.map(mapAlert).filter(a => a.ticker !== '—' && (Math.abs(a.changePct) > 0.05 || a.flowDollars > 0));
   }, [liveAlerts]);
 
   const uniqueAlerts = useMemo(() => {
@@ -224,7 +263,10 @@ export default function AlertsTab({ session, group, darkMode }) {
   const alertHistory = useMemo(() => {
     return liveAlerts.slice(0, 30).map(a => ({
       id: a.id, ticker: a.ticker, signal_type: a.signal_type,
-      price: a.price, change_pct: a.change_pct, created_at: a.created_at,
+      price: a.price, change_pct: a.change_pct, gap_pct: a.gap_pct,
+      pct_from_high: a.pct_from_high, short_ma: a.short_ma, long_ma: a.long_ma,
+      volume_ratio: a.volume_ratio, volume: a.volume, avg_volume: a.avg_volume,
+      notes: a.notes, created_at: a.created_at,
     }));
   }, [liveAlerts]);
 
@@ -232,7 +274,9 @@ export default function AlertsTab({ session, group, darkMode }) {
     const total = alertHistory.length;
     const byType = {};
     alertHistory.forEach(a => { byType[a.signal_type || 'vol_surge'] = (byType[a.signal_type || 'vol_surge'] || 0) + 1; });
-    const resolved = perfHistory.filter(h => h.return_pct != null);
+    // Only count signal types shown in the Action alerts feed
+    const actionTypes = new Set(Object.keys(TYPE_CONFIG));
+    const resolved = perfHistory.filter(h => h.return_pct != null && actionTypes.has(h.signal_type));
     const wins = resolved.filter(h => h.return_pct > 0).length;
     const winRate = resolved.length > 0 ? Math.round((wins / resolved.length) * 100) : null;
     const avgReturn = resolved.length > 0 ? resolved.reduce((s, h) => s + Number(h.return_pct), 0) / resolved.length : null;
@@ -280,8 +324,8 @@ export default function AlertsTab({ session, group, darkMode }) {
         }}>
           {uniqueAlerts.map((alert, i) => {
             const isSelected = selectedId === alert.id;
-            const size = chipSize(alert.changePct);
-            const isUp = alert.changePct >= 0;
+            const size = alert.isFlow ? chipSize(alert.flowDollars / 500000) : chipSize(alert.changePct);
+            const isUp = alert.isFlow ? alert.flowDollars > 0 : alert.changePct >= 0;
             const tc = typeFor(alert.type);
             const f = freshness(alert.created_at);
             const isHot = f >= 0.85;
@@ -307,7 +351,9 @@ export default function AlertsTab({ session, group, darkMode }) {
                 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: '#000', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{alert.ticker}</span>
                   <span style={{ fontSize: 9, color: 'rgba(0,0,0,0.6)', lineHeight: 1, marginTop: 1 }}>
-                    {alert.changePct >= 0 ? '+' : ''}{alert.changePct.toFixed(1)}%
+                    {alert.isFlow
+                      ? (alert.flowDollars > 0 ? fmtMoney(alert.flowDollars) : '—')
+                      : `${alert.changePct >= 0 ? '+' : ''}${alert.changePct.toFixed(1)}%`}
                   </span>
                   <span style={{
                     fontSize: 6.5, fontWeight: 700, color: 'rgba(0,0,0,0.45)', lineHeight: 1, marginTop: 2,
@@ -385,13 +431,13 @@ export default function AlertsTab({ session, group, darkMode }) {
               <>
                 {visible.map(h => {
                   const tc = typeFor(h.signal_type);
-                  const pct = Number(h.change_pct) || 0;
+                  const m = historyMetric(h, t);
                   return (
                     <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderTop: `1px solid ${t.border}` }}>
                       <span style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, color: t.text1, width: 44, fontSize: 12 }}>{h.ticker}</span>
                       <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 3, background: tc.bg, color: tc.color }}>{tc.label}</span>
                       <span style={{ color: t.text3, fontSize: 11, flex: 1 }}>{h.price ? `$${Number(h.price).toFixed(2)}` : ''}</span>
-                      <span style={{ color: pct >= 0 ? t.green : t.red, fontSize: 11, fontWeight: 600 }}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span>
+                      <span style={{ color: m.color, fontSize: 11, fontWeight: 600 }}>{m.text}</span>
                       <span style={{ color: t.text3, fontSize: 11 }}>{timeAgo(h.created_at)}</span>
                     </div>
                   );
@@ -431,8 +477,10 @@ function DetailPanel({ alert, t }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
         <span style={{ fontSize: 18, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{alert.ticker}</span>
         <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: tc.bg, color: tc.color, fontFamily: "'Outfit', sans-serif" }}>{tc.label}</span>
-        <span style={{ fontSize: 15, fontWeight: 700, color: alert.changePct >= 0 ? t.green : t.red, marginLeft: 'auto' }}>
-          {alert.changePct >= 0 ? '+' : ''}{alert.changePct.toFixed(1)}%
+        <span style={{ fontSize: 15, fontWeight: 700, color: alert.isFlow ? '#5eed8a' : (alert.changePct >= 0 ? t.green : t.red), marginLeft: 'auto' }}>
+          {alert.isFlow
+            ? (alert.flowDollars > 0 ? fmtMoney(alert.flowDollars) : '—')
+            : `${alert.changePct >= 0 ? '+' : ''}${alert.changePct.toFixed(1)}%`}
         </span>
       </div>
       <div style={{ fontSize: 11, color: t.text3, marginBottom: 8 }}>
