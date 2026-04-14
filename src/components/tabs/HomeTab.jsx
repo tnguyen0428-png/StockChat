@@ -120,24 +120,28 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   // ═══════════════════════════════════════
   const loadHotMovers = async () => {
     try {
-      const threeDaysAgo = new Date();
-      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-      threeDaysAgo.setHours(0, 0, 0, 0);
-      const { data: alerts } = await supabase
+      const windowStart = new Date();
+      windowStart.setDate(windowStart.getDate() - 7);
+      windowStart.setHours(0, 0, 0, 0);
+      const { data: alerts, error: alertsErr } = await supabase
         .from('breakout_alerts')
         .select('ticker, signal_type, change_pct, change')
-        .gte('created_at', threeDaysAgo.toISOString())
+        .gte('created_at', windowStart.toISOString())
         .order('created_at', { ascending: false })
         .limit(50);
+
+      if (alertsErr) console.error('[HomeTab] breakout_alerts error:', alertsErr);
+      console.log('[HomeTab] Hot movers:', { alertCount: alerts?.length || 0, error: alertsErr?.message });
 
       if (alerts && alerts.length > 0) {
         const seen = new Map();
         alerts.forEach(a => { if (!seen.has(a.ticker)) seen.set(a.ticker, a); });
         setHotMovers([...seen.values()].slice(0, 5));
       } else {
-        const { data: wlData } = await supabase
+        const { data: wlData, error: wlErr } = await supabase
           .from('user_watchlist')
           .select('symbol');
+        if (wlErr) console.error('[HomeTab] user_watchlist error:', wlErr);
         if (wlData && wlData.length > 0) {
           const counts = {};
           wlData.forEach(row => { counts[row.symbol] = (counts[row.symbol] || 0) + 1; });
