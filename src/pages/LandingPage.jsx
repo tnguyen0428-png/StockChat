@@ -6,520 +6,368 @@ const TOTAL_SPOTS = 50;
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [email, setEmail]           = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [btnError, setBtnError] = useState('');
-  const [visible, setVisible] = useState(false);
-  const [spotsLeft, setSpotsLeft] = useState(null);
-  const [faqOpen, setFaqOpen] = useState(null);
-
-  useEffect(() => { setTimeout(() => setVisible(true), 60); }, []);
+  const [success, setSuccess]       = useState(false);
+  const [btnError, setBtnError]     = useState('');
+  const [visible, setVisible]       = useState(false);
+  const [spotsUsed, setSpotsUsed]   = useState(25);
 
   useEffect(() => {
-    supabase.from('profiles').select('*', { count: 'exact', head: true })
-      .then(({ count, error }) => {
-        if (!error && count != null) setSpotsLeft(Math.max(0, TOTAL_SPOTS - count));
-      });
+    const t = setTimeout(() => setVisible(true), 60);
+    return () => clearTimeout(t);
   }, []);
 
-  const showError = (msg) => { setBtnError(msg); setTimeout(() => setBtnError(''), 2500); };
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .then(({ count }) => { if (count != null) setSpotsUsed(count); });
+  }, []);
+
+  const showError = (msg) => {
+    setBtnError(msg);
+    setTimeout(() => setBtnError(''), 2200);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email.trim()) { showError('Enter your email'); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { showError('Invalid email'); return; }
     setSubmitting(true);
-    const { error } = await supabase.from('waitlist').insert({ email: email.trim().toLowerCase() });
+    const { error } = await supabase
+      .from('waitlist')
+      .insert({ email: email.trim().toLowerCase() });
     setSubmitting(false);
     if (error) {
-      if (error.code === '23505') showError('Already on the list!');
+      if (error.code === '23505') showError("You're already on the list!");
       else showError('Something went wrong');
       return;
     }
     setSuccess(true);
   };
 
-  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+  const spotsOpen = Math.max(0, TOTAL_SPOTS - spotsUsed);
+  const pct       = Math.min(100, (spotsUsed / TOTAL_SPOTS) * 100);
 
-  const spotsUsed = spotsLeft !== null ? TOTAL_SPOTS - spotsLeft : 0;
-  const progressPct = spotsLeft !== null ? (spotsUsed / TOTAL_SPOTS) * 100 : 0;
-  const noSpots = spotsLeft === 0;
-
-  const FEATURES = [
-    { icon: '⚡', title: 'Smart alerts & dark pool flow', desc: 'Breakout alerts, options activity, and dark pool orders — see where big money is moving.' },
-    { icon: '✦', title: 'AI-powered research', desc: 'Ask about any stock — earnings, fundamentals, sector momentum. Sharp answers, no fluff.', iconColor: '#8B5CF6' },
-    { icon: '👥', title: 'Trade with your team', desc: 'Private groups, daily briefings, and curated watchlists — shared with your crew.' },
-    { icon: '🏆', title: 'Portfolio challenge', desc: '$50K paper cash. Compete on the leaderboard, earn badges, talk trash — prove who trades best.' },
-  ];
-
-  const FAQS = [
-    { q: 'Why is access limited?', a: "We're a small team. We'd rather give 50 people a great experience than 1,000 people a buggy one. Each round we open more spots." },
-    { q: 'Is it free?', a: "Yes, completely free during the beta. We're building with our friends first — no hidden fees, no premium tiers yet." },
-    { q: 'Is this a brokerage?', a: "No. We don't hold your money or execute real trades. The portfolio challenge uses virtual cash. We're a research and community tool." },
-  ];
-
-  const SCREENSHOTS = [
-    { label: 'Home', src: '/screenshot-home.png' },
-    { label: 'Alerts', src: '/screenshot-alerts.png' },
-    { label: 'Challenge', src: '/screenshot-challenge.png' },
-  ];
-
-  const AVATARS = [
-    { bg: '#2563eb', letter: 'T' },
-    { bg: '#7c3aed', letter: 'N' },
-    { bg: '#db2777', letter: 'D' },
-    { bg: '#d97706', letter: 'E' },
-  ];
-
-  const fade = (delay = 0) => ({
-    opacity: visible ? 1 : 0,
-    transform: visible ? 'translateY(0)' : 'translateY(22px)',
-    transition: `opacity 0.55s ease ${delay}ms, transform 0.55s ease ${delay}ms`,
-  });
+  const cls = (d) => `ls${visible ? ` ls-vis ls-d${d}` : ''}`;
 
   return (
-    <div style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif", background: '#f4f6f9', minHeight: '100vh', overflowX: 'hidden', fontSize: 13 }}>
+    <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=DM+Sans:wght@400;500;600;700&display=swap');
-        * { box-sizing: border-box; }
-        body { margin: 0; }
-        .lp-heading { font-family: 'Outfit', sans-serif; }
-        .lp-btn-green {
-          background: #16a34a;
-          color: #fff;
-          border: none;
-          border-radius: 10px;
-          font-family: 'DM Sans', sans-serif;
-          font-weight: 700;
-          font-size: 15px;
-          cursor: pointer;
-          transition: background 0.18s, transform 0.12s;
-          padding: 13px 28px;
-          letter-spacing: 0.01em;
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #eef2f7; }
+
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(16px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
-        .lp-btn-green:hover { background: #15803d; transform: translateY(-1px); }
-        .lp-btn-green:active { transform: translateY(0); }
-        .lp-btn-green:disabled { background: #4ade80; cursor: not-allowed; transform: none; }
-        .lp-input {
-          width: 100%;
-          padding: 13px 16px;
-          border: 1.5px solid rgba(255,255,255,0.16);
-          border-radius: 10px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 16px;
-          outline: none;
-          transition: border-color 0.18s, box-shadow 0.18s;
-          background: rgba(255,255,255,0.08);
-          color: #f1f5f9;
-        }
-        .lp-input:focus { border-color: #4ade80; box-shadow: 0 0 0 3px rgba(74,222,128,0.15); }
-        .lp-input::placeholder { color: rgba(255,255,255,0.35); }
-        .lp-input:disabled { opacity: 0.5; cursor: not-allowed; }
-        .lp-faq-item {
-          border-bottom: 1px solid #e5e7eb;
-          cursor: pointer;
-          user-select: none;
-        }
-        .lp-faq-item:last-child { border-bottom: none; }
-        .lp-faq-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 18px 0;
-          gap: 12px;
-        }
-        .lp-faq-row:hover .lp-faq-q { color: #16a34a !important; }
-        .lp-chevron {
-          transition: transform 0.22s ease;
-          color: #6b7280;
-          flex-shrink: 0;
-        }
-        .lp-chevron.open { transform: rotate(180deg); }
-        .lp-faq-answer {
-          overflow: hidden;
-          transition: max-height 0.28s ease, opacity 0.22s ease;
-          max-height: 0;
-          opacity: 0;
-        }
-        .lp-faq-answer.open { max-height: 200px; opacity: 1; }
-        .lp-screen-scroll {
-          display: flex;
-          gap: 16px;
-          overflow-x: auto;
-          padding-bottom: 8px;
-          -webkit-overflow-scrolling: touch;
-          scrollbar-width: none;
-        }
-        .lp-screen-scroll::-webkit-scrollbar { display: none; }
-        .lp-screen-card {
-          flex-shrink: 0;
-          width: 140px;
-          height: 200px;
-          border-radius: 14px;
-          position: relative;
-          overflow: hidden;
-          box-shadow: 0 8px 28px rgba(0,0,0,0.28);
-          transition: transform 0.22s ease;
-        }
-        .lp-screen-card:hover { transform: translateY(-4px) scale(1.03); }
-        .lp-feature-card {
-          background: #fff;
-          border-radius: 16px;
-          padding: 22px 20px;
-          box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-          border: 1px solid #e5e7eb;
-          transition: box-shadow 0.18s, transform 0.18s;
-        }
-        .lp-feature-card:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.09); transform: translateY(-2px); }
-        .lp-avatar {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          border: 2px solid #fff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 13px;
-          font-weight: 700;
-          color: #fff;
-          flex-shrink: 0;
-        }
-        @keyframes pulse-glow {
-          0%, 100% { opacity: 0.45; }
-          50% { opacity: 0.85; }
-        }
-        @keyframes grid-fade {
-          0% { opacity: 0; }
-          100% { opacity: 1; }
-        }
+        .ls { opacity: 0; }
+        .ls.ls-vis { animation: fadeUp 0.52s ease forwards; }
+        .ls.ls-d1 { animation-delay: 0.04s; }
+        .ls.ls-d2 { animation-delay: 0.15s; }
+        .ls.ls-d3 { animation-delay: 0.26s; }
+        .ls.ls-d4 { animation-delay: 0.37s; }
+        .ls.ls-d5 { animation-delay: 0.48s; }
+        .ls.ls-d6 { animation-delay: 0.58s; }
+
+        .ea-input { outline: none; }
+        .ea-input::placeholder { color: rgba(255,255,255,0.4); }
+        .ea-input:focus { border-color: #8cd9a0 !important; }
+        .login-btn:hover { color: #8cd9a0 !important; }
+
+        .ss-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .ss-scroll::-webkit-scrollbar { display: none; }
       `}</style>
 
-      {/* NAV */}
-      <nav style={{
-        background: '#132d52',
-        borderBottom: '1px solid rgba(255,255,255,0.07)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        padding: '0 20px',
-      }}>
-        <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
-          {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-              <rect width="28" height="28" rx="8" fill="#16a34a"/>
-              <polyline points="5,18 10,11 14,15 19,8 23,13" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-            </svg>
-            <span className="lp-heading" style={{ color: '#fff', fontWeight: 800, fontSize: 17, letterSpacing: '-0.01em' }}>UpTik</span>
-            <span style={{
-              background: 'rgba(74,222,128,0.15)',
-              color: '#4ade80',
-              fontSize: 10,
-              fontWeight: 700,
-              padding: '2px 8px',
-              borderRadius: 20,
-              border: '1px solid rgba(74,222,128,0.3)',
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              fontFamily: "'DM Sans', sans-serif",
-            }}>Beta</span>
-          </div>
-          {/* Login */}
-          <button
-            onClick={() => navigate('/login')}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'rgba(255,255,255,0.75)',
-              fontFamily: "'DM Sans', sans-serif",
-              fontWeight: 600,
-              fontSize: 14,
-              cursor: 'pointer',
-              padding: '6px 4px',
-              transition: 'color 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#fff'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.75)'; }}
-          >
-            Login
-          </button>
-        </div>
-      </nav>
+      <div style={{ fontFamily: "'DM Sans', sans-serif", background: '#eef2f7', color: '#1a2d4a' }}>
 
-      {/* HERO */}
-      <section style={{
-        background: 'linear-gradient(160deg, #132d52 0%, #1a3a5e 100%)',
-        padding: '72px 20px 80px',
-        position: 'relative',
-        overflow: 'hidden',
-      }}>
-        {/* Grid overlay */}
-        <div style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none',
-          backgroundImage: 'linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
-          backgroundSize: '40px 40px',
-          animation: 'grid-fade 1.4s ease forwards',
-        }} />
-        {/* Green glow */}
-        <div style={{
-          position: 'absolute', top: '5%', left: '50%', transform: 'translateX(-50%)',
-          width: 500, height: 300, borderRadius: '50%',
-          background: 'radial-gradient(ellipse, rgba(22,163,74,0.2) 0%, transparent 70%)',
-          animation: 'pulse-glow 4s ease-in-out infinite',
-          pointerEvents: 'none',
-        }} />
+        {/* ══════════════════════════════════════
+            SECTION 1 — HERO (navy gradient)
+        ══════════════════════════════════════ */}
+        <section style={{
+          background: 'linear-gradient(160deg, #132d52 0%, #1a3a5e 100%)',
+          position: 'relative',
+          overflow: 'hidden',
+          paddingBottom: 44,
+        }}>
+          {/* Grid overlay */}
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none',
+            backgroundImage: `
+              linear-gradient(rgba(140,217,160,0.05) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(140,217,160,0.05) 1px, transparent 1px)
+            `,
+            backgroundSize: '40px 40px',
+          }} />
+          {/* Green glow */}
+          <div style={{
+            position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+            width: 700, height: 480, zIndex: 0, pointerEvents: 'none',
+            background: 'radial-gradient(ellipse at 50% 20%, rgba(26,173,94,0.17) 0%, transparent 65%)',
+          }} />
 
-        <div style={{ maxWidth: 560, margin: '0 auto', position: 'relative', textAlign: 'center' }}>
-          {/* Pill */}
-          <div style={{ ...fade(0), display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(22,163,74,0.14)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 24, padding: '5px 14px 5px 10px', marginBottom: 28 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80', display: 'inline-block', boxShadow: '0 0 8px #4ade80' }} />
-            <span style={{ color: '#86efac', fontSize: 12, fontWeight: 600, letterSpacing: '0.02em' }}>Private trading community</span>
-          </div>
-
-          {/* Headline */}
-          <h1 className="lp-heading" style={{ ...fade(80), margin: '0 0 18px', fontSize: 'clamp(36px, 8vw, 48px)', fontWeight: 900, lineHeight: 1.08, color: '#fff', letterSpacing: '-0.03em' }}>
-            Trade stocks with your{' '}
-            <span style={{ color: '#8cd9a0' }}>crew</span>
-          </h1>
-
-          {/* Subtitle */}
-          <p style={{ ...fade(160), margin: '0 0 36px', fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, maxWidth: 440, marginLeft: 'auto', marginRight: 'auto' }}>
-            Rolling out slowly to get it right. AI research, real-time alerts, and a paper trading challenge — built for friends who trade together.
-          </p>
-
-          {/* Spots card */}
-          <div style={{ ...fade(240), background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '26px 26px 22px', backdropFilter: 'blur(12px)', textAlign: 'left' }}>
-            {/* Header row */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
-                {spotsLeft !== null
-                  ? `${spotsLeft} of ${TOTAL_SPOTS} spots open`
-                  : `— of ${TOTAL_SPOTS} spots open`}
-              </span>
-              <span style={{
-                background: 'rgba(74,222,128,0.15)',
-                color: '#4ade80',
-                fontSize: 10,
-                fontWeight: 700,
-                padding: '2px 8px',
-                borderRadius: 20,
-                border: '1px solid rgba(74,222,128,0.25)',
-                letterSpacing: '0.05em',
-                textTransform: 'uppercase',
-              }}>Beta</span>
+          {/* Nav */}
+          <nav style={{
+            position: 'relative', zIndex: 2,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '12px 20px', maxWidth: 600, margin: '0 auto',
+          }}>
+            {/* Logo */}
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <svg width="26" height="26" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0"
+                strokeLinecap="round" strokeLinejoin="round"
+                style={{ marginRight: -2, position: 'relative', top: 3 }}>
+                <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3.5"/>
+                <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.5" opacity="0.6"/>
+                <path d="M25 22 L25 30" strokeWidth="1.8" opacity="0.35"/>
+                <path d="M35 8 L29 14 M35 8 L41 14" strokeWidth="3.5"/>
+              </svg>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                  <span style={{ fontSize: 18, fontWeight: 500, color: '#8cd9a0' }}>p</span>
+                  <span style={{ fontSize: 18, fontWeight: 500, color: '#f0ede8' }}>tik</span>
+                </div>
+                <div style={{
+                  fontSize: 9, color: '#d4e4f2', letterSpacing: 1.5,
+                  fontFamily: "'Outfit', sans-serif", marginTop: -2, paddingLeft: 2,
+                }}>a l e r t s</div>
+              </div>
             </div>
-
-            {/* Progress bar */}
-            <div style={{ height: 5, background: 'rgba(255,255,255,0.1)', borderRadius: 6, marginBottom: 20, overflow: 'hidden' }}>
+            {/* Right */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{
-                height: '100%',
-                width: `${progressPct}%`,
-                background: 'linear-gradient(90deg, #16a34a, #4ade80)',
-                borderRadius: 6,
-                transition: 'width 0.9s ease',
-              }} />
+                fontSize: 11, fontWeight: 700, color: '#8cd9a0',
+                background: 'rgba(26,173,94,0.15)', border: '1px solid rgba(26,173,94,0.3)',
+                padding: '3px 10px', borderRadius: 20,
+              }}>Beta</div>
+              <button
+                className="login-btn"
+                onClick={() => navigate('/login')}
+                style={{
+                  background: 'none', border: 'none', fontSize: 14, fontWeight: 600,
+                  color: '#fff', cursor: 'pointer', padding: 0,
+                  fontFamily: "'DM Sans', sans-serif", transition: 'color 0.15s',
+                }}
+              >Login</button>
+            </div>
+          </nav>
+
+          {/* Hero content */}
+          <div style={{
+            position: 'relative', zIndex: 2,
+            maxWidth: 560, margin: '0 auto',
+            padding: '18px 20px 0',
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            textAlign: 'center', gap: 16,
+          }}>
+
+            {/* Headline */}
+            <h1 className={cls(1)} style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: 34, fontWeight: 800,
+              color: '#fff', lineHeight: 1.13,
+              letterSpacing: '-0.4px', marginTop: 6,
+            }}>
+              Trade stocks with your{' '}
+              <span style={{ color: '#8cd9a0' }}>crew</span>
+            </h1>
+
+            {/* Feature pills */}
+            <div className={cls(2)} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+              {['AI research', 'Smart alerts', 'Paper challenge', 'Group chat'].map(f => (
+                <div key={f} style={{
+                  fontSize: 13,
+                  color: 'rgba(255,255,255,0.5)',
+                  background: 'rgba(255,255,255,0.06)',
+                  padding: '5px 12px', borderRadius: 12,
+                }}>{f}</div>
+              ))}
             </div>
 
-            {success ? (
-              <div style={{ textAlign: 'center', padding: '8px 0' }}>
-                <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(22,163,74,0.2)', border: '1.5px solid rgba(74,222,128,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path d="M4 10L8.5 14.5L16 6" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <div className="lp-heading" style={{ color: '#4ade80', fontWeight: 700, fontSize: 16, marginBottom: 4 }}>You're on the list!</div>
-                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>We'll email you when your spot is ready.</div>
+            {/* Spots counter card */}
+            <div className={cls(3)} style={{
+              width: '100%', maxWidth: 400,
+              background: 'rgba(255,255,255,0.06)',
+              borderRadius: 16, padding: '18px 20px',
+              border: '1px solid rgba(255,255,255,0.1)',
+            }}>
+              {/* Header row */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>
+                  {spotsOpen} of {TOTAL_SPOTS} spots open
+                </span>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, color: '#8cd9a0',
+                  background: 'rgba(26,173,94,0.15)', border: '1px solid rgba(26,173,94,0.3)',
+                  padding: '2px 8px', borderRadius: 10, letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                }}>Beta</div>
               </div>
-            ) : noSpots ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <button disabled className="lp-btn-green" style={{ width: '100%', padding: 13, fontSize: 15, opacity: 0.6 }}>
-                  Join Waitlist
-                </button>
-                <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: 12, marginTop: 2 }}>
-                  Next round opening soon
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  disabled={submitting}
-                  className="lp-input"
-                />
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="lp-btn-green"
-                  style={{ width: '100%', padding: 13, fontSize: 15 }}
-                >
-                  {submitting ? 'Joining...' : btnError || 'Get early access →'}
-                </button>
-                {btnError && !submitting && (
-                  <div style={{ color: '#f87171', fontSize: 12, textAlign: 'center', marginTop: -4 }}>{btnError}</div>
-                )}
-              </form>
-            )}
-          </div>
-        </div>
-      </section>
 
-      {/* SOCIAL PROOF */}
-      <section style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '16px 20px' }}>
-        <div style={{ maxWidth: 560, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            {AVATARS.map((av, i) => (
-              <div key={i} className="lp-avatar" style={{ background: av.bg, marginLeft: i === 0 ? 0 : -9, zIndex: 4 - i }}>
-                {av.letter}
+              {/* Progress bar — 4px */}
+              <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 4, marginBottom: 14, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', width: `${pct}%`,
+                  background: '#1AAD5E', borderRadius: 4,
+                  transition: 'width 0.6s ease',
+                }} />
               </div>
-            ))}
-          </div>
-          <span style={{ color: '#374151', fontSize: 13, fontWeight: 500 }}>
-            Join traders already inside
-          </span>
-        </div>
-      </section>
 
-      {/* WHAT'S INSIDE */}
-      <section style={{ background: '#eef2f7', padding: '64px 20px' }}>
-        <div style={{ maxWidth: 560, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 36 }}>
-            <div style={{ display: 'inline-block', background: '#dcfce7', color: '#16a34a', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 20, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12, fontFamily: "'DM Sans', sans-serif" }}>
-              What&apos;s inside
+              {/* Form / success */}
+              {success ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '4px 0' }}>
+                  <div style={{
+                    width: 38, height: 38, borderRadius: '50%',
+                    background: 'rgba(26,173,94,0.15)', border: '2px solid rgba(26,173,94,0.4)',
+                    color: '#8cd9a0', fontSize: 17, fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>✓</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', fontFamily: "'Outfit', sans-serif" }}>
+                    You're on the list
+                  </div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+                    We'll reach out when you're in.
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    className="ea-input"
+                    type="email"
+                    placeholder="Your email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    disabled={submitting}
+                    style={{
+                      flex: 1, padding: '11px 13px', borderRadius: 9,
+                      border: '1.5px solid rgba(255,255,255,0.14)',
+                      background: 'rgba(255,255,255,0.08)',
+                      color: '#fff', fontSize: 15,
+                      fontFamily: "'DM Sans', sans-serif",
+                      transition: 'border-color 0.15s',
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    style={{
+                      flexShrink: 0,
+                      padding: '11px 15px', borderRadius: 9, border: 'none',
+                      background: btnError ? '#E05252' : '#1AAD5E',
+                      color: '#fff', fontSize: 13, fontWeight: 700,
+                      fontFamily: "'Outfit', sans-serif",
+                      cursor: submitting ? 'not-allowed' : 'pointer',
+                      whiteSpace: 'nowrap',
+                      opacity: submitting ? 0.7 : 1,
+                      transition: 'background 0.15s',
+                    }}
+                  >
+                    {submitting ? '…' : btnError || 'Get early access'}
+                  </button>
+                </form>
+              )}
             </div>
-            <h2 className="lp-heading" style={{ margin: 0, fontSize: 'clamp(24px, 5vw, 32px)', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-              Everything you need.<br />Nothing you don&apos;t.
-            </h2>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 }}>
-            {FEATURES.map((f, i) => (
-              <div key={i} className="lp-feature-card">
-                <div style={{ fontSize: 26, marginBottom: 12, lineHeight: 1, color: f.iconColor || undefined }}>
-                  {f.icon}
-                </div>
-                <div className="lp-heading" style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', marginBottom: 6, lineHeight: 1.3 }}>{f.title}</div>
-                <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.65 }}>{f.desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      {/* SCREENSHOTS */}
-      <section style={{ background: '#132d52', padding: '60px 0' }}>
-        <div style={{ maxWidth: 560, margin: '0 auto', paddingLeft: 20, paddingRight: 20, marginBottom: 28 }}>
-          <div style={{ display: 'inline-block', background: 'rgba(74,222,128,0.12)', color: '#4ade80', fontSize: 10, fontWeight: 700, padding: '4px 12px', borderRadius: 20, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12, fontFamily: "'DM Sans', sans-serif" }}>
-            Real screenshots
+            {/* Social proof */}
+            <div className={cls(4)} style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 4 }}>
+              <div style={{ display: 'flex' }}>
+                {[
+                  { l: 'T', bg: 'linear-gradient(135deg,#1AAD5E,#0d8a47)' },
+                  { l: 'N', bg: 'linear-gradient(135deg,#4A90D9,#2d6cb5)' },
+                  { l: 'D', bg: 'linear-gradient(135deg,#D4A017,#b58a12)' },
+                  { l: 'E', bg: 'linear-gradient(135deg,#8B5CF6,#6D28D9)' },
+                ].map((a, i) => (
+                  <div key={a.l} style={{
+                    width: 26, height: 26, borderRadius: '50%',
+                    border: '2px solid rgba(19,45,82,0.9)',
+                    background: a.bg,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 10, fontWeight: 700, color: '#fff',
+                    marginLeft: i > 0 ? -7 : 0,
+                    zIndex: 4 - i, position: 'relative',
+                  }}>{a.l}</div>
+                ))}
+              </div>
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>
+                Join traders already inside
+              </span>
+            </div>
+
           </div>
-          <h2 className="lp-heading" style={{ margin: 0, fontSize: 'clamp(22px, 5vw, 28px)', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
-            See it in action
-          </h2>
-          <p style={{ margin: '8px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Swipe to explore →</p>
-        </div>
-        <div style={{ paddingLeft: 20 }}>
-          <div className="lp-screen-scroll">
-            {SCREENSHOTS.map((s, i) => (
-              <div key={i} style={{ flexShrink: 0, textAlign: 'center' }}>
+        </section>
+
+        {/* ══════════════════════════════════════
+            SECTION 2 — SCREENSHOTS (#eef2f7)
+        ══════════════════════════════════════ */}
+        <section className={cls(5)} style={{ background: '#eef2f7', padding: '34px 0 32px' }}>
+          {/* Label */}
+          <div style={{ textAlign: 'center', marginBottom: 20 }}>
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: 2.5,
+              color: '#7a8ea3', textTransform: 'uppercase',
+              fontFamily: "'Outfit', sans-serif",
+            }}>Inside the app</span>
+          </div>
+
+          {/* Horizontal scroll cards */}
+          <div
+            className="ss-scroll"
+            style={{
+              display: 'flex', gap: 18, overflowX: 'auto',
+              padding: '4px 24px 12px',
+              justifyContent: 'center',
+            }}
+          >
+            {[
+              { src: '/screenshot-home.png',      label: 'Live prices & briefings',  desc: 'Market overview at a glance'  },
+              { src: '/screenshot-alerts.png',    label: 'AI-powered scanner',       desc: 'Smart alerts & flow signals'  },
+              { src: '/screenshot-challenge.png', label: 'Compete with friends',     desc: 'Paper trading leaderboard'    },
+            ].map(s => (
+              <div key={s.src} style={{
+                flexShrink: 0,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+              }}>
                 <img
                   src={s.src}
                   alt={s.label}
                   style={{
-                    width: 160, height: 280, objectFit: 'cover', objectPosition: 'top',
-                    borderRadius: 16, border: '2px solid rgba(140,217,160,0.2)',
+                    width: 150, height: 'auto',
+                    borderRadius: 14,
+                    border: '2px solid #1AAD5E',
+                    boxShadow: '0 6px 22px rgba(0,0,0,0.1)',
                     display: 'block',
                   }}
                 />
-                <div style={{ fontSize: 12, color: '#8cd9a0', fontWeight: 600, marginTop: 8 }}>{s.label}</div>
-              </div>
-            ))}
-            <div style={{ flexShrink: 0, width: 4 }} />
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section style={{ background: '#fff', padding: '64px 20px' }}>
-        <div style={{ maxWidth: 560, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 36 }}>
-            <div style={{ display: 'inline-block', background: '#f0fdf4', color: '#16a34a', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 20, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12, fontFamily: "'DM Sans', sans-serif" }}>
-              FAQ
-            </div>
-            <h2 className="lp-heading" style={{ margin: 0, fontSize: 'clamp(22px, 5vw, 30px)', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
-              Honest answers
-            </h2>
-          </div>
-          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, overflow: 'hidden', padding: '0 22px' }}>
-            {FAQS.map((faq, i) => (
-              <div
-                key={i}
-                className="lp-faq-item"
-                onClick={() => setFaqOpen(faqOpen === i ? null : i)}
-              >
-                <div className="lp-faq-row">
-                  <span className="lp-faq-q lp-heading" style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', flex: 1, transition: 'color 0.15s', lineHeight: 1.4 }}>
-                    {faq.q}
-                  </span>
-                  <svg className={`lp-chevron${faqOpen === i ? ' open' : ''}`} width="18" height="18" viewBox="0 0 18 18" fill="none">
-                    <path d="M4.5 6.75L9 11.25L13.5 6.75" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <div className={`lp-faq-answer${faqOpen === i ? ' open' : ''}`}>
-                  <p style={{ margin: '0 0 18px', fontSize: 13, color: '#6b7280', lineHeight: 1.7 }}>{faq.a}</p>
-                </div>
+                <div style={{
+                  fontSize: 13, fontWeight: 700, color: '#1a2d4a',
+                  textAlign: 'center', fontFamily: "'Outfit', sans-serif",
+                }}>{s.label}</div>
+                <div style={{ fontSize: 12, color: '#7a8ea3', textAlign: 'center' }}>{s.desc}</div>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* BOTTOM CTA */}
-      <section style={{
-        background: 'linear-gradient(135deg, #132d52 0%, #1a3a5e 60%, #0f2440 100%)',
-        padding: '72px 20px',
-        position: 'relative',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          position: 'absolute', bottom: '-20%', left: '50%', transform: 'translateX(-50%)',
-          width: 400, height: 200, borderRadius: '50%',
-          background: 'radial-gradient(ellipse, rgba(22,163,74,0.22) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }} />
-        <div style={{ maxWidth: 520, margin: '0 auto', textAlign: 'center', position: 'relative' }}>
-          <h2 className="lp-heading" style={{ margin: '0 0 12px', fontSize: 'clamp(26px, 6vw, 38px)', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.1 }}>
-            Ready to trade with your crew?
-          </h2>
-          <p style={{ margin: '0 0 28px', color: 'rgba(255,255,255,0.55)', fontSize: 14, lineHeight: 1.65 }}>
-            {spotsLeft !== null && spotsLeft > 0 ? (
-              <><span style={{ color: '#8cd9a0', fontWeight: 700 }}>{spotsLeft} spots</span> remaining in this round.</>
-            ) : spotsLeft === 0 ? (
-              'All beta spots are filled — join the waitlist for the next round.'
-            ) : (
-              'Limited beta access — grab a spot before they\'re gone.'
-            )}
-          </p>
-          <button
-            onClick={scrollToTop}
-            className="lp-btn-green"
-            style={{ padding: '14px 36px', fontSize: 15 }}
-          >
-            Get early access →
-          </button>
-        </div>
-      </section>
+        {/* ══════════════════════════════════════
+            SECTION 3 — FOOTER
+        ══════════════════════════════════════ */}
+        <footer className={cls(6)} style={{
+          background: '#eef2f7',
+          borderTop: '1px solid #d8e2ed',
+          padding: '16px 20px',
+          textAlign: 'center',
+          display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center',
+        }}>
+          <div style={{
+            fontSize: 13, fontStyle: 'italic', fontWeight: 600,
+            color: '#7a8ea3', fontFamily: "'Outfit', sans-serif", letterSpacing: '0.5px',
+          }}>ONE TEAM, ONE TRADE</div>
+          <div style={{ fontSize: 12, color: '#a0b0c0' }}>© 2026 UpTikAlerts</div>
+        </footer>
 
-      {/* FOOTER */}
-      <footer style={{ background: '#0a1628', padding: '28px 20px', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        <p style={{ margin: '0 0 6px', color: 'rgba(255,255,255,0.35)', fontSize: 12, fontStyle: 'italic', fontFamily: "'Outfit', sans-serif", letterSpacing: '0.05em' }}>
-          ONE TEAM, ONE TRADE
-        </p>
-        <p style={{ margin: 0, color: 'rgba(255,255,255,0.2)', fontSize: 11 }}>
-          © 2026 UpTikAlerts
-        </p>
-      </footer>
-    </div>
+      </div>
+    </>
   );
 }
