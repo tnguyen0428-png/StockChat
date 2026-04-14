@@ -60,9 +60,9 @@ export default function LandingPage() {
   ];
 
   const SCREENSHOTS = [
-    { label: 'Home', gradient: 'linear-gradient(135deg, #132d52, #1a4a6e)' },
-    { label: 'Alerts', gradient: 'linear-gradient(135deg, #1a3a5e, #0f2440)' },
-    { label: 'Challenge', gradient: 'linear-gradient(135deg, #132d52, #1a4a30)' },
+    { label: 'Home', src: '/screenshot-home.png' },
+    { label: 'Alerts', src: '/screenshot-alerts.png' },
+    { label: 'Challenge', src: '/screenshot-challenge.png' },
   ];
 
   const AVATARS = [
@@ -422,26 +422,17 @@ export default function LandingPage() {
         <div style={{ paddingLeft: 20 }}>
           <div className="lp-screen-scroll">
             {SCREENSHOTS.map((s, i) => (
-              <div key={i} className="lp-screen-card" style={{ background: s.gradient }}>
-                {/* Placeholder UI chrome */}
-                <div style={{ position: 'absolute', inset: 0, padding: 12, display: 'flex', flexDirection: 'column', gap: 7 }}>
-                  <div style={{ height: 8, background: 'rgba(255,255,255,0.12)', borderRadius: 4, width: '55%' }} />
-                  <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 4, width: '75%' }} />
-                  <div style={{ height: 40, background: 'rgba(255,255,255,0.06)', borderRadius: 8, marginTop: 6 }} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 2 }}>
-                    <div style={{ height: 34, background: 'rgba(255,255,255,0.07)', borderRadius: 6 }} />
-                    <div style={{ height: 34, background: 'rgba(255,255,255,0.07)', borderRadius: 6 }} />
-                  </div>
-                  <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 4, width: '85%', marginTop: 2 }} />
-                  <div style={{ height: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 4, width: '65%' }} />
-                  <div style={{ flex: 1 }} />
-                  <div style={{ height: 28, background: 'rgba(22,163,74,0.28)', borderRadius: 6, border: '1px solid rgba(74,222,128,0.18)' }} />
-                </div>
-                <div style={{ position: 'absolute', bottom: 10, left: 0, right: 0, textAlign: 'center' }}>
-                  <span style={{ background: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: 10, fontWeight: 600, padding: '3px 10px', borderRadius: 20, letterSpacing: '0.04em', fontFamily: "'DM Sans', sans-serif" }}>
-                    {s.label}
-                  </span>
-                </div>
+              <div key={i} style={{ flexShrink: 0, textAlign: 'center' }}>
+                <img
+                  src={s.src}
+                  alt={s.label}
+                  style={{
+                    width: 160, height: 280, objectFit: 'cover', objectPosition: 'top',
+                    borderRadius: 16, border: '2px solid rgba(140,217,160,0.2)',
+                    display: 'block',
+                  }}
+                />
+                <div style={{ fontSize: 12, color: '#8cd9a0', fontWeight: 600, marginTop: 8 }}>{s.label}</div>
               </div>
             ))}
             <div style={{ flexShrink: 0, width: 4 }} />
