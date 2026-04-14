@@ -130,8 +130,8 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (alertsErr) console.error('[HomeTab] breakout_alerts error:', alertsErr);
-      console.log('[HomeTab] Hot movers:', { alertCount: alerts?.length || 0, error: alertsErr?.message });
+      console.log('[HomeTab] Hot movers:', { alertCount: alerts?.length || 0, error: alertsErr?.message, windowStart: windowStart.toISOString() });
+      if (alertsErr) console.error('[HomeTab] breakout_alerts error:', alertsErr.message);
 
       if (alerts && alerts.length > 0) {
         const seen = new Map();
@@ -141,7 +141,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
         const { data: wlData, error: wlErr } = await supabase
           .from('user_watchlist')
           .select('symbol');
-        if (wlErr) console.error('[HomeTab] user_watchlist error:', wlErr);
+        if (wlErr) console.error('[HomeTab] user_watchlist fallback error:', wlErr.message);
         if (wlData && wlData.length > 0) {
           const counts = {};
           wlData.forEach(row => { counts[row.symbol] = (counts[row.symbol] || 0) + 1; });
