@@ -26,6 +26,7 @@ const SIGNAL_LABELS = {
   ma_cross: 'MA Cross',
   high_52w: '52W High',
   flow_signal: 'Flow',
+  confluence: 'Confluence',
 };
 
 const QUICK_ADD = ['NVDA', 'AAPL', 'TSLA', 'AMD', 'SPY', 'META'];
@@ -123,40 +124,68 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
       const windowStart = new Date();
       windowStart.setDate(windowStart.getDate() - 7);
       windowStart.setHours(0, 0, 0, 0);
-      const { data: alerts, error: alertsErr } = await supabase
+
+      // Primary: featured confluence alerts from last 7 days
+      const { data: confluenceAlerts, error: confluenceErr } = await supabase
         .from('breakout_alerts')
-        .select('ticker, signal_type, change_pct, change, conviction')
+        .select('ticker, signal_type, change_pct, conviction, notes')
+        .eq('signal_type', 'confluence')
+        .eq('featured', true)
+        .gte('created_at', windowStart.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(4);
+
+      if (confluenceErr) console.error('[HomeTab] confluence query error:', confluenceErr.message);
+
+      if (confluenceAlerts && confluenceAlerts.length > 0) {
+        console.log('[HomeTab] Hot movers: using featured confluence alerts', confluenceAlerts.length);
+        setHotMovers(confluenceAlerts.slice(0, 4));
+        return;
+      }
+
+      // Fallback 1: recent non-confluence alerts deduped by ticker
+      const { data: recentAlerts, error: recentErr } = await supabase
+        .from('breakout_alerts')
+        .select('ticker, signal_type, change_pct, conviction, notes')
+        .neq('signal_type', 'confluence')
         .gte('created_at', windowStart.toISOString())
         .order('created_at', { ascending: false })
         .limit(50);
 
-      console.log('[HomeTab] Hot movers:', { alertCount: alerts?.length || 0, error: alertsErr?.message, windowStart: windowStart.toISOString() });
-      if (alertsErr) console.error('[HomeTab] breakout_alerts error:', alertsErr.message);
+      if (recentErr) console.error('[HomeTab] recent alerts fallback error:', recentErr.message);
 
-      if (alerts && alerts.length > 0) {
+      if (recentAlerts && recentAlerts.length > 0) {
         const seen = new Map();
-        alerts.forEach(a => { if (!seen.has(a.ticker)) seen.set(a.ticker, a); });
-        setHotMovers([...seen.values()].slice(0, 5));
-      } else {
-        const { data: wlData, error: wlErr } = await supabase
-          .from('user_watchlist')
-          .select('symbol');
-        if (wlErr) console.error('[HomeTab] user_watchlist fallback error:', wlErr.message);
-        if (wlData && wlData.length > 0) {
-          const counts = {};
-          wlData.forEach(row => { counts[row.symbol] = (counts[row.symbol] || 0) + 1; });
-          const top5 = Object.entries(counts)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([symbol, count]) => ({
-              ticker: symbol,
-              signal_type: 'popular',
-              change_pct: null,
-              change: null,
-              _watchCount: count,
-            }));
-          setHotMovers(top5);
+        for (const a of recentAlerts) {
+          if (!seen.has(a.ticker)) seen.set(a.ticker, a);
+          if (seen.size === 4) break;
         }
+        console.log('[HomeTab] Hot movers: using recent deduped alerts', seen.size);
+        setHotMovers([...seen.values()]);
+        return;
+      }
+
+      // Fallback 2: watchlist popularity
+      const { data: wlData, error: wlErr } = await supabase
+        .from('user_watchlist')
+        .select('symbol');
+      if (wlErr) console.error('[HomeTab] user_watchlist fallback error:', wlErr.message);
+      if (wlData && wlData.length > 0) {
+        const counts = {};
+        wlData.forEach(row => { counts[row.symbol] = (counts[row.symbol] || 0) + 1; });
+        const top4 = Object.entries(counts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 4)
+          .map(([symbol, count]) => ({
+            ticker: symbol,
+            signal_type: 'popular',
+            change_pct: null,
+            conviction: null,
+            notes: null,
+            _watchCount: count,
+          }));
+        console.log('[HomeTab] Hot movers: using watchlist popularity', top4.length);
+        setHotMovers(top4);
       }
     } catch (err) {
       console.error('[HomeTab] loadHotMovers failed:', err.message);
@@ -414,11 +443,13 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
             </div>
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
               {hotMovers.map((mover, i) => {
-                const isPopular = mover.change_pct === null && mover.change === null;
-                const chg = isPopular ? null : Number(mover.change_pct ?? mover.change ?? 0);
+                const isPopular = mover.signal_type === 'popular';
+                const chg = isPopular ? null : Number(mover.change_pct ?? 0);
                 const priceData = researchPrices[mover.ticker];
                 const isConfluence = mover.signal_type === 'confluence';
                 const tierColors = { S: '#d4af37', A: '#22c55e', B: '#3b82f6', C: '#888' };
+                const scoreMatch = mover.notes ? mover.notes.match(/Score\s+(\d+)/) : null;
+                const score = scoreMatch ? scoreMatch[1] : null;
                 return (
                   <div key={i} style={{
                     flexShrink: 0, width: 100, borderRadius: 10,
@@ -439,6 +470,11 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                     {priceData && (
                       <div style={{ fontSize: 10, color: t.text2 }}>
                         ${priceData.price.toFixed(2)}
+                      </div>
+                    )}
+                    {isConfluence && score && (
+                      <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600, marginTop: 2 }}>
+                        Score {score}
                       </div>
                     )}
                   </div>
