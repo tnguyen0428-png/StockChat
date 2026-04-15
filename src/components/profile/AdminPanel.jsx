@@ -362,31 +362,17 @@ export default function AdminPanel({ session, profile }) {
     setNewsLoading(true);
     setSelectedNews([]);
     try {
-      const data = await polyFetch(`/v2/reference/news?limit=20`);
+      const data = await polyFetch(`/v2/reference/news?limit=40`);
       const FILTER_OUT = [
-        // Class action / legal spam
         'class action', 'securities fraud', 'securities litigation', 'law firm',
         'lawsuit investigation', 'reminds investors', 'reminds shareholders',
         'legal action', 'filed a lawsuit', 'seeks damages',
-        // Insider selling (keep insider buying)
-        'insider selling', 'insiders sell', 'insider sold', 'executives sell',
-        'ceo sells', 'cfo sells', 'officer sells', 'director sells',
-        // Sponsored / PR fluff
-        'press release', 'sponsored content', 'paid promotion', 'advertorial',
-        'business wire', 'globe newswire', 'accesswire', 'prnewswire',
-        // Penny stock pump
+        'sponsored content', 'paid promotion', 'advertorial',
         'penny stock', 'could 10x', 'next big thing', 'hidden gem stock',
         'under the radar stock', 'microcap alert', 'hot stock pick',
         'stock to watch before it explodes', 'massive upside potential',
-        // Crypto
-        'bitcoin', 'ethereum', 'crypto', 'cryptocurrency', 'blockchain',
-        'defi', 'nft', 'altcoin', 'memecoin', 'solana', 'dogecoin',
-        'shiba inu', 'cardano', 'web3', 'token sale',
-        // Dividends
-        'dividend announcement', 'dividend record date', 'ex-dividend',
-        'dividend declared', 'dividend increase', 'dividend cut',
-        'dividend yield', 'dividend payout',
-        // Listicles / clickbait
+        'crypto', 'cryptocurrency', 'memecoin', 'nft', 'defi', 'web3', 'token sale',
+        'altcoin', 'shiba inu', 'dogecoin', 'cardano',
         'top stocks to buy', 'best stocks to buy', 'stocks to buy now',
         'top picks for', 'best investments for', 'stocks you should buy',
         'hot stocks for', 'must-buy stocks',
