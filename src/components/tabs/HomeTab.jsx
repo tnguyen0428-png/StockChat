@@ -352,106 +352,112 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
         </div>
       </div>
 
+      {/* ═══ MARKET CONTEXT ═══ */}
+      {marketStatus === 'open' && (() => {
+        const items = pulseItems
+          .map(item => ({ item, d: activePulse[item.key] }))
+          .filter(({ d }) => d?.change != null);
+        if (items.length < 2) return null;
+        const best = items.reduce((a, b) => a.d.change > b.d.change ? a : b);
+        const worst = items.reduce((a, b) => a.d.change < b.d.change ? a : b);
+        return (
+          <div style={{ padding: '4px 14px', fontSize: 11, color: t.text2 }}>
+            📊{' '}
+            <span style={{ color: t.green, fontWeight: 600 }}>
+              {best.item.label} leading {best.d.change > 0 ? '+' : ''}{best.d.change.toFixed(2)}%
+            </span>
+            {' · '}
+            <span style={{ color: '#ff6b6b', fontWeight: 600 }}>
+              {worst.item.label} lagging {worst.d.change.toFixed(2)}%
+            </span>
+          </div>
+        );
+      })()}
+
       {/* ═══ SCROLLABLE CONTENT ═══ */}
       <div style={S.content}>
 
-        {/* ═══ PERSONAL STATUS CARD ═══ */}
-        {!portfolioLoading && (
-          hasJoinedChallenge ? (
-            /* ── Returning user ── */
-            <div
-              style={{
-                margin: '10px 14px 4px',
-                background: t.card,
-                border: `1px solid ${t.border}`,
-                borderRadius: 12,
-                padding: '12px 14px',
-                cursor: 'pointer',
-              }}
-              onClick={() => onTabChange?.('challenge')}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 44, height: 44, borderRadius: 22,
-                  background: 'rgba(26,173,94,0.12)',
-                  border: `2px solid ${t.green}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>
-                  <span style={{ fontSize: 15, fontWeight: 800, color: t.green }}>
-                    {myRank ? `#${myRank}` : '—'}
-                  </span>
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 10, color: t.text3, marginBottom: 1 }}>Welcome back,</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: t.text1, marginBottom: 4 }}>{username}</div>
-                  {aheadUser && (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <span style={{ fontSize: 11, color: t.text3 }}>
-                          Rival: <span style={{ color: t.text3 }}>@{aheadUser.username}</span>
-                        </span>
-                        <span style={{ fontSize: 11, color: '#ff9040', fontWeight: 600 }}>-{aheadUser.gap}%</span>
-                      </div>
-                      <div style={{ height: 3, borderRadius: 2, background: t.border, overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%', borderRadius: 2,
-                          width: `${aheadUser.progress}%`,
-                          background: t.green,
-                          transition: 'width 0.6s ease',
-                        }} />
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 17, fontWeight: 800, color: t.green }}>
-                    {isPositive ? '+' : ''}{(totalReturn || 0).toFixed(2)}%
-                  </div>
-                  <div style={{ fontSize: 10, color: t.text3 }}>Total return</div>
-                </div>
-              </div>
+        {/* ── TODAY'S MARKET (briefing) ── */}
+        <div style={S.briefSection}>
+          <div style={S.briefHeader}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={S.briefTitle}>Daily Briefing</span>
+              {briefing && (
+                <span style={S.briefTime}>
+                  {(() => {
+                    const briefDate = new Date(briefing.created_at);
+                    const todayMidnight = new Date();
+                    todayMidnight.setHours(0, 0, 0, 0);
+                    const isToday = briefDate >= todayMidnight;
+                    const timeStr = briefDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                    return (isToday ? '' : 'Yesterday · ') + timeStr + ' EST';
+                  })()}
+                </span>
+              )}
             </div>
+            {briefingArticles.length > 1 && (
+              <button style={S.briefToggle} onClick={() => setBriefingExpanded(p => !p)}>
+                {briefingExpanded ? 'Less ▲' : `+${briefingArticles.length - 1} more ▼`}
+              </button>
+            )}
+          </div>
+
+          {briefingArticles.length > 0 ? (
+            <>
+              <BriefCard article={briefingArticles[0]} S={S} />
+              {briefingExpanded && briefingArticles.slice(1).map((a, i) => (
+                <BriefCard key={i} article={a} S={S} />
+              ))}
+            </>
           ) : (
-            /* ── New user ── */
-            <div
-              style={{
-                margin: '10px 14px 4px',
-                background: 'linear-gradient(135deg, #0d2a4a 0%, #1a3a5e 60%, #0d3d2a 100%)',
-                borderRadius: 12,
-                padding: '14px 14px',
-                cursor: 'pointer',
-                overflow: 'hidden',
-              }}
-              onClick={() => onTabChange?.('challenge')}
-            >
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                <span style={{ fontSize: 26, lineHeight: 1, flexShrink: 0 }}>🏆</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 3 }}>Learn to Invest</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginBottom: 8 }}>
-                    <span style={{ color: t.green, fontWeight: 600 }}>$50K virtual cash</span> — zero risk
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-                    {['📊 Curated picks', '📈 Live data', '🏅 Leaderboard'].map(chip => (
-                      <span key={chip} style={{
-                        fontSize: 10, color: 'rgba(255,255,255,0.8)',
-                        background: 'rgba(255,255,255,0.1)', borderRadius: 6,
-                        padding: '3px 7px',
-                      }}>{chip}</span>
-                    ))}
-                  </div>
-                  <div style={{
-                    display: 'inline-flex', alignItems: 'center',
-                    background: t.green, color: '#fff',
-                    padding: '8px 16px', borderRadius: 8,
-                    fontSize: 12, fontWeight: 700,
-                  }}>
-                    Start Investing →
-                  </div>
+            <div style={{ ...S.briefEmpty, textAlign: 'center', padding: '16px 14px' }}>
+              <div style={{ fontSize: 24, marginBottom: 6 }}>📰</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: t.text1, marginBottom: 4 }}>Briefing posts weekdays at 9:00 AM EST</div>
+              <div style={{ fontSize: 11, color: t.text3 }}>AI-generated market summary with today's top headlines and alerts</div>
+            </div>
+          )}
+        </div>
+
+        {/* ═══ NEW USER CTA ═══ */}
+        {!portfolioLoading && !hasJoinedChallenge && (
+          <div
+            style={{
+              margin: '10px 14px 4px',
+              background: 'linear-gradient(135deg, #0d2a4a 0%, #1a3a5e 60%, #0d3d2a 100%)',
+              borderRadius: 12,
+              padding: '14px 14px',
+              cursor: 'pointer',
+              overflow: 'hidden',
+            }}
+            onClick={() => onTabChange?.('challenge')}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <span style={{ fontSize: 26, lineHeight: 1, flexShrink: 0 }}>🏆</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 3 }}>Learn to Invest</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginBottom: 8 }}>
+                  <span style={{ color: t.green, fontWeight: 600 }}>$50K virtual cash</span> — zero risk
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                  {['📊 Curated picks', '📈 Live data', '🏅 Leaderboard'].map(chip => (
+                    <span key={chip} style={{
+                      fontSize: 10, color: 'rgba(255,255,255,0.8)',
+                      background: 'rgba(255,255,255,0.1)', borderRadius: 6,
+                      padding: '3px 7px',
+                    }}>{chip}</span>
+                  ))}
+                </div>
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center',
+                  background: t.green, color: '#fff',
+                  padding: '8px 16px', borderRadius: 8,
+                  fontSize: 12, fontWeight: 700,
+                }}>
+                  Start Investing →
                 </div>
               </div>
             </div>
-          )
+          </div>
         )}
 
         {/* ═══ HOT TODAY ═══ */}
@@ -744,46 +750,8 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
           )}
         </div>
 
-        <div style={S.sectionDivider} />
-
-        {/* ── TODAY'S MARKET (briefing) ── */}
-        <div style={S.briefSection}>
-          <div style={S.briefHeader}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={S.briefTitle}>Daily Briefing</span>
-              {briefing && (
-                <span style={S.briefTime}>
-                  {(() => {
-                    const briefDate = new Date(briefing.created_at);
-                    const todayMidnight = new Date();
-                    todayMidnight.setHours(0, 0, 0, 0);
-                    const isToday = briefDate >= todayMidnight;
-                    const timeStr = briefDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-                    return (isToday ? '' : 'Yesterday · ') + timeStr + ' EST';
-                  })()}
-                </span>
-              )}
-            </div>
-            {briefingArticles.length > 1 && (
-              <button style={S.briefToggle} onClick={() => setBriefingExpanded(p => !p)}>
-                {briefingExpanded ? 'Less ▲' : `+${briefingArticles.length - 1} more ▼`}
-              </button>
-            )}
-          </div>
-
-          {briefingArticles.length > 0 ? (
-            <>
-              <BriefCard article={briefingArticles[0]} S={S} />
-              {briefingExpanded && briefingArticles.slice(1).map((a, i) => (
-                <BriefCard key={i} article={a} S={S} />
-              ))}
-            </>
-          ) : (
-            <div style={S.briefEmpty}>No briefing posted yet today</div>
-          )}
-        </div>
-
         {/* ═══ HOW UPTIK WORKS ═══ */}
+        {(!hasJoinedChallenge || !hasWatchlist) && (
         <div style={{ padding: '8px 14px 14px' }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: t.text1, marginBottom: 8 }}>How UpTik works</div>
           <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden' }}>
@@ -815,6 +783,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
             ))}
           </div>
         </div>
+        )}
 
       </div>
     </div>
