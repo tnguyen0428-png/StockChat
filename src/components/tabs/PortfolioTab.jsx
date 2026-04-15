@@ -372,8 +372,51 @@ export default function PortfolioTab({ session, darkMode }) {
         <div style={s.learnCard}>
           <div style={s.learnCardHdr}><span style={{ fontSize: 9, fontWeight: 700, color: t.purple }}>💡 LEARN</span></div>
           <div style={s.learnCardBody}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: t.text1, marginBottom: 3 }}>{trades.length === 0 ? 'What is a stock ticker?' : 'When to cut your losses'}</div>
-            <div style={{ fontSize: 11, color: t.text3, lineHeight: 1.6 }}>{trades.length === 0 ? "A short code for a company. AAPL = Apple, NVDA = Nvidia, TSLA = Tesla. Tap Join above to pick your first stock!" : "Most pros set a stop at 15-20%. If a stock drops that much from your buy price, consider whether your original thesis still holds."}</div>
+            {trades.length === 0 ? (
+              <>
+                <div style={{ fontSize: 12, fontWeight: 600, color: t.text1, marginBottom: 3 }}>What is a stock ticker?</div>
+                <div style={{ fontSize: 11, color: t.text3, lineHeight: 1.6 }}>A short code for a company. AAPL = Apple, NVDA = Nvidia, TSLA = Tesla. Tap Join above to pick your first stock!</div>
+              </>
+            ) : (() => {
+              const lessons = [
+                {
+                  title: 'Forward P/E — Are you overpaying?',
+                  body: 'Price divided by next year\'s expected earnings. A stock at $100 with $5 expected earnings = 20x P/E. Lower means cheaper relative to profits. Compare within the same sector — tech P/Es are naturally higher than banks.',
+                },
+                {
+                  title: 'DCF — Is it undervalued?',
+                  body: 'Discounted Cash Flow estimates what a stock is worth based on future cash flows. Green dot on your watchlist = stock trades below fair value (potential bargain). Red dot = trades above fair value (potentially expensive).',
+                },
+                {
+                  title: 'PEG Ratio — Growth at a fair price?',
+                  body: 'P/E divided by earnings growth rate. Under 1.0 = you\'re paying less than the growth justifies (good deal). Over 2.0 = you\'re paying a premium. PEG adjusts P/E for growth — a high P/E is fine if growth is high too.',
+                },
+                {
+                  title: 'Revenue Growth — Is the business expanding?',
+                  body: 'Year-over-year increase in total sales. 20%+ is strong for large companies. Revenue grows before profits do — it tells you if customers are buying more. Shrinking revenue is a red flag even if profits look okay.',
+                },
+                {
+                  title: 'Net Margin — How profitable is each dollar?',
+                  body: 'Profit as a percentage of revenue. If a company earns $1B on $10B revenue, that\'s 10% margin. Software companies often hit 25%+, retailers might be 3-5%. Higher margins = more room to survive downturns.',
+                },
+                {
+                  title: 'EPS Growth — Are profits actually growing?',
+                  body: 'Earnings Per Share growth shows if the company is making more money per share over time. Consistent 15%+ EPS growth is a strong signal. Watch for one-time boosts that inflate EPS temporarily.',
+                },
+                {
+                  title: 'Debt/Equity — How leveraged are they?',
+                  body: 'Total debt divided by shareholder equity. Under 1.0 = conservative. Over 2.0 = heavily leveraged. High debt is risky when interest rates are high — the company spends more on interest payments instead of growth.',
+                },
+              ];
+              const dayIndex = new Date().getDay();
+              const lesson = lessons[dayIndex % lessons.length];
+              return (
+                <>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: t.text1, marginBottom: 3 }}>{lesson.title}</div>
+                  <div style={{ fontSize: 11, color: t.text3, lineHeight: 1.6 }}>{lesson.body}</div>
+                </>
+              );
+            })()}
           </div>
         </div>
 
