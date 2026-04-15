@@ -125,7 +125,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
       windowStart.setHours(0, 0, 0, 0);
       const { data: alerts, error: alertsErr } = await supabase
         .from('breakout_alerts')
-        .select('ticker, signal_type, change_pct, change')
+        .select('ticker, signal_type, change_pct, change, conviction')
         .gte('created_at', windowStart.toISOString())
         .order('created_at', { ascending: false })
         .limit(50);
@@ -417,13 +417,22 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                 const isPopular = mover.change_pct === null && mover.change === null;
                 const chg = isPopular ? null : Number(mover.change_pct ?? mover.change ?? 0);
                 const priceData = researchPrices[mover.ticker];
+                const isConfluence = mover.signal_type === 'confluence';
+                const tierColors = { S: '#d4af37', A: '#22c55e', B: '#3b82f6', C: '#888' };
                 return (
                   <div key={i} style={{
                     flexShrink: 0, width: 100, borderRadius: 10,
                     background: t.card, border: `1px solid ${t.border}`,
                     padding: '8px 8px',
                   }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginBottom: 2 }}>{mover.ticker}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: t.text1 }}>{mover.ticker}</span>
+                      {isConfluence && mover.conviction && (
+                        <span style={{ fontSize: 9, fontWeight: 700, color: tierColors[mover.conviction] ?? '#888', border: `1px solid ${tierColors[mover.conviction] ?? '#888'}`, borderRadius: 3, padding: '0 3px', lineHeight: '14px' }}>
+                          {mover.conviction}
+                        </span>
+                      )}
+                    </div>
                     <div style={{ fontSize: 11, color: t.text3, marginBottom: 3 }}>
                       {isPopular ? `${mover._watchCount || 0} watching` : `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`}
                     </div>

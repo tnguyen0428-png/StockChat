@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { polyFetch } from '../../lib/polygonClient';
 import { runScreener, SECTOR_MAP } from '../../lib/screener';
-import { run52wHighScan, DEFAULT_THRESHOLD, runVolSurgeScan, DEFAULT_VOL_MULTIPLIER, runGapUpScan, DEFAULT_GAP_THRESHOLD, runMACrossScan, DEFAULT_SHORT_MA, DEFAULT_LONG_MA } from '../../lib/breakoutScanner';
+import { run52wHighScan, DEFAULT_THRESHOLD, runVolSurgeScan, DEFAULT_VOL_MULTIPLIER, runGapUpScan, DEFAULT_GAP_THRESHOLD, runMACrossScan, DEFAULT_SHORT_MA, DEFAULT_LONG_MA, runConfluenceScan } from '../../lib/breakoutScanner';
 import { runFlowScan } from '../../lib/institutionalFlow';
 
 export default function AdminPanel({ session, profile }) {
@@ -61,6 +61,8 @@ export default function AdminPanel({ session, profile }) {
   const [scanMAStatus, setScanMAStatus] = useState(null);
   const [scanningAll, setScanningAll] = useState(false);
   const [scanAllProgress, setScanAllProgress] = useState('');
+  const [confluenceResults, setConfluenceResults] = useState([]);
+  const [confluenceStatus, setConfluenceStatus] = useState(null);
   const [scanningFlow, setScanningFlow] = useState(false);
   const [scanFlowStatus, setScanFlowStatus] = useState(null);
 
@@ -209,6 +211,23 @@ export default function AdminPanel({ session, profile }) {
 
     } finally {
       // Always clean up — even if something unexpected happens
+      setScanningAll(false);
+      setScanAllProgress('');
+    }
+  };
+
+  const handleConfluenceScan = async () => {
+    setScanningAll(true);
+    setScanAllProgress('Starting confluence scan…');
+    setConfluenceResults([]);
+    setConfluenceStatus(null);
+    try {
+      const { inserted, confluenceResults: results } = await runConfluenceScan((msg) => setScanAllProgress(msg));
+      setConfluenceResults(results);
+      setConfluenceStatus({ inserted, count: results.length });
+    } catch (e) {
+      setConfluenceStatus({ error: e.message });
+    } finally {
       setScanningAll(false);
       setScanAllProgress('');
     }
@@ -438,19 +457,18 @@ export default function AdminPanel({ session, profile }) {
                   Scans S&P 500 + Nasdaq 100 for breakout signals. Results appear in the Alerts tab.
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
-                  {/* Manual — runs all 4 client-side scanners (admin on-demand only) */}
+                  {/* Confluence — RSI + ADX + VWAP weighted scoring */}
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <button
                       style={{ ...adminStyles.btn, width: '100%', fontSize: 14, background: scanningAll ? 'var(--border)' : '#1a3c2a', opacity: isAnyScanRunning && !scanningAll ? 0.4 : 1 }}
-                      onClick={handleScanAll} disabled={isAnyScanRunning}
+                      onClick={handleConfluenceScan} disabled={isAnyScanRunning}
                     >
-                      {scanningAll ? `🔧 Manual… ${scanAllProgress}` : '🔧 Manual'}
+                      {scanningAll ? `🔧 Confluence… ${scanAllProgress}` : '🔧 Confluence Scan'}
                     </button>
                     <div style={{ fontSize: 10, color: 'var(--text2)', lineHeight: 1.5, padding: '0 2px' }}>
-                      ⚡ 52W High (5%)<br/>
-                      🔥 Vol Surge (2x)<br/>
-                      📈 Gap Up (1.5%)<br/>
-                      🔀 MA Cross (9/21)
+                      ⚡ 52W High · 🔥 Vol · 📈 Gap · 🔀 MA<br/>
+                      RSI + ADX + VWAP scoring<br/>
+                      S≥75 · A≥50 · B≥25 · C&lt;25
                     </div>
                   </div>
                   {/* Auto — UW flow scanner (scheduled 3x/day + on-demand) */}
@@ -504,6 +522,46 @@ export default function AdminPanel({ session, profile }) {
                 {scanMAStatus && <div style={{ fontSize: 12, color: scanMAStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scanMAStatus.error ? `Error: ${scanMAStatus.error}` : scanMAStatus.inserted === 0 ? '🔀 MA — no crossovers found' : `🔀 MA — ${scanMAStatus.inserted} alert${scanMAStatus.inserted > 1 ? 's' : ''} added`}</div>}
                 {/* Auto scan result */}
                 {scanFlowStatus && <div style={{ fontSize: 12, color: scanFlowStatus.error ? 'var(--red)' : 'var(--green)', marginBottom: 4 }}>{scanFlowStatus.error ? `Error: ${scanFlowStatus.error}` : scanFlowStatus.inserted === 0 ? '💰 Big Money — no flow signals found' : `💰 Big Money — ${scanFlowStatus.inserted} alert${scanFlowStatus.inserted > 1 ? 's' : ''} added`}</div>}
+                {/* Confluence scan result */}
+                {confluenceStatus && (
+                  <div style={{ marginTop: 6 }}>
+                    {confluenceStatus.error
+                      ? <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 4 }}>Error: {confluenceStatus.error}</div>
+                      : <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 6 }}>
+                          🔧 Confluence — {confluenceStatus.count} tickers · {confluenceStatus.inserted} rows inserted
+                        </div>
+                    }
+                    {confluenceResults.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 300, overflowY: 'auto' }}>
+                        {confluenceResults.map(r => {
+                          const tierColors = { S: '#d4af37', A: 'var(--green)', B: '#3b82f6', C: '#888' };
+                          const tierBg     = { S: '#3a2d00', A: 'var(--green-bg)', B: '#1e2a40', C: '#1a1a1a' };
+                          return (
+                            <div key={r.ticker} style={{ background: 'var(--card2)', borderRadius: 8, padding: '8px 10px', border: `1px solid ${tierColors[r.tier]}40` }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: tierColors[r.tier], background: tierBg[r.tier], borderRadius: 4, padding: '1px 6px', border: `1px solid ${tierColors[r.tier]}` }}>
+                                  {r.tier}
+                                </span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text1)' }}>{r.ticker}</span>
+                                <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 'auto' }}>Score: {r.score}</span>
+                              </div>
+                              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 3 }}>
+                                {r.signals.map(sig => (
+                                  <span key={sig} style={{ fontSize: 10, background: 'var(--card)', borderRadius: 3, padding: '1px 5px', color: 'var(--text2)', border: '1px solid var(--border)' }}>
+                                    {sig === '52w_high' ? '52W' : sig === 'vol_surge' ? 'Vol' : sig === 'gap_up' ? 'Gap' : 'MA'}
+                                  </span>
+                                ))}
+                              </div>
+                              <div style={{ fontSize: 10, color: 'var(--text3)', lineHeight: 1.6 }}>
+                                RSI {r.rsi ?? 'n/a'} · ADX {r.adxData?.adx ?? 'n/a'}{r.adxData ? ` (${r.adxData.plusDI > r.adxData.minusDI ? '▲' : '▼'})` : ''} · VWAP {r.vwap != null ? `$${r.vwap.toFixed(2)}` : 'n/a'}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : s.id === 'screener' ? (
               <div style={adminStyles.body}>

@@ -74,6 +74,9 @@ async function fetchPolygonSnapshots(symbols) {
               volume:            Math.round(dayVol),
               prevDayVolume:     prevVol > 0 ? Math.round(prevVol) : null,
               changesPercentage: t.todaysChangePerc ?? null,
+              vwap:              t.day?.vw ?? null,
+              dayHigh:           t.day?.h ?? null,
+              dayLow:            t.day?.l ?? null,
             };
           } else if (prevVol > 0) {
             // Market closed — use prevDay as "latest"
@@ -84,6 +87,9 @@ async function fetchPolygonSnapshots(symbols) {
               volume:            Math.round(prevVol),
               prevDayVolume:     null,
               changesPercentage: t.todaysChangePerc ?? null,
+              vwap:              t.prevDay?.vw ?? null,
+              dayHigh:           t.prevDay?.h ?? null,
+              dayLow:            t.prevDay?.l ?? null,
             };
           }
         }
@@ -117,7 +123,9 @@ async function fetchPolygonAggs(symbol, days) {
       return {
         closes:  results.map(d => d.c),
         highs:   results.map(d => d.h),
+        lows:    results.map(d => d.l),
         volumes: results.map(d => d.v),
+        vwaps:   results.map(d => d.vw),
       };
     }
     return null;
@@ -191,6 +199,287 @@ async function getAlertedTodaySet(signalType) {
 function calcSMA(closes, period) {
   const slice = closes.slice(-period);
   return slice.reduce((sum, v) => sum + v, 0) / slice.length;
+}
+
+/**
+ * Wilder smoothing RSI. Returns 0-100 or null if insufficient data.
+ */
+function calcRSI(closes, period = 14) {
+  if (!closes || closes.length < period + 1) return null;
+  const slice = closes.slice(-(period + 1));
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = slice[i] - slice[i - 1];
+    if (diff > 0) gains += diff;
+    else losses += Math.abs(diff);
+  }
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+  // Wilder smoothing for remaining candles beyond the seed period
+  for (let i = period + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    const g = diff > 0 ? diff : 0;
+    const l = diff < 0 ? Math.abs(diff) : 0;
+    avgGain = (avgGain * (period - 1) + g) / period;
+    avgLoss = (avgLoss * (period - 1) + l) / period;
+  }
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return parseFloat((100 - 100 / (1 + rs)).toFixed(2));
+}
+
+/**
+ * Standard ADX with +DI / -DI. Returns { adx, plusDI, minusDI } or null.
+ */
+function calcADX(highs, lows, closes, period = 14) {
+  if (!highs || highs.length < period * 2) return null;
+  const trArr = [], plusDMArr = [], minusDMArr = [];
+  for (let i = 1; i < highs.length; i++) {
+    const highDiff = highs[i] - highs[i - 1];
+    const lowDiff  = lows[i - 1] - lows[i];
+    trArr.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1])));
+    plusDMArr.push(highDiff > lowDiff && highDiff > 0 ? highDiff : 0);
+    minusDMArr.push(lowDiff > highDiff && lowDiff > 0 ? lowDiff : 0);
+  }
+  // Seed with simple sum
+  let smoothTR    = trArr.slice(0, period).reduce((s, v) => s + v, 0);
+  let smoothPlus  = plusDMArr.slice(0, period).reduce((s, v) => s + v, 0);
+  let smoothMinus = minusDMArr.slice(0, period).reduce((s, v) => s + v, 0);
+  const dxArr = [];
+  const addDX = () => {
+    const plusDI  = smoothTR > 0 ? (smoothPlus  / smoothTR) * 100 : 0;
+    const minusDI = smoothTR > 0 ? (smoothMinus / smoothTR) * 100 : 0;
+    const sum = plusDI + minusDI;
+    dxArr.push(sum > 0 ? Math.abs(plusDI - minusDI) / sum * 100 : 0);
+  };
+  addDX();
+  for (let i = period; i < trArr.length; i++) {
+    smoothTR    = smoothTR    - smoothTR    / period + trArr[i];
+    smoothPlus  = smoothPlus  - smoothPlus  / period + plusDMArr[i];
+    smoothMinus = smoothMinus - smoothMinus / period + minusDMArr[i];
+    addDX();
+  }
+  if (dxArr.length < period) return null;
+  const adx = parseFloat((dxArr.slice(-period).reduce((s, v) => s + v, 0) / period).toFixed(2));
+  const plusDI  = smoothTR > 0 ? parseFloat(((smoothPlus  / smoothTR) * 100).toFixed(2)) : 0;
+  const minusDI = smoothTR > 0 ? parseFloat(((smoothMinus / smoothTR) * 100).toFixed(2)) : 0;
+  return { adx, plusDI, minusDI };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONFLUENCE SCAN — RSI + ADX + VWAP weighted scoring
+// ══════════════════════════════════════════════════════════════════════════════
+
+export async function runConfluenceScan(onProgress) {
+  onProgress?.('Running 4 breakout scans…');
+
+  // ── Step 1: run all 4 scan* functions in parallel ──
+  const [hits52w, hitsVol, hitsGap, hitsMA] = await Promise.allSettled([
+    scan52wHigh(),
+    scanVolSurge(),
+    scanGapUp(),
+    scanMACross(),
+  ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : []));
+
+  onProgress?.('Merging signals…');
+
+  // ── Step 2: merge results by ticker into a Map ──
+  const tickerMap = new Map(); // ticker → { signals: Set, data: {...} }
+
+  const merge = (hits, signalKey, dataFn) => {
+    for (const h of hits) {
+      if (!tickerMap.has(h.symbol)) {
+        tickerMap.set(h.symbol, { signals: new Set(), snapData: h });
+      }
+      const entry = tickerMap.get(h.symbol);
+      entry.signals.add(signalKey);
+      Object.assign(entry.snapData, dataFn(h));
+    }
+  };
+
+  merge(hits52w, '52w_high',  h => ({ high_52w: h.high_52w, pct_from_high: h.pct_from_high, price: h.price, volume: h.volume, avg_volume: h.avg_volume, change_pct: h.change_pct, sector: h.sector }));
+  merge(hitsVol, 'vol_surge', h => ({ current_volume: h.current_volume, avg_volume: h.avg_volume, volume_ratio: h.volume_ratio, price: h.price, change_pct: h.change_pct }));
+  merge(hitsGap, 'gap_up',    h => ({ gap_pct: h.gap_pct, open_price: h.open_price, prev_close: h.prev_close, price: h.price, volume: h.volume, change_pct: h.change_pct }));
+  merge(hitsMA,  'ma_cross',  h => ({ short_ma: h.short_ma, long_ma: h.long_ma, price: h.price, volume: h.volume, change_pct: h.change_pct }));
+
+  const tickers = [...tickerMap.keys()];
+  onProgress?.(`Fetching RSI/ADX/VWAP for ${tickers.length} tickers…`);
+
+  // ── Step 3: fetch RSI, ADX, VWAP (batched 5 at a time) ──
+  const BATCH = 5;
+  for (let i = 0; i < tickers.length; i += BATCH) {
+    const batch = tickers.slice(i, i + BATCH);
+    await Promise.all(batch.map(async (ticker) => {
+      const entry = tickerMap.get(ticker);
+      // fetch 60 days for enough ADX history (needs ~28+ candles)
+      const aggs = await fetchPolygonAggs(ticker, 60);
+      if (aggs) {
+        entry.rsi   = calcRSI(aggs.closes);
+        entry.adx   = calcADX(aggs.highs, aggs.lows, aggs.closes);
+        entry.vwap  = aggs.vwaps?.[aggs.vwaps.length - 1] ?? null;
+      }
+      // Also grab snapshot vwap as fallback
+      if (!entry.vwap) {
+        const snaps = await fetchPolygonSnapshots([ticker]);
+        entry.vwap = snaps[ticker]?.vwap ?? null;
+      }
+    }));
+    if (i + BATCH < tickers.length) await new Promise(r => setTimeout(r, 300));
+    onProgress?.(`RSI/ADX/VWAP: ${Math.min(i + BATCH, tickers.length)}/${tickers.length}`);
+  }
+
+  // ── Step 4: score each ticker ──
+  const SIGNAL_WEIGHTS = { '52w_high': 25, 'vol_surge': 25, 'gap_up': 20, 'ma_cross': 15 };
+
+  const confluenceResults = [];
+  for (const [ticker, entry] of tickerMap.entries()) {
+    let score = 0;
+
+    // Signal scores
+    for (const sig of entry.signals) score += SIGNAL_WEIGHTS[sig] ?? 0;
+
+    // RSI score
+    const rsi = entry.rsi;
+    if (rsi != null) {
+      if      (rsi >= 50 && rsi <= 70) score += 10;
+      else if (rsi >= 40 && rsi < 50)  score += 3;
+      else if (rsi > 70)               score -= 5;
+    }
+
+    // ADX score
+    const adxData = entry.adx;
+    if (adxData != null) {
+      const bullish = adxData.plusDI > adxData.minusDI;
+      if (adxData.adx >= 25 && bullish) {
+        score += 10;
+        if (adxData.adx >= 40) score += 3;
+      } else if (adxData.adx >= 25 && !bullish) {
+        score += 2;
+      } else if (adxData.adx < 20) {
+        score -= 5;
+      }
+    }
+
+    // VWAP score
+    const price = entry.snapData.price;
+    const vwap  = entry.vwap;
+    if (price != null && vwap != null && vwap > 0) {
+      if (price > vwap) score += 7;
+      else              score -= 3;
+    }
+
+    // Rel volume bonus
+    const volRatio = entry.snapData.volume_ratio ?? (entry.snapData.current_volume && entry.snapData.avg_volume && entry.snapData.avg_volume > 0
+      ? entry.snapData.current_volume / entry.snapData.avg_volume
+      : entry.snapData.volume && entry.snapData.avg_volume && entry.snapData.avg_volume > 0
+        ? entry.snapData.volume / entry.snapData.avg_volume
+        : null);
+    if (volRatio != null) {
+      if (volRatio > 3) score += 3;
+      if (volRatio > 5) score += 3;
+    }
+
+    // Within 1% of 52W high bonus
+    const pctFromHigh = entry.snapData.pct_from_high;
+    if (pctFromHigh != null && pctFromHigh < 1) score += 2;
+
+    // Gap >3% bonus
+    const gapPct = entry.snapData.gap_pct;
+    if (gapPct != null && gapPct > 3) score += 2;
+
+    // Clamp to 0-100
+    score = Math.max(0, Math.min(100, score));
+
+    // Tier assignment
+    let tier;
+    if      (score >= 75) tier = 'S';
+    else if (score >= 50) tier = 'A';
+    else if (score >= 25) tier = 'B';
+    else                  tier = 'C';
+
+    confluenceResults.push({ ticker, score, tier, signals: [...entry.signals], rsi, adxData, vwap, snapData: entry.snapData });
+  }
+
+  // Sort by score descending
+  confluenceResults.sort((a, b) => b.score - a.score);
+
+  // Top 4 are featured
+  const featuredTickers = new Set(confluenceResults.slice(0, 4).map(r => r.ticker));
+
+  onProgress?.('Inserting alerts…');
+
+  // ── Step 5: insert individual signal rows + one confluence summary row per ticker ──
+  const insertRows = [];
+
+  // Individual signal rows (backward compat)
+  for (const [ticker, entry] of tickerMap.entries()) {
+    const result = confluenceResults.find(r => r.ticker === ticker);
+    const feat = featuredTickers.has(ticker);
+
+    for (const sig of entry.signals) {
+      const sd = entry.snapData;
+      const relVol = sd.volume_ratio ?? (sd.current_volume && sd.avg_volume ? parseFloat((sd.current_volume / sd.avg_volume).toFixed(2)) : (sd.volume && sd.avg_volume ? parseFloat((sd.volume / sd.avg_volume).toFixed(2)) : null));
+      insertRows.push({
+        signal_type:   sig,
+        ticker,
+        price:         sd.price,
+        change_pct:    sd.change_pct,
+        volume:        sd.current_volume ?? sd.volume,
+        avg_volume:    sd.avg_volume,
+        rel_volume:    relVol,
+        high_52w:      sd.high_52w ?? null,
+        pct_from_high: sd.pct_from_high ?? null,
+        gap_pct:       sd.gap_pct ?? null,
+        open_price:    sd.open_price ?? null,
+        prev_close:    sd.prev_close ?? null,
+        short_ma:      sd.short_ma ?? null,
+        long_ma:       sd.long_ma ?? null,
+        volume_ratio:  sd.volume_ratio ?? null,
+        sector:        sd.sector ?? null,
+        conviction:    result?.tier ?? null,
+        featured:      feat,
+        notes:         `Confluence scan: ${[...entry.signals].join(', ')}`,
+      });
+    }
+  }
+
+  // Confluence summary rows
+  for (const r of confluenceResults) {
+    const sd = r.snapData;
+    const relVol = sd.volume_ratio ?? (sd.current_volume && sd.avg_volume ? parseFloat((sd.current_volume / sd.avg_volume).toFixed(2)) : (sd.volume && sd.avg_volume ? parseFloat((sd.volume / sd.avg_volume).toFixed(2)) : null));
+    insertRows.push({
+      signal_type:   'confluence',
+      ticker:        r.ticker,
+      price:         sd.price,
+      change_pct:    sd.change_pct,
+      volume:        sd.current_volume ?? sd.volume,
+      avg_volume:    sd.avg_volume,
+      rel_volume:    relVol,
+      high_52w:      sd.high_52w ?? null,
+      pct_from_high: sd.pct_from_high ?? null,
+      gap_pct:       sd.gap_pct ?? null,
+      open_price:    sd.open_price ?? null,
+      prev_close:    sd.prev_close ?? null,
+      short_ma:      sd.short_ma ?? null,
+      long_ma:       sd.long_ma ?? null,
+      volume_ratio:  sd.volume_ratio ?? null,
+      sector:        sd.sector ?? null,
+      conviction:    r.tier,
+      featured:      featuredTickers.has(r.ticker),
+      notes:         `Score ${r.score} · Tier ${r.tier} · RSI ${r.rsi ?? 'n/a'} · ADX ${r.adxData?.adx ?? 'n/a'} · Signals: ${r.signals.join(', ')}`,
+    });
+  }
+
+  let inserted = 0;
+  if (insertRows.length > 0) {
+    const { error } = await supabase.from('breakout_alerts').insert(insertRows);
+    if (error) { console.error('[Confluence] Insert error:', error.message); throw error; }
+    inserted = insertRows.length;
+  }
+
+  onProgress?.(`Done — ${confluenceResults.length} tickers, ${inserted} rows inserted`);
+  console.log(`[Confluence] Done — ${confluenceResults.length} tickers scored, ${inserted} rows inserted`);
+  return { inserted, confluenceResults };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
