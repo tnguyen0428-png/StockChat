@@ -218,13 +218,32 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   // ═══════════════════════════════════════
   const loadBriefing = async () => {
     try {
-      const { data } = await supabase
+      const todayMidnight = new Date();
+      todayMidnight.setHours(0, 0, 0, 0);
+
+      // First try today's briefing
+      const { data: todayData } = await supabase
+        .from('daily_briefings')
+        .select('*')
+        .gte('created_at', todayMidnight.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (todayData) {
+        setBriefing(todayData);
+        return;
+      }
+
+      // Fall back to most recent briefing from any date
+      const { data: recentData } = await supabase
         .from('daily_briefings')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (data) setBriefing(data);
+
+      if (recentData) setBriefing(recentData);
     } catch (err) {
       console.error('[Briefing] Load error:', err.message);
     }
@@ -734,7 +753,14 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
               <span style={S.briefTitle}>Daily Briefing</span>
               {briefing && (
                 <span style={S.briefTime}>
-                  {new Date(briefing.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} EST
+                  {(() => {
+                    const briefDate = new Date(briefing.created_at);
+                    const todayMidnight = new Date();
+                    todayMidnight.setHours(0, 0, 0, 0);
+                    const isToday = briefDate >= todayMidnight;
+                    const timeStr = briefDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                    return (isToday ? '' : 'Yesterday · ') + timeStr + ' EST';
+                  })()}
                 </span>
               )}
             </div>
