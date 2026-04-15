@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useTheme, SentimentPill, timeAgo } from './alertsCasinoComponents';
 import { isMarketOpen } from '../../utils/marketUtils';
+import { lifecycleStateFor } from '../../lib/alertLifecycle';
+import { MIN_SAMPLES_FLOOR } from '../../lib/signalConfidence';
 
 // ── Constants ──
 // Polygon replaced FMP as the exit-price source for alert scoring on 2026-04-14.
@@ -17,6 +19,13 @@ const TYPE_CONFIG = {
   gap_up:      { label: 'GAP UP',    color: '#60a5fa', bg: 'rgba(37,99,235,0.15)' },
   ma_cross:    { label: 'MA CROSS',  color: '#60a5fa', bg: 'rgba(37,99,235,0.15)' },
 };
+
+// Only these signal types earn a slot on the action chip grid — our
+// differentiated, edge-backed signals. 52-week-high is excluded because it's
+// generic (every app flags it) and our own cohort stats show it pays out at
+// ~48% over 94 trades — below coin-flip. Still visible in Recent Alerts for
+// users who explicitly want that view; just not promoted as an action chip.
+const GRID_SIGNAL_TYPES = new Set(['flow_signal', 'gap_up', 'vol_surge', 'ma_cross']);
 
 const CHIP_SLOTS = [
   { top: '10%', left: '5%' },  { top: '8%',  left: '35%' },
@@ -223,6 +232,10 @@ export default function AlertsTab({ session, group, darkMode }) {
   // cycle — avoids StrictMode double-invoking a side effect placed in a setState updater.
   const wasDisconnectedRef = useRef(false);
 
+  // Cohort stats power the confidence line + lifecycle status inside the
+  // detail panel when a chip is tapped. Pulled once — small view, rarely changes.
+  const [cohortStats, setCohortStats] = useState([]);
+
   // Extracted so we can refetch on focus + reconnect
   const loadData = useCallback(async () => {
     const sevenDaysAgo = new Date();
@@ -307,8 +320,53 @@ export default function AlertsTab({ session, group, darkMode }) {
     };
   }, [loadData]);
 
+  // Fetch cohort stats (the v_signal_cohort_stats view) once on mount.
+  // Small table, no realtime needed. If the view is missing (migration not
+  // applied yet) we silently fall back to "Insufficient" inside the detail panel.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('v_signal_cohort_stats')
+        .select('*');
+      if (cancelled) return;
+      if (error) {
+        console.warn('[alerts] cohort stats unavailable:', error.message);
+        return;
+      }
+      setCohortStats(data || []);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Lookup: best cohort row for a given signal_type.
+  // "Best" = prefer the shortest horizon that has enough samples to score.
+  const cohortFor = useMemo(() => {
+    const byType = new Map();
+    const horizonRank = h => (h === '1d' ? 0 : h === '7d' ? 1 : h === '30d' ? 2 : 3);
+    (cohortStats || []).forEach(row => {
+      const cur = byType.get(row.signal_type);
+      if (!cur || horizonRank(row.horizon) < horizonRank(cur.horizon)) {
+        byType.set(row.signal_type, row);
+      }
+    });
+    return (signalType) => byType.get(signalType) || null;
+  }, [cohortStats]);
+
+  // Lookup: perf row for a given alert id (newest matching row wins).
+  const perfByAlertId = useMemo(() => {
+    const m = new Map();
+    (perfHistory || []).forEach(p => {
+      if (p?.alert_id && !m.has(p.alert_id)) m.set(p.alert_id, p);
+    });
+    return m;
+  }, [perfHistory]);
+
   const displayAlerts = useMemo(() => {
-    return liveAlerts.map(mapAlert).filter(a => a.ticker !== '—' && (Math.abs(a.changePct) > 0.05 || a.flowDollars > 0));
+    return liveAlerts
+      .filter(r => GRID_SIGNAL_TYPES.has(r.signal_type))
+      .map(mapAlert)
+      .filter(a => a.ticker !== '—' && (Math.abs(a.changePct) > 0.05 || a.flowDollars > 0));
   }, [liveAlerts]);
 
   const uniqueAlerts = useMemo(() => {
@@ -392,29 +450,51 @@ export default function AlertsTab({ session, group, darkMode }) {
                 style={{
                   position: 'absolute', ...CHIP_SLOTS[i % 8],
                   animation: isSelected ? 'none' : `float${i % 8} ${FLOAT_DURATIONS[i % 8]}s ease-in-out infinite`,
-                  opacity: selectedAlert && !isSelected ? 0.35 : f,
+                  opacity: selectedAlert && !isSelected ? 0.35 : 1,
                   transition: 'opacity 0.3s ease', cursor: 'pointer',
                   zIndex: isSelected ? 10 : isHot ? 5 : 1,
                 }}>
+                {/* Flow chips get their own violet styling — different
+                    color, larger primary text, inner text on white — so the
+                    eye lands on flow first (our differentiated signal). */}
                 <div style={{
                   width: size, height: size, borderRadius: '50%',
-                  background: isUp
-                    ? 'radial-gradient(circle at 40% 40%, #7dffb0, #2ebd68)'
-                    : 'radial-gradient(circle at 40% 40%, #ff9e9e, #c94444)',
-                  border: `2px solid ${isUp ? '#5eed8a' : '#F09595'}`,
+                  background: alert.isFlow
+                    ? 'radial-gradient(circle at 40% 40%, #c4a7ff, #7c3aed)'
+                    : isUp
+                      ? 'radial-gradient(circle at 40% 40%, #7dffb0, #2ebd68)'
+                      : 'radial-gradient(circle at 40% 40%, #ff9e9e, #c94444)',
+                  border: `2px solid ${alert.isFlow ? '#9f6cf0' : isUp ? '#5eed8a' : '#F09595'}`,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: isSelected ? '0 0 0 3px rgba(123,140,222,0.5)' : isHot ? '0 0 8px rgba(94,237,138,0.35)' : undefined,
-                  animation: isHot && !isSelected ? 'freshPulse 2.5s ease-in-out infinite' : undefined,
+                  boxShadow: isSelected
+                    ? '0 0 0 3px rgba(123,140,222,0.5)'
+                    : alert.isFlow
+                      ? '0 0 0 3px rgba(124,58,237,0.15), 0 0 12px rgba(124,58,237,0.25)'
+                      : isHot
+                        ? '0 0 8px rgba(94,237,138,0.35)'
+                        : undefined,
+                  animation: isHot && !isSelected && !alert.isFlow ? 'freshPulse 2.5s ease-in-out infinite' : undefined,
                   transition: 'box-shadow 0.2s ease',
                 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#000', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{alert.ticker}</span>
-                  <span style={{ fontSize: 9, color: 'rgba(0,0,0,0.6)', lineHeight: 1, marginTop: 1 }}>
+                  <span style={{
+                    fontSize: 11, fontWeight: 700,
+                    color: alert.isFlow ? '#fff' : '#000',
+                    lineHeight: 1, fontFamily: "'Outfit', sans-serif",
+                  }}>{alert.ticker}</span>
+                  <span style={{
+                    fontSize: alert.isFlow ? 10 : 9,
+                    fontWeight: alert.isFlow ? 700 : 500,
+                    color: alert.isFlow ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.6)',
+                    lineHeight: 1, marginTop: 1,
+                  }}>
                     {alert.isFlow
                       ? (alert.flowDollars > 0 ? fmtMoney(alert.flowDollars) : '—')
                       : `${alert.changePct >= 0 ? '+' : ''}${alert.changePct.toFixed(1)}%`}
                   </span>
                   <span style={{
-                    fontSize: 6.5, fontWeight: 700, color: 'rgba(0,0,0,0.45)', lineHeight: 1, marginTop: 2,
+                    fontSize: 6.5, fontWeight: 700,
+                    color: alert.isFlow ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.45)',
+                    lineHeight: 1, marginTop: 2,
                     textTransform: 'uppercase', letterSpacing: 0.3, textAlign: 'center', maxWidth: size - 10,
                   }}>
                     {tc.label}
@@ -432,7 +512,15 @@ export default function AlertsTab({ session, group, darkMode }) {
       )}
 
       {/* ═══ DETAIL PANEL ═══ */}
-      {selectedAlert && <DetailPanel alert={selectedAlert} t={t} />}
+      {selectedAlert && (
+        <DetailPanel
+          alert={selectedAlert}
+          rawAlert={liveAlerts.find(r => r.id === selectedAlert.id) || null}
+          perfRow={perfByAlertId.get(selectedAlert.id) || null}
+          cohort={cohortFor(selectedAlert.type)}
+          t={t}
+        />
+      )}
 
       {/* ═══ STATS STRIP ═══ */}
       {alertStats.total > 0 && (
@@ -579,8 +667,45 @@ function FreshnessBar({ lastUpdated, connState, onRefresh, tick, t }) {
   );
 }
 
-function DetailPanel({ alert, t }) {
+function DetailPanel({ alert, rawAlert, perfRow, cohort, t }) {
   const tc = typeFor(alert.type);
+
+  // Derive confidence + lifecycle state for this alert. lifecycleStateFor is a
+  // pure function — safe to call every render. Falls back to "Insufficient" if
+  // the cohort view is missing or the sample is too small.
+  const ls = lifecycleStateFor(rawAlert || alert, perfRow, cohort);
+  const conf = ls.confidence;
+
+  const confLabelColor =
+    conf.label === 'Strong' ? t.green :
+    conf.label === 'Mixed'  ? '#fbbf24' :
+    conf.label === 'Weak'   ? t.red :
+    t.text3;
+
+  // Plain-English label mapping. Internal taxonomy (Strong/Mixed/Weak) stays
+  // as-is in signalConfidence.js; we only translate at render time so regular
+  // users read a sentence they understand, not a regulatory-looking rating.
+  // Avoids "Strong Buy / Buy / Hold / Sell" language (investment-adviser
+  // territory) while still telling the user what the cohort is saying.
+  const confDisplayLabel =
+    conf.label === 'Strong' ? 'Usually wins' :
+    conf.label === 'Mixed'  ? 'Coin-flip'    :
+    conf.label === 'Weak'   ? 'Usually loses':
+    conf.label;
+
+  const dotColor =
+    ls.dotColor === 'live' ? '#4A90D9' :
+    ls.dotColor === 'warn' ? '#D4A017' :
+    ls.dotColor === 'win'  ? t.green :
+    ls.dotColor === 'loss' ? t.red :
+    '#c9d1dd';
+
+  const statusColor =
+    ls.stage === 'closed_winner' ? t.green :
+    ls.stage === 'closed_miss'   ? t.red :
+    ls.stage === 'near_peak'     ? '#fbbf24' :
+    t.text1;
+
   return (
     <div style={{ background: t.card, borderRadius: 10, border: `1px solid ${t.border}`, padding: '10px 12px', marginBottom: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -595,7 +720,42 @@ function DetailPanel({ alert, t }) {
       <div style={{ fontSize: 11, color: t.text3, marginBottom: 8 }}>
         {alert.company && `${alert.company} · `}{alert.price && `$${Number(alert.price).toFixed(2)} · `}{timeAgo(alert.created_at)}
       </div>
+
+      {/* Confidence one-liner.
+          - Trustworthy cohort → colored label + stats (Strong · 62% win rate · 1d · 78 similar)
+          - Below the sample floor → muted "Building history" line so the feature is
+            always discoverable and users learn the rhythm of it filling up.
+          Layout stays identical so the line swaps in place without a jump. */}
+      {conf.label !== 'Insufficient' ? (
+        <div style={{
+          fontSize: 11, color: t.text2, marginBottom: 6,
+          fontVariantNumeric: 'tabular-nums',
+        }}>
+          <span style={{ fontWeight: 700, color: confLabelColor, letterSpacing: 0.2 }}>{confDisplayLabel}</span>
+          <span style={{ color: t.border, margin: '0 5px' }}>·</span>
+          {conf.hitRatePct != null ? `${conf.hitRatePct}%` : '—'}
+          <span style={{ color: t.border, margin: '0 5px' }}>·</span>
+          {conf.nSamples ?? '—'} alerts like this
+        </div>
+      ) : (
+        <div style={{
+          fontSize: 11, color: t.text3, marginBottom: 6,
+          fontVariantNumeric: 'tabular-nums', fontStyle: 'italic',
+        }}>
+          Building history
+          {conf.hitRatePct != null && (
+            <>
+              <span style={{ margin: '0 5px' }}>·</span>
+              {conf.hitRatePct}% so far
+            </>
+          )}
+          <span style={{ margin: '0 5px' }}>·</span>
+          {conf.nSamples ?? 0} of {MIN_SAMPLES_FLOOR} alerts like this
+        </div>
+      )}
+
       <div style={{ fontSize: 11, color: t.text2, lineHeight: 1.5, marginBottom: 10 }}>{alert.explanation}</div>
+
       <div style={{ display: 'flex', gap: 6 }}>
         {alert.stats.map((s, i) => (
           <div key={i} style={{ flex: 1, background: t.surface, borderRadius: 6, padding: '5px 4px', textAlign: 'center' }}>
@@ -607,6 +767,29 @@ function DetailPanel({ alert, t }) {
             }}>{s.value}</div>
           </div>
         ))}
+      </div>
+
+      {/* Lifecycle status row — always rendered so users learn the rhythm */}
+      <div style={{
+        marginTop: 9, paddingTop: 9,
+        borderTop: `1px dashed ${t.border}`,
+        display: 'flex', alignItems: 'center', gap: 8,
+        fontSize: 11,
+      }}>
+        <span style={{
+          width: 7, height: 7, borderRadius: '50%',
+          background: dotColor,
+          animation: ls.dotColor === 'live' ? 'pulse 1.8s ease-in-out infinite' : undefined,
+          flexShrink: 0,
+        }} />
+        <span style={{ color: statusColor, fontWeight: 500 }}>{ls.statusText}</span>
+        <span style={{
+          color: t.text3,
+          marginLeft: 'auto',
+          fontVariantNumeric: 'tabular-nums',
+        }}>
+          {ls.subText}
+        </span>
       </div>
     </div>
   );

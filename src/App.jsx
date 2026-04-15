@@ -9,10 +9,11 @@ import { supabase } from './lib/supabase';
 import { safeGet, safeSet, safeRemove } from './lib/safeStorage';
 
 // Pages
-import LoginPage     from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import LandingPage   from './pages/LandingPage';
-import JoinGroupPage from './pages/JoinGroupPage';
+import LoginPage            from './pages/LoginPage';
+import DashboardPage        from './pages/DashboardPage';
+import LandingPage          from './pages/LandingPage';
+import JoinGroupPage        from './pages/JoinGroupPage';
+import DevCohortStatsPage   from './pages/DevCohortStatsPage';
 import { GroupProvider } from './context/GroupContext';
 
 // Loading screen
@@ -164,6 +165,15 @@ export default function App() {
             <GroupProvider session={session}>
               <DashboardPage session={session} />
             </GroupProvider>
+          </ProtectedRoute>
+        }
+      />
+      {/* Dev-only surface — Stage 1 truth table. Not linked from UI. */}
+      <Route
+        path="/dev/cohort-stats"
+        element={
+          <ProtectedRoute session={session}>
+            <DevCohortStatsPage />
           </ProtectedRoute>
         }
       />
