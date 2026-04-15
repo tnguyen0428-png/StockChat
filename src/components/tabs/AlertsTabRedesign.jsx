@@ -13,11 +13,12 @@ import { MIN_SAMPLES_FLOOR } from '../../lib/signalConfidence';
 const POLYGON_SCORING_CUTOFF = '2026-04-14T00:00:00Z';
 
 const TYPE_CONFIG = {
-  vol_surge:   { label: 'VOL SURGE', color: '#a78bfa', bg: 'rgba(167,139,250,0.15)' },
-  flow_signal: { label: 'BIG MONEY', color: '#5eed8a', bg: 'rgba(94,237,138,0.12)' },
-  '52w_high':  { label: '52W HIGH',  color: '#fbbf24', bg: 'rgba(217,119,6,0.15)' },
-  gap_up:      { label: 'GAP UP',    color: '#60a5fa', bg: 'rgba(37,99,235,0.15)' },
-  ma_cross:    { label: 'MA CROSS',  color: '#60a5fa', bg: 'rgba(37,99,235,0.15)' },
+  vol_surge:   { label: 'VOL SURGE',   color: '#a78bfa', bg: 'rgba(167,139,250,0.15)' },
+  flow_signal: { label: 'BIG MONEY',   color: '#5eed8a', bg: 'rgba(94,237,138,0.12)' },
+  '52w_high':  { label: '52W HIGH',    color: '#fbbf24', bg: 'rgba(217,119,6,0.15)' },
+  gap_up:      { label: 'GAP UP',      color: '#60a5fa', bg: 'rgba(37,99,235,0.15)' },
+  ma_cross:    { label: 'MA CROSS',    color: '#60a5fa', bg: 'rgba(37,99,235,0.15)' },
+  confluence:  { label: 'CONFLUENCE',  color: '#d4af37', bg: 'rgba(212,175,55,0.15)' },
 };
 
 // Only these signal types earn a slot on the action chip grid — our
@@ -25,7 +26,7 @@ const TYPE_CONFIG = {
 // generic (every app flags it) and our own cohort stats show it pays out at
 // ~48% over 94 trades — below coin-flip. Still visible in Recent Alerts for
 // users who explicitly want that view; just not promoted as an action chip.
-const GRID_SIGNAL_TYPES = new Set(['flow_signal', 'gap_up', 'vol_surge', 'ma_cross']);
+const GRID_SIGNAL_TYPES = new Set(['flow_signal', 'gap_up', 'vol_surge', 'ma_cross', 'confluence']);
 
 const CHIP_SLOTS = [
   { top: '10%', left: '5%' },  { top: '8%',  left: '35%' },
@@ -52,9 +53,10 @@ const FLOAT_DURATIONS = [18, 15, 22, 17, 20, 16, 19, 21];
 
 const FLOW_TYPES = new Set(['flow_signal']);
 const HISTORY_FILTERS = [
-  { key: 'all', label: 'All' },
-  { key: 'stocks', label: 'Stocks' },
-  { key: 'flow', label: 'Big $' },
+  { key: 'all',        label: 'All' },
+  { key: 'confluence', label: 'Top' },
+  { key: 'stocks',     label: 'Stocks' },
+  { key: 'flow',       label: 'Big $' },
 ];
 
 const EDUCATION_PANELS = [
@@ -88,6 +90,22 @@ const EDUCATION_PANELS = [
     ],
     example: <><span style={{ color: '#5eed8a', fontWeight: 500 }}>PLTR</span> — 3 bullish sweeps · $2.1M premium · $4.5M dark pool → institutions loading up aggressively</>,
     exBg: 'rgba(94,237,138,0.04)', exBorder: 'rgba(94,237,138,0.1)',
+  },
+  {
+    id: 'confluence', title: 'Confluence score', subtitle: 'Smart · multi-signal',
+    color: '#d4af37', bg: 'rgba(212,175,55,0.06)', border: 'rgba(212,175,55,0.2)', divider: 'rgba(212,175,55,0.15)',
+    what: <>Combines multiple technical signals into a single <span style={{ color: '#d4af37', fontWeight: 500 }}>point-weighted score</span>. High scores mean several independent indicators agree at once.</>,
+    why: 'One signal can be noise. When RSI, ADX, VWAP, and volume all line up on the same stock, the edge compounds.',
+    scans: [
+      ['RSI momentum', '14-day RSI above 60 scores +15pts (overbought zone adds urgency)'],
+      ['ADX trend strength', 'ADX > 25 scores +20pts (strong directional trend confirmed)'],
+      ['VWAP position', 'price above VWAP scores +15pts (institutions buying above fair value)'],
+      ['Volume surge', 'volume ratio ≥ 2x scores +25pts (crowd participation)'],
+      ['52W High proximity', 'within 2% of high scores +10pts (breakout zone)'],
+      ['Tier cutoffs', 'S-Tier ≥ 85pts · A-Tier ≥ 70pts · B-Tier ≥ 55pts'],
+    ],
+    example: <><span style={{ color: '#d4af37', fontWeight: 500 }}>NVDA</span> — RSI 68 · ADX 31 · above VWAP · 3.1x vol · at 52W High → <span style={{ color: '#d4af37' }}>87pts S-Tier</span></>,
+    exBg: 'rgba(212,175,55,0.04)', exBorder: 'rgba(212,175,55,0.1)',
   },
 ];
 
@@ -150,14 +168,22 @@ function historyMetric(h, t) {
     }
     return { text: '↑ cross', color: '#60a5fa' };
   }
+  if (type === 'confluence') {
+    const notes = h.notes || '';
+    const scoreMatch = notes.match(/Score:(\d+)/i);
+    const tierMatch  = notes.match(/Tier:([A-Z])/i);
+    const score = scoreMatch ? scoreMatch[1] : null;
+    const tier  = tierMatch  ? tierMatch[1]  : null;
+    if (tier || score) return { text: `${tier ? tier + ' · ' : ''}${score ? score + 'pts' : ''}`.replace(/ · $/, ''), color: '#d4af37' };
+    return { text: '—', color: '#d4af37' };
+  }
   if (type === 'vol_surge') {
     const v = Number(h.volume_ratio);
     if (isFinite(v) && v > 0) return { text: `${v.toFixed(1)}x vol`, color: '#a78bfa' };
   }
   // gap_up stores the move in gap_pct, not change_pct — fall back to either so
   // Recent Alerts never shows "—" for a row that actually has a move logged.
-  // Mirrors mapAlert's precedence: change → change_pct → gap_pct.
-  const rawPct = h.change ?? h.change_pct ?? h.gap_pct;
+  const rawPct = h.change_pct ?? h.gap_pct;
   const pct = Number(rawPct);
   if (isFinite(pct) && pct !== 0) return { text: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, color: pct >= 0 ? t.green : t.red };
   return { text: '—', color: t.text3 };
@@ -167,8 +193,9 @@ function mapAlert(a) {
   const ticker = a.ticker ?? a.tickers?.[0] ?? '—';
   const type = a.signal_type ?? a.alert_type ?? 'vol_surge';
   const isFlow = type === 'flow_signal';
+  const isConfluence = type === 'confluence';
 
-  const change = isFlow ? (a.change ?? a.change_pct ?? 0) : (a.change ?? a.change_pct ?? a.gap_pct ?? 0);
+  const change = isFlow ? (a.change_pct ?? 0) : (a.change_pct ?? a.gap_pct ?? 0);
   const changePct = Number(change) || 0;
   const flowDollars = isFlow ? (Number(a.gap_pct) || 0) : 0;
   const company = a.company ?? a.name ?? '';
@@ -179,9 +206,26 @@ function mapAlert(a) {
   const flowSweeps = isFlow && a.volume_ratio ? Number(a.volume_ratio) : 0;
   const flowDpValue = isFlow && a.gap_pct ? Number(a.gap_pct) : null;
 
+  // Parse confluence fields from notes ("Score:87|Tier:S|Signals:52W High + Vol Surge")
+  let confluenceScore = null, confluenceTier = null, confluenceSignals = null;
+  if (isConfluence && a.notes) {
+    const scoreMatch = a.notes.match(/Score:(\d+)/i);
+    const tierMatch  = a.notes.match(/Tier:([A-Z])/i);
+    const sigMatch   = a.notes.match(/Signals:([^|]+)/i);
+    confluenceScore   = scoreMatch ? Number(scoreMatch[1]) : null;
+    confluenceTier    = tierMatch  ? tierMatch[1]  : (a.conviction || null);
+    confluenceSignals = sigMatch   ? sigMatch[1].trim() : null;
+  }
+  const tier = a.conviction ?? confluenceTier ?? null;
+
   let explanation = a.title || a.signal || '';
   if (!explanation) {
-    if (type === 'vol_surge' && volRatio) {
+    if (isConfluence) {
+      const tierLabel = confluenceTier || tier || 'A';
+      const pts = confluenceScore ? `${confluenceScore}pts` : '';
+      const sigs = confluenceSignals ? ` · ${confluenceSignals}` : '';
+      explanation = `${tierLabel}-Tier confluence${pts ? ` (${pts})` : ''}${sigs}`;
+    } else if (type === 'vol_surge' && volRatio) {
       explanation = `Trading ${Number(volRatio).toFixed(1)}x normal volume`;
       if (changePct) explanation += ` with price ${changePct >= 0 ? 'up' : 'down'} ${Math.abs(changePct).toFixed(1)}%`;
     } else if (isFlow) {
@@ -199,7 +243,14 @@ function mapAlert(a) {
     }
   }
 
-  const stats = isFlow ? [
+  const confluenceStats = [
+    { label: 'Score', value: confluenceScore != null ? `${confluenceScore}pts` : '—' },
+    { label: 'RSI',   value: a.rsi   != null ? Number(a.rsi).toFixed(0)   : '—' },
+    { label: 'ADX',   value: a.adx   != null ? Number(a.adx).toFixed(0)   : '—' },
+    { label: 'Tier',  value: confluenceTier || tier || '—' },
+  ];
+
+  const stats = isConfluence ? confluenceStats : isFlow ? [
     { label: 'Sweeps', value: flowSweeps || '—' },
     { label: 'Premium', value: fmtMoney(flowPremium) },
     { label: 'Dark Pool', value: fmtMoney(flowDpValue) },
@@ -211,7 +262,7 @@ function mapAlert(a) {
     { label: 'Signal', value: a.notes ? a.notes.slice(0, 20) : (volRatio ? volRatio + 'x avg' : '—') },
   ];
 
-  return { id: a.id, ticker, type, isFlow, changePct, flowDollars, company, price, explanation, stats, created_at: a.created_at };
+  return { id: a.id, ticker, type, isFlow, isConfluence, tier, changePct, flowDollars, company, price, explanation, stats, created_at: a.created_at };
 }
 
 // ===== MAIN COMPONENT =====
@@ -375,15 +426,21 @@ export default function AlertsTab({ session, group, darkMode }) {
     return [...seen.values()].slice(0, 8);
   }, [displayAlerts]);
 
-  // Derive history from liveAlerts instead of a separate query
+  // Derive history from liveAlerts instead of a separate query.
+  // When a confluence row exists for a ticker, hide the individual signal rows
+  // for that same ticker so the list isn't cluttered with its component signals.
   const alertHistory = useMemo(() => {
-    return liveAlerts.slice(0, 30).map(a => ({
+    const rows = liveAlerts.slice(0, 30).map(a => ({
       id: a.id, ticker: a.ticker, signal_type: a.signal_type,
       price: a.price, change_pct: a.change_pct, gap_pct: a.gap_pct,
       pct_from_high: a.pct_from_high, short_ma: a.short_ma, long_ma: a.long_ma,
       volume_ratio: a.volume_ratio, volume: a.volume, avg_volume: a.avg_volume,
       notes: a.notes, created_at: a.created_at,
     }));
+    const confluenceTickers = new Set(
+      rows.filter(r => r.signal_type === 'confluence').map(r => r.ticker)
+    );
+    return rows.filter(r => r.signal_type === 'confluence' || !confluenceTickers.has(r.ticker));
   }, [liveAlerts]);
 
   const alertStats = useMemo(() => {
@@ -459,12 +516,14 @@ export default function AlertsTab({ session, group, darkMode }) {
                     eye lands on flow first (our differentiated signal). */}
                 <div style={{
                   width: size, height: size, borderRadius: '50%',
-                  background: alert.isFlow
-                    ? 'radial-gradient(circle at 40% 40%, #c4a7ff, #7c3aed)'
-                    : isUp
-                      ? 'radial-gradient(circle at 40% 40%, #7dffb0, #2ebd68)'
-                      : 'radial-gradient(circle at 40% 40%, #ff9e9e, #c94444)',
-                  border: `2px solid ${alert.isFlow ? '#9f6cf0' : isUp ? '#5eed8a' : '#F09595'}`,
+                  background: alert.isConfluence
+                    ? 'radial-gradient(circle at 40% 40%, #ffe082, #d4af37)'
+                    : alert.isFlow
+                      ? 'radial-gradient(circle at 40% 40%, #c4a7ff, #7c3aed)'
+                      : isUp
+                        ? 'radial-gradient(circle at 40% 40%, #7dffb0, #2ebd68)'
+                        : 'radial-gradient(circle at 40% 40%, #ff9e9e, #c94444)',
+                  border: `2px solid ${alert.isConfluence ? '#d4af37' : alert.isFlow ? '#9f6cf0' : isUp ? '#5eed8a' : '#F09595'}`,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                   boxShadow: isSelected
                     ? '0 0 0 3px rgba(123,140,222,0.5)'
@@ -487,9 +546,11 @@ export default function AlertsTab({ session, group, darkMode }) {
                     color: alert.isFlow ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.6)',
                     lineHeight: 1, marginTop: 1,
                   }}>
-                    {alert.isFlow
-                      ? (alert.flowDollars > 0 ? fmtMoney(alert.flowDollars) : '—')
-                      : `${alert.changePct >= 0 ? '+' : ''}${alert.changePct.toFixed(1)}%`}
+                    {alert.isConfluence
+                      ? (alert.tier ? `${alert.tier}-Tier` : '—')
+                      : alert.isFlow
+                        ? (alert.flowDollars > 0 ? fmtMoney(alert.flowDollars) : '—')
+                        : `${alert.changePct >= 0 ? '+' : ''}${alert.changePct.toFixed(1)}%`}
                   </span>
                   <span style={{
                     fontSize: 6.5, fontWeight: 700,
@@ -522,6 +583,9 @@ export default function AlertsTab({ session, group, darkMode }) {
         />
       )}
 
+      {/* ═══ EDUCATION ═══ */}
+      <EducationZone t={t} />
+
       {/* ═══ STATS STRIP ═══ */}
       {alertStats.total > 0 && (
         <>
@@ -549,9 +613,6 @@ export default function AlertsTab({ session, group, darkMode }) {
         </>
       )}
 
-      {/* ═══ EDUCATION ═══ */}
-      <EducationZone t={t} />
-
       {/* ═══ ALERT HISTORY ═══ */}
       {alertHistory.length > 0 && (
         <div style={{ background: t.card, borderRadius: 10, border: `1px solid ${t.border}`, overflow: 'hidden', marginTop: 10 }}>
@@ -560,8 +621,9 @@ export default function AlertsTab({ session, group, darkMode }) {
             <div style={{ display: 'flex', gap: 4 }}>
               {HISTORY_FILTERS.map(f => {
                 const active = historyFilter === f.key;
-                const fc = f.key === 'all' ? { color: t.blue, bg: t.blueBg }
-                  : f.key === 'stocks' ? { color: '#a78bfa', bg: 'rgba(167,139,250,0.1)' }
+                const fc = f.key === 'all'        ? { color: t.blue,    bg: t.blueBg }
+                  : f.key === 'confluence'         ? { color: '#d4af37', bg: 'rgba(212,175,55,0.1)' }
+                  : f.key === 'stocks'             ? { color: '#a78bfa', bg: 'rgba(167,139,250,0.1)' }
                   : { color: '#5eed8a', bg: 'rgba(94,237,138,0.08)' };
                 return (
                   <span key={f.key} onClick={() => setHistoryFilter(f.key)}
@@ -578,7 +640,8 @@ export default function AlertsTab({ session, group, darkMode }) {
           {(() => {
             const filtered = alertHistory.filter(h =>
               historyFilter === 'all' ||
-              (historyFilter === 'stocks' && !FLOW_TYPES.has(h.signal_type)) ||
+              (historyFilter === 'confluence' && h.signal_type === 'confluence') ||
+              (historyFilter === 'stocks' && !FLOW_TYPES.has(h.signal_type) && h.signal_type !== 'confluence') ||
               (historyFilter === 'flow' && FLOW_TYPES.has(h.signal_type))
             );
             const visible = showAllHistory ? filtered : filtered.slice(0, 5);
