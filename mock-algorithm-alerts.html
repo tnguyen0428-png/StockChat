@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UpTik — Algorithm Alert Mock</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #e8ecf1;
+    color: #1e293b;
+    min-height: 100vh;
+    padding: 24px 16px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .phone {
+    max-width: 420px;
+    margin: 0 auto;
+    background: #f5f7fa;
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 30px 60px -20px rgba(15, 23, 42, 0.25);
+    border: 1px solid rgba(15, 23, 42, 0.06);
+  }
+  .header {
+    background: #0f172a;
+    color: #fff;
+    padding: 20px 20px 14px;
+  }
+  .header .brand {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .header .brand span { color: #5eed8a; }
+  .header .tag {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: #94a3b8;
+    margin-top: 2px;
+  }
+  .content { padding: 20px 16px; }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #64748b;
+    margin: 20px 4px 10px;
+    text-transform: uppercase;
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  /* Stats strip */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .stat {
+    background: #fff;
+    border-radius: 14px;
+    padding: 14px 10px;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  }
+  .stat .label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #94a3b8;
+    text-transform: uppercase;
+  }
+  .stat .value {
+    font-size: 22px;
+    font-weight: 800;
+    margin-top: 6px;
+    letter-spacing: -0.5px;
+  }
+  .stat .value.green { color: #16a34a; }
+  .stat .value.red { color: #dc2626; }
+
+  /* Alert card */
+  .alert {
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+    border: 1px solid rgba(15, 23, 42, 0.05);
+    position: relative;
+  }
+  .alert-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .ticker {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .chip {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .chip.gap { background: rgba(37, 99, 235, 0.12); color: #2563eb; }
+  .chip.vol { background: rgba(167, 139, 250, 0.15); color: #7c3aed; }
+  .chip.flow { background: rgba(94, 237, 138, 0.15); color: #16a34a; }
+  .chip.high { background: rgba(251, 191, 36, 0.15); color: #b45309; }
+  .chip.cross { background: rgba(59, 130, 246, 0.12); color: #2563eb; }
+
+  .price {
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 600;
+  }
+  .change {
+    margin-left: auto;
+    font-size: 16px;
+    font-weight: 800;
+  }
+  .change.up { color: #16a34a; }
+  .change.down { color: #dc2626; }
+
+  /* Confidence row */
+  .conf-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .conf-row.strong { background: rgba(22, 163, 74, 0.08); color: #166534; }
+  .conf-row.mixed  { background: rgba(251, 191, 36, 0.10); color: #92400e; }
+  .conf-row.weak   { background: rgba(148, 163, 184, 0.15); color: #475569; }
+  .conf-label { font-weight: 800; }
+  .conf-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .conf-row.strong .conf-dot { background: #16a34a; }
+  .conf-row.mixed  .conf-dot { background: #fbbf24; }
+  .conf-row.weak   .conf-dot { background: #94a3b8; }
+  .conf-percent { margin-left: auto; font-weight: 800; font-size: 14px; }
+
+  /* Metadata grid */
+  .meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 14px;
+    padding: 10px 4px 4px;
+    border-top: 1px solid #eef2f7;
+    font-size: 12px;
+  }
+  .meta-item .k {
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .meta-item .v {
+    color: #1e293b;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .meta-item .v.pos { color: #16a34a; }
+  .meta-item .v.neg { color: #dc2626; }
+
+  /* Rank badge — lives above the ticker row, doesn't collide with change% */
+  .rank {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 800;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .rank.top { color: #16a34a; background: rgba(22, 163, 74, 0.1); }
+
+  /* Insufficient history state */
+  .insufficient {
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-radius: 10px;
+    font-size: 11px;
+    color: #94a3b8;
+    margin-bottom: 10px;
+    font-style: italic;
+    text-align: center;
+  }
+
+  /* Samples footnote */
+  .samples {
+    font-size: 10px;
+    color: #94a3b8;
+    margin-top: 8px;
+    text-align: right;
+    font-weight: 500;
+  }
+
+  /* Disclaimer */
+  .disclaimer {
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 10px;
+    color: #64748b;
+    text-align: center;
+    margin-top: 20px;
+    line-height: 1.5;
+  }
+
+  /* Comparison labels */
+  .compare-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: #64748b;
+    text-transform: uppercase;
+    margin: 28px 4px 8px;
+    text-align: center;
+  }
+  .compare-label.after { color: #16a34a; }
+  .compare-label.before { color: #94a3b8; }
+
+  /* Before card (faded old version) */
+  .alert.before {
+    opacity: 0.75;
+  }
+  .alert.before .dash {
+    font-size: 20px;
+    color: #cbd5e1;
+    margin-left: auto;
+    font-weight: 800;
+  }
+
+  /* Annotation arrow */
+  .annotate {
+    font-size: 10px;
+    color: #16a34a;
+    font-weight: 700;
+    margin-top: 4px;
+    padding: 4px 0 0 12px;
+    border-left: 2px solid #16a34a;
+    padding-left: 10px;
+    background: transparent;
+  }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="header">
+    <div class="brand">Up<span>tik</span></div>
+    <div class="tag">ACTION ALERTS</div>
+  </div>
+
+  <div class="content">
+
+    <!-- Stats strip -->
+    <div class="section-title">Today</div>
+    <div class="stats">
+      <div class="stat">
+        <div class="label">Signals</div>
+        <div class="value">11</div>
+      </div>
+      <div class="stat">
+        <div class="label">Hit Rate 1d</div>
+        <div class="value green">64%</div>
+      </div>
+      <div class="stat">
+        <div class="label">Avg Move</div>
+        <div class="value green">+2.1%</div>
+      </div>
+    </div>
+
+    <!-- STRONG confidence alert -->
+    <div class="section-title">Top Signals</div>
+
+    <div class="alert">
+      <div class="rank top">TOP SIGNAL · #1 OF 11</div>
+      <div class="alert-top">
+        <span class="ticker">AAL</span>
+        <span class="chip gap">GAP UP</span>
+        <span class="price">$12.11</span>
+        <span class="change up">+7.3%</span>
+      </div>
+
+      <div class="conf-row strong">
+        <span class="conf-dot"></span>
+        <span class="conf-label">Strong signal</span>
+        <span class="conf-percent">72% · 1d</span>
+      </div>
+
+      <div class="meta">
+        <div class="meta-item">
+          <div class="k">Similar hits avg</div>
+          <div class="v pos">+2.8% in 3d</div>
+        </div>
+        <div class="meta-item">
+          <div class="k">Typical hold</div>
+          <div class="v">18 hours</div>
+        </div>
+        <div class="meta-item">
+          <div class="k">When wrong</div>
+          <div class="v neg">-1.1% avg</div>
+        </div>
+        <div class="meta-item">
+          <div class="k">Volume</div>
+          <div class="v">4.2× normal</div>
+        </div>
+      </div>
+
+      <div class="samples">Based on 47 similar past signals · last 90d</div>
+    </div>
+
+    <!-- MIXED confidence alert -->
+    <div class="alert">
+      <div class="rank">#2 OF 11</div>
+      <div class="alert-top">
+        <span class="ticker">COIN</span>
+        <span class="chip gap">GAP UP</span>
+        <span class="price">$184.52</span>
+        <span class="change up">+2.8%</span>
+      </div>
+
+      <div class="conf-row mixed">
+        <span class="conf-dot"></span>
+        <span class="conf-label">Mixed signal</span>
+        <span class="conf-percent">58% · 1d</span>
+      </div>
+
+      <div class="meta">
+        <div class="meta-item">
+          <div class="k">Similar hits avg</div>
+          <div class="v pos">+1.2% in 3d</div>
+        </div>
+        <div class="meta-item">
+          <div class="k">Typical hold</div>
+          <div class="v">1.2 days</div>
+        </div>
+        <div class="meta-item">
+          <div class="k">When wrong</div>
+          <div class="v neg">-1.8% avg</div>
+        </div>
+        <div class="meta-item">
+          <div class="k">Volume</div>
+          <div class="v">2.1× normal</div>
+        </div>
+      </div>
+
+      <div class="samples">Based on 31 similar past signals · last 90d</div>
+    </div>
+
+    <!-- STRONG flow signal -->
+    <div class="alert">
+      <div class="rank">#3 OF 11</div>
+      <div class="alert-top">
+        <span class="ticker">META</span>
+        <span class="chip flow">BIG MONEY</span>
+        <span class="price">$634.53</span>
+        <span class="change up">+0.7%</span>
+      </div>
+
+      <div class="conf-row strong">
+        <span class="conf-dot"></span>
+        <span class="conf-label">Strong signal</span>
+        <span class="conf-percent">68% · 7d</span>
+      </div>
+
+      <div class="meta">
+        <div class="meta-item">
+          <div class="k">Similar hits avg</div>
+          <div class="v pos">+4.2% in 7d</div>
+        </div>
+        <div class="meta-item">
+          <div class="k">Typical hold</div>
+          <div class="v">3.4 days</div>
+        </div>
+        <div class="meta-item">
+          <div class="k">When wrong</div>
+          <div class="v neg">-2.3% avg</div>
+        </div>
+        <div class="meta-item">
+          <div class="k">Premium</div>
+          <div class="v">$2.1M sweeps</div>
+        </div>
+      </div>
+
+      <div class="samples">Based on 24 similar past signals · last 90d</div>
+    </div>
+
+    <!-- WEAK confidence alert (honest about low confidence) -->
+    <div class="alert">
+      <div class="rank">#7 OF 11</div>
+      <div class="alert-top">
+        <span class="ticker">PINS</span>
+        <span class="chip gap">GAP UP</span>
+        <span class="price">$18.64</span>
+        <span class="change up">+1.7%</span>
+      </div>
+
+      <div class="conf-row weak">
+        <span class="conf-dot"></span>
+        <span class="conf-label">Weak signal</span>
+        <span class="conf-percent">47% · 1d</span>
+      </div>
+
+      <div class="meta">
+        <div class="meta-item">
+          <div class="k">Similar hits avg</div>
+          <div class="v neg">-0.3% in 3d</div>
+        </div>
+        <div class="meta-item">
+          <div class="k">Typical hold</div>
+          <div class="v">6 hours</div>
+        </div>
+        <div class="meta-item">
+          <div class="k">When wrong</div>
+          <div class="v neg">-2.1% avg</div>
+        </div>
+        <div class="meta-item">
+          <div class="k">Volume</div>
+          <div class="v">1.3× normal</div>
+        </div>
+      </div>
+
+      <div class="samples">Based on 52 similar past signals · last 90d</div>
+    </div>
+
+    <!-- INSUFFICIENT HISTORY alert -->
+    <div class="alert">
+      <div class="rank">#8 OF 11</div>
+      <div class="alert-top">
+        <span class="ticker">ALB</span>
+        <span class="chip gap">GAP UP</span>
+        <span class="price">$72.18</span>
+        <span class="change up">+1.6%</span>
+      </div>
+
+      <div class="insufficient">
+        Not enough history yet to score this signal — keep watching
+      </div>
+
+      <div class="meta">
+        <div class="meta-item">
+          <div class="k">Move today</div>
+          <div class="v pos">+1.6%</div>
+        </div>
+        <div class="meta-item">
+          <div class="k">Volume</div>
+          <div class="v">2.8× normal</div>
+        </div>
+      </div>
+
+      <div class="samples">Only 6 similar past signals · need 20+</div>
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="disclaimer">
+      For informational purposes only. Not financial or investment advice.<br>
+      Past performance does not guarantee future results.
+    </div>
+
+    <!-- BEFORE / AFTER comparison -->
+    <div class="compare-label before">━━━  Today's card (before)  ━━━</div>
+
+    <div class="alert before">
+      <div class="alert-top">
+        <span class="ticker">AAL</span>
+        <span class="chip gap">GAP UP</span>
+        <span class="price">$12.11</span>
+        <span class="change up">+7.3%</span>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;padding-top:4px;">
+        Volume 4.2× normal · 3h ago
+      </div>
+    </div>
+
+    <div class="compare-label after">━━━  With algorithm (after)  ━━━</div>
+
+    <div class="alert">
+      <div class="rank top">TOP SIGNAL · #1 OF 11</div>
+      <div class="alert-top">
+        <span class="ticker">AAL</span>
+        <span class="chip gap">GAP UP</span>
+        <span class="price">$12.11</span>
+        <span class="change up">+7.3%</span>
+      </div>
+      <div class="conf-row strong">
+        <span class="conf-dot"></span>
+        <span class="conf-label">Strong signal</span>
+        <span class="conf-percent">72% · 1d</span>
+      </div>
+      <div class="annotate">Now users see: is this worth acting on, how big, how long, how risky, and where it ranks today.</div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

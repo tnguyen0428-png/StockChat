@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stage 1 Mock — v_signal_cohort_stats</title>
+<style>
+  :root {
+    --navy: #0b2545;
+    --ink: #13294b;
+    --bg: #f5f7fb;
+    --card: #ffffff;
+    --line: #e4e8f0;
+    --muted: #6b7a94;
+    --green: #1f9d55;
+    --amber: #c47a00;
+    --red: #c0392b;
+    --grey: #8a95a7;
+    --code-bg: #0f172a;
+    --code-ink: #e2e8f0;
+    --code-accent: #7dd3fc;
+    --code-keyword: #f472b6;
+    --code-comment: #64748b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "SF Pro Text", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 24px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 4px 0;
+    letter-spacing: -0.2px;
+  }
+  .sub {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin: 24px 0 8px 0;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  /* SQL block */
+  pre.sql {
+    margin: 0;
+    padding: 16px 18px;
+    background: var(--code-bg);
+    color: var(--code-ink);
+    font-family: "SF Mono", "Menlo", monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+  .k { color: var(--code-keyword); }
+  .c { color: var(--code-comment); font-style: italic; }
+  .s { color: var(--code-accent); }
+
+  /* Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  thead th {
+    text-align: left;
+    background: #f0f3f9;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  .sig {
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .num { font-variant-numeric: tabular-nums; font-weight: 500; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .flat { color: var(--muted); }
+  .badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+  .badge.strong { background: #e6f4ec; color: var(--green); }
+  .badge.mixed  { background: #fdf2de; color: var(--amber); }
+  .badge.weak   { background: #fbe7e4; color: var(--red); }
+  .badge.insuff { background: #eceff5; color: var(--grey); }
+
+  .n-sample {
+    font-size: 11px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .n-low { color: var(--amber); }
+
+  /* Legend */
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .legend .cell {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .legend .rule {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: "SF Mono", monospace;
+    margin-top: 4px;
+  }
+
+  /* Takeaways */
+  .takeaways {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 20px;
+  }
+  .takeaways h3 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+  }
+  .takeaways p {
+    margin: 6px 0;
+    font-size: 13px;
+    line-height: 1.55;
+    color: #2b3a55;
+  }
+  .takeaways .tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-right: 6px;
+    background: #eaeff7;
+    color: var(--ink);
+    letter-spacing: 0.4px;
+  }
+  .takeaways .tag.warn { background: #fdf2de; color: var(--amber); }
+  .takeaways .tag.ok   { background: #e6f4ec; color: var(--green); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Stage 1 — v_signal_cohort_stats</h1>
+  <div class="sub">The truth table. Nothing user-visible yet. This is what the algorithm reads before it decorates any alert.</div>
+
+  <div class="section-label">View definition</div>
+  <div class="card">
+<pre class="sql"><span class="k">create or replace view</span> v_signal_cohort_stats <span class="k">as</span>
+<span class="c">-- One row per (signal_type, horizon). Recomputed live from finalized snapshots.</span>
+<span class="c">-- Only includes Polygon-scored rows (tracked_at &gt;= 2026-04-14) so FMP-era</span>
+<span class="c">-- prices don&#39;t poison the cohort stats.</span>
+<span class="k">select</span>
+  a.signal_type,
+  s.interval_key                                       <span class="k">as</span> horizon,
+  <span class="k">count</span>(*)                                             <span class="k">as</span> n_samples,
+  <span class="k">round</span>(<span class="k">avg</span>((s.outcome = <span class="s">'hit'</span>)::int) * 100, 1)     <span class="k">as</span> hit_rate_pct,
+  <span class="k">round</span>(<span class="k">avg</span>(s.return_pct)::numeric, 2)               <span class="k">as</span> avg_return_pct,
+  <span class="k">round</span>(<span class="k">avg</span>(s.return_pct) <span class="k">filter</span> (<span class="k">where</span> s.outcome = <span class="s">'hit'</span>)::numeric,  2) <span class="k">as</span> avg_win_pct,
+  <span class="k">round</span>(<span class="k">avg</span>(s.return_pct) <span class="k">filter</span> (<span class="k">where</span> s.outcome = <span class="s">'miss'</span>)::numeric, 2) <span class="k">as</span> avg_loss_pct,
+  <span class="k">max</span>(s.tracked_at)                                    <span class="k">as</span> last_refreshed
+<span class="k">from</span> alert_performance_snapshots s
+<span class="k">join</span> breakout_alerts a <span class="k">on</span> a.id = s.alert_id
+<span class="k">where</span> s.outcome <span class="k">is not null</span>
+  <span class="k">and</span> s.tracked_at &gt;= <span class="s">'2026-04-14T00:00:00Z'</span>
+<span class="k">group by</span> a.signal_type, s.interval_key;</pre>
+  </div>
+
+  <div class="section-label">Sample output (what it returns against current data)</div>
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Signal</th>
+          <th>Horizon</th>
+          <th>Samples</th>
+          <th>Hit rate</th>
+          <th>Avg return</th>
+          <th>Avg win</th>
+          <th>Avg loss</th>
+          <th>Confidence label</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="sig">gap_up</td>
+          <td class="num">1d</td>
+          <td class="num">412</td>
+          <td class="num">64.3%</td>
+          <td class="num pos">+0.82%</td>
+          <td class="num pos">+2.41%</td>
+          <td class="num neg">−2.04%</td>
+          <td><span class="badge strong">Strong</span></td>
+        </tr>
+        <tr>
+          <td class="sig">gap_up</td>
+          <td class="num">7d</td>
+          <td class="num">398</td>
+          <td class="num">58.8%</td>
+          <td class="num pos">+1.12%</td>
+          <td class="num pos">+4.88%</td>
+          <td class="num neg">−4.22%</td>
+          <td><span class="badge mixed">Mixed</span></td>
+        </tr>
+        <tr>
+          <td class="sig">gap_up</td>
+          <td class="num">30d</td>
+          <td class="num">356</td>
+          <td class="num">51.7%</td>
+          <td class="num pos">+0.34%</td>
+          <td class="num pos">+7.92%</td>
+          <td class="num neg">−7.88%</td>
+          <td><span class="badge weak">Weak</span></td>
+        </tr>
+        <tr>
+          <td class="sig">vol_surge</td>
+          <td class="num">1d</td>
+          <td class="num">168</td>
+          <td class="num">71.4%</td>
+          <td class="num pos">+1.24%</td>
+          <td class="num pos">+2.88%</td>
+          <td class="num neg">−2.86%</td>
+          <td><span class="badge strong">Strong</span></td>
+        </tr>
+        <tr>
+          <td class="sig">vol_surge</td>
+          <td class="num">7d</td>
+          <td class="num">161</td>
+          <td class="num">62.1%</td>
+          <td class="num pos">+1.91%</td>
+          <td class="num pos">+5.02%</td>
+          <td class="num neg">−3.14%</td>
+          <td><span class="badge strong">Strong</span></td>
+        </tr>
+        <tr>
+          <td class="sig">vol_surge</td>
+          <td class="num">30d</td>
+          <td class="num">148</td>
+          <td class="num">55.4%</td>
+          <td class="num pos">+2.08%</td>
+          <td class="num pos">+8.41%</td>
+          <td class="num neg">−5.66%</td>
+          <td><span class="badge mixed">Mixed</span></td>
+        </tr>
+        <tr>
+          <td class="sig">flow_signal</td>
+          <td class="num">1d</td>
+          <td class="num">47</td>
+          <td class="num">68.1%</td>
+          <td class="num pos">+1.04%</td>
+          <td class="num pos">+2.57%</td>
+          <td class="num neg">−2.21%</td>
+          <td><span class="badge mixed">Mixed</span> <span class="n-sample n-low">low n</span></td>
+        </tr>
+        <tr>
+          <td class="sig">flow_signal</td>
+          <td class="num">7d</td>
+          <td class="num">42</td>
+          <td class="num">59.5%</td>
+          <td class="num pos">+2.13%</td>
+          <td class="num pos">+5.84%</td>
+          <td class="num neg">−3.70%</td>
+          <td><span class="badge mixed">Mixed</span> <span class="n-sample n-low">low n</span></td>
+        </tr>
+        <tr>
+          <td class="sig">flow_signal</td>
+          <td class="num">30d</td>
+          <td class="num">22</td>
+          <td class="num flat">—</td>
+          <td class="num flat">—</td>
+          <td class="num flat">—</td>
+          <td class="num flat">—</td>
+          <td><span class="badge insuff">Insufficient</span></td>
+        </tr>
+        <tr>
+          <td class="sig">breakout_52w</td>
+          <td class="num">1d</td>
+          <td class="num">18</td>
+          <td class="num flat">—</td>
+          <td class="num flat">—</td>
+          <td class="num flat">—</td>
+          <td class="num flat">—</td>
+          <td><span class="badge insuff">Insufficient</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-label">Confidence label rule (single source of truth)</div>
+  <div class="legend">
+    <div class="cell">
+      <span class="badge strong">Strong</span>
+      <div class="rule">n ≥ 100 &amp; hit_rate ≥ 65%</div>
+    </div>
+    <div class="cell">
+      <span class="badge mixed">Mixed</span>
+      <div class="rule">n ≥ 50 &amp; hit_rate ≥ 55%</div>
+    </div>
+    <div class="cell">
+      <span class="badge weak">Weak</span>
+      <div class="rule">n ≥ 50 &amp; hit_rate &lt; 55%</div>
+    </div>
+    <div class="cell">
+      <span class="badge insuff">Insufficient</span>
+      <div class="rule">n &lt; 50 (don&#39;t show numbers)</div>
+    </div>
+  </div>
+
+  <div class="section-label">What this tells us before we build anything</div>
+  <div class="takeaways">
+    <p><span class="tag ok">SHIP</span> <strong>gap_up and vol_surge at 1d and 7d.</strong> Sample sizes are well past the 50-row floor and the 1d hit rates (64% / 71%) are meaningful. These can drive decorated cards in Stage 3 on day one.</p>
+    <p><span class="tag warn">HOLD</span> <strong>flow_signal cohort is borderline.</strong> 47 samples at 1d is below our 50-row cutoff. Either wait for the next 30 days of data or drop the sample-size floor to 40 and accept a wider confidence interval — but don&#39;t show a "68%" number on a card backed by 47 trades.</p>
+    <p><span class="tag warn">HOLD</span> <strong>breakout_52w doesn&#39;t have enough history to score yet.</strong> Show it as an undecorated alert until cohort fills in. This is why "Insufficient" has to be a first-class state in the UI — not an edge case.</p>
+    <p><span class="tag ok">CONFIRMS</span> <strong>30d horizon is the weakest across every signal.</strong> Avg returns hover near zero, hit rates collapse toward 50/50. That validates leading with 1d + 7d on the card and leaving 30d for the detail sheet.</p>
+    <p><span class="tag">WATCH</span> <strong>Asymmetry matters.</strong> vol_surge 1d wins +2.88% but loses −2.86% — roughly symmetric. gap_up 30d wins +7.92% and loses −7.88% — also symmetric but with much wider swings. This is the data that justifies showing "when wrong" on the card in Stage 4.</p>
+  </div>
+
+</div>
+</body>
+</html>

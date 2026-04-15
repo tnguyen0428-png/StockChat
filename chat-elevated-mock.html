@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Elevated Chat — Ticker Threads</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #060e1a; display: flex; justify-content: center; padding: 20px; gap: 32px; }
+
+  .phone { width: 390px; height: 844px; background: #0f1a2e; display: flex; flex-direction: column; position: relative; overflow: hidden; border-radius: 20px; border: 1px solid #1e3d6240; }
+
+  /* ── Header ── */
+  .header { background: linear-gradient(135deg, #132d52, #0f2440); padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .header-left { display: flex; align-items: center; gap: 8px; }
+  .header-title { font-size: 15px; font-weight: 700; color: #fff; }
+  .header-group { font-size: 13px; color: #5eed8a; font-weight: 600; }
+  .header-dot { width: 6px; height: 6px; border-radius: 50%; background: #5eed8a; display: inline-block; }
+  .invite-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #fff; font-size: 11px; font-weight: 600; padding: 5px 12px; border-radius: 6px; cursor: pointer; }
+
+  /* ── View Toggle ── */
+  .view-toggle { display: flex; padding: 6px 16px 2px; gap: 0; background: #0f1a2e; flex-shrink: 0; }
+  .vtab { flex: 1; text-align: center; padding: 9px 0; font-size: 12px; font-weight: 500; color: #3a5a7a; cursor: pointer; border-radius: 8px; transition: all 0.2s; position: relative; }
+  .vtab.active { background: #132d52; color: #fff; font-weight: 600; }
+  .vtab .notif { position: absolute; top: 3px; right: 16%; width: 7px; height: 7px; border-radius: 50%; background: #5eed8a; }
+
+  /* ── Feed (Chat view) ── */
+  .feed { flex: 1; overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .feed.hidden { display: none; }
+
+  .date-div { text-align: center; font-size: 10px; color: #3a5a7a; padding: 10px 0 4px; }
+
+  .msg { padding: 6px 0; }
+  .msg-row { display: flex; align-items: flex-start; gap: 8px; }
+  .av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .msg-body { flex: 1; min-width: 0; }
+  .msg-meta { display: flex; align-items: center; gap: 5px; }
+  .msg-name { font-size: 12px; font-weight: 600; color: #5eed8a; }
+  .msg-name.admin { color: #7B8CDE; }
+  .msg-name.ai { color: #a78bfa; }
+  .msg-badge { font-size: 7px; font-weight: 700; padding: 1px 4px; border-radius: 3px; }
+  .badge-admin { color: #7B8CDE; background: rgba(123,140,222,0.15); }
+  .badge-ai { color: #a78bfa; background: rgba(167,139,250,0.15); }
+  .msg-time { font-size: 10px; color: #2a4a6a; }
+  .msg-text { font-size: 13px; color: #c8d8e8; line-height: 1.4; margin-top: 2px; }
+  .ticker { color: #5eed8a; font-weight: 600; }
+
+  /* ── Ticker Thread Card ── */
+  .ticker-thread { margin-top: 8px; background: #0a1628; border: 1px solid #1e3d6250; border-radius: 14px; overflow: hidden; }
+  .tt-header { display: flex; align-items: center; padding: 10px 12px; gap: 10px; }
+  .tt-logo { width: 32px; height: 32px; border-radius: 8px; background: #132d52; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #5eed8a; }
+  .tt-info { flex: 1; }
+  .tt-sym { font-size: 14px; font-weight: 700; color: #e8edf2; }
+  .tt-name { font-size: 10px; color: #5a7a9a; }
+  .tt-price { text-align: right; }
+  .tt-val { font-size: 15px; font-weight: 700; color: #e8edf2; }
+  .tt-chg { font-size: 11px; font-weight: 600; }
+  .tt-chg.green { color: #5eed8a; }
+  .tt-chg.red { color: #F09595; }
+
+  /* Sentiment bar */
+  .tt-sentiment { display: flex; align-items: center; padding: 0 12px 8px; gap: 6px; }
+  .sent-btn { display: flex; align-items: center; gap: 3px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; border: none; cursor: pointer; transition: all 0.15s; }
+  .sent-bull { background: rgba(94,237,138,0.1); color: #5eed8a; border: 1px solid rgba(94,237,138,0.2); }
+  .sent-bull.voted { background: rgba(94,237,138,0.25); border-color: #5eed8a; }
+  .sent-bear { background: rgba(240,149,149,0.1); color: #F09595; border: 1px solid rgba(240,149,149,0.2); }
+  .sent-target { background: rgba(123,140,222,0.1); color: #7B8CDE; border: 1px solid rgba(123,140,222,0.2); }
+  .sent-count { font-size: 10px; color: #5a7a9a; margin-left: auto; }
+
+  /* Thread preview */
+  .tt-thread-preview { padding: 6px 12px 10px; border-top: 1px solid #1e3d6230; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .tt-avatars { display: flex; }
+  .tt-avatars .mini-av { width: 18px; height: 18px; border-radius: 50%; font-size: 7px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; margin-left: -4px; border: 1.5px solid #0a1628; }
+  .tt-avatars .mini-av:first-child { margin-left: 0; }
+  .tt-thread-text { font-size: 10px; color: #5a7a9a; }
+  .tt-thread-text span { color: #7B8CDE; font-weight: 600; }
+
+  /* ── AI Response Card ── */
+  .ai-card { margin-top: 6px; background: rgba(167,139,250,0.05); border: 1px solid rgba(167,139,250,0.1); border-radius: 12px; padding: 10px 12px; }
+  .ai-card-text { font-size: 12px; color: #c8d8e8; line-height: 1.4; }
+
+  /* ── Trending View ── */
+  .trending { flex: 1; overflow-y: auto; padding: 12px; display: none; flex-direction: column; gap: 8px; }
+  .trending.show { display: flex; }
+
+  .trending-header { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 8px; }
+  .trending-title { font-size: 13px; font-weight: 700; color: #e8edf2; }
+  .trending-sub { font-size: 10px; color: #3a5a7a; }
+  .trending-filter { display: flex; gap: 6px; }
+  .tf { font-size: 10px; padding: 4px 10px; border-radius: 12px; border: 1px solid #1e3d62; color: #5a7a9a; cursor: pointer; background: none; }
+  .tf.active { background: #132d52; color: #fff; border-color: #5eed8a30; }
+
+  .trend-card { background: #0a1628; border: 1px solid #1e3d6240; border-radius: 14px; padding: 12px; }
+  .trend-top { display: flex; align-items: center; gap: 10px; }
+  .trend-rank { font-size: 18px; font-weight: 800; color: #1e3d62; width: 28px; text-align: center; }
+  .trend-rank.g { color: #FFD700; }
+  .trend-rank.s { color: #C0C0C0; }
+  .trend-rank.b { color: #CD7F32; }
+  .trend-logo { width: 36px; height: 36px; border-radius: 8px; background: #132d52; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #5eed8a; }
+  .trend-info { flex: 1; }
+  .trend-sym { font-size: 14px; font-weight: 700; color: #e8edf2; }
+  .trend-co { font-size: 10px; color: #5a7a9a; }
+  .trend-price-col { text-align: right; }
+  .trend-price { font-size: 14px; font-weight: 700; color: #e8edf2; }
+  .trend-pct { font-size: 11px; font-weight: 600; }
+  .trend-pct.green { color: #5eed8a; }
+  .trend-pct.red { color: #F09595; }
+
+  .trend-bottom { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 8px; border-top: 1px solid #1e3d6220; }
+  .trend-stat { display: flex; align-items: center; gap: 3px; font-size: 10px; color: #5a7a9a; }
+  .trend-stat .val { color: #e8edf2; font-weight: 600; }
+  .trend-bar { flex: 1; height: 4px; background: rgba(240,149,149,0.2); border-radius: 2px; overflow: hidden; }
+  .trend-bar-fill { height: 100%; background: #5eed8a; border-radius: 2px; }
+  .trend-mentions { font-size: 10px; color: #3a5a7a; margin-left: auto; white-space: nowrap; }
+
+  /* ── DMs View ── */
+  .dms { flex: 1; overflow-y: auto; padding: 8px 12px; display: none; flex-direction: column; }
+  .dms.show { display: flex; }
+  .dm-item { display: flex; align-items: center; gap: 12px; padding: 14px 4px; border-bottom: 1px solid #1e3d6220; cursor: pointer; }
+  .dm-av { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .dm-info { flex: 1; }
+  .dm-name { font-size: 14px; font-weight: 600; color: #e8edf2; }
+  .dm-preview { font-size: 12px; color: #5a7a9a; margin-top: 2px; }
+  .dm-time { font-size: 10px; color: #3a5a7a; }
+  .dm-unread { width: 18px; height: 18px; border-radius: 50%; background: #5eed8a; color: #0a1628; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 4px; }
+
+  /* ── Input Bar ── */
+  .input-bar { padding: 8px 12px 24px; background: #0f1a2e; border-top: 1px solid #1e3d6230; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .input-bar.hidden { display: none; }
+  .input-field { flex: 1; background: #132d52; border: 1px solid #1e3d62; border-radius: 20px; padding: 10px 14px; font-size: 13px; color: #c8d8e8; outline: none; }
+  .input-field::placeholder { color: #2a4a6a; }
+  .send-btn { width: 36px; height: 36px; border-radius: 50%; background: #5eed8a; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .send-btn svg { width: 16px; height: 16px; fill: #0a1628; }
+  .emoji-btn { font-size: 18px; cursor: pointer; flex-shrink: 0; }
+
+  /* ── Bottom Nav ── */
+  .bottom-nav { display: flex; background: #0a1220; border-top: 1px solid #1e3d6230; padding: 8px 0 16px; flex-shrink: 0; }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 9px; color: #2a4a6a; cursor: pointer; }
+  .nav-item.active { color: #5eed8a; }
+  .nav-item svg { width: 20px; height: 20px; }
+
+  /* ── Labels ── */
+  .screen-label { text-align: center; margin-bottom: 12px; }
+  .screen-label h3 { font-size: 13px; color: #5a7a9a; font-weight: 400; }
+  .screen-label h3 b { color: #5eed8a; font-weight: 700; }
+  .screen-label p { font-size: 10px; color: #2a4a6a; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════ -->
+<!-- SCREEN 1: CHAT — TICKER THREADS      -->
+<!-- ══════════════════════════════════════ -->
+<div>
+  <div class="screen-label">
+    <h3><b>Chat</b> — Ticker threads build the list</h3>
+    <p>$TICKER mentions auto-expand. Group reacts with sentiment.</p>
+  </div>
+  <div class="phone">
+    <div class="header">
+      <div class="header-left">
+        <span class="header-title">GroupChat</span>
+        <span class="header-group">AiGuys</span>
+        <span class="header-dot"></span>
+      </div>
+      <button class="invite-btn">Invite</button>
+    </div>
+
+    <div class="view-toggle">
+      <div class="vtab active" onclick="showView(this,'chat',0)">Chat</div>
+      <div class="vtab" onclick="showView(this,'trending',0)">Trending<div class="notif"></div></div>
+      <div class="vtab" onclick="showView(this,'dms',0)">DMs</div>
+    </div>
+
+    <!-- CHAT FEED -->
+    <div class="feed" id="chat0">
+      <div class="date-div">Today</div>
+
+      <div class="msg">
+        <div class="msg-row">
+          <div class="av" style="background:#e6a800;">J</div>
+          <div class="msg-body">
+            <div class="msg-meta">
+              <span class="msg-name" style="color:#e6a800;">Jack</span>
+              <span class="msg-time">9:31 AM</span>
+            </div>
+            <div class="msg-text">what are futures looking like?</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="msg-row">
+          <div class="av" style="background:#a78bfa;">U</div>
+          <div class="msg-body">
+            <div class="msg-meta">
+              <span class="msg-name ai">UpTik</span>
+              <span class="msg-badge badge-ai">AI</span>
+              <span class="msg-time">9:31 AM</span>
+            </div>
+            <div class="ai-card">
+              <div class="ai-card-text">Nas futures <span style="color:#5eed8a;">+0.32%</span>, Dow <span style="color:#F09595;">−0.49%</span>. VIX at 30 — elevated fear. Markets closed.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="msg-row">
+          <div class="av" style="background:#5eed8a; color:#0a1628;">Y</div>
+          <div class="msg-body">
+            <div class="msg-meta">
+              <span class="msg-name">Yoshi</span>
+              <span class="msg-time">10:02 AM</span>
+            </div>
+            <div class="msg-text"><span class="ticker">$NVDA</span> looking strong after that dip. anyone adding?</div>
+
+            <!-- TICKER THREAD CARD -->
+            <div class="ticker-thread">
+              <div class="tt-header">
+                <div class="tt-logo">NV</div>
+                <div class="tt-info">
+                  <div class="tt-sym">NVDA</div>
+                  <div class="tt-name">NVIDIA Corporation</div>
+                </div>
+                <div class="tt-price">
+                  <div class="tt-val">$188.63</div>
+                  <div class="tt-chg green">+2.57%</div>
+                </div>
+              </div>
+              <div class="tt-sentiment">
+                <button class="sent-btn sent-bull voted">🐂 4</button>
+                <button class="sent-btn sent-bear">🐻 1</button>
+                <button class="sent-btn sent-target">🎯 $210</button>
+                <span class="sent-count">12 mentions this week</span>
+              </div>
+              <div class="tt-thread-preview">
+                <div class="tt-avatars">
+                  <div class="mini-av" style="background:#2a7d4b;">N</div>
+                  <div class="mini-av" style="background:#e6a800;">J</div>
+                  <div class="mini-av" style="background:#7B8CDE;">M</div>
+                </div>
+                <div class="tt-thread-text"><span>3 replies</span> · Neal: "been holding since 170"</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="msg-row">
+          <div class="av" style="background:#2a7d4b;">N</div>
+          <div class="msg-body">
+            <div class="msg-meta">
+              <span class="msg-name">Neal</span>
+              <span class="msg-time">10:15 AM</span>
+            </div>
+            <div class="msg-text"><span class="ticker">$TSLA</span> also interesting. Fwd P/E is wild tho 😂</div>
+
+            <div class="ticker-thread">
+              <div class="tt-header">
+                <div class="tt-logo" style="color:#F09595;">T</div>
+                <div class="tt-info">
+                  <div class="tt-sym">TSLA</div>
+                  <div class="tt-name">Tesla, Inc.</div>
+                </div>
+                <div class="tt-price">
+                  <div class="tt-val">$348.95</div>
+                  <div class="tt-chg green">+0.96%</div>
+                </div>
+              </div>
+              <div class="tt-sentiment">
+                <button class="sent-btn sent-bull">🐂 2</button>
+                <button class="sent-btn sent-bear">🐻 3</button>
+                <button class="sent-btn sent-target">🎯 $400</button>
+                <span class="sent-count">8 mentions</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="msg-row">
+          <div class="av" style="background:#7B8CDE;">M</div>
+          <div class="msg-body">
+            <div class="msg-meta">
+              <span class="msg-name" style="color:#7B8CDE;">MattK</span>
+              <span class="msg-time">10:22 AM</span>
+            </div>
+            <div class="msg-text">watching <span class="ticker">$AVGO</span> closely. broadcom earnings next week 👀</div>
+
+            <div class="ticker-thread">
+              <div class="tt-header">
+                <div class="tt-logo">AV</div>
+                <div class="tt-info">
+                  <div class="tt-sym">AVGO</div>
+                  <div class="tt-name">Broadcom Inc.</div>
+                </div>
+                <div class="tt-price">
+                  <div class="tt-val">$198.42</div>
+                  <div class="tt-chg green">+1.72%</div>
+                </div>
+              </div>
+              <div class="tt-sentiment">
+                <button class="sent-btn sent-bull voted">🐂 5</button>
+                <button class="sent-btn sent-bear">🐻 0</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRENDING VIEW -->
+    <div class="trending" id="trending0">
+      <div class="trending-header">
+        <div>
+          <div class="trending-title">Group Trending</div>
+          <div class="trending-sub">Auto-ranked by mentions, sentiment & volume</div>
+        </div>
+      </div>
+      <div class="trending-filter">
+        <button class="tf active">This week</button>
+        <button class="tf">Today</button>
+        <button class="tf">All time</button>
+      </div>
+
+      <!-- #1 -->
+      <div class="trend-card">
+        <div class="trend-top">
+          <div class="trend-rank g">1</div>
+          <div class="trend-logo">NV</div>
+          <div class="trend-info">
+            <div class="trend-sym">NVDA</div>
+            <div class="trend-co">NVIDIA Corporation</div>
+          </div>
+          <div class="trend-price-col">
+            <div class="trend-price">$188.63</div>
+            <div class="trend-pct green">+2.57%</div>
+          </div>
+        </div>
+        <div class="trend-bottom">
+          <div class="trend-stat">🐂 <span class="val">80%</span></div>
+          <div class="trend-bar"><div class="trend-bar-fill" style="width:80%"></div></div>
+          <div class="trend-stat">🎯 <span class="val">$210</span></div>
+          <div class="trend-mentions">12 mentions</div>
+        </div>
+      </div>
+
+      <!-- #2 -->
+      <div class="trend-card">
+        <div class="trend-top">
+          <div class="trend-rank s">2</div>
+          <div class="trend-logo">AV</div>
+          <div class="trend-info">
+            <div class="trend-sym">AVGO</div>
+            <div class="trend-co">Broadcom Inc.</div>
+          </div>
+          <div class="trend-price-col">
+            <div class="trend-price">$198.42</div>
+            <div class="trend-pct green">+1.72%</div>
+          </div>
+        </div>
+        <div class="trend-bottom">
+          <div class="trend-stat">🐂 <span class="val">100%</span></div>
+          <div class="trend-bar"><div class="trend-bar-fill" style="width:100%"></div></div>
+          <div class="trend-stat">🎯 <span class="val">—</span></div>
+          <div class="trend-mentions">9 mentions</div>
+        </div>
+      </div>
+
+      <!-- #3 -->
+      <div class="trend-card">
+        <div class="trend-top">
+          <div class="trend-rank b">3</div>
+          <div class="trend-logo" style="color:#F09595;">T</div>
+          <div class="trend-info">
+            <div class="trend-sym">TSLA</div>
+            <div class="trend-co">Tesla, Inc.</div>
+          </div>
+          <div class="trend-price-col">
+            <div class="trend-price">$348.95</div>
+            <div class="trend-pct green">+0.96%</div>
+          </div>
+        </div>
+        <div class="trend-bottom">
+          <div class="trend-stat">🐂 <span class="val">40%</span></div>
+          <div class="trend-bar"><div class="trend-bar-fill" style="width:40%"></div></div>
+          <div class="trend-stat">🎯 <span class="val">$400</span></div>
+          <div class="trend-mentions">8 mentions</div>
+        </div>
+      </div>
+
+      <!-- #4 -->
+      <div class="trend-card">
+        <div class="trend-top">
+          <div class="trend-rank">4</div>
+          <div class="trend-logo">AM</div>
+          <div class="trend-info">
+            <div class="trend-sym">AMD</div>
+            <div class="trend-co">Advanced Micro Devices</div>
+          </div>
+          <div class="trend-price-col">
+            <div class="trend-price">$245.04</div>
+            <div class="trend-pct green">+3.55%</div>
+          </div>
+        </div>
+        <div class="trend-bottom">
+          <div class="trend-stat">🐂 <span class="val">67%</span></div>
+          <div class="trend-bar"><div class="trend-bar-fill" style="width:67%"></div></div>
+          <div class="trend-stat">🎯 <span class="val">$280</span></div>
+          <div class="trend-mentions">5 mentions</div>
+        </div>
+      </div>
+
+      <!-- #5 -->
+      <div class="trend-card">
+        <div class="trend-top">
+          <div class="trend-rank">5</div>
+          <div class="trend-logo">SP</div>
+          <div class="trend-info">
+            <div class="trend-sym">SPY</div>
+            <div class="trend-co">SPDR S&P 500 ETF</div>
+          </div>
+          <div class="trend-price-col">
+            <div class="trend-price">$679.46</div>
+            <div class="trend-pct red">−0.07%</div>
+          </div>
+        </div>
+        <div class="trend-bottom">
+          <div class="trend-stat">🐂 <span class="val">55%</span></div>
+          <div class="trend-bar"><div class="trend-bar-fill" style="width:55%"></div></div>
+          <div class="trend-stat">🎯 <span class="val">—</span></div>
+          <div class="trend-mentions">4 mentions</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DMS -->
+    <div class="dms" id="dms0">
+      <div class="dm-item">
+        <div class="dm-av" style="background:#5eed8a; color:#0a1628;">Y</div>
+        <div class="dm-info">
+          <div class="dm-name">Yoshi</div>
+          <div class="dm-preview">You: what do you think?</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="dm-time">22m</div>
+        </div>
+      </div>
+      <div class="dm-item">
+        <div class="dm-av" style="background:#e6a800;">J</div>
+        <div class="dm-info">
+          <div class="dm-name">Jack</div>
+          <div class="dm-preview">nice call on AVGO 🔥</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="dm-time">2h</div>
+          <div class="dm-unread">1</div>
+        </div>
+      </div>
+      <div class="dm-item">
+        <div class="dm-av" style="background:#7B8CDE;">M</div>
+        <div class="dm-info">
+          <div class="dm-name">MattK</div>
+          <div class="dm-preview">yo check AAPL after hours</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="dm-time">1d</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-bar" id="input0">
+      <input class="input-field" placeholder="Message... $TICKER or @AI" readonly>
+      <span class="emoji-btn">😎</span>
+      <button class="send-btn"><svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>
+    </div>
+
+    <div class="bottom-nav">
+      <div class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>Home</div>
+      <div class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>Alerts</div>
+      <div class="nav-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>Chat</div>
+      <div class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>Challenge</div>
+      <div class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>Profile</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showView(el, view, phoneIdx) {
+  // Update tabs
+  el.parentElement.querySelectorAll('.vtab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+
+  // Toggle views
+  const phone = el.closest('.phone');
+  phone.querySelector('.feed').classList.add('hidden');
+  phone.querySelector('.trending').classList.remove('show');
+  phone.querySelector('.dms').classList.remove('show');
+
+  const input = phone.querySelector('.input-bar');
+
+  if (view === 'chat') {
+    phone.querySelector('.feed').classList.remove('hidden');
+    input.classList.remove('hidden');
+  } else if (view === 'trending') {
+    phone.querySelector('.trending').classList.add('show');
+    input.classList.add('hidden');
+  } else if (view === 'dms') {
+    phone.querySelector('.dms').classList.add('show');
+    input.classList.add('hidden');
+  }
+}
+</script>
+
+</body>
+</html>

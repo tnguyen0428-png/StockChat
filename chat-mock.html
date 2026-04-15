@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat Tab — Simplified Mock</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a1220; display: flex; justify-content: center; }
+
+  .phone { width: 390px; height: 844px; background: #0f1a2e; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+
+  /* ── Labels ── */
+  .label-bar { background: rgba(94,237,138,0.08); border-bottom: 1px solid rgba(94,237,138,0.15); padding: 6px 16px; display: flex; align-items: center; gap: 6px; }
+  .label-tag { font-size: 9px; font-weight: 700; color: #5eed8a; letter-spacing: 1px; text-transform: uppercase; }
+  .label-desc { font-size: 10px; color: #5a7a9a; }
+
+  /* ── Header ── */
+  .header { background: linear-gradient(135deg, #132d52, #0f2440); padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .header-title { font-size: 16px; font-weight: 700; color: #fff; }
+  .header-group { font-size: 13px; color: #5eed8a; font-weight: 600; }
+  .header-dot { width: 6px; height: 6px; border-radius: 50%; background: #5eed8a; }
+  .invite-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 11px; font-weight: 600; padding: 5px 12px; border-radius: 6px; cursor: pointer; }
+
+  /* ── Toggle ── */
+  .toggle-row { display: flex; padding: 8px 16px; gap: 0; background: #0f1a2e; }
+  .toggle-pill { flex: 1; text-align: center; padding: 10px 0; font-size: 13px; font-weight: 500; color: #5a7a9a; cursor: pointer; border-radius: 10px; transition: all 0.2s; position: relative; }
+  .toggle-pill.active { background: #132d52; color: #fff; font-weight: 600; }
+  .toggle-pill .badge { position: absolute; top: 4px; right: 20%; background: #5eed8a; color: #0a1628; font-size: 9px; font-weight: 700; min-width: 16px; height: 16px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+
+  /* ── Messages ── */
+  .messages { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 2px; }
+
+  .date-divider { text-align: center; font-size: 10px; color: #5a7a9a; padding: 12px 0 6px; }
+
+  .msg { display: flex; flex-direction: column; padding: 6px 0; }
+  .msg-header { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+  .msg-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .msg-name { font-size: 12px; font-weight: 600; color: #5eed8a; }
+  .msg-name.admin { color: #7B8CDE; }
+  .msg-badge { font-size: 8px; font-weight: 700; color: #7B8CDE; background: rgba(123,140,222,0.15); padding: 1px 5px; border-radius: 3px; }
+  .msg-time { font-size: 10px; color: #3a5a7a; }
+  .msg-text { font-size: 13px; color: #c8d8e8; line-height: 1.45; margin-left: 34px; }
+  .msg-text .ticker { color: #5eed8a; font-weight: 600; cursor: pointer; }
+  .msg-text .ai-tag { color: #a78bfa; font-weight: 600; }
+
+  /* Inline ticker card */
+  .ticker-card { margin-left: 34px; margin-top: 6px; background: rgba(94,237,138,0.06); border: 1px solid rgba(94,237,138,0.12); border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; max-width: 280px; }
+  .ticker-card-logo { width: 28px; height: 28px; border-radius: 6px; background: #1e3d62; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #5eed8a; }
+  .ticker-card-info { flex: 1; }
+  .ticker-card-sym { font-size: 12px; font-weight: 700; color: #e8edf2; }
+  .ticker-card-name { font-size: 10px; color: #5a7a9a; }
+  .ticker-card-price { text-align: right; }
+  .ticker-card-val { font-size: 13px; font-weight: 700; color: #e8edf2; }
+  .ticker-card-chg { font-size: 10px; color: #5eed8a; font-weight: 600; }
+  .ticker-card-chg.red { color: #F09595; }
+
+  /* AI response */
+  .ai-response { margin-left: 34px; margin-top: 6px; background: rgba(167,139,250,0.06); border: 1px solid rgba(167,139,250,0.12); border-radius: 10px; padding: 10px 12px; max-width: 300px; }
+  .ai-response-head { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; }
+  .ai-label { font-size: 9px; font-weight: 700; color: #a78bfa; letter-spacing: 0.5px; }
+  .ai-response-text { font-size: 12px; color: #c8d8e8; line-height: 1.4; }
+
+  /* ── Input Bar ── */
+  .input-bar { padding: 8px 12px 28px; background: #0f1a2e; border-top: 1px solid #1e3d62; display: flex; align-items: center; gap: 8px; }
+  .input-field { flex: 1; background: #132d52; border: 1px solid #1e3d62; border-radius: 20px; padding: 10px 14px; font-size: 13px; color: #c8d8e8; outline: none; }
+  .input-field::placeholder { color: #3a5a7a; }
+  .emoji-btn { width: 34px; height: 34px; border-radius: 50%; background: none; border: none; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .send-btn { width: 36px; height: 36px; border-radius: 50%; background: #5eed8a; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .send-btn svg { width: 16px; height: 16px; fill: #0a1628; }
+
+  /* ── Bottom Nav ── */
+  .bottom-nav { display: flex; background: #0a1220; border-top: 1px solid #1e3d62; padding: 8px 0 20px; }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: #3a5a7a; cursor: pointer; }
+  .nav-item.active { color: #5eed8a; }
+  .nav-item svg { width: 20px; height: 20px; }
+
+  /* ── DM Inbox ── */
+  .dm-inbox { flex: 1; overflow-y: auto; padding: 8px 16px; display: none; flex-direction: column; gap: 0; }
+  .dm-inbox.show { display: flex; }
+  .messages.hide { display: none; }
+  .input-bar.hide { display: none; }
+
+  .dm-item { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid #1e3d6230; cursor: pointer; }
+  .dm-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .dm-info { flex: 1; }
+  .dm-name { font-size: 14px; font-weight: 600; color: #e8edf2; }
+  .dm-preview { font-size: 12px; color: #5a7a9a; margin-top: 2px; }
+  .dm-meta { text-align: right; }
+  .dm-time { font-size: 10px; color: #5a7a9a; }
+  .dm-unread { width: 18px; height: 18px; border-radius: 50%; background: #5eed8a; color: #0a1628; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 4px; margin-left: auto; }
+
+  .dm-empty { text-align: center; padding: 60px 20px; }
+  .dm-empty-icon { font-size: 32px; margin-bottom: 8px; }
+  .dm-empty-text { font-size: 13px; color: #5a7a9a; }
+  .dm-empty-hint { font-size: 11px; color: #3a5a7a; margin-top: 4px; }
+
+  /* Side-by-side layout */
+  .comparison { display: flex; gap: 40px; padding: 20px; }
+  .mock-label { text-align: center; margin-bottom: 12px; }
+  .mock-label h3 { font-size: 14px; color: #5a7a9a; font-weight: 500; }
+  .mock-label h3 span { color: #5eed8a; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div class="comparison">
+  <!-- BEFORE -->
+  <div>
+    <div class="mock-label"><h3>BEFORE — <span>3 sub-tabs, buried features</span></h3></div>
+    <div class="phone" style="opacity: 0.55; filter: saturate(0.4);">
+      <div class="header">
+        <div class="header-left">
+          <span class="header-title">GroupChat</span>
+          <span class="header-group">AiGuys</span>
+          <span class="header-dot"></span>
+        </div>
+        <button class="invite-btn">Invite</button>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-pill active">Groups</div>
+        <div class="toggle-pill">DMs</div>
+      </div>
+      <!-- OLD: sub-tabs -->
+      <div style="display:flex; border-bottom: 1px solid #1e3d62; background: #0f1a2e;">
+        <div style="flex:1; text-align:center; padding: 10px; font-size:12px; color:#fff; font-weight:600; border-bottom: 2px solid #5eed8a;">Chat</div>
+        <div style="flex:1; text-align:center; padding: 10px; font-size:12px; color:#5a7a9a;">Lists</div>
+        <div style="flex:1; text-align:center; padding: 10px; font-size:12px; color:#5a7a9a;">Watchlist (2)</div>
+      </div>
+      <div style="flex:1; padding: 16px; overflow-y: auto;">
+        <div style="text-align:center; font-size:10px; color:#5a7a9a; padding:8px 0;">3/29/2026</div>
+        <div class="msg">
+          <div class="msg-header"><div class="msg-avatar" style="background:#2a7d4b;">N</div><span class="msg-name">Neal</span><span class="msg-time">3/29</span></div>
+          <div class="msg-text">Testing</div>
+        </div>
+        <div class="msg">
+          <div class="msg-header"><div class="msg-avatar" style="background:#7B8CDE;">A</div><span class="msg-name admin">Admin</span><span class="msg-badge">ADMIN</span><span class="msg-time">3/29</span></div>
+          <div class="msg-text">Hi</div>
+        </div>
+        <div class="msg">
+          <div class="msg-header"><div class="msg-avatar" style="background:#7B8CDE;">A</div><span class="msg-name admin">Admin</span><span class="msg-badge">ADMIN</span><span class="msg-time">3/29</span></div>
+          <div class="msg-text">Ill work on stickers next</div>
+        </div>
+        <div class="msg">
+          <div class="msg-header"><div class="msg-avatar" style="background:#7B8CDE;">A</div><span class="msg-name admin">Admin</span><span class="msg-badge">ADMIN</span><span class="msg-time">3/29</span></div>
+          <div class="msg-text">Dang more bugs</div>
+        </div>
+        <div class="msg">
+          <div class="msg-header"><div class="msg-avatar" style="background:#e6a800;">J</div><span class="msg-name">Jack</span><span class="msg-time">3/30</span></div>
+          <div class="msg-text">what is the market futures at moment</div>
+        </div>
+      </div>
+      <!-- Old input with too many elements -->
+      <div class="input-bar">
+        <div style="background:#5eed8a; color:#0a1628; font-size:10px; font-weight:700; padding:6px 10px; border-radius:16px; white-space:nowrap;">AI Ask</div>
+        <input class="input-field" placeholder="Message... $TICKER or @AI" style="font-size:11px;" readonly>
+        <span style="font-size:16px; cursor:pointer;">💬</span>
+        <span class="emoji-btn">😎</span>
+        <button class="send-btn"><svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>Home</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>Alerts</div>
+        <div class="nav-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>Chat</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>Challenge</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>Profile</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AFTER -->
+  <div>
+    <div class="mock-label"><h3>AFTER — <span>Clean chat, zero sub-tabs</span></h3></div>
+    <div class="phone" id="mockPhone">
+      <div class="label-bar">
+        <span class="label-tag">Proposed</span>
+        <span class="label-desc">Click Groups / DMs to switch</span>
+      </div>
+      <div class="header">
+        <div class="header-left">
+          <span class="header-title">GroupChat</span>
+          <span class="header-group">AiGuys</span>
+          <span class="header-dot"></span>
+        </div>
+        <button class="invite-btn">Invite</button>
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle-pill active" id="groupsTab" onclick="showGroups()">Groups</div>
+        <div class="toggle-pill" id="dmsTab" onclick="showDMs()">
+          DMs
+          <span class="badge">1</span>
+        </div>
+      </div>
+
+      <!-- GROUP CHAT -->
+      <div class="messages" id="groupMessages">
+        <div class="date-divider">March 29, 2026</div>
+
+        <div class="msg">
+          <div class="msg-header">
+            <div class="msg-avatar" style="background:#2a7d4b;">N</div>
+            <span class="msg-name">Neal</span>
+            <span class="msg-time">2:14 PM</span>
+          </div>
+          <div class="msg-text">Testing</div>
+        </div>
+
+        <div class="msg">
+          <div class="msg-header">
+            <div class="msg-avatar" style="background:#7B8CDE;">A</div>
+            <span class="msg-name admin">Admin</span>
+            <span class="msg-badge">ADMIN</span>
+            <span class="msg-time">2:15 PM</span>
+          </div>
+          <div class="msg-text">Ill work on stickers next</div>
+        </div>
+
+        <div class="msg">
+          <div class="msg-header">
+            <div class="msg-avatar" style="background:#7B8CDE;">A</div>
+            <span class="msg-name admin">Admin</span>
+            <span class="msg-badge">ADMIN</span>
+            <span class="msg-time">2:18 PM</span>
+          </div>
+          <div class="msg-text">Dang more bugs</div>
+        </div>
+
+        <div class="date-divider">March 30, 2026</div>
+
+        <div class="msg">
+          <div class="msg-header">
+            <div class="msg-avatar" style="background:#e6a800;">J</div>
+            <span class="msg-name" style="color:#e6a800;">Jack</span>
+            <span class="msg-time">9:31 AM</span>
+          </div>
+          <div class="msg-text">what is the market futures at moment</div>
+        </div>
+
+        <div class="msg">
+          <div class="msg-header">
+            <div class="msg-avatar" style="background:#a78bfa;">U</div>
+            <span class="msg-name" style="color:#a78bfa;">UpTik</span>
+            <span class="msg-badge" style="color:#a78bfa; background:rgba(167,139,250,0.15);">AI</span>
+            <span class="msg-time">9:31 AM</span>
+          </div>
+          <div class="ai-response">
+            <div class="ai-response-text">Nasdaq futures +0.32%, Dow futures −0.49%. Markets are closed.</div>
+          </div>
+        </div>
+
+        <div class="msg">
+          <div class="msg-header">
+            <div class="msg-avatar" style="background:#5eed8a; color:#0a1628;">Y</div>
+            <span class="msg-name">Yoshi</span>
+            <span class="msg-time">10:02 AM</span>
+          </div>
+          <div class="msg-text">anyone watching <span class="ticker">$NVDA</span> today?</div>
+          <!-- Inline ticker card -->
+          <div class="ticker-card">
+            <div class="ticker-card-logo">NV</div>
+            <div class="ticker-card-info">
+              <div class="ticker-card-sym">NVDA</div>
+              <div class="ticker-card-name">NVIDIA Corp</div>
+            </div>
+            <div class="ticker-card-price">
+              <div class="ticker-card-val">$188.63</div>
+              <div class="ticker-card-chg">+2.57%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="msg">
+          <div class="msg-header">
+            <div class="msg-avatar" style="background:#2a7d4b;">N</div>
+            <span class="msg-name">Neal</span>
+            <span class="msg-time">10:15 AM</span>
+          </div>
+          <div class="msg-text">yeah been holding since 170. <span class="ticker">$TSLA</span> looking interesting too</div>
+          <div class="ticker-card">
+            <div class="ticker-card-logo" style="background:#8b1a1a;">T</div>
+            <div class="ticker-card-info">
+              <div class="ticker-card-sym">TSLA</div>
+              <div class="ticker-card-name">Tesla, Inc.</div>
+            </div>
+            <div class="ticker-card-price">
+              <div class="ticker-card-val">$348.95</div>
+              <div class="ticker-card-chg">+0.96%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DM INBOX -->
+      <div class="dm-inbox" id="dmInbox">
+        <div class="dm-item">
+          <div class="dm-avatar" style="background:#5eed8a; color:#0a1628;">Y</div>
+          <div class="dm-info">
+            <div class="dm-name">Yoshi</div>
+            <div class="dm-preview">You: what do you think?</div>
+          </div>
+          <div class="dm-meta">
+            <div class="dm-time">22m</div>
+          </div>
+        </div>
+        <div class="dm-item">
+          <div class="dm-avatar" style="background:#e6a800;">J</div>
+          <div class="dm-info">
+            <div class="dm-name">Jack</div>
+            <div class="dm-preview">nice call on AVGO</div>
+          </div>
+          <div class="dm-meta">
+            <div class="dm-time">2h</div>
+            <div class="dm-unread">1</div>
+          </div>
+        </div>
+        <div class="dm-item">
+          <div class="dm-avatar" style="background:#7B8CDE;">M</div>
+          <div class="dm-info">
+            <div class="dm-name">MattK</div>
+            <div class="dm-preview">yo check AAPL after hours</div>
+          </div>
+          <div class="dm-meta">
+            <div class="dm-time">1d</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input bar (only shows for Groups) -->
+      <div class="input-bar" id="inputBar">
+        <input class="input-field" placeholder="Message... $TICKER or @AI" readonly>
+        <span class="emoji-btn">😎</span>
+        <button class="send-btn">
+          <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+        </button>
+      </div>
+
+      <div class="bottom-nav">
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>Home</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>Alerts</div>
+        <div class="nav-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>Chat</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>Challenge</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>Profile</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showGroups() {
+    document.getElementById('groupsTab').classList.add('active');
+    document.getElementById('dmsTab').classList.remove('active');
+    document.getElementById('groupMessages').classList.remove('hide');
+    document.getElementById('dmInbox').classList.remove('show');
+    document.getElementById('inputBar').classList.remove('hide');
+  }
+  function showDMs() {
+    document.getElementById('dmsTab').classList.add('active');
+    document.getElementById('groupsTab').classList.remove('active');
+    document.getElementById('groupMessages').classList.add('hide');
+    document.getElementById('dmInbox').classList.add('show');
+    document.getElementById('inputBar').classList.add('hide');
+  }
+</script>
+
+</body>
+</html>
