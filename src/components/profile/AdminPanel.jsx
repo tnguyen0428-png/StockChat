@@ -454,7 +454,7 @@ export default function AdminPanel({ session, profile }) {
             s.id === 'alertscanner' ? (
               <div style={adminStyles.body}>
                 <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>
-                  Scans S&P 500 + Nasdaq 100 for breakout signals. Results appear in the Alerts tab.
+                  Scans ~250 tickers (S&P 500 + Nasdaq 100) with 4 breakout scanners + 3 confirmation indicators. Scored 0–100 with S/A/B/C tiers.
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
                   {/* Confluence — RSI + ADX + VWAP weighted scoring */}
@@ -465,10 +465,14 @@ export default function AdminPanel({ session, profile }) {
                     >
                       {scanningAll ? `🔧 Confluence… ${scanAllProgress}` : '🔧 Confluence Scan'}
                     </button>
-                    <div style={{ fontSize: 10, color: 'var(--text2)', lineHeight: 1.5, padding: '0 2px' }}>
-                      ⚡ 52W High · 🔥 Vol · 📈 Gap · 🔀 MA<br/>
-                      RSI + ADX + VWAP scoring<br/>
-                      S≥75 · A≥50 · B≥25 · C&lt;25
+                    <div style={{ fontSize: 10, color: 'var(--text2)', lineHeight: 1.6, padding: '0 2px' }}>
+                      <span style={{ color: 'var(--text1)', fontWeight: 600 }}>4 Scanners:</span><br/>
+                      ⚡ 52W High (5%) · 🔥 Vol (2x avg)<br/>
+                      📈 Gap Up (1.5%) · 🔀 MA Cross (9/21)<br/>
+                      <span style={{ color: 'var(--text1)', fontWeight: 600 }}>3 Confirmations:</span><br/>
+                      RSI 50-70 ✓ · &gt;70 ⚠️<br/>
+                      ADX ≥25 ✓ · &lt;20 ⚠️<br/>
+                      VWAP above ✓ · below ⚠️
                     </div>
                   </div>
                   {/* Auto — UW flow scanner (scheduled 3x/day + on-demand) */}
@@ -548,12 +552,14 @@ export default function AdminPanel({ session, profile }) {
                               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 3 }}>
                                 {r.signals.map(sig => (
                                   <span key={sig} style={{ fontSize: 10, background: 'var(--card)', borderRadius: 3, padding: '1px 5px', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                                    {sig === '52w_high' ? '52W' : sig === 'vol_surge' ? 'Vol' : sig === 'gap_up' ? 'Gap' : 'MA'}
+                                    {sig === '52w_high' ? '⚡ 52W High' : sig === 'vol_surge' ? '🔥 Vol Surge' : sig === 'gap_up' ? '📈 Gap Up' : '🔀 MA Cross'}
                                   </span>
                                 ))}
                               </div>
                               <div style={{ fontSize: 10, color: 'var(--text3)', lineHeight: 1.6 }}>
-                                RSI {r.rsi ?? 'n/a'} · ADX {r.adxData?.adx ?? 'n/a'}{r.adxData ? ` (${r.adxData.plusDI > r.adxData.minusDI ? '▲' : '▼'})` : ''} · VWAP {r.vwap != null ? `$${r.vwap.toFixed(2)}` : 'n/a'}
+                                RSI {r.rsi ?? 'n/a'}{r.rsi != null ? (r.rsi >= 50 && r.rsi <= 70 ? ' ✓' : r.rsi > 70 ? ' ⚠️' : '') : ''}{' · '}
+                                ADX {r.adxData?.adx ?? 'n/a'}{r.adxData ? (r.adxData.adx >= 25 && r.adxData.plusDI > r.adxData.minusDI ? ' ✓' : r.adxData.adx < 20 ? ' ⚠️' : '') : ''}{r.adxData ? ` ${r.adxData.plusDI > r.adxData.minusDI ? '+DI▲' : '-DI▼'}` : ''}{' · '}
+                                VWAP {r.vwap != null && r.snapData?.price != null ? (r.snapData.price > r.vwap ? `$${r.vwap.toFixed(2)} Above ✓` : `$${r.vwap.toFixed(2)} Below ⚠️`) : 'n/a'}
                               </div>
                             </div>
                           );
