@@ -69,25 +69,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   // ── Hot movers ──
   const [hotMovers, setHotMovers] = useState([]);
 
-  // Fix 3: fetch prices for hot movers after they load
-  useEffect(() => {
-    if (hotMovers.length > 0) {
-      fetchResearchPrices(hotMovers.map(m => m.ticker));
-    }
-  }, [hotMovers]);
-
-  // Fix 4: auto-expand watchlist on first load if no sector selected
-  useEffect(() => {
-    if (watchlist.length > 0 && researchSector === null) {
-      setResearchSector('__mylist__');
-      const wlStocks = watchlist.map((w, i) => ({
-        id: w.id, ticker: w.symbol, ranking: i + 1,
-        score: null, thesis: null, notes: null, _isWatchlist: true,
-      }));
-      setResearchStocks(wlStocks);
-      fetchResearchPrices(watchlist.map(w => w.symbol));
-    }
-  }, [watchlist]);
+  // (moved to below loadHotMovers — single canonical copy)
 
   // ── UI refs ──
   const outerWrapRef    = useRef(null);
@@ -128,7 +110,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
       // Primary: featured confluence alerts from last 7 days
       const { data: confluenceAlerts, error: confluenceErr } = await supabase
         .from('breakout_alerts')
-        .select('ticker, signal_type, change_pct, conviction, notes')
+        .select('ticker, signal_type, change_pct, conviction, notes, confluence_score, confluence_tier')
         .eq('signal_type', 'confluence')
         .eq('featured', true)
         .gte('created_at', windowStart.toISOString())
@@ -146,7 +128,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
       // Fallback 1: recent non-confluence alerts deduped by ticker
       const { data: recentAlerts, error: recentErr } = await supabase
         .from('breakout_alerts')
-        .select('ticker, signal_type, change_pct, conviction, notes')
+        .select('ticker, signal_type, change_pct, conviction, notes, confluence_score, confluence_tier')
         .neq('signal_type', 'confluence')
         .gte('created_at', windowStart.toISOString())
         .order('created_at', { ascending: false })
@@ -473,8 +455,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                 const priceData = researchPrices[mover.ticker];
                 const isConfluence = mover.signal_type === 'confluence';
                 const tierColors = { S: '#d4af37', A: '#22c55e', B: '#3b82f6', C: '#888' };
-                const scoreMatch = mover.notes ? mover.notes.match(/Score\s+(\d+)/) : null;
-                const score = scoreMatch ? scoreMatch[1] : null;
+                const score = mover.confluence_score ?? null;
                 return (
                   <div key={i} style={{
                     flexShrink: 0, width: 100, borderRadius: 10,

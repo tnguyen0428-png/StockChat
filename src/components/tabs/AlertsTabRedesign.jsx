@@ -206,15 +206,13 @@ function mapAlert(a) {
   const flowSweeps = isFlow && a.volume_ratio ? Number(a.volume_ratio) : 0;
   const flowDpValue = isFlow && a.gap_pct ? Number(a.gap_pct) : null;
 
-  // Parse confluence fields from notes ("Score:87|Tier:S|Signals:52W High + Vol Surge")
+  // Read structured columns written by the confluence scanner.
+  // Falls back to conviction for legacy rows that pre-date the structured columns.
   let confluenceScore = null, confluenceTier = null, confluenceSignals = null;
-  if (isConfluence && a.notes) {
-    const scoreMatch = a.notes.match(/Score:(\d+)/i);
-    const tierMatch  = a.notes.match(/Tier:([A-Z])/i);
-    const sigMatch   = a.notes.match(/Signals:([^|]+)/i);
-    confluenceScore   = scoreMatch ? Number(scoreMatch[1]) : null;
-    confluenceTier    = tierMatch  ? tierMatch[1]  : (a.conviction || null);
-    confluenceSignals = sigMatch   ? sigMatch[1].trim() : null;
+  if (isConfluence) {
+    confluenceScore   = a.confluence_score != null ? Number(a.confluence_score) : null;
+    confluenceTier    = a.confluence_tier ?? a.conviction ?? null;
+    confluenceSignals = a.component_signals ? (Array.isArray(a.component_signals) ? a.component_signals.join(' + ') : String(a.component_signals)) : null;
   }
   const tier = a.conviction ?? confluenceTier ?? null;
 
@@ -300,7 +298,7 @@ export default function AlertsTab({ session, group, darkMode }) {
         .not('outcome', 'is', null)
         .gte('tracked_at', POLYGON_SCORING_CUTOFF)   // drop FMP-era rows from win rate
         .in('signal_type', Object.keys(TYPE_CONFIG))
-        .order('alert_time', { ascending: false }).limit(20),
+        .order('alert_time', { ascending: false }).limit(100),
       supabase.from('market_data').select('*'),
     ]);
     if (alertsRes.data) setLiveAlerts(alertsRes.data);
@@ -350,7 +348,7 @@ export default function AlertsTab({ session, group, darkMode }) {
           if (trackedAt && trackedAt < cutoff) return;
           setPerfHistory(prev => {
             const rest = prev.filter(p => p.id !== row.id);
-            return (row.outcome || row.admin_outcome) ? [row, ...rest].slice(0, 20) : rest;
+            return (row.outcome || row.admin_outcome) ? [row, ...rest].slice(0, 100) : rest;
           });
           setLastUpdated(new Date());
         }
@@ -450,10 +448,11 @@ export default function AlertsTab({ session, group, darkMode }) {
     // Only count signal types shown in the Action alerts feed
     const actionTypes = new Set(Object.keys(TYPE_CONFIG));
     const resolved = perfHistory.filter(h => h.return_pct != null && actionTypes.has(h.signal_type));
-    const wins = resolved.filter(h => h.return_pct > 0).length;
+    // Match the scoring function's threshold (HIT_THRESHOLDS['1d'] = 0 → any non-negative return = hit)
+    const wins = resolved.filter(h => h.return_pct >= 0).length;
     const winRate = resolved.length > 0 ? Math.round((wins / resolved.length) * 100) : null;
     const avgReturn = resolved.length > 0 ? resolved.reduce((s, h) => s + Number(h.return_pct), 0) / resolved.length : null;
-    return { total, byType, winRate, avgReturn, hasPerf: resolved.length > 0 };
+    return { total, byType, winRate, avgReturn, resolvedCount: resolved.length, hasPerf: resolved.length > 0 };
   }, [alertHistory, perfHistory]);
 
   const selectedAlert = selectedId ? uniqueAlerts.find(a => a.id === selectedId) : null;
@@ -587,10 +586,15 @@ export default function AlertsTab({ session, group, darkMode }) {
       <EducationZone t={t} />
 
       {/* ═══ STATS STRIP ═══ */}
-      {alertStats.total > 0 && (
+      {(alertStats.total > 0 || alertStats.resolvedCount > 0) && (
         <>
           <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-            <StatCard label="Total alerts" value={alertStats.total} color={t.text1} t={t} />
+            <StatCard
+              label={alertStats.hasPerf ? 'Scored' : 'Total alerts'}
+              value={alertStats.hasPerf ? alertStats.resolvedCount : alertStats.total}
+              color={t.text1}
+              t={t}
+            />
             {alertStats.hasPerf ? (
               <>
                 <StatCard label="Win rate" value={`${alertStats.winRate}%`} color={alertStats.winRate >= 50 ? t.green : t.red} t={t} />
@@ -647,6 +651,13 @@ export default function AlertsTab({ session, group, darkMode }) {
             const visible = showAllHistory ? filtered : filtered.slice(0, 5);
             return (
               <>
+                {visible.length === 0 && (
+                  <div style={{ padding: '14px 12px', textAlign: 'center', color: t.text3, fontSize: 12, borderTop: `1px solid ${t.border}` }}>
+                    {historyFilter === 'confluence' ? 'No top-tier confluence alerts today'
+                      : historyFilter === 'flow' ? 'No institutional flow signals today'
+                      : 'No alerts yet'}
+                  </div>
+                )}
                 {visible.map(h => {
                   const tc = typeFor(h.signal_type);
                   const m = historyMetric(h, t);

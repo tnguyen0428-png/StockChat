@@ -266,6 +266,43 @@ function calcADX(highs, lows, closes, period = 14) {
   return { adx, plusDI, minusDI };
 }
 
+// Plain base-signal note for a single-signal ticker routed out of the
+// confluence scan. Shape matches each base scanner's own `notes` line so
+// the card is indistinguishable from a stand-alone base alert. Falls back
+// to an empty string when sd lacks the field (defensive — callers should
+// not rely on a particular shape, the cohort copy carries the real info).
+function baseSignalNote(primary, sd) {
+  const num = (v, d = 2) => (v == null || !Number.isFinite(Number(v))) ? null : Number(v).toFixed(d);
+  switch (primary) {
+    case 'gap_up': {
+      const op = num(sd.open_price), pc = num(sd.prev_close), gp = num(sd.gap_pct);
+      if (op && pc && gp) return `Open $${op} · Prev Close $${pc} · +${gp}% gap`;
+      return gp ? `Gapped up ${gp}% at open` : '';
+    }
+    case 'vol_surge': {
+      const cv = sd.current_volume ?? sd.volume, av = sd.avg_volume, vr = sd.volume_ratio;
+      if (cv && av && vr) {
+        return `Vol ${(cv / 1e6).toFixed(1)}M · Avg ${(av / 1e6).toFixed(1)}M · ${vr}x avg`;
+      }
+      return vr ? `${vr}x avg volume` : '';
+    }
+    case '52w_high': {
+      const p = num(sd.price), hi = num(sd.high_52w), pf = num(sd.pct_from_high);
+      if (p && hi && pf) return `Price $${p} · 52W High $${hi} · ${pf}% away`;
+      return hi ? `At/near 52W high $${hi}` : '';
+    }
+    case 'ma_cross': {
+      // Confluence merge doesn't carry short_ma_period/long_ma_period, so
+      // use a simpler shape without the explicit day counts.
+      const s = num(sd.short_ma), l = num(sd.long_ma);
+      if (s && l) return `Short MA $${s} · Long MA $${l} · bullish crossover`;
+      return 'Bullish MA crossover';
+    }
+    default:
+      return '';
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // CONFLUENCE SCAN — RSI + ADX + VWAP weighted scoring
 // ══════════════════════════════════════════════════════════════════════════════
@@ -390,12 +427,32 @@ export async function runConfluenceScan(onProgress) {
     // Clamp to 0-100
     score = Math.max(0, Math.min(100, score));
 
-    // Tier assignment
-    let tier;
-    if      (score >= 75) tier = 'S';
-    else if (score >= 50) tier = 'A';
-    else if (score >= 25) tier = 'B';
-    else                  tier = 'C';
+    // Tier assignment — CONFLUENCE means two things must be true:
+    //   (a) at least two base signals actually fired, and
+    //   (b) score >= 50 (S requires >= 75).
+    //
+    // Rule (a) is the language contract: "confluence" means "flowing
+    // together" — one base signal can't flow together with itself. Before
+    // this rule, a 52W High with strong RSI/ADX/VWAP could clear 50 on
+    // bonuses alone (e.g. ASLB: 25 + 29 bonus points = 54) and earn a
+    // CONFLUENCE badge despite only one component firing. That trained
+    // users to distrust the badge.
+    //
+    // Rule (b) prevents weak 2-signal pairs (gap_up 20 + ma_cross 15 = 35
+    // base) from riding under the label on the strength of two mediocre
+    // signals alone. Score >= 50 with two components means either a
+    // strong pair (52w+vol = 50 base) or a moderate pair plus real
+    // technical confirmation.
+    //
+    // Everything that fails either gate routes to its highest-weighted
+    // component signal in step 5, landing in a mature base cohort instead
+    // of the starvation-prone 'confluence' bucket.
+    let tier = null;
+    if (entry.signals.size >= 2) {
+      if      (score >= 75) tier = 'S';
+      else if (score >= 50) tier = 'A';
+    }
+    // else: tier stays null → this ticker will NOT produce a confluence row.
 
     confluenceResults.push({ ticker, score, tier, signals: [...entry.signals], rsi, adxData, vwap, snapData: entry.snapData });
   }
@@ -408,66 +465,135 @@ export async function runConfluenceScan(onProgress) {
 
   onProgress?.('Inserting alerts…');
 
-  // ── Step 5: insert individual signal rows + one confluence summary row per ticker ──
-  const insertRows = [];
+  // ── Step 5: insert ONE row per ticker, choosing signal_type by tier ───
+  //
+  // CHANGED 2026-04-15 (part 1): we used to insert one row per component
+  // signal PLUS the summary row. That contaminated base-signal cohorts
+  // (gap_up's hit rate counted confluence-tagged gap_ups) and encoded
+  // tier/score/signals as regex-parsed free text in `notes`. Now we write
+  // structured columns (confluence_tier, confluence_score,
+  // component_signals). Migration 20260415120000 adds the columns +
+  // backfills historical data.
+  //
+  // CHANGED 2026-04-15 (part 2): raise the tier threshold so CONFLUENCE
+  // means conviction. SIGNAL_WEIGHTS cap a single base signal at 25 pts,
+  // so score ≥ 50 requires either two components firing or one component
+  // plus strong RSI/ADX/VWAP enhancement. Tickers that score below 50 are
+  // still useful signals, just not confluence-grade — route them to their
+  // highest-weighted component signal (e.g. '52w_high' or 'gap_up') so
+  // they land in a mature cohort the UI can actually narrate against.
+  // Otherwise they'd sit in the 'confluence' cohort with copy like
+  // "Building history · 0 of 50" which trains users to distrust the app.
 
-  // Individual signal rows (backward compat)
-  for (const [ticker, entry] of tickerMap.entries()) {
-    const result = confluenceResults.find(r => r.ticker === ticker);
-    const feat = featuredTickers.has(ticker);
-
-    for (const sig of entry.signals) {
-      const sd = entry.snapData;
-      const relVol = sd.volume_ratio ?? (sd.current_volume && sd.avg_volume ? parseFloat((sd.current_volume / sd.avg_volume).toFixed(2)) : (sd.volume && sd.avg_volume ? parseFloat((sd.volume / sd.avg_volume).toFixed(2)) : null));
-      insertRows.push({
-        signal_type:   sig,
-        ticker,
-        price:         sd.price,
-        change_pct:    sd.change_pct,
-        volume:        sd.current_volume ?? sd.volume,
-        avg_volume:    sd.avg_volume,
-        rel_volume:    relVol,
-        high_52w:      sd.high_52w ?? null,
-        pct_from_high: sd.pct_from_high ?? null,
-        gap_pct:       sd.gap_pct ?? null,
-        open_price:    sd.open_price ?? null,
-        prev_close:    sd.prev_close ?? null,
-        short_ma:      sd.short_ma ?? null,
-        long_ma:       sd.long_ma ?? null,
-        volume_ratio:  sd.volume_ratio ?? null,
-        sector:        sd.sector ?? null,
-        conviction:    result?.tier ?? null,
-        featured:      feat,
-        notes:         `Confluence scan: ${[...entry.signals].join(', ')}`,
-      });
+  // Pre-fetch today's already-alerted sets per base signal so we don't
+  // double-insert if runGapUpScan (etc.) already fired for this ticker
+  // earlier in the day. runConfluenceScan inserts under a base signal
+  // only when the base scanner hasn't already claimed the ticker.
+  const baseSignalSets = {};
+  const baseSignalsNeeded = new Set();
+  for (const r of confluenceResults) {
+    if (r.tier == null) {
+      const primary = [...r.signals].sort(
+        (a, b) => (SIGNAL_WEIGHTS[b] ?? 0) - (SIGNAL_WEIGHTS[a] ?? 0)
+      )[0];
+      if (primary) baseSignalsNeeded.add(primary);
     }
   }
+  await Promise.all(
+    [...baseSignalsNeeded].map(async (sig) => {
+      baseSignalSets[sig] = await getAlertedTodaySet(sig);
+    })
+  );
 
-  // Confluence summary rows
+  const insertRows = [];
+  let routedToBase = 0;
+  let skippedDuplicate = 0;
+
   for (const r of confluenceResults) {
     const sd = r.snapData;
-    const relVol = sd.volume_ratio ?? (sd.current_volume && sd.avg_volume ? parseFloat((sd.current_volume / sd.avg_volume).toFixed(2)) : (sd.volume && sd.avg_volume ? parseFloat((sd.volume / sd.avg_volume).toFixed(2)) : null));
+    const relVol = sd.volume_ratio ?? (sd.current_volume && sd.avg_volume
+      ? parseFloat((sd.current_volume / sd.avg_volume).toFixed(2))
+      : (sd.volume && sd.avg_volume
+          ? parseFloat((sd.volume / sd.avg_volume).toFixed(2))
+          : null));
+
+    // Shared fields — identical shape whether we file this as confluence
+    // or as a base-signal row.
+    const baseRow = {
+      ticker:         r.ticker,
+      price:          sd.price,
+      change_pct:     sd.change_pct,
+      volume:         sd.current_volume ?? sd.volume,
+      avg_volume:     sd.avg_volume,
+      rel_volume:     relVol,
+      high_52w:       sd.high_52w ?? null,
+      pct_from_high:  sd.pct_from_high ?? null,
+      gap_pct:        sd.gap_pct ?? null,
+      open_price:     sd.open_price ?? null,
+      prev_close:     sd.prev_close ?? null,
+      short_ma:       sd.short_ma ?? null,
+      long_ma:        sd.long_ma ?? null,
+      volume_ratio:   sd.volume_ratio ?? null,
+      sector:         sd.sector ?? null,
+    };
+
+    if (r.tier != null) {
+      // Path A: tier S or A → file as confluence.
+      insertRows.push({
+        ...baseRow,
+        signal_type:       'confluence',
+        conviction:        r.tier,
+        featured:          featuredTickers.has(r.ticker),
+        // Structured confluence columns — what the UI reads.
+        confluence_tier:   r.tier,
+        confluence_score:  r.score,
+        component_signals: r.signals,   // text[] → ['gap_up','52w_high',…]
+        // Notes is decorative / human-readable only. UI must NOT parse it.
+        notes: `Tier ${r.tier} · Score ${r.score} · RSI ${r.rsi ?? 'n/a'} · ADX ${r.adxData?.adx ?? 'n/a'} · ${r.signals.join(' + ')}`,
+      });
+      continue;
+    }
+
+    // Path B: tier is null (score < 50) → route to the highest-weighted
+    // component signal so the ticker lands in a mature cohort.
+    const primary = [...r.signals].sort(
+      (a, b) => (SIGNAL_WEIGHTS[b] ?? 0) - (SIGNAL_WEIGHTS[a] ?? 0)
+    )[0];
+    if (!primary) continue;   // no recognized signal — nothing to file under
+
+    // Dedup against the stand-alone base scanner that may have already
+    // inserted this ticker earlier today.
+    if (baseSignalSets[primary]?.has(r.ticker)) {
+      skippedDuplicate++;
+      continue;
+    }
+    baseSignalSets[primary].add(r.ticker);   // block further dupes within this run
+
+    // Notes copy — two cases:
+    //   • Multi-signal route: keep the honest "Multi-signal N/100" line —
+    //     e.g. CRWD fires Gap Up + MA Cross; the card benefits from the
+    //     extra context that it's a confluence-scanned but sub-threshold.
+    //   • Single-signal route: write the plain base-signal note (same
+    //     shape runGapUpScan / runVolSurgeScan / etc. use). This is the
+    //     NET case — only Gap Up fired, so calling it "Multi-signal" was
+    //     flatly wrong. Matching the base scanner's notes means the card
+    //     reads identically to a stand-alone base-signal alert.
+    let routedNotes;
+    if (r.signals.length >= 2) {
+      routedNotes = `Multi-signal ${r.score}/100 (${r.signals.join(' + ')}) · routed under ${primary} (below confluence tier threshold)`;
+    } else {
+      routedNotes = baseSignalNote(primary, sd);
+    }
+
     insertRows.push({
-      signal_type:   'confluence',
-      ticker:        r.ticker,
-      price:         sd.price,
-      change_pct:    sd.change_pct,
-      volume:        sd.current_volume ?? sd.volume,
-      avg_volume:    sd.avg_volume,
-      rel_volume:    relVol,
-      high_52w:      sd.high_52w ?? null,
-      pct_from_high: sd.pct_from_high ?? null,
-      gap_pct:       sd.gap_pct ?? null,
-      open_price:    sd.open_price ?? null,
-      prev_close:    sd.prev_close ?? null,
-      short_ma:      sd.short_ma ?? null,
-      long_ma:       sd.long_ma ?? null,
-      volume_ratio:  sd.volume_ratio ?? null,
-      sector:        sd.sector ?? null,
-      conviction:    r.tier,
-      featured:      featuredTickers.has(r.ticker),
-      notes:         `Score ${r.score} · Tier ${r.tier} · RSI ${r.rsi ?? 'n/a'} · ADX ${r.adxData?.adx ?? 'n/a'} · Signals: ${r.signals.join(', ')}`,
+      ...baseRow,
+      signal_type: primary,
+      // conviction / featured / confluence_* intentionally left null —
+      // this is a plain base-signal row, not a confluence row. It shares
+      // the base cohort's hit-rate copy and lifecycle thresholds.
+      notes: routedNotes,
     });
+    routedToBase++;
   }
 
   let inserted = 0;
@@ -477,9 +603,15 @@ export async function runConfluenceScan(onProgress) {
     inserted = insertRows.length;
   }
 
-  onProgress?.(`Done — ${confluenceResults.length} tickers, ${inserted} rows inserted`);
-  console.log(`[Confluence] Done — ${confluenceResults.length} tickers scored, ${inserted} rows inserted`);
-  return { inserted, confluenceResults };
+  const confluenceCount = inserted - routedToBase;
+  const summary =
+    `Done — ${confluenceResults.length} tickers scored, ` +
+    `${confluenceCount} confluence (A/S), ` +
+    `${routedToBase} routed to base signal, ` +
+    `${skippedDuplicate} skipped as duplicate`;
+  onProgress?.(summary);
+  console.log(`[Confluence] ${summary}`);
+  return { inserted, confluenceResults, confluenceCount, routedToBase, skippedDuplicate };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -832,9 +964,11 @@ export async function scanMACross(
     await Promise.all(batch.map(async (symbol) => {
       // Try Polygon aggs first
       let closes = null;
+      let aggVolumes = null;
       const aggs = await fetchPolygonAggs(symbol, daysNeeded);
       if (aggs?.closes && aggs.closes.length >= daysNeeded) {
         closes = aggs.closes;
+        aggVolumes = aggs.volumes ?? null;
       }
 
       // Fallback to FMP historical
@@ -856,12 +990,22 @@ export async function scanMACross(
       // Bullish crossover: yesterday short <= long, today short > long
       if (yesterdayShort <= yesterdayLong && todayShort > todayLong) {
         const snap = snapshots[symbol];
+
+        // Compute trailing avg daily volume (exclude today) from Polygon aggs
+        // Matches the pattern vol_surge uses so the "Nx avg" ratio is comparable.
+        let avgVol = null;
+        if (aggVolumes && aggVolumes.length > 1) {
+          const hist = aggVolumes.slice(0, -1); // exclude today
+          const sum  = hist.reduce((s, v) => s + (Number(v) || 0), 0);
+          if (sum > 0) avgVol = Math.round(sum / hist.length);
+        }
+
         results.push({
           symbol,
           price:           snap?.price ?? closes[closes.length - 1],
           change_pct:      snap?.changesPercentage ?? null,
-          volume:          snap?.volume ?? null,
-          avg_volume:      null,
+          volume:          snap?.volume ?? (aggVolumes ? aggVolumes[aggVolumes.length - 1] : null),
+          avg_volume:      avgVol,
           short_ma:        parseFloat(todayShort.toFixed(2)),
           long_ma:         parseFloat(todayLong.toFixed(2)),
           short_ma_period: shortPeriod,
@@ -889,21 +1033,27 @@ export async function runMACrossScan(
   const hits = await scanMACross(shortPeriod, longPeriod, onProgress);
   if (hits.length === 0) return { inserted: 0, hits: [] };
 
-  const rows = hits.map(h => ({
-    signal_type:     'ma_cross',
-    ticker:          h.symbol,
-    price:           h.price,
-    change_pct:      h.change_pct,
-    volume:          h.volume,
-    avg_volume:      h.avg_volume,
-    rel_volume:      (h.volume && h.avg_volume && h.avg_volume > 0) ? parseFloat((h.volume / h.avg_volume).toFixed(2)) : null,
-    short_ma:        h.short_ma,
-    long_ma:         h.long_ma,
-    short_ma_period: h.short_ma_period,
-    long_ma_period:  h.long_ma_period,
-    sector:          h.sector,
-    notes:           `${h.short_ma_period}MA $${h.short_ma.toFixed(2)} · ${h.long_ma_period}MA $${h.long_ma.toFixed(2)} · bullish crossover`,
-  }));
+  const rows = hits.map(h => {
+    const ratio = (h.volume && h.avg_volume && h.avg_volume > 0)
+      ? parseFloat((h.volume / h.avg_volume).toFixed(2))
+      : null;
+    return {
+      signal_type:     'ma_cross',
+      ticker:          h.symbol,
+      price:           h.price,
+      change_pct:      h.change_pct,
+      volume:          h.volume,
+      avg_volume:      h.avg_volume,
+      rel_volume:      ratio,
+      volume_ratio:    ratio,
+      short_ma:        h.short_ma,
+      long_ma:         h.long_ma,
+      short_ma_period: h.short_ma_period,
+      long_ma_period:  h.long_ma_period,
+      sector:          h.sector,
+      notes:           `${h.short_ma_period}MA $${h.short_ma.toFixed(2)} · ${h.long_ma_period}MA $${h.long_ma.toFixed(2)} · bullish crossover`,
+    };
+  });
 
   const { error } = await supabase.from('breakout_alerts').insert(rows);
   if (error) { console.error('[MA Cross] Insert error:', error.message); throw error; }

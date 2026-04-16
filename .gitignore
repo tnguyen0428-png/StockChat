@@ -9,13 +9,25 @@ node_modules/
 # Build output
 dist/
 dist-test/
-dist-check-*/
+dist-check*/
 
 # Vite temp files
 vite.config.js.timestamp-*
 
+# Supabase CLI scratch (linked-project, version caches, etc.)
+supabase/.temp/
+
 # Claude Code session data
 .claude/
+
+# Scratch / diagnostic scripts (one-off debugging, not prod code)
+check_recording.mjs
+scripts/diagnose-*
+scripts/query-*
+scripts/wipe-*
+
+# Mockups (design artifacts, not runtime)
+mockup-confluence-2sig-rule.html
 
 # OS
 .DS_Store
