@@ -79,12 +79,15 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
   // Tab activation: always snap to bottom on entry (fresh look at latest).
   useEffect(() => {
     if (activeTab !== 'challenge') return;
-    requestAnimationFrame(() => {
+    const frameId = requestAnimationFrame(() => {
       const el = smackMsgsRef.current;
       if (!el) return;
       el.scrollTop = el.scrollHeight;
       prevSmackScrollHeightRef.current = el.scrollHeight;
     });
+    // Cancel the frame if the tab deactivates before it runs — avoids
+    // writing to a stale ref on a just-unmounted component.
+    return () => cancelAnimationFrame(frameId);
   }, [activeTab]);
   // New messages (including initial load): pull down only if the user
   // was at/near the bottom BEFORE the new content landed.

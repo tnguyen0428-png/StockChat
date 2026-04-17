@@ -176,7 +176,10 @@ export function useLeaderboard(session, trades, prices) {
     setLbLoading(false);
   }, [session?.user?.id]);
 
-  useEffect(() => { loadLeaderboard(); }, []);
+  // Follow loadLeaderboard's identity — it's useCallback([session?.user?.id]),
+  // so when the user signs in/out after mount, the effect re-fires with the
+  // new closure instead of holding the stale one forever.
+  useEffect(() => { loadLeaderboard(); }, [loadLeaderboard]);
 
   // ── Activity feed ──
   const loadActivity = useCallback(async () => {
@@ -277,7 +280,10 @@ export function useLeaderboard(session, trades, prices) {
 
   useEffect(() => {
     if (allTradesRef.current.length > 0) loadSectorData();
-  }, [leaderboard]);
+    // loadSectorData is useCallback([]) so its identity is stable — include it
+    // anyway so react-hooks/exhaustive-deps stays happy and future edits that
+    // add deps to loadSectorData don't silently capture a stale closure.
+  }, [leaderboard, loadSectorData]);
 
   // ── Badges ──
   const loadBadges = useCallback(async () => {
