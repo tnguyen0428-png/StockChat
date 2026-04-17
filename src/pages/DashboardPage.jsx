@@ -88,12 +88,20 @@ export default function DashboardPage({ session }) {
       const isKB = shrinkage > 100 || vv.offsetTop > 0;
       setKeyboardOpen(isKB);
       if (isKB) {
+        // Use bottom:0 instead of height:vv.height. On iOS 17+ Safari
+        // (especially Private mode with the URL pill), visualViewport.height
+        // under-reports the visible area above the keyboard — sizing the
+        // page to that shorter value leaves a strip of body background
+        // bleeding through between our input bar and the iOS chrome.
+        // interactive-widget=resizes-content (set in index.html) shrinks
+        // the layout viewport to exactly the visible area above the
+        // keyboard, so top:offsetTop + bottom:0 fills it edge-to-edge.
         setVpStyle({
           position: 'fixed',
           top: `${vv.offsetTop}px`,
           left: 0,
           right: 0,
-          height: `${vv.height}px`,
+          bottom: 0,
           maxWidth: 480,
           margin: '0 auto',
         });
