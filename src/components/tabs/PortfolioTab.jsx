@@ -10,7 +10,7 @@ import SellModal from '../portfolio/SellModal';
 
 import { SEASON_START, SEASON_END } from '../../lib/constants';
 import { usePortfolio } from '../../hooks/usePortfolio';
-import { useLeaderboard, BADGE_DEFS, TIER_DEFS, getTier } from '../../hooks/useLeaderboard';
+import { useLeaderboard, BADGE_DEFS, getTier } from '../../hooks/useLeaderboard';
 import { useSmackTalk, REACTIONS } from '../../hooks/useSmackTalk';
 import { getPortfolioStyles } from './portfolioStyles';
 
@@ -52,7 +52,7 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
   const {
     leaderboard, expandedUser, setExpandedUser,
     lbLoading, myRank, aheadUser, activity,
-    userBadges, sectorData, riskLevel,
+    userBadges,
     loadLeaderboard, loadActivity,
   } = lb;
 
