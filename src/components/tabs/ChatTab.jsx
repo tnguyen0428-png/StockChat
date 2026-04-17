@@ -444,10 +444,12 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   }, [group?.id, activeGroup?.name, profile?.username, watchlist, aiLastTicker, session?.user?.id]);
 
   const handleSend = useCallback(async () => {
-    // Dismiss mobile keyboard FIRST — synchronously, inside the user gesture.
-    // iOS/Android will only reliably close the on-screen keyboard if blur()
-    // fires before any awaits or state-triggered re-renders.
-    inputRef.current?.blur();
+    // Keep focus on the input after send. Every modern chat app (iMessage,
+    // WhatsApp, Slack, Telegram, Discord) leaves the keyboard up so users
+    // can fire off consecutive messages without re-tapping the field. The
+    // earlier code blur()ed on send to force-dismiss the iOS/Android
+    // keyboard — that saved one swipe at the cost of a tap on every single
+    // message. Net friction went up, not down.
     if (sendingRef.current) return;
     const text = aiMode ? `@AI ${inputText.trim()}` : inputText.trim();
     if (!inputText.trim() || !profile || !group) return;
