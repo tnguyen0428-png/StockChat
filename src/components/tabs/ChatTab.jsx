@@ -473,6 +473,12 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   }, [group?.id, activeGroup?.name, profile?.username, watchlist, aiLastTicker, session?.user?.id]);
 
   const handleSend = useCallback(async () => {
+    // Keep focus on the input after send. Every modern chat app (iMessage,
+    // WhatsApp, Slack, Telegram, Discord) leaves the keyboard up so users
+    // can fire off consecutive messages without re-tapping the field. The
+    // earlier code blur()ed on send to force-dismiss the iOS/Android
+    // keyboard — that saved one swipe at the cost of a tap on every single
+    // message. Net friction went up, not down.
     if (sendingRef.current) return;
     const text = aiMode ? `@AI ${inputText.trim()}` : inputText.trim();
     if (!inputText.trim() || !profile || !group) return;
@@ -486,10 +492,10 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
       }).select().single();
       if (data) {
         setMessages(prev => [...prev, data]);
-        // Drop the keyboard so users can read the chat after posting.
-        document.activeElement?.blur();
-        // Pin to bottom now and again after the keyboard-dismiss animation
-        // (~300ms) so the viewport resize doesn't leave their message hidden.
+        // User just pressed send. Pin to bottom NOW (keyboard still up) and
+        // again after the keyboard-dismiss animation completes (~300ms) so
+        // the viewport resize doesn't leave their message hidden above the
+        // new bottom edge.
         const pinBottom = () => {
           const el = messagesAreaRef.current;
           if (el) el.scrollTop = el.scrollHeight;

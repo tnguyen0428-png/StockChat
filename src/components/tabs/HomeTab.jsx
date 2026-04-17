@@ -68,7 +68,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   const [briefingExpanded, setBriefingExpanded] = useState(false);
 
   // ── Onboarding ──
-  const [onboarding, setOnboarding] = useState(() => JSON.parse(safeGet('uptik_onboarding') || 'null') || {});
+  const [onboarding, setOnboarding] = useState(() => safeGet('uptik_onboarding') || {});
 
   // ── Recent Activity ──
   const [recentActivity, setRecentActivity] = useState([]);
@@ -322,7 +322,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   const markDone = (key) => {
     const updated = { ...onboarding, [key]: true };
     setOnboarding(updated);
-    safeSet('uptik_onboarding', JSON.stringify(updated));
+    safeSet('uptik_onboarding', updated);
   };
 
   const onboardingStepDefs = [
