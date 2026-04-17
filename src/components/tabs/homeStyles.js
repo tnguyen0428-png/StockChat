@@ -27,6 +27,7 @@ export function getHomeStyles(t) {
 
     // ── Content (scrollable area) ──
     content: { flex: 1, overflowY: 'auto', paddingBottom: 8, background: t.bg, position: 'relative', zIndex: 1 },
+    sectionDivider: { height: 1, background: t.border, margin: '0 14px' },
 
     // ── Briefing ──
     briefSection: { padding: '8px 14px 6px' },
@@ -45,6 +46,8 @@ export function getHomeStyles(t) {
 
     // ── Stocks section (inline) ──
     stocksSection: { padding: '0 14px 6px' },
+    stocksHeader: { marginBottom: 6 },
+    stocksTitle: { fontSize: 14, fontWeight: 700, color: t.text1, fontFamily: "var(--font-heading)" },
     stocksBtns: { display: 'flex', gap: 8, marginBottom: 8 },
     stocksBtn: {
       padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,

@@ -21,6 +21,15 @@ import { useLeaderboard } from '../../hooks/useLeaderboard';
 import { usePortfolio } from '../../hooks/usePortfolio';
 import { useGroup } from '../../context/GroupContext';
 
+const SIGNAL_LABELS = {
+  gap_up: 'Gap Up',
+  vol_surge: 'Vol Surge',
+  ma_cross: 'MA Cross',
+  high_52w: '52W High',
+  flow_signal: 'Flow',
+  confluence: 'Confluence',
+};
+
 const QUICK_ADD = ['NVDA', 'AAPL', 'TSLA', 'AMD', 'SPY', 'META'];
 
 export default function HomeTab({ session, onTabChange, darkMode }) {
@@ -31,8 +40,8 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   const { marketPulse, marketIndicators, futuresData, futuresLabels, marketStatus, loadMarketIndicators } = useMarketData();
 
   // ── Portfolio & Leaderboard ──
-  const { trades, prices, loadingData: portfolioLoading } = usePortfolio(session);
-  const { loadLeaderboard } = useLeaderboard(session, trades, prices);
+  const { trades, prices, totalReturn, loadingData: portfolioLoading } = usePortfolio(session);
+  const { myRank, aheadUser, loadLeaderboard } = useLeaderboard(session, trades, prices);
 
   // ── Watchlist ──
   const {
@@ -264,6 +273,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   // DERIVED DATA
   // ═══════════════════════════════════════
   const hasJoinedChallenge = trades.length > 0;
+  const isPositive = (totalReturn || 0) >= 0;
   const username = profile?.username || 'Trader';
 
   const DEFAULT_ITEMS = [{ label: 'S&P 500', key: 'SPY' }, { label: 'Nasdaq', key: 'QQQ' }, { label: 'Dow', key: 'DIA' }];
