@@ -1,5 +1,9 @@
 import { callClaude } from './callClaude';
 import { buildFeedbackContext } from '../feedbackContext';
+// Static import (was `await import(...)` in fetchContext below). dataAgent
+// already statically imports the same module, so the dynamic variant was
+// ignored by Vite's code splitter and just produced a build warning.
+import { lookupPrice } from '../tools/priceLookup';
 
 export const macroAgent = {
   async fetchContext(supabase) {
@@ -11,21 +15,19 @@ export const macroAgent = {
       .order('confidence', { ascending: false })
       .limit(10);
 
-    // Try to get SPY and QQQ prices for market overview
-    let marketData = null;
-    try {
-      const { lookupPrice } = await import('../tools/priceLookup.js');
-      const [spy, qqq, vix] = await Promise.allSettled([
-        lookupPrice('SPY'),
-        lookupPrice('QQQ'),
-        lookupPrice('VIX'),
-      ]);
-      marketData = {
-        spy: spy.status === 'fulfilled' ? spy.value : null,
-        qqq: qqq.status === 'fulfilled' ? qqq.value : null,
-        vix: vix.status === 'fulfilled' ? vix.value : null,
-      };
-    } catch {}
+    // SPY / QQQ / VIX market overview. lookupPrice is already defensive —
+    // it catches its own network/parse errors and returns null — so
+    // Promise.allSettled is belt-and-suspenders, not a cover for bugs.
+    const [spy, qqq, vix] = await Promise.allSettled([
+      lookupPrice('SPY'),
+      lookupPrice('QQQ'),
+      lookupPrice('VIX'),
+    ]);
+    const marketData = {
+      spy: spy.status === 'fulfilled' ? spy.value : null,
+      qqq: qqq.status === 'fulfilled' ? qqq.value : null,
+      vix: vix.status === 'fulfilled' ? vix.value : null,
+    };
 
     // Summarize which sectors are alerting today
     const sectors = {};
@@ -40,7 +42,10 @@ export const macroAgent = {
       topAlerts: (alerts || []).slice(0, 5).map(a =>
         `${a.ticker} ${a.change_percent >= 0 ? '+' : ''}${a.change_percent}% (${a.scanner_tag})`
       ).join(', '),
-      hasData: marketData !== null,
+      // hasData = at least one of SPY/QQQ/VIX loaded successfully. Used
+      // downstream to decide whether to include "market data unavailable"
+      // copy in the prompt.
+      hasData: Boolean(marketData.spy || marketData.qqq || marketData.vix),
     };
   },
 

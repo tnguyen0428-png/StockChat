@@ -8,8 +8,7 @@ node_modules/
 
 # Build output
 dist/
-dist-test/
-dist-check*/
+dist-*/
 
 # Vite temp files
 vite.config.js.timestamp-*

@@ -84,6 +84,13 @@ export function useLeaderboard(session, trades, prices) {
   // ── Leaderboard ──
   const loadLeaderboard = useCallback(async () => {
     setLbLoading(true);
+    // Leaderboard query caps — review as the user base grows.
+    //   100 portfolios: fine for the current private-beta user count, but
+    //     once we grow past ~80 active traders the tail gets silently
+    //     dropped. At that point paginate server-side or sort/limit
+    //     at the DB tier instead of in the client.
+    //   1000 trades: covers roughly 10 open positions per portfolio at the
+    //     100-user cap. Same warning applies — scale with the user count.
     const [{ data: allPortfolios, error: pfErr }, { data: allTrades, error: trErr }] = await Promise.all([
       supabase.from('paper_portfolios').select('*, profiles(username)').limit(100),
       supabase.from('paper_trades').select('*').limit(1000),

@@ -31,9 +31,17 @@ export default function ProfileTab({ session, profile, group, isAdmin, onSignOut
     return () => { cancelled = true; };
   }, [session?.user?.id]);
 
-  const copyInviteLink = () => {
-    navigator.clipboard?.writeText(`${window.location.origin}/join/${group?.invite_code}`).catch(() => {});
-    setCopied(true); setTimeout(() => setCopied(false), 2000);
+  const copyInviteLink = async () => {
+    // Only flip "Copied!" when writeText actually succeeded — otherwise the
+    // user sees a confirmation while their clipboard is empty (e.g. browser
+    // blocked clipboard access, iframe without permission, etc.).
+    try {
+      await navigator.clipboard?.writeText(`${window.location.origin}/join/${group?.invite_code}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('[ProfileTab] Clipboard copy failed:', err?.message);
+    }
   };
 
   const handleToggle = async (key) => {
