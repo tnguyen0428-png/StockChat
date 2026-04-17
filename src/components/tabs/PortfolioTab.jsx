@@ -14,7 +14,7 @@ import { useLeaderboard, BADGE_DEFS, TIER_DEFS, getTier } from '../../hooks/useL
 import { useSmackTalk, REACTIONS } from '../../hooks/useSmackTalk';
 import { getPortfolioStyles } from './portfolioStyles';
 
-export default function PortfolioTab({ session, darkMode }) {
+export default function PortfolioTab({ session, darkMode, keyboardOpen = false }) {
   const [showPortfolio, setShowPortfolio]     = useState(false);
   const [showAllRankings, setShowAllRankings] = useState(false);
 
@@ -23,6 +23,11 @@ export default function PortfolioTab({ session, darkMode }) {
   // realtime INSERT → loadTrashTalk → setTrashTalkMsgs). Without this, the
   // page visibly snaps back to the top mid-send on mobile.
   const scrollRef = useRef(null);
+
+  // Ref on the smack talk input so we can pull it flush to the bottom of
+  // the scroll container when it gets focus. Default iOS auto-scroll parks
+  // the input mid-viewport, leaving a huge empty gap above the keyboard.
+  const smackInputRef = useRef(null);
 
   // ── Hooks ──
   const portfolio = usePortfolio(session);
@@ -56,6 +61,29 @@ export default function PortfolioTab({ session, darkMode }) {
     onSellComplete();
     loadLeaderboard();
     loadActivity();
+  };
+
+  // ── Pull the smack input flush to the bottom of the viewport on focus ──
+  // iOS (and some Android browsers) auto-scroll a focused input into view by
+  // centering it vertically. That leaves a visible gap between the input
+  // and the keyboard — wasted real estate and extra friction. Wait for the
+  // keyboard animation to settle, then explicitly scroll the outer scroll
+  // container so the input bottom sits 8px above the viewport bottom.
+  const pinSmackInputToBottom = () => {
+    const scrollEl = scrollRef.current;
+    const inputEl  = smackInputRef.current;
+    if (!scrollEl || !inputEl) return;
+    const scrollRect = scrollEl.getBoundingClientRect();
+    const inputRect  = inputEl.getBoundingClientRect();
+    const delta = inputRect.bottom - (scrollRect.bottom - 8);
+    if (delta > 0) scrollEl.scrollTop = scrollEl.scrollTop + delta;
+  };
+
+  const handleSmackFocus = () => {
+    // Two passes: once right after tap (if keyboard is already up from a
+    // previous send), once after the 350ms iOS keyboard animation.
+    requestAnimationFrame(pinSmackInputToBottom);
+    setTimeout(pinSmackInputToBottom, 350);
   };
 
   // ── Send smack talk while pinning scroll position ──
@@ -142,7 +170,11 @@ export default function PortfolioTab({ session, darkMode }) {
 
   return (
     <div ref={scrollRef} style={s.scroll}>
-      <div style={{ padding: '8px 12px 80px' }}>
+      {/* 80px bottom padding clears the BottomNav. When the keyboard is
+           open the BottomNav is unmounted (DashboardPage), so that reserve
+           becomes dead white space below the smack input — drop it to 8px
+           so the input can sit flush with the keyboard. */}
+      <div style={{ padding: keyboardOpen ? '8px 12px 8px' : '8px 12px 80px' }}>
 
         {/* HEADER ROW */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -479,7 +511,16 @@ export default function PortfolioTab({ session, darkMode }) {
             })}
           </div>
           <div style={s.smackInput}>
-            <input style={s.smackInputField} value={trashTalkInput} onChange={e => setTrashTalkInput(e.target.value.slice(0, 200))} placeholder="Talk your talk..." onKeyDown={e => e.key === 'Enter' && handleSendSmack()} enterKeyHint="send" />
+            <input
+              ref={smackInputRef}
+              style={s.smackInputField}
+              value={trashTalkInput}
+              onChange={e => setTrashTalkInput(e.target.value.slice(0, 200))}
+              placeholder="Talk your talk..."
+              onKeyDown={e => e.key === 'Enter' && handleSendSmack()}
+              onFocus={handleSmackFocus}
+              enterKeyHint="send"
+            />
             {/* preventDefault on pointerdown stops the button from stealing
                  focus off the input on mobile. Keeps the soft keyboard up
                  across consecutive sends — same pattern as the chat send.
