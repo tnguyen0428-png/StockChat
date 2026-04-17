@@ -238,12 +238,53 @@ const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiv
   );
 });
 
+// ── Display helpers ──
+// Keep the slim header readable on narrow phones — "UpTik Public" is long and
+// the default group for almost every user. Rename to "Public Chat" in the UI
+// only; underlying group.name stays canonical.
+function displayGroupName(name) {
+  if (!name) return 'Chat';
+  if (name === 'UpTik Public') return 'Public Chat';
+  return name;
+}
+
+// Simple US market-hours status for the slim header sub-line. Best-effort —
+// doesn't account for early closes or holidays, but good enough for a status
+// chip that just says "Market open" vs "Market closed".
+function getMarketStatus() {
+  try {
+    const et = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
+    const d = new Date(et);
+    const day = d.getDay(); // 0 Sun … 6 Sat
+    const mins = d.getHours() * 60 + d.getMinutes();
+    const isWeekend = day === 0 || day === 6;
+    const isOpen = !isWeekend && mins >= 570 && mins < 960; // 9:30 – 16:00 ET
+    return isOpen ? 'Market open' : 'Market closed';
+  } catch {
+    return '';
+  }
+}
+
 // ── Main ChatTab ──
 export default function ChatTab({ session, profile, group, isAdmin, isModerator, setUnreadChat, allGroups, publicGroups, customGroups, enterGroup, onCreateGroup, onJoinGroup }) {
   const { activeGroup } = useGroup();
   const [watchlist, setWatchlist] = useState([]);
   const [privateExpanded, setPrivateExpanded] = useState(false);
   const [memberCounts, setMemberCounts] = useState({});
+
+  // viewMode: 'chat' (slim header + messages + input) vs 'list' (group selector).
+  // Default is 'chat' — landing on the Chat tab should show messages with zero
+  // taps. Users hit the back chevron to browse groups; tapping a group snaps
+  // back to chat. Keeps the primary action (read/send) on screen.
+  const [viewMode, setViewMode] = useState('chat');
+
+  // Re-compute market status once a minute so the sub-line updates around 9:30
+  // and 16:00 ET without requiring a tab switch.
+  const [marketStatus, setMarketStatus] = useState(() => getMarketStatus());
+  useEffect(() => {
+    const id = setInterval(() => setMarketStatus(getMarketStatus()), 60000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const ids = [...(publicGroups || []), ...(customGroups || [])].map(g => g.id);
@@ -464,78 +505,114 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   const mainPublic = (publicGroups || []).find(g => g.name === 'UpTik Public') || (publicGroups || [])[0];
   const privateGroups = customGroups || [];
 
+  // Tap-to-enter helper used by every group row in list view: switch the
+  // active group, then snap to chat view so the user lands on messages.
+  const openGroup = (g) => {
+    enterGroup(g);
+    setViewMode('chat');
+  };
+
   return (
     <div ref={wrapRef} style={styles.wrap}>
 
-      {/* ── Group Selector Card ── */}
-      <div style={selectorStyles.card}>
-        {/* Public Chat row */}
-        {mainPublic && (
-          <div
-            onClick={() => enterGroup(mainPublic)}
-            style={{ ...selectorStyles.row, background: group?.id === mainPublic.id ? 'rgba(26,173,94,0.08)' : 'transparent' }}
-          >
-            <div style={{ ...selectorStyles.iconWrap, background: 'rgba(26,173,94,0.15)' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1AAD5E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-              </svg>
+      {/* ── Group Selector (LIST VIEW) ── */}
+      {viewMode === 'list' && (
+        <div style={selectorStyles.card}>
+          {/* Public Chat row */}
+          {mainPublic && (
+            <div
+              onClick={() => openGroup(mainPublic)}
+              style={{ ...selectorStyles.row, background: group?.id === mainPublic.id ? 'rgba(26,173,94,0.08)' : 'transparent' }}
+            >
+              <div style={{ ...selectorStyles.iconWrap, background: 'rgba(26,173,94,0.15)' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1AAD5E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+              </div>
+              <div style={selectorStyles.rowText}>
+                <div style={selectorStyles.rowName}>Public Chat</div>
+                {memberCounts[mainPublic.id] > 0 && <div style={selectorStyles.rowSub}>{memberCounts[mainPublic.id]} members</div>}
+              </div>
+              {group?.id === mainPublic.id && <div style={{ ...selectorStyles.activeDot, background: '#1AAD5E' }} />}
             </div>
-            <div style={selectorStyles.rowText}>
-              <div style={selectorStyles.rowName}>Public Chat</div>
-              {memberCounts[mainPublic.id] > 0 && <div style={selectorStyles.rowSub}>{memberCounts[mainPublic.id]} members</div>}
-            </div>
-            {group?.id === mainPublic.id && <div style={{ ...selectorStyles.activeDot, background: '#1AAD5E' }} />}
+          )}
+
+          {/* Private Chats divider */}
+          <div onClick={() => setPrivateExpanded(e => !e)} style={selectorStyles.divider}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <span style={selectorStyles.dividerText}>
+              Private Chats{privateGroups.length > 0 ? ` (${privateGroups.length})` : ''}
+            </span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2.5"
+              style={{ transform: privateExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
           </div>
-        )}
 
-        {/* Private Chats divider */}
-        <div onClick={() => setPrivateExpanded(e => !e)} style={selectorStyles.divider}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-          <span style={selectorStyles.dividerText}>
-            Private Chats{privateGroups.length > 0 ? ` (${privateGroups.length})` : ''}
-          </span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2.5"
-            style={{ transform: privateExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
+          {/* Private group rows + New Group button */}
+          {privateExpanded && (
+            <>
+              {privateGroups.map(g => {
+                const color = g.color || '#7B68EE';
+                return (
+                  <div
+                    key={g.id}
+                    onClick={() => openGroup(g)}
+                    style={{ ...selectorStyles.row, background: group?.id === g.id ? `${color}15` : 'transparent' }}
+                  >
+                    <div style={{ ...selectorStyles.iconWrap, background: `${color}20` }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                      </svg>
+                    </div>
+                    <div style={selectorStyles.rowText}>
+                      <div style={selectorStyles.rowName}>{g.name}</div>
+                      {memberCounts[g.id] > 0 && <div style={selectorStyles.rowSub}>{memberCounts[g.id]} members</div>}
+                    </div>
+                    {group?.id === g.id && <div style={{ ...selectorStyles.activeDot, background: color }} />}
+                  </div>
+                );
+              })}
+              <div style={{ padding: '8px 12px' }}>
+                <button onClick={onCreateGroup} style={selectorStyles.newGroupBtn}>+ New Group</button>
+              </div>
+            </>
+          )}
         </div>
+      )}
 
-        {/* Private group rows + New Group button */}
-        {privateExpanded && (
-          <>
-            {privateGroups.map(g => {
-              const color = g.color || '#7B68EE';
-              return (
-                <div
-                  key={g.id}
-                  onClick={() => enterGroup(g)}
-                  style={{ ...selectorStyles.row, background: group?.id === g.id ? `${color}15` : 'transparent' }}
-                >
-                  <div style={{ ...selectorStyles.iconWrap, background: `${color}20` }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                    </svg>
-                  </div>
-                  <div style={selectorStyles.rowText}>
-                    <div style={selectorStyles.rowName}>{g.name}</div>
-                    {memberCounts[g.id] > 0 && <div style={selectorStyles.rowSub}>{memberCounts[g.id]} members</div>}
-                  </div>
-                  {group?.id === g.id && <div style={{ ...selectorStyles.activeDot, background: color }} />}
-                </div>
-              );
-            })}
-            <div style={{ padding: '8px 12px' }}>
-              <button onClick={onCreateGroup} style={selectorStyles.newGroupBtn}>+ New Group</button>
+      {/* ── Slim Chat Header (CHAT VIEW) ── */}
+      {viewMode === 'chat' && group && (
+        <div style={styles.chatHeader}>
+          <button
+            onClick={() => setViewMode('list')}
+            aria-label="Back to group list"
+            style={styles.backBtn}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+          </button>
+          <div style={styles.chatHeaderText}>
+            <div style={styles.chatHeaderName}>{displayGroupName(group?.name)}</div>
+            <div style={styles.chatHeaderSub}>
+              {memberCounts[group?.id] > 0 && (
+                <>
+                  {memberCounts[group?.id]} member{memberCounts[group?.id] === 1 ? '' : 's'}
+                  {marketStatus && ' · '}
+                </>
+              )}
+              {marketStatus}
             </div>
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
 
-      {/* Chat view */}
-      {loading ? (
+      {/* Chat view — messages + input, only rendered in chat mode */}
+      {viewMode === 'chat' && (loading ? (
         <div style={styles.loadingWrap}>
           <div style={styles.spinner} />
         </div>
@@ -577,53 +654,55 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
           )}
           <div ref={messagesEndRef} />
         </div>
-      )}
+      ))}
 
-      <div style={styles.inputBar}>
-        <div
-          style={{
-            borderRadius: 16,
-            background: aiMode ? 'rgba(139,92,246,0.15)' : 'var(--card2)',
-            border: `1.5px solid ${aiMode ? 'rgba(139,92,246,0.3)' : 'var(--border)'}`,
-            padding: '6px 10px',
-            display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, cursor: 'pointer',
-            transition: 'all 0.15s',
-          }}
-          onClick={() => { setAiMode(prev => !prev); inputRef.current?.focus(); }}
-        >
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#8B5CF6' }}>AI</span>
-          <span style={{ fontSize: 11, fontWeight: 500, color: aiMode ? '#8B5CF6' : 'var(--text3)' }}>Ask</span>
+      {viewMode === 'chat' && (
+        <div style={styles.inputBar}>
+          <div
+            style={{
+              borderRadius: 16,
+              background: aiMode ? 'rgba(139,92,246,0.15)' : 'var(--card2)',
+              border: `1.5px solid ${aiMode ? 'rgba(139,92,246,0.3)' : 'var(--border)'}`,
+              padding: '6px 10px',
+              display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onClick={() => { setAiMode(prev => !prev); inputRef.current?.focus(); }}
+          >
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#8B5CF6' }}>AI</span>
+            <span style={{ fontSize: 11, fontWeight: 500, color: aiMode ? '#8B5CF6' : 'var(--text3)' }}>Ask</span>
+          </div>
+          <input
+            ref={inputRef}
+            style={{ ...styles.input, borderColor: aiMode ? '#8B5CF6' : 'var(--border)' }}
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={aiMode ? 'Ask AI about any stock...' : 'Chat with your group...'}
+            enterKeyHint="send"
+            // Hints to iOS Safari that this is a chat message field, not a
+            // credential. Without these, Safari shows the "uptikalerts.com"
+            // AutoFill chip + password-manager nav in the form accessory
+            // bar, inflating the chrome between the input and the keyboard.
+            type="text"
+            name="chat-message"
+            inputMode="text"
+            autoComplete="off"
+            autoCorrect="on"
+            autoCapitalize="sentences"
+            spellCheck={true}
+            data-1p-ignore="true"
+            data-lpignore="true"
+          />
+          <button
+            style={{ ...styles.sendBtn, background: aiMode ? '#8B5CF6' : 'var(--green)', opacity: inputText.trim() ? 1 : 0.4 }}
+            onClick={handleSend}
+            disabled={!inputText.trim()}
+          >
+            ➤
+          </button>
         </div>
-        <input
-          ref={inputRef}
-          style={{ ...styles.input, borderColor: aiMode ? '#8B5CF6' : 'var(--border)' }}
-          value={inputText}
-          onChange={e => setInputText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={aiMode ? 'Ask AI about any stock...' : 'Chat with your group...'}
-          enterKeyHint="send"
-          // Hints to iOS Safari that this is a chat message field, not a
-          // credential. Without these, Safari shows the "uptikalerts.com"
-          // AutoFill chip + password-manager nav in the form accessory
-          // bar, inflating the chrome between the input and the keyboard.
-          type="text"
-          name="chat-message"
-          inputMode="text"
-          autoComplete="off"
-          autoCorrect="on"
-          autoCapitalize="sentences"
-          spellCheck={true}
-          data-1p-ignore="true"
-          data-lpignore="true"
-        />
-        <button
-          style={{ ...styles.sendBtn, background: aiMode ? '#8B5CF6' : 'var(--green)', opacity: inputText.trim() ? 1 : 0.4 }}
-          onClick={handleSend}
-          disabled={!inputText.trim()}
-        >
-          ➤
-        </button>
-      </div>
+      )}
 
     </div>
   );
@@ -632,6 +711,35 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
 // ── Styles ──
 const styles = {
   wrap: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  // Slim 46px chat header — back chevron + group name + member/status line.
+  // Reclaims ~110px vs the old selector-card-on-top layout so more messages
+  // fit above the keyboard on small screens.
+  chatHeader: {
+    display: 'flex', alignItems: 'center', gap: 4,
+    padding: '0 8px 0 2px',
+    minHeight: 46, height: 46,
+    background: 'var(--card)',
+    borderBottom: '1px solid var(--border)',
+    flexShrink: 0,
+  },
+  backBtn: {
+    background: 'none', border: 'none', padding: 0,
+    width: 40, height: 40, flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: 'var(--text1)', cursor: 'pointer',
+    borderRadius: 8,
+  },
+  chatHeaderText: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' },
+  chatHeaderName: {
+    fontSize: 15, fontWeight: 600, color: 'var(--text1)',
+    lineHeight: 1.15,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  },
+  chatHeaderSub: {
+    fontSize: 11, color: 'var(--text3)',
+    marginTop: 2, lineHeight: 1.15,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  },
   messagesArea: {
     flex: 1, overflowY: 'auto',
     padding: '8px 14px',
