@@ -140,6 +140,20 @@ function nextMarketDay() {
 
 function typeFor(raw) { return TYPE_CONFIG[raw] || TYPE_CONFIG.vol_surge; }
 
+// Dev-only warning for rows that can't produce a meaningful metric. Hitting
+// this in dev means either (a) real missing data worth filtering upstream,
+// or (b) a bug where the row shape lost a column we expected to read. Either
+// way, we want it loud in the console the first time it renders so silent
+// "—" fallbacks stop hiding data problems (observed 2026-04-17: confluence
+// rows silently showed "—" for weeks because the upstream projection had
+// dropped confluence_score and no one noticed).
+function _warnNoMetric(h) {
+  if (import.meta.env?.DEV) {
+    // eslint-disable-next-line no-console
+    console.warn('[historyMetric] no metric for signal_type=%s ticker=%s', h?.signal_type, h?.ticker, h);
+  }
+}
+
 // Returns { text, color } for the rightmost metric in the history row
 function historyMetric(h, t) {
   const type = h.signal_type;
@@ -152,11 +166,12 @@ function historyMetric(h, t) {
     if (sweeps > 0) return { text: `${sweeps} sweep${sweeps > 1 ? 's' : ''}`, color: '#5eed8a' };
     const trades = Number(h.volume) || 0;
     if (trades > 0) return { text: `${trades} trades`, color: '#5eed8a' };
+    _warnNoMetric(h);
     return { text: '—', color: t.text3 };
   }
   if (type === '52w_high') {
     const p = Number(h.pct_from_high);
-    if (!isFinite(p)) return { text: '—', color: t.text3 };
+    if (!isFinite(p)) { _warnNoMetric(h); return { text: '—', color: t.text3 }; }
     if (p < 0.1) return { text: 'at high', color: '#fbbf24' };
     return { text: `-${p.toFixed(1)}%`, color: '#fbbf24' };
   }
@@ -169,12 +184,35 @@ function historyMetric(h, t) {
     return { text: '↑ cross', color: '#60a5fa' };
   }
   if (type === 'confluence') {
+    // Read the structured columns first. breakout_alerts has dedicated
+    // confluence_score / confluence_tier fields written by the confluence
+    // scanner — the same columns mapAlert() reads for the detail card.
+    // The old notes-regex path was a legacy fallback from before those
+    // columns existed; it returns "—" against any row written by the
+    // current scanner, which is why CONFLUENCE rows in Recent Alerts
+    // rendered blank while the detail card above them showed the real
+    // score and tier (observed 2026-04-17 on EXC, MRNA, NI).
+    const score = h.confluence_score != null ? Number(h.confluence_score) : null;
+    const tier  = h.confluence_tier || h.conviction || null;
+    if (tier || score != null) {
+      const parts = [];
+      if (tier) parts.push(tier);
+      if (score != null) parts.push(`${score}pts`);
+      return { text: parts.join(' · '), color: '#d4af37' };
+    }
+    // Fallback for any pre-structured-column rows still in the 7-day window.
+    // Actual notes format is "Tier A · Score 52 · RSI ..." (space, not colon);
+    // the earlier regex expected "Tier:A / Score:52" and never matched.
     const notes = h.notes || '';
-    const scoreMatch = notes.match(/Score:(\d+)/i);
-    const tierMatch  = notes.match(/Tier:([A-Z])/i);
-    const score = scoreMatch ? scoreMatch[1] : null;
-    const tier  = tierMatch  ? tierMatch[1]  : null;
-    if (tier || score) return { text: `${tier ? tier + ' · ' : ''}${score ? score + 'pts' : ''}`.replace(/ · $/, ''), color: '#d4af37' };
+    const scoreMatch = notes.match(/Score[: ](\d+)/i);
+    const tierMatch  = notes.match(/Tier[: ]([A-Z])/i);
+    if (tierMatch || scoreMatch) {
+      const parts = [];
+      if (tierMatch) parts.push(tierMatch[1]);
+      if (scoreMatch) parts.push(`${scoreMatch[1]}pts`);
+      return { text: parts.join(' · '), color: '#d4af37' };
+    }
+    _warnNoMetric(h);
     return { text: '—', color: '#d4af37' };
   }
   if (type === 'vol_surge') {
@@ -186,6 +224,7 @@ function historyMetric(h, t) {
   const rawPct = h.change_pct ?? h.gap_pct;
   const pct = Number(rawPct);
   if (isFinite(pct) && pct !== 0) return { text: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, color: pct >= 0 ? t.green : t.red };
+  _warnNoMetric(h);
   return { text: '—', color: t.text3 };
 }
 
@@ -530,13 +569,15 @@ export default function AlertsTab({ session, group, darkMode, isAdmin = false })
   // gives enough headroom for the rarer signal types to surface while
   // keeping the expanded-view render count sane.
   const alertHistory = useMemo(() => {
-    const rows = liveAlerts.slice(0, 100).map(a => ({
-      id: a.id, ticker: a.ticker, signal_type: a.signal_type,
-      price: a.price, change_pct: a.change_pct, gap_pct: a.gap_pct,
-      pct_from_high: a.pct_from_high, short_ma: a.short_ma, long_ma: a.long_ma,
-      volume_ratio: a.volume_ratio, volume: a.volume, avg_volume: a.avg_volume,
-      notes: a.notes, created_at: a.created_at,
-    }));
+    // Pass rows through as-is instead of re-projecting into a hand-maintained
+    // column allowlist. The old pick-list caused silent bugs: any new column
+    // added to breakout_alerts (confluence_score/_tier, conviction, etc.)
+    // had to be manually added here too, or downstream readers would see
+    // `undefined` and quietly render nothing. Observed 2026-04-17 with
+    // confluence rows showing "—" for the tier/score metric. The fetch
+    // already does `select('*')`, so rows carry every column — there's no
+    // memory reason to trim, and there IS a correctness reason not to.
+    const rows = liveAlerts.slice(0, 100);
     const confluenceTickers = new Set(
       rows.filter(r => r.signal_type === 'confluence').map(r => r.ticker)
     );
