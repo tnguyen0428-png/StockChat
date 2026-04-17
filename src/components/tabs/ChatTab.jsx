@@ -388,17 +388,25 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   // first thing they see — zero scroll friction to the live conversation.
   // Tabs use display:none (not unmount), so the component instance survives
   // tab switches; this effect re-runs on every activation transition.
+  //
+  // Multi-pass snap because a single rAF is not reliable here:
+  //   - rAF: display:none→flex layout settle
+  //   - 150ms: async child content (ticker mention cards load async)
+  //   - 400ms: iOS keyboard animation when input auto-focuses
+  //   - 800ms: slow-network ticker cards on 3G
+  // Each pass is cheap (one scrollTop write) and idempotent, so the
+  // redundancy is worth it for reliability.
   useEffect(() => {
     if (activeTab !== 'chat' || viewMode !== 'chat' || loading) return;
-    const el = messagesAreaRef.current;
-    if (!el) return;
-    const snap = () => { if (messagesAreaRef.current) messagesAreaRef.current.scrollTop = messagesAreaRef.current.scrollHeight; };
-    // Two passes: once this frame, once after layout settles (display:none
-    // → flex flip can leave scrollHeight stale on the first rAF on some
-    // browsers, especially after a tab that was never scrolled).
+    const snap = () => {
+      const el = messagesAreaRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    };
     requestAnimationFrame(snap);
-    const t = setTimeout(snap, 120);
-    return () => clearTimeout(t);
+    const t1 = setTimeout(snap, 150);
+    const t2 = setTimeout(snap, 400);
+    const t3 = setTimeout(snap, 800);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [activeTab, viewMode, loading, group?.id]);
 
   // Hard-pin scroll to bottom on any new message or AI loading state.
