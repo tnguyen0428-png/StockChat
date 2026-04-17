@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { useTheme } from './alertsCasinoComponents';
 
 // ── Extracted modules ──
-import { safeGet } from '../../lib/safeStorage';
+import { safeGet, safeSet } from '../../lib/safeStorage';
 import { getHomeStyles } from './homeStyles';
 import BriefCard from '../home/BriefCard';
 
@@ -66,6 +66,12 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   const [briefing, setBriefing]                 = useState(null);
   const [briefingExpanded, setBriefingExpanded] = useState(false);
 
+  // ── Onboarding ──
+  const [onboarding, setOnboarding] = useState(() => safeGet('uptik_onboarding') || {});
+
+  // ── Recent Activity ──
+  const [recentActivity, setRecentActivity] = useState([]);
+
   // ── Hot movers ──
   const [hotMovers, setHotMovers] = useState([]);
 
@@ -87,6 +93,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
         loadMarketIndicators(),
         loadLeaderboard(),
         loadHotMovers(),
+        loadRecentActivity(),
         loadWatchlist().then(() => {
           if (cancelled) return;
           const saved = safeGet('uptik_last_sector');
@@ -232,6 +239,33 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   };
 
   // ═══════════════════════════════════════
+  // RECENT ACTIVITY
+  // ═══════════════════════════════════════
+  const loadRecentActivity = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('paper_trades')
+        .select('ticker, status, created_at, profiles(username)')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      if (error) console.error('[HomeTab] recent activity error:', error.message);
+      if (data) setRecentActivity(data);
+    } catch (err) {
+      console.error('[HomeTab] loadRecentActivity failed:', err.message);
+    }
+  };
+
+  const formatActivityTime = (isoString) => {
+    const diff = Date.now() - new Date(isoString).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
+
+  // ═══════════════════════════════════════
   // DERIVED DATA
   // ═══════════════════════════════════════
   const hasJoinedChallenge = trades.length > 0;
@@ -279,6 +313,64 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
       : [];
 
   const hasWatchlist = watchlist.length > 0;
+
+  // ── Onboarding helpers ──
+  const markDone = (key) => {
+    const updated = { ...onboarding, [key]: true };
+    setOnboarding(updated);
+    safeSet('uptik_onboarding', updated);
+  };
+
+  const onboardingStepDefs = [
+    {
+      key: 'watchlist',
+      emoji: '🔍',
+      title: 'Add first stock',
+      desc: 'Search and add a stock to your watchlist',
+      done: watchlist.length > 0,
+      action: () => {
+        setResearchSector('__mylist__');
+        setResearchExpanded(null);
+        const wlStocks = watchlist.map((w, i) => ({
+          id: w.id, ticker: w.symbol, ranking: i + 1,
+          score: null, thesis: null, notes: null, _isWatchlist: true,
+        }));
+        setResearchStocks(wlStocks);
+        setShowSearch(true);
+      },
+      actionLabel: 'Search stocks',
+    },
+    {
+      key: 'challenge',
+      emoji: '🏆',
+      title: 'Join Challenge',
+      desc: 'Trade with $50K virtual cash and compete',
+      done: trades.length > 0,
+      action: () => onTabChange?.('challenge'),
+      actionLabel: 'Go to Challenge',
+    },
+    {
+      key: 'chat',
+      emoji: '💬',
+      title: 'Say hello in chat',
+      desc: 'Introduce yourself to the group',
+      done: !!onboarding.chat,
+      action: () => { markDone('chat'); onTabChange?.('chat'); },
+      actionLabel: 'Open Chat',
+    },
+    {
+      key: 'sectors',
+      emoji: '📊',
+      title: 'Explore sector picks',
+      desc: 'Browse analyst-curated stock picks by sector',
+      done: !!onboarding.sectors,
+      action: () => { markDone('sectors'); setShowSectorDropdown(true); },
+      actionLabel: 'Browse Sectors',
+    },
+  ];
+
+  const completedCount = onboardingStepDefs.filter(s => s.done).length;
+  const onboardingComplete = completedCount === 4;
 
   // ── Styles ──
   const S = getHomeStyles(t);
@@ -416,9 +508,9 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
               <span style={{ fontSize: 26, lineHeight: 1, flexShrink: 0 }}>🏆</span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 3 }}>Learn to Invest</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 3 }}>Test Your Skills</div>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginBottom: 8 }}>
-                  <span style={{ color: t.green, fontWeight: 600 }}>$50K virtual cash</span> — zero risk
+                  <span style={{ color: t.green, fontWeight: 600 }}>$50K virtual cash</span> — pick stocks, compete with your crew, prove your picks
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
                   {['📊 Curated picks', '📈 Live data', '🏅 Leaderboard'].map(chip => (
@@ -435,7 +527,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                   padding: '8px 16px', borderRadius: 8,
                   fontSize: 12, fontWeight: 700,
                 }}>
-                  Start Investing →
+                  Start Trading →
                 </div>
               </div>
             </div>
@@ -731,39 +823,91 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
           )}
         </div>
 
-        {/* ═══ HOW UPTIK WORKS ═══ */}
-        {(!hasJoinedChallenge || !hasWatchlist) && (
-        <div style={{ padding: '8px 14px 14px' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: t.text1, marginBottom: 8 }}>How UpTik works</div>
-          <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden' }}>
-            {[
-              { num: 1, color: '#1AAD5E', title: 'Build your watchlist', desc: 'Track stocks with live prices & fundamentals' },
-              { num: 2, color: '#FFB020', title: 'Join the Challenge', desc: 'Practice with $50K virtual cash — compete with your crew' },
-              { num: 3, color: '#42A5F5', title: 'Explore sector picks', desc: 'Prescreened stocks ranked by our analysts' },
-              { num: 4, color: '#8B5CF6', title: 'Learn as a team', desc: 'Chat, share ideas, and grow together' },
-            ].map((step, i, arr) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 12,
-                  padding: '12px 14px',
-                  borderBottom: i < arr.length - 1 ? `1px solid ${t.border}` : 'none',
-                }}
-              >
-                <div style={{
-                  width: 26, height: 26, borderRadius: 13, flexShrink: 0,
-                  background: step.color, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{step.num}</span>
+        {/* ═══ GET STARTED CHECKLIST ═══ */}
+        {!onboardingComplete && (
+          <div style={{ padding: '8px 14px 14px' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: t.text1, marginBottom: 8 }}>Get Started</div>
+            <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden' }}>
+              {onboardingStepDefs.map((step, i, arr) => (
+                <div
+                  key={step.key}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '12px 14px',
+                    borderBottom: i < arr.length - 1 ? `1px solid ${t.border}` : 'none',
+                    opacity: step.done ? 0.6 : 1,
+                  }}
+                >
+                  <div style={{
+                    width: 20, height: 20, borderRadius: 10, flexShrink: 0,
+                    border: `2px solid ${step.done ? '#1AAD5E' : t.border}`,
+                    background: step.done ? '#1AAD5E' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {step.done && <span style={{ fontSize: 10, color: '#fff', fontWeight: 700 }}>✓</span>}
+                  </div>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{step.emoji}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginBottom: 2, textDecoration: step.done ? 'line-through' : 'none' }}>{step.title}</div>
+                    <div style={{ fontSize: 11, color: t.text3, lineHeight: 1.4 }}>{step.desc}</div>
+                  </div>
+                  {!step.done && (
+                    <button
+                      style={{
+                        background: 'transparent', border: `1px solid ${t.green}`,
+                        color: t.green, borderRadius: 7,
+                        padding: '5px 10px', fontSize: 11, fontWeight: 600,
+                        cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
+                      }}
+                      onClick={step.action}
+                    >{step.actionLabel}</button>
+                  )}
                 </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginBottom: 2 }}>{step.title}</div>
-                  <div style={{ fontSize: 11, color: t.text3, lineHeight: 1.4 }}>{step.desc}</div>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            <div style={{ marginTop: 10, height: 4, borderRadius: 2, background: t.border, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', borderRadius: 2, background: '#1AAD5E',
+                width: `${(completedCount / 4) * 100}%`,
+                transition: 'width 0.3s ease',
+              }} />
+            </div>
+            <div style={{ fontSize: 10, color: t.text3, marginTop: 4, textAlign: 'right' }}>{completedCount}/4 complete</div>
           </div>
-        </div>
+        )}
+
+        {/* ═══ RECENT ACTIVITY ═══ */}
+        {onboardingComplete && recentActivity.length > 0 && (
+          <div style={{ padding: '8px 14px 14px' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: t.text1, marginBottom: 8 }}>Recent Activity</div>
+            <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden' }}>
+              {recentActivity.slice(0, 4).map((trade, i, arr) => {
+                const isBuy = trade.status === 'open';
+                const actorName = trade.profiles?.username || 'Someone';
+                const action = isBuy ? 'bought' : 'sold';
+                const dotColor = isBuy ? '#1AAD5E' : '#ff6b6b';
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 14px',
+                      borderBottom: i < arr.length - 1 ? `1px solid ${t.border}` : 'none',
+                    }}
+                  >
+                    <div style={{ width: 8, height: 8, borderRadius: 4, background: dotColor, flexShrink: 0 }} />
+                    <div style={{ flex: 1, fontSize: 12, color: t.text1 }}>
+                      <span style={{ fontWeight: 600 }}>{actorName}</span>{' '}{action}{' '}
+                      <span style={{ fontWeight: 700, color: isBuy ? '#1AAD5E' : '#ff6b6b' }}>{trade.ticker}</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: t.text3, flexShrink: 0 }}>
+                      {formatActivityTime(trade.created_at)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
 
       </div>
