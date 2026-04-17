@@ -85,58 +85,41 @@ export default function DashboardPage({ session }) {
     const vv = window.visualViewport;
     if (!vv) return;
     const update = () => {
-      // Detect keyboard: any meaningful viewport shrinkage (>100px) OR any
-      // offsetTop shift. The old 75% threshold missed cases where the iOS
-      // accessory bar + QuickType + shorter keyboard together didn't eat
-      // quite enough of the viewport — leaving the page sized to 100dvh
-      // while the keyboard was clearly up, and creating a visible gap
-      // between the input bar and the keyboard's accessory bar.
+      // Detect keyboard by viewport shrinkage only. The earlier
+      // "vv.offsetTop > 0" clause fired spuriously during iOS rubber-band
+      // scroll and pinch interactions, flickering keyboardOpen true/false
+      // and unmounting/remounting BottomNav mid-scroll — the visible
+      // shakiness users reported. Pure shrinkage > 100px is a reliable,
+      // non-flickering signal for keyboard presence.
       const shrinkage = initialVH.current - vv.height;
-      const isKB = shrinkage > 100 || vv.offsetTop > 0;
+      const isKB = shrinkage > 100;
       setKeyboardOpen(isKB);
       if (isKB) {
-        // Runtime detection for interactive-widget=resizes-content support.
-        // When it works (most modern iOS Safari + Chrome/Android), the layout
-        // viewport — window.innerHeight — shrinks to match the visual viewport
-        // above the keyboard. When it doesn't (iOS 17+ Safari Private mode),
-        // window.innerHeight stays at full screen height while only vv.height
-        // shrinks.
-        //
-        // Two different fixes for two different bugs, same root cause of
-        // "where does the visible area end":
-        //
-        //   • resizes-content WORKS  → use bottom:0. The layout viewport is
-        //     already the exact visible area, so bottom:0 fills it flush to
-        //     the keyboard's accessory bar with no body-background strip.
-        //     (Using height:vv.height here leaves a gap because vv.height
-        //     slightly under-reports vs the resized layout viewport.)
-        //
-        //   • resizes-content BROKEN → use height:vv.height. The layout
-        //     viewport is still full screen, so bottom:0 would extend the
-        //     page below the keyboard and hide the input bar. Sizing to
-        //     vv.height keeps the input bar above the keyboard.
-        const layoutMatchesVisual = Math.abs(window.innerHeight - vv.height) < 20;
-        // Round to nearest pixel to ignore sub-pixel jitter during iOS
-        // URL-bar and keyboard animations; without rounding the cache key
-        // below would change on every animation frame.
+        // Size the page to the visible viewport above the keyboard so the
+        // bottom-anchored input bar sits above the keyboard. Using a pure
+        // height:vv.height approach (not bottom:0) because bottom:0 hid
+        // the input bar entirely in iOS 17+ Safari Private mode — there,
+        // interactive-widget=resizes-content doesn't shrink the layout
+        // viewport and bottom:0 extends the page below the keyboard.
+        // height:vv.height is the conservative fix: input bar is always
+        // visible, and any tiny gap between it and the keyboard's
+        // accessory bar is strictly cosmetic.
         const offsetTop = Math.round(vv.offsetTop);
         const vhRounded = Math.round(vv.height);
-        const key = layoutMatchesVisual ? `m|${offsetTop}` : `h|${offsetTop}|${vhRounded}`;
+        // Cache key to skip no-op setVpStyle during iOS keyboard-animation
+        // frames that arrive with unchanged rounded values.
+        const key = `${offsetTop}|${vhRounded}`;
         if (key === lastVpKeyRef.current) return;
         lastVpKeyRef.current = key;
-        const base = {
+        setVpStyle({
           position: 'fixed',
           top: `${offsetTop}px`,
           left: 0,
           right: 0,
+          height: `${vhRounded}px`,
           maxWidth: 480,
           margin: '0 auto',
-        };
-        setVpStyle(
-          layoutMatchesVisual
-            ? { ...base, bottom: 0 }
-            : { ...base, height: `${vhRounded}px` }
-        );
+        });
       } else {
         if (lastVpKeyRef.current === '') return;
         lastVpKeyRef.current = '';
