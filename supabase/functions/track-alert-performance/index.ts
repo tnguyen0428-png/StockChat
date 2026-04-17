@@ -412,6 +412,15 @@ Deno.serve(async (req) => {
     // accuracy because they're the old 24h-only system and the legacy cron
     // ran hourly when it was active.
     const cutoff = new Date(now.getTime() - 20 * 3600_000).toISOString();
+    // Was .limit(50) — sized back when the legacy cron ran hourly and 50/hour
+    // easily kept up. Now that this cron runs every 3h, 50 per run means
+    // throughput is 50 rows / 3h ≈ 17/h, which lags behind typical alert-
+    // generation rates and produces a backlog any time cron misses a window.
+    // Observed gap (2026-04-15 → 2026-04-17) left ~117 due rows pending that
+    // the next run could only chip away at. 500 is enough to catch up a full
+    // day's worth of skipped runs in a single execution while staying well
+    // under the 150s edge-function timeout (Polygon snapshot batches 200
+    // tickers/call → ~3 HTTP calls total for legacy prices).
     const { data: legacyPending, error: legacyErr } = await supabase
       .from('alert_performance')
       .select('id, ticker, alert_price, alert_time')
@@ -419,7 +428,7 @@ Deno.serve(async (req) => {
       .is('admin_outcome', null)
       .lt('alert_time', cutoff)
       .order('alert_time', { ascending: true })
-      .limit(50);
+      .limit(500);
     if (legacyErr) {
       console.error('[perf-track] Legacy fetch error:', legacyErr.message);
     }

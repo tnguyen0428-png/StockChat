@@ -2,7 +2,7 @@
 // UPTIKALERTS — LOGIN / SIGNUP PAGE
 // ============================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signIn, signUp, supabase } from '../lib/supabase';
 
@@ -20,6 +20,11 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
   const [newPassword, setNewPassword] = useState('');
   const [resetDone, setResetDone] = useState(false);
 
+  // Refs for focus management when switching between login/signup tabs.
+  // autoFocus only runs on mount, so switching modes wouldn't move focus.
+  const usernameRef = useRef(null);
+  const emailRef = useRef(null);
+
   // Clear stale errors when entering recovery mode
   useEffect(() => {
     if (recoveryMode) {
@@ -27,6 +32,34 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
       setSuccess('');
     }
   }, [recoveryMode]);
+
+  // Move focus to the first field when switching tabs
+  useEffect(() => {
+    if (recoveryMode) return;
+    if (mode === 'signup') {
+      usernameRef.current?.focus();
+    } else {
+      emailRef.current?.focus();
+    }
+  }, [mode, recoveryMode]);
+
+  // Surface email-verification outcome from ?verify=... (set by App.jsx)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const verify = params.get('verify');
+    if (!verify) return;
+    if (verify === 'expired') {
+      setError('Your confirmation link has expired. Sign in and we\u2019ll resend it, or sign up again.');
+    } else if (verify === 'failed') {
+      setError('We couldn\u2019t verify that link. Please try signing in, or request a new link.');
+    } else if (verify === 'ok') {
+      setSuccess('\u2713 Email confirmed! You can sign in now.');
+    }
+    // Clean the URL so refreshes don't re-show the banner
+    const url = new URL(window.location.href);
+    url.searchParams.delete('verify');
+    window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+  }, []);
 
   // Auto-redirect to /app 2s after successful reset
   useEffect(() => {
@@ -48,7 +81,20 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setLoading(false);
     if (error) {
-      setError('Failed to update password. Please try again.');
+      // Surface the real Supabase error so users know what to fix instead
+      // of staring at a generic retry prompt. Most common case in recovery
+      // flow is "new password should be different from the old password".
+      const msg = (error.message || '').toLowerCase();
+      console.error('[Auth] updateUser failed:', error.message);
+      if (msg.includes('different from the old') || msg.includes('same as')) {
+        setError('Your new password must be different from your current password.');
+      } else if (msg.includes('session') || msg.includes('logged in') || msg.includes('jwt')) {
+        setError('Your reset link has expired. Please request a new one from the sign-in page.');
+      } else if (msg.includes('weak') || msg.includes('at least') || msg.includes('character')) {
+        setError(error.message); // Supabase's own "password should be at least N characters" copy is already clear
+      } else {
+        setError(error.message || 'Failed to update password. Please try again.');
+      }
     } else {
       setResetDone(true);
     }
@@ -99,6 +145,12 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
                   onChange={e => setNewPassword(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handlePasswordReset()}
                   autoFocus
+                  // autoComplete="new-password" tells the browser NOT to autofill
+                  // the user's existing saved password here — otherwise they'll
+                  // submit their old password and Supabase rejects it with
+                  // "new password should be different from the old password".
+                  autoComplete="new-password"
+                  name="new-password"
                 />
               </div>
               {error && <div style={styles.error}>{error}</div>}
@@ -148,19 +200,37 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
     if (mode === 'login') {
       const { error } = await signIn(email.trim(), password);
       if (error) {
-        setError('Invalid email or password. Please try again.');
+        const msg = (error.message || '').toLowerCase();
+        if (msg.includes('email not confirmed') || msg.includes('not confirmed') || msg.includes('confirm your email')) {
+          setError('Please confirm your email first. Check your inbox (and spam folder) for the confirmation link.');
+        } else if (msg.includes('rate') || msg.includes('too many')) {
+          setError('Too many attempts. Please wait a minute and try again.');
+        } else if (msg.includes('invalid') || msg.includes('credentials')) {
+          setError('Invalid email or password. Please try again.');
+        } else {
+          setError(error.message || 'Something went wrong. Please try again.');
+        }
       }
       // Don't navigate here — App.jsx onAuthStateChange will set session,
       // which triggers <Navigate to="/app"> in the /login route automatically.
       // Navigating manually causes a flash because session hasn't propagated yet.
     } else {
-      const { error } = await signUp(email.trim(), password, username.trim());
+      const { data, error } = await signUp(email.trim(), password, username.trim());
       if (error) {
-        if (error.message.includes('already registered')) {
-          setError('This email is already registered. Try logging in.');
-        } else {
+        const msg = (error.message || '').toLowerCase();
+        if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('already been registered')) {
+          setError('This email is already registered. Try signing in, or reset your password.');
+        } else if (msg.includes('password')) {
           setError(error.message);
+        } else if (msg.includes('rate') || msg.includes('too many')) {
+          setError('Too many attempts. Please wait a minute and try again.');
+        } else {
+          setError(error.message || 'Could not create account. Please try again.');
         }
+      } else if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        // Supabase returns a fake user with empty identities[] when the email
+        // already exists and confirmations are ON. Don't pretend it worked.
+        setError('This email is already registered. Try signing in, or reset your password.');
       } else {
         setSuccess('Account created! Please check your email to confirm, then log in.');
         setMode('login');
@@ -216,15 +286,16 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
           <div style={styles.fieldWrap}>
             <label style={styles.label}>Trader Name</label>
             <input
+              ref={usernameRef}
               style={styles.input}
               type="text"
               placeholder="e.g. TonyT"
               value={username}
-              onChange={e => setUsername(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 20))}
+              onChange={e => setUsername(e.target.value.replace(/[^a-zA-Z0-9_.]/g, '').slice(0, 20))}
               onKeyDown={handleKeyDown}
-              autoFocus
               maxLength={20}
             />
+            <div style={styles.hint}>Letters, numbers, <code>_</code> and <code>.</code> only</div>
           </div>
         )}
 
@@ -232,13 +303,13 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
         <div style={styles.fieldWrap}>
           <label style={styles.label}>Email</label>
           <input
+            ref={emailRef}
             style={styles.input}
             type="email"
             placeholder="you@email.com"
             value={email}
             onChange={e => setEmail(e.target.value)}
             onKeyDown={handleKeyDown}
-            autoFocus={mode === 'login'}
           />
         </div>
 
@@ -286,12 +357,28 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
           <div style={styles.forgotWrap}>
             <button
               onClick={async () => {
+                if (loading) return;
                 if (!email.trim()) { setError('Enter your email first.'); return; }
                 setError('');
-                await supabase.auth.resetPasswordForEmail(email.trim());
-                setSuccess('✓ Check your email for a reset link');
+                setSuccess('');
+                setLoading(true);
+                const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+                  redirectTo: `${window.location.origin}/login`,
+                });
+                setLoading(false);
+                if (error) {
+                  const msg = (error.message || '').toLowerCase();
+                  if (msg.includes('rate') || msg.includes('too many')) {
+                    setError('Too many reset attempts. Please wait a minute and try again.');
+                  } else {
+                    setError(error.message || 'Could not send reset email. Please try again.');
+                  }
+                } else {
+                  setSuccess('✓ Check your email for a reset link (and your spam folder).');
+                }
               }}
-              style={styles.forgotBtn}
+              disabled={loading}
+              style={{ ...styles.forgotBtn, ...(loading ? { opacity: 0.5 } : {}) }}
             >
               Forgot password?
             </button>
@@ -401,6 +488,11 @@ const styles = {
     fontSize: 14,
     color: 'var(--text1)',
     transition: 'border-color 0.15s',
+  },
+  hint: {
+    fontSize: 11,
+    color: 'var(--text3)',
+    marginTop: 4,
   },
   error: {
     background: 'var(--red-bg)',

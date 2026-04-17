@@ -64,21 +64,44 @@ export default function App() {
   const [recoveryMode, setRecoveryMode] = useState(false);
 
   useEffect(() => {
-    // ── Handle email confirmation (PKCE flow) ──
+    // ── Handle email confirmation / password recovery token in URL ──
     const params = new URLSearchParams(window.location.search);
     const tokenHash = params.get('token_hash');
     const type = params.get('type');
 
+    // Supabase's default email template uses the implicit flow, which drops
+    // the session into the URL *fragment* (#access_token=...&type=recovery),
+    // not the query string. Detect type=recovery in either place and flip
+    // recoveryMode immediately so we render the reset form even if SIGNED_IN
+    // arrives before PASSWORD_RECOVERY (event ordering is not guaranteed).
+    const hash = window.location.hash || '';
+    const isRecoveryFromHash = hash.includes('type=recovery');
+    const isRecoveryFromQuery = type === 'recovery';
+    if (isRecoveryFromHash || isRecoveryFromQuery) {
+      setRecoveryMode(true);
+    }
+
     if (tokenHash && type) {
       supabase.auth.verifyOtp({ token_hash: tokenHash, type })
         .then(({ data, error }) => {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('token_hash');
+          url.searchParams.delete('type');
+
           if (error) {
             console.error('Email verification failed:', error.message);
+            // Surface it to LoginPage via ?verify=... so the user sees why the
+            // link didn't work instead of landing on a silent /login.
+            const msg = (error.message || '').toLowerCase();
+            const kind = (msg.includes('expired') || msg.includes('invalid')) ? 'expired' : 'failed';
+            url.searchParams.set('verify', kind);
+          } else if (type === 'recovery') {
+            // PASSWORD_RECOVERY event will flip recoveryMode. No banner needed.
           } else {
-            console.log('Email verified successfully');
+            // Successful signup confirmation.
+            url.searchParams.set('verify', 'ok');
           }
-          // Clean the URL
-          window.history.replaceState({}, '', window.location.pathname);
+          window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
         });
     }
 
@@ -95,13 +118,27 @@ export default function App() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
+        // PASSWORD_RECOVERY must ALWAYS be handled, even before getSession
+        // resolves — otherwise a recovery-link cold-load can swallow the event
+        // and drop the user on a normal login page with no way forward.
+        if (event === 'PASSWORD_RECOVERY') {
+          setRecoveryMode(true);
+          setSession(newSession ?? null);
+          initialised = true;
+          return;
+        }
+
         // Ignore events that arrive before getSession resolves — they carry
         // the same data and setting state twice causes a flash.
         if (!initialised) return;
 
-        if (event === 'PASSWORD_RECOVERY') {
-          setRecoveryMode(true);
-        } else if (event === 'USER_UPDATED' || event === 'SIGNED_IN') {
+        // Only USER_UPDATED exits recovery mode — that's the event that fires
+        // after updateUser({ password }) succeeds. SIGNED_IN must NOT reset
+        // recoveryMode, because Supabase fires SIGNED_IN right alongside
+        // PASSWORD_RECOVERY when the recovery link is consumed; letting it
+        // flip recoveryMode back to false silently drops the user onto the
+        // normal login form with no way to finish the reset.
+        if (event === 'USER_UPDATED') {
           setRecoveryMode(false);
         }
 

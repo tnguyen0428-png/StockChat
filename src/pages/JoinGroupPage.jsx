@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { safeSet } from '../lib/safeStorage';
 
 export default function JoinGroupPage({ session }) {
   const { code } = useParams();
@@ -23,7 +24,8 @@ export default function JoinGroupPage({ session }) {
 
     if (!session) {
       // Save invite code so we can join after login
-      localStorage.setItem('uptik_pending_invite', code);
+      // (safeSet so iOS private browsing doesn't throw and break the flow)
+      safeSet('uptik_pending_invite', code);
       setStatus('needLogin');
       return;
     }
@@ -59,8 +61,8 @@ export default function JoinGroupPage({ session }) {
     }
 
     // Set as active group and navigate after a short delay
-    localStorage.setItem('uptik_active_group', data.group_id);
-    localStorage.setItem('uptik_join_redirect', 'chat');
+    safeSet('uptik_active_group', data.group_id);
+    safeSet('uptik_join_redirect', 'chat');
     setTimeout(() => navigate('/app'), 1800);
   };
 

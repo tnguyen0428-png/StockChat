@@ -293,12 +293,28 @@ export default function AlertsTab({ session, group, darkMode }) {
     const [alertsRes, perfRes, marketRes] = await Promise.all([
       supabase.from('breakout_alerts').select('*')
         .gte('created_at', sevenDaysAgo.toISOString())
-        .order('created_at', { ascending: false }).limit(50),
+        // Was .limit(50) — with 52w_high and gap_up dominating daily volume,
+        // the 50 most recent rows would starve out lower-volume types like
+        // confluence and flow_signal. Users clicking the "Top" or "Big $"
+        // filter saw an empty list even when the DB had plenty of recent
+        // matching rows (observed 2026-04-17: 14 confluence + 34 flow_signal
+        // in last 7d, but zero of either in the top 50 fetched because
+        // 52w_high/gap_up occupied the whole window). 500 is enough headroom
+        // for a full week of mixed-signal output.
+        .order('created_at', { ascending: false }).limit(500),
       supabase.from('alert_performance').select('*')
         .not('outcome', 'is', null)
         .gte('tracked_at', POLYGON_SCORING_CUTOFF)   // drop FMP-era rows from win rate
         .in('signal_type', Object.keys(TYPE_CONFIG))
-        .order('alert_time', { ascending: false }).limit(100),
+        // Was .limit(100) — but the SCORED stat card showed that 100 as if it
+        // were the true resolved count, when the table actually held ~500+
+        // resolved rows post-cutoff. Stats were computed from only the 100
+        // most recent, which (a) misrepresented sample size to the user and
+        // (b) truncated win rate to a rolling tail instead of the full
+        // post-cutoff cohort. Raised to 1000 so the count is real and the
+        // stats use the full population. Ceiling stays in place so a runaway
+        // insert rate can't DoS the client's memory.
+        .order('alert_time', { ascending: false }).limit(1000),
       supabase.from('market_data').select('*'),
     ]);
     if (alertsRes.data) setLiveAlerts(alertsRes.data);
@@ -308,7 +324,17 @@ export default function AlertsTab({ session, group, darkMode }) {
       const vix = marketRes.data.find(r => r.key === 'vix_score');
       setFearScore((fg || vix)?.value?.score ?? null);
     }
-    setLastUpdated(new Date());
+    // FreshnessBar lives under the STATS strip (Scored / Win rate / Avg return)
+    // so it has to reflect when the SCORING data was last updated, not just
+    // "I fetched something". Previously this was set to `new Date()` which made
+    // "Live · Updated just now" always render even when the last cron run was
+    // a day old and the scores hadn't moved. Now it reflects the freshest
+    // tracked_at in perfHistory — if the cron is lagging, the label says so.
+    const latestTrackedAt = (perfRes.data || [])
+      .map(r => r.tracked_at)
+      .filter(Boolean)
+      .reduce((max, cur) => (!max || cur > max ? cur : max), null);
+    setLastUpdated(latestTrackedAt ? new Date(latestTrackedAt) : null);
     setLoading(false);
   }, []);
 
@@ -335,7 +361,12 @@ export default function AlertsTab({ session, group, darkMode }) {
     const alertCh = supabase.channel('alerts_chips_feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'breakout_alerts' }, ({ new: row }) => {
         setLiveAlerts(prev => [row, ...prev]);
-        setLastUpdated(new Date());
+        // Intentionally NOT bumping lastUpdated here. The FreshnessBar sits
+        // under the stats strip and its label describes when SCORES were
+        // last updated. An alert INSERT is a new pending row, not a new
+        // score — previously this bump made the label say "just now" while
+        // win-rate data was a day stale. Alert-level freshness is already
+        // shown in the header's "Last scan: X ago" line.
       }).subscribe(onSubStatus);
 
     const perfCh = supabase.channel('perf_chips_feed')
@@ -348,9 +379,14 @@ export default function AlertsTab({ session, group, darkMode }) {
           if (trackedAt && trackedAt < cutoff) return;
           setPerfHistory(prev => {
             const rest = prev.filter(p => p.id !== row.id);
-            return (row.outcome || row.admin_outcome) ? [row, ...rest].slice(0, 100) : rest;
+            // Slice cap matches the initial-fetch limit (1000) so the
+            // in-memory window never silently diverges from the DB query.
+            return (row.outcome || row.admin_outcome) ? [row, ...rest].slice(0, 1000) : rest;
           });
-          setLastUpdated(new Date());
+          // Use the row's own tracked_at (source of truth) rather than
+          // Date.now(), so the label tracks when the score was actually
+          // computed — not when realtime happened to deliver it.
+          if (row.tracked_at) setLastUpdated(new Date(row.tracked_at));
         }
       }).subscribe(onSubStatus);
 
@@ -427,8 +463,16 @@ export default function AlertsTab({ session, group, darkMode }) {
   // Derive history from liveAlerts instead of a separate query.
   // When a confluence row exists for a ticker, hide the individual signal rows
   // for that same ticker so the list isn't cluttered with its component signals.
+  //
+  // Was slice(0, 30). Problem: 52w_high + gap_up dominate insertion volume
+  // (~60% of the daily feed), so the 30 most recent rows were almost always
+  // 100% those two types. The "Top" (confluence) and "Big $" (flow_signal)
+  // filters both ended up filtering a 30-row list with zero matches even
+  // when the DB had plenty of recent rows of those types. Slicing to 100
+  // gives enough headroom for the rarer signal types to surface while
+  // keeping the expanded-view render count sane.
   const alertHistory = useMemo(() => {
-    const rows = liveAlerts.slice(0, 30).map(a => ({
+    const rows = liveAlerts.slice(0, 100).map(a => ({
       id: a.id, ticker: a.ticker, signal_type: a.signal_type,
       price: a.price, change_pct: a.change_pct, gap_pct: a.gap_pct,
       pct_from_high: a.pct_from_high, short_ma: a.short_ma, long_ma: a.long_ma,
@@ -711,12 +755,17 @@ function FreshnessBar({ lastUpdated, connState, onRefresh, tick, t }) {
     : ageSec < 86400 ? `${Math.round(ageSec / 3600)}h ago`
     : `${Math.round(ageSec / 86400)}d ago`;
 
-  const stale = ageSec != null && ageSec > 600; // >10 min = stale-looking
+  // The scoring cron runs every 3h. Anything older than ~4h means at least
+  // one run missed. Previously threshold was 10min (a realtime-data assumption)
+  // which hid the staleness because "alert inserted" and "score computed" were
+  // treated as the same signal. Now that the bar only reflects score freshness,
+  // the threshold has to match the scoring cadence.
+  const stale = ageSec != null && ageSec > 4 * 3600; // >4h = at least one cron cycle missed
   const isLive = connState === 'live' && !stale;
   const dotColor = isLive ? t.green : (connState === 'reconnecting' || stale) ? '#fbbf24' : t.text3;
   const statusText = connState === 'reconnecting' ? 'Reconnecting…'
     : connState === 'connecting' ? 'Connecting…'
-    : stale ? 'Stale' : 'Live';
+    : stale ? 'Scores stale' : 'Live';
 
   return (
     <div
@@ -735,7 +784,7 @@ function FreshnessBar({ lastUpdated, connState, onRefresh, tick, t }) {
         flexShrink: 0,
       }} />
       <span style={{ fontWeight: 500 }}>{statusText}</span>
-      <span style={{ color: t.text3 }}>· Updated {ageLabel}</span>
+      <span style={{ color: t.text3 }}>· Scores {ageLabel}</span>
       <span style={{ marginLeft: 'auto', color: t.text3, fontSize: 11 }}>↻</span>
     </div>
   );

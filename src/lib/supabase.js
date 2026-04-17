@@ -26,11 +26,17 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // ── AUTH HELPERS ──
 
 export const signUp = async (email, password, username) => {
+  // Explicit emailRedirectTo so the confirmation link lands on /login
+  // regardless of what the Supabase dashboard Site URL is set to.
+  const redirectTo = typeof window !== 'undefined'
+    ? `${window.location.origin}/login`
+    : undefined;
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: { username }
+      data: { username },
+      ...(redirectTo ? { emailRedirectTo: redirectTo } : {}),
     }
   });
   return { data, error };
