@@ -473,18 +473,18 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   }, [group?.id, activeGroup?.name, profile?.username, watchlist, aiLastTicker, session?.user?.id]);
 
   const handleSend = useCallback(async () => {
-    // Keep focus on the input after send. Every modern chat app (iMessage,
-    // WhatsApp, Slack, Telegram, Discord) leaves the keyboard up so users
-    // can fire off consecutive messages without re-tapping the field. The
-    // earlier code blur()ed on send to force-dismiss the iOS/Android
-    // keyboard — that saved one swipe at the cost of a tap on every single
-    // message. Net friction went up, not down.
+    // Dismiss the soft keyboard on send. Neal wants the keyboard to go
+    // back down after each message so the full chat is visible without
+    // needing to swipe the keyboard away. Trade-off: a second message
+    // requires re-tapping the input, but the default action (read the
+    // conversation you just contributed to) becomes friction-free.
     if (sendingRef.current) return;
     const text = aiMode ? `@AI ${inputText.trim()}` : inputText.trim();
     if (!inputText.trim() || !profile || !group) return;
     sendingRef.current = true;
     try {
       setInputText('');
+      inputRef.current?.blur();
       const { data, error } = await supabase.from('chat_messages').insert({
         group_id: group.id, user_id: session.user.id,
         username: profile.username, user_color: profile.color,
@@ -736,14 +736,10 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
           />
           <button
             style={{ ...styles.sendBtn, background: aiMode ? '#8B5CF6' : 'var(--green)', opacity: inputText.trim() ? 1 : 0.4 }}
-            // preventDefault on pointerdown stops the button from taking
-            // focus away from the input when tapped. This is what keeps the
-            // soft keyboard up across consecutive sends on Android/iOS —
-            // without it, the tap blurs the input and fires the keyboard
-            // dismiss animation before onClick runs. onPointerDown (vs
-            // onMouseDown) unifies mouse/touch/pen for maximum cross-device
-            // coverage; click still fires normally afterwards.
-            onPointerDown={(e) => e.preventDefault()}
+            // No preventDefault on pointerdown here — we want the tap to
+            // naturally blur the input so the soft keyboard dismisses
+            // alongside the explicit blur() inside handleSend. Both paths
+            // (tap button / Enter key) converge on keyboard-down.
             onClick={handleSend}
             disabled={!inputText.trim()}
           >

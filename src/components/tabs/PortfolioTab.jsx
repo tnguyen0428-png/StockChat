@@ -137,6 +137,10 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
   // container. Snapshot scrollTop before the send, then restore it after
   // React has reconciled (rAF) and once more after the keyboard/viewport
   // has had time to settle (350ms).
+  //
+  // We also blur the input on send so the soft keyboard dismisses — Neal
+  // wants tap-send → keyboard-down so the full smack talk thread is
+  // visible again without a manual swipe.
   const handleSendSmack = () => {
     const el = scrollRef.current;
     const saved = el ? el.scrollTop : 0;
@@ -149,6 +153,7 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
     // zeroing prevSmackScrollHeightRef: the length-change effect treats 0
     // as the "first load / always scroll" signal.
     prevSmackScrollHeightRef.current = 0;
+    smackInputRef.current?.blur();
     sendTrashTalk();
     requestAnimationFrame(pin);
     setTimeout(pin, 120);
@@ -571,12 +576,13 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
               onFocus={handleSmackFocus}
               enterKeyHint="send"
             />
-            {/* preventDefault on pointerdown stops the button from stealing
-                 focus off the input on mobile. Keeps the soft keyboard up
-                 across consecutive sends — same pattern as the chat send.
-                 handleSendSmack also pins scrollTop across the re-render
+            {/* No preventDefault on pointerdown — we want the tap to
+                 blur the input so the soft keyboard dismisses alongside
+                 the explicit blur() inside handleSendSmack. Both the
+                 button tap and Enter key converge on keyboard-down.
+                 handleSendSmack still pins scrollTop across the re-render
                  so the page doesn't snap to the top on send. */}
-            <button style={s.smackSendBtn} onPointerDown={(e) => e.preventDefault()} onClick={handleSendSmack}>Send</button>
+            <button style={s.smackSendBtn} onClick={handleSendSmack}>Send</button>
           </div>
         </div>
 
