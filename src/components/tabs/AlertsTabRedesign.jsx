@@ -264,7 +264,7 @@ function mapAlert(a) {
 }
 
 // ===== MAIN COMPONENT =====
-export default function AlertsTab({ session, group, darkMode }) {
+export default function AlertsTab({ session, group, darkMode, isAdmin = false }) {
   const t = useTheme(darkMode);
   const [liveAlerts, setLiveAlerts] = useState([]);
   const [fearScore, setFearScore] = useState(null);
@@ -276,6 +276,9 @@ export default function AlertsTab({ session, group, darkMode }) {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [connState, setConnState] = useState('connecting'); // 'live' | 'reconnecting' | 'connecting'
   const [tick, setTick] = useState(0); // forces "Xs ago" label to re-render
+  // True while we're invoking track-alert-performance + awaiting the refetch.
+  // Drives the FreshnessBar's spinner + disables re-tap while in flight.
+  const [refreshing, setRefreshing] = useState(false);
   // Tracks whether we've been disconnected so we can refetch once on re-subscribe.
   // Held in a ref (not state) so the side effect lives outside React's render/commit
   // cycle — avoids StrictMode double-invoking a side effect placed in a setState updater.
@@ -337,6 +340,80 @@ export default function AlertsTab({ session, group, darkMode }) {
     setLastUpdated(latestTrackedAt ? new Date(latestTrackedAt) : null);
     setLoading(false);
   }, []);
+
+  // Fetch cohort stats (the v_signal_cohort_stats view).
+  //
+  // Originally this lived inline in a mount-only useEffect([]) — so stats
+  // never refreshed mid-session even when the scorer closed new snapshots
+  // and the view's underlying aggregate moved. That was a silent staleness
+  // bug: the top-level stats strip (SCORED / WIN RATE / AVG RETURN) updated
+  // live via alert_performance realtime, but the detail panel's confidence
+  // line kept reading against the mount-time cohort. Users would reasonably
+  // assume the two strips stay in sync.
+  //
+  // Extracted into a useCallback so `refreshScores` can call it alongside
+  // loadData() — one tap on ↻ now updates every score-derived surface at
+  // the same cadence. Declared here (above refreshScores) so the
+  // useCallback dependency reference doesn't hit a temporal dead zone.
+  const loadCohortStats = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('v_signal_cohort_stats')
+      .select('*');
+    if (error) {
+      console.warn('[alerts] cohort stats unavailable:', error.message);
+      return;
+    }
+    setCohortStats(data || []);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (cancelled) return;
+      await loadCohortStats();
+    })();
+    return () => { cancelled = true; };
+  }, [loadCohortStats]);
+
+  // Manual scorer trigger — wired to the FreshnessBar's ↻ button.
+  //
+  // Why this exists: previously ↻ called loadData() which only re-reads
+  // alert_performance from the DB. When the scoring cron lagged (observed
+  // 21h gap on 2026-04-17), tapping "refresh" did nothing visible because
+  // the underlying rows hadn't been updated — the button looked broken.
+  //
+  // Now ↻ invokes the track-alert-performance edge function (the same one
+  // the pg_cron hits every 3h), then refetches. Tap → scores actually
+  // update. If the cron hiccups, users have a self-service fallback that
+  // matches the stickiness goal: one tap does what the label promises.
+  //
+  // Timeout note: Supabase's functions.invoke client bails at ~30s, but
+  // the edge function keeps running server-side for up to its own 150s
+  // budget. A thrown error here almost always means "client gave up, job
+  // is still finishing" — we swallow it and refetch anyway. The refetch
+  // is the source of truth for what actually landed.
+  const refreshScores = useCallback(async () => {
+    // Admin-only: the edge function is a real job (Polygon API calls, DB writes)
+    // so we don't expose the trigger to regular users. For non-admins, the ↻
+    // icon is hidden entirely and this callback short-circuits — a defense-in-
+    // depth check in case the button is ever exposed elsewhere.
+    if (!isAdmin) return;
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await supabase.functions.invoke('track-alert-performance', { body: {} });
+    } catch (e) {
+      // Expected on busy runs — server keeps going past the client's 30s.
+      console.warn('[alerts] scorer invoke returned error (likely client timeout):', e?.message);
+    }
+    // Refetch both in parallel: alert_performance drives the SCORED / WIN RATE /
+    // AVG RETURN strip, and v_signal_cohort_stats drives the detail panel's
+    // "Usually wins / Building history" confidence line. Keeping them on the
+    // same tap prevents the "top updated, bottom didn't" asymmetry users hit
+    // before this fix.
+    await Promise.all([loadData(), loadCohortStats()]);
+    setRefreshing(false);
+  }, [loadData, loadCohortStats, refreshing, isAdmin]);
 
   // Fetch alerts + performance + market data in parallel, subscribe to realtime
   useEffect(() => {
@@ -404,25 +481,6 @@ export default function AlertsTab({ session, group, darkMode }) {
       supabase.removeChannel(perfCh);
     };
   }, [loadData]);
-
-  // Fetch cohort stats (the v_signal_cohort_stats view) once on mount.
-  // Small table, no realtime needed. If the view is missing (migration not
-  // applied yet) we silently fall back to "Insufficient" inside the detail panel.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from('v_signal_cohort_stats')
-        .select('*');
-      if (cancelled) return;
-      if (error) {
-        console.warn('[alerts] cohort stats unavailable:', error.message);
-        return;
-      }
-      setCohortStats(data || []);
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   // Lookup: best cohort row for a given signal_type.
   // "Best" = prefer the shortest horizon that has enough samples to score.
@@ -654,7 +712,9 @@ export default function AlertsTab({ session, group, darkMode }) {
           <FreshnessBar
             lastUpdated={lastUpdated}
             connState={connState}
-            onRefresh={loadData}
+            onRefresh={refreshScores}
+            refreshing={refreshing}
+            canRefresh={isAdmin}
             tick={tick}
             t={t}
           />
@@ -744,8 +804,15 @@ function StatCard({ label, value, color, t }) {
 }
 
 // Live/stale indicator — stickiness goal: one glance tells you if numbers are current.
+//
+// `canRefresh` gates the manual scorer trigger. The edge function does real
+// work (Polygon calls, DB writes, ~150s budget) so we only expose it to
+// admins. For regular users the bar still shows status + age — it just
+// doesn't advertise a trigger they can't use. Hiding the affordance
+// (rather than showing a disabled button) avoids the "why is this button
+// broken?" friction that would otherwise hurt the stickiness goal.
 // eslint-disable-next-line no-unused-vars
-function FreshnessBar({ lastUpdated, connState, onRefresh, tick, t }) {
+function FreshnessBar({ lastUpdated, connState, onRefresh, refreshing, canRefresh, tick, t }) {
   // Compute staleness in seconds (tick forces re-render)
   const ageSec = lastUpdated ? Math.max(0, Math.round((Date.now() - lastUpdated.getTime()) / 1000)) : null;
   const ageLabel = ageSec == null
@@ -762,30 +829,46 @@ function FreshnessBar({ lastUpdated, connState, onRefresh, tick, t }) {
   // the threshold has to match the scoring cadence.
   const stale = ageSec != null && ageSec > 4 * 3600; // >4h = at least one cron cycle missed
   const isLive = connState === 'live' && !stale;
-  const dotColor = isLive ? t.green : (connState === 'reconnecting' || stale) ? '#fbbf24' : t.text3;
-  const statusText = connState === 'reconnecting' ? 'Reconnecting…'
+  const dotColor = refreshing ? '#60A5FA'
+    : isLive ? t.green
+    : (connState === 'reconnecting' || stale) ? '#fbbf24'
+    : t.text3;
+  const statusText = refreshing ? 'Refreshing…'
+    : connState === 'reconnecting' ? 'Reconnecting…'
     : connState === 'connecting' ? 'Connecting…'
     : stale ? 'Scores stale' : 'Live';
 
+  const clickable = canRefresh && !refreshing;
+
   return (
     <div
-      onClick={onRefresh}
-      title="Tap to refresh"
+      onClick={clickable ? onRefresh : undefined}
+      title={!canRefresh ? undefined : refreshing ? 'Refreshing scores…' : 'Tap to refresh'}
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
         padding: '4px 8px', marginBottom: 10,
         fontSize: 10, color: t.text3,
-        cursor: 'pointer', userSelect: 'none',
+        cursor: clickable ? 'pointer' : refreshing ? 'progress' : 'default',
+        userSelect: 'none',
+        opacity: refreshing ? 0.75 : 1,
+        transition: 'opacity 0.15s ease',
       }}
     >
+      <style>{`@keyframes uptk-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
       <span style={{
         width: 6, height: 6, borderRadius: '50%', background: dotColor,
         boxShadow: isLive ? `0 0 4px ${dotColor}` : 'none',
         flexShrink: 0,
       }} />
       <span style={{ fontWeight: 500 }}>{statusText}</span>
-      <span style={{ color: t.text3 }}>· Scores {ageLabel}</span>
-      <span style={{ marginLeft: 'auto', color: t.text3, fontSize: 11 }}>↻</span>
+      {!refreshing && <span style={{ color: t.text3 }}>· Scores {ageLabel}</span>}
+      {canRefresh && (
+        <span style={{
+          marginLeft: 'auto', color: t.text3, fontSize: 11,
+          display: 'inline-block',
+          animation: refreshing ? 'uptk-spin 0.9s linear infinite' : 'none',
+        }}>↻</span>
+      )}
     </div>
   );
 }

@@ -320,7 +320,7 @@ export default function DashboardPage({ session }) {
         {mountedTabs.has('alerts') && (
           <div style={{ display: activeTab === 'alerts' ? 'flex' : 'none', flex: 1, flexDirection: 'column' }}>
             <Suspense fallback={<TabFallback />}>
-              <AlertsTab session={session} group={activeGroup} darkMode={darkMode} />
+              <AlertsTab session={session} group={activeGroup} darkMode={darkMode} isAdmin={isAdmin} />
             </Suspense>
           </div>
         )}
