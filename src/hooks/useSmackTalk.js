@@ -42,9 +42,11 @@ export function useSmackTalk(session) {
   const sendTrashTalk = async () => {
     const msg = trashTalkInput.trim();
     if (!msg || !session?.user?.id) return;
-    // Clear input immediately so UX feels responsive
+    // Clear input immediately so UX feels responsive. DO NOT blur the active
+    // element — that dismisses the mobile keyboard after every send and
+    // forces the user to re-tap the field. Every modern chat app keeps the
+    // keyboard up for consecutive smack talk. Matches the chat send fix.
     setTrashTalkInput('');
-    document.activeElement?.blur();
     const { error } = await supabase.from('challenge_chat').insert({
       user_id: session.user.id,
       message: msg,

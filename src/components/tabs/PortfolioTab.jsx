@@ -4,7 +4,7 @@
 // Left: portfolio + buy | Right: game cards
 // ============================================
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useTheme } from './alertsCasinoComponents';
 import SellModal from '../portfolio/SellModal';
 
@@ -17,6 +17,12 @@ import { getPortfolioStyles } from './portfolioStyles';
 export default function PortfolioTab({ session, darkMode }) {
   const [showPortfolio, setShowPortfolio]     = useState(false);
   const [showAllRankings, setShowAllRankings] = useState(false);
+
+  // Ref on the outer scroll container so we can pin scrollTop across the
+  // re-render storm that happens when smack talk is sent (supabase insert →
+  // realtime INSERT → loadTrashTalk → setTrashTalkMsgs). Without this, the
+  // page visibly snaps back to the top mid-send on mobile.
+  const scrollRef = useRef(null);
 
   // ── Hooks ──
   const portfolio = usePortfolio(session);
@@ -50,6 +56,25 @@ export default function PortfolioTab({ session, darkMode }) {
     onSellComplete();
     loadLeaderboard();
     loadActivity();
+  };
+
+  // ── Send smack talk while pinning scroll position ──
+  // The page was snapping to the top after every send on mobile. Root cause:
+  // the realtime INSERT → loadTrashTalk → setTrashTalkMsgs re-render combined
+  // with the input clear was resetting scrollTop on the outer scroll
+  // container. Snapshot scrollTop before the send, then restore it after
+  // React has reconciled (rAF) and once more after the keyboard/viewport
+  // has had time to settle (350ms).
+  const handleSendSmack = () => {
+    const el = scrollRef.current;
+    const saved = el ? el.scrollTop : 0;
+    const pin = () => {
+      if (scrollRef.current) scrollRef.current.scrollTop = saved;
+    };
+    sendTrashTalk();
+    requestAnimationFrame(pin);
+    setTimeout(pin, 120);
+    setTimeout(pin, 350);
   };
 
   // ── Theme setup ──
@@ -116,7 +141,7 @@ export default function PortfolioTab({ session, darkMode }) {
   }
 
   return (
-    <div style={s.scroll}>
+    <div ref={scrollRef} style={s.scroll}>
       <div style={{ padding: '8px 12px 80px' }}>
 
         {/* HEADER ROW */}
@@ -454,8 +479,13 @@ export default function PortfolioTab({ session, darkMode }) {
             })}
           </div>
           <div style={s.smackInput}>
-            <input style={s.smackInputField} value={trashTalkInput} onChange={e => setTrashTalkInput(e.target.value.slice(0, 200))} placeholder="Talk your talk..." onKeyDown={e => e.key === 'Enter' && sendTrashTalk()} enterKeyHint="send" />
-            <button style={s.smackSendBtn} onClick={() => sendTrashTalk()}>Send</button>
+            <input style={s.smackInputField} value={trashTalkInput} onChange={e => setTrashTalkInput(e.target.value.slice(0, 200))} placeholder="Talk your talk..." onKeyDown={e => e.key === 'Enter' && handleSendSmack()} enterKeyHint="send" />
+            {/* preventDefault on pointerdown stops the button from stealing
+                 focus off the input on mobile. Keeps the soft keyboard up
+                 across consecutive sends — same pattern as the chat send.
+                 handleSendSmack also pins scrollTop across the re-render
+                 so the page doesn't snap to the top on send. */}
+            <button style={s.smackSendBtn} onPointerDown={(e) => e.preventDefault()} onClick={handleSendSmack}>Send</button>
           </div>
         </div>
 
