@@ -74,6 +74,13 @@ export default function DashboardPage({ session }) {
   const [vpStyle, setVpStyle] = useState({});
   const initialVH = useRef(window.innerHeight);
   const pageRef = useRef(null);
+  // Cache the last vpStyle signature so we can skip setVpStyle when the
+  // computed values haven't meaningfully changed. iOS fires visualViewport
+  // events during URL-bar show/hide on every scroll frame — unconditionally
+  // calling setVpStyle with a new object literal each time re-renders the
+  // entire page tree on every scroll, which amplifies any downstream
+  // scroll-position writes and makes the whole app feel shaky.
+  const lastVpKeyRef = useRef('');
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
@@ -109,9 +116,17 @@ export default function DashboardPage({ session }) {
         //     page below the keyboard and hide the input bar. Sizing to
         //     vv.height keeps the input bar above the keyboard.
         const layoutMatchesVisual = Math.abs(window.innerHeight - vv.height) < 20;
+        // Round to nearest pixel to ignore sub-pixel jitter during iOS
+        // URL-bar and keyboard animations; without rounding the cache key
+        // below would change on every animation frame.
+        const offsetTop = Math.round(vv.offsetTop);
+        const vhRounded = Math.round(vv.height);
+        const key = layoutMatchesVisual ? `m|${offsetTop}` : `h|${offsetTop}|${vhRounded}`;
+        if (key === lastVpKeyRef.current) return;
+        lastVpKeyRef.current = key;
         const base = {
           position: 'fixed',
-          top: `${vv.offsetTop}px`,
+          top: `${offsetTop}px`,
           left: 0,
           right: 0,
           maxWidth: 480,
@@ -120,9 +135,11 @@ export default function DashboardPage({ session }) {
         setVpStyle(
           layoutMatchesVisual
             ? { ...base, bottom: 0 }
-            : { ...base, height: `${vv.height}px` }
+            : { ...base, height: `${vhRounded}px` }
         );
       } else {
+        if (lastVpKeyRef.current === '') return;
+        lastVpKeyRef.current = '';
         setVpStyle({});
       }
     };
