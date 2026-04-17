@@ -269,7 +269,6 @@ function getMarketStatus() {
 export default function ChatTab({ session, profile, group, isAdmin, isModerator, setUnreadChat, allGroups, publicGroups, customGroups, enterGroup, onCreateGroup, onJoinGroup }) {
   const { activeGroup } = useGroup();
   const [watchlist, setWatchlist] = useState([]);
-  const [privateExpanded, setPrivateExpanded] = useState(false);
   const [memberCounts, setMemberCounts] = useState({});
 
   // viewMode: 'chat' (slim header + messages + input) vs 'list' (group selector).
@@ -538,49 +537,43 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
             </div>
           )}
 
-          {/* Private Chats divider */}
-          <div onClick={() => setPrivateExpanded(e => !e)} style={selectorStyles.divider}>
+          {/* Private Chats label — always expanded. No dropdown toggle:
+               keeping private groups visible inline reduces taps and
+               cognitive load (core thesis: low-friction > affordances). */}
+          <div style={selectorStyles.divider}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
             </svg>
             <span style={selectorStyles.dividerText}>
               Private Chats{privateGroups.length > 0 ? ` (${privateGroups.length})` : ''}
             </span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2.5"
-              style={{ transform: privateExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
           </div>
 
-          {/* Private group rows + New Group button */}
-          {privateExpanded && (
-            <>
-              {privateGroups.map(g => {
-                const color = g.color || '#7B68EE';
-                return (
-                  <div
-                    key={g.id}
-                    onClick={() => openGroup(g)}
-                    style={{ ...selectorStyles.row, background: group?.id === g.id ? `${color}15` : 'transparent' }}
-                  >
-                    <div style={{ ...selectorStyles.iconWrap, background: `${color}20` }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                      </svg>
-                    </div>
-                    <div style={selectorStyles.rowText}>
-                      <div style={selectorStyles.rowName}>{g.name}</div>
-                      {memberCounts[g.id] > 0 && <div style={selectorStyles.rowSub}>{memberCounts[g.id]} members</div>}
-                    </div>
-                    {group?.id === g.id && <div style={{ ...selectorStyles.activeDot, background: color }} />}
-                  </div>
-                );
-              })}
-              <div style={{ padding: '8px 12px' }}>
-                <button onClick={onCreateGroup} style={selectorStyles.newGroupBtn}>+ New Group</button>
+          {/* Private group rows + New Group button — always shown */}
+          {privateGroups.map(g => {
+            const color = g.color || '#7B68EE';
+            return (
+              <div
+                key={g.id}
+                onClick={() => openGroup(g)}
+                style={{ ...selectorStyles.row, background: group?.id === g.id ? `${color}15` : 'transparent' }}
+              >
+                <div style={{ ...selectorStyles.iconWrap, background: `${color}20` }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                </div>
+                <div style={selectorStyles.rowText}>
+                  <div style={selectorStyles.rowName}>{g.name}</div>
+                  {memberCounts[g.id] > 0 && <div style={selectorStyles.rowSub}>{memberCounts[g.id]} members</div>}
+                </div>
+                {group?.id === g.id && <div style={{ ...selectorStyles.activeDot, background: color }} />}
               </div>
-            </>
-          )}
+            );
+          })}
+          <div style={{ padding: '8px 12px' }}>
+            <button onClick={onCreateGroup} style={selectorStyles.newGroupBtn}>+ New Group</button>
+          </div>
         </div>
       )}
 
@@ -863,7 +856,6 @@ const selectorStyles = {
     background: 'var(--bg2, rgba(0,0,0,0.04))',
     padding: '7px 12px',
     display: 'flex', alignItems: 'center', gap: 6,
-    cursor: 'pointer',
     borderTop: '1px solid var(--border)',
   },
   dividerText: { fontSize: 13, fontWeight: 600, color: 'var(--text3)', flex: 1 },
