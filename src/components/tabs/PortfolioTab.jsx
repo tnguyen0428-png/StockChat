@@ -68,40 +68,33 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
   //   2. When a new message arrives, it pulls into view — unless the user
   //      has scrolled up to read history, in which case we leave them.
   //
-  // The "is the user near the bottom?" flag is kept in a ref and updated
-  // on the scroll event (BEFORE any new-message re-render), so the
-  // length-change effect has accurate prior state to read.
-  const smackNearBottomRef = useRef(true);
+  // We intentionally DO NOT attach a scroll listener to smackMsgs.
+  // Reading scrollHeight/clientHeight on every scroll event on mobile can
+  // cause layout recalc jank and make the outer page feel shaky. Instead,
+  // we snapshot the PRIOR scrollHeight in a ref and compare it to the
+  // current scrollTop+clientHeight the next time a message arrives — that
+  // tells us whether the user was at the bottom BEFORE the new message
+  // extended the content, with zero per-frame work during scrolling.
+  const prevSmackScrollHeightRef = useRef(0);
+  // Tab activation: always snap to bottom on entry (fresh look at latest).
+  useEffect(() => {
+    if (activeTab !== 'challenge') return;
+    requestAnimationFrame(() => {
+      const el = smackMsgsRef.current;
+      if (!el) return;
+      el.scrollTop = el.scrollHeight;
+      prevSmackScrollHeightRef.current = el.scrollHeight;
+    });
+  }, [activeTab]);
+  // New messages (including initial load): pull down only if the user
+  // was at/near the bottom BEFORE the new content landed.
   useEffect(() => {
     const el = smackMsgsRef.current;
     if (!el) return;
-    const onScroll = () => {
-      smackNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-    };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
-  }, []);
-  // Tab activation: always snap to bottom on entry (fresh look at latest).
-  // Deps are [activeTab] ONLY — we intentionally DO NOT re-run on message
-  // arrivals, because that would override the nearBottom check below and
-  // yank users out of scrollback whenever new smack came in.
-  useEffect(() => {
-    if (activeTab !== 'challenge') return;
-    const snap = () => {
-      if (smackMsgsRef.current) {
-        smackMsgsRef.current.scrollTop = smackMsgsRef.current.scrollHeight;
-        smackNearBottomRef.current = true;
-      }
-    };
-    requestAnimationFrame(snap);
-    const t = setTimeout(snap, 120);
-    return () => clearTimeout(t);
-  }, [activeTab]);
-  // New message arrives (and initial message load): pull down only if the
-  // user was at/near the bottom when the message landed. smackNearBottomRef
-  // starts true, so the very first load will scroll.
-  useEffect(() => {
-    if (!smackNearBottomRef.current) return;
+    const prevHeight = prevSmackScrollHeightRef.current;
+    const wasNearBottom = prevHeight === 0 || (prevHeight - el.scrollTop - el.clientHeight) < 40;
+    prevSmackScrollHeightRef.current = el.scrollHeight;
+    if (!wasNearBottom) return;
     requestAnimationFrame(() => {
       if (smackMsgsRef.current) smackMsgsRef.current.scrollTop = smackMsgsRef.current.scrollHeight;
     });
@@ -150,10 +143,12 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
     const pin = () => {
       if (scrollRef.current) scrollRef.current.scrollTop = saved;
     };
-    // Force the inner smackMsgs list to pull down on the realtime round-trip
-    // so the user always sees their own message land, even if they had
-    // scrolled up earlier in the session.
-    smackNearBottomRef.current = true;
+    // Force the inner smackMsgs list to treat the user as "at the bottom"
+    // so the realtime round-trip of their own message pulls into view,
+    // even if they had scrolled up earlier in the session. We do this by
+    // zeroing prevSmackScrollHeightRef: the length-change effect treats 0
+    // as the "first load / always scroll" signal.
+    prevSmackScrollHeightRef.current = 0;
     sendTrashTalk();
     requestAnimationFrame(pin);
     setTimeout(pin, 120);
