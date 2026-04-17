@@ -243,10 +243,13 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   // ═══════════════════════════════════════
   const loadRecentActivity = async () => {
     try {
+      // paper_trades uses bought_at (indexed) for trade timestamps; created_at
+      // is not a column on the deployed table (the migration adds it but prod
+      // was created earlier). Ordering and display both key off bought_at.
       const { data, error } = await supabase
         .from('paper_trades')
-        .select('ticker, status, created_at, profiles(username)')
-        .order('created_at', { ascending: false })
+        .select('ticker, status, bought_at, profiles(username)')
+        .order('bought_at', { ascending: false })
         .limit(5);
       if (error) console.error('[HomeTab] recent activity error:', error.message);
       if (data) setRecentActivity(data);
@@ -901,7 +904,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                       <span style={{ fontWeight: 700, color: isBuy ? '#1AAD5E' : '#ff6b6b' }}>{trade.ticker}</span>
                     </div>
                     <div style={{ fontSize: 10, color: t.text3, flexShrink: 0 }}>
-                      {formatActivityTime(trade.created_at)}
+                      {formatActivityTime(trade.bought_at)}
                     </div>
                   </div>
                 );
