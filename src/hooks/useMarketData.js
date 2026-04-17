@@ -96,7 +96,12 @@ export function useMarketData() {
           setFuturesLabels(labels);
           return;
         }
-      } catch {}
+      } catch (e) {
+        // One Yahoo CORS proxy path failed — silent fallthrough to the
+        // next proxy / ETF fallback is by design, but log in DEV so we
+        // notice when every path is dying at once.
+        if (import.meta.env.DEV) console.warn('[useMarketData] Yahoo CORS proxy failed:', e?.message || e);
+      }
     }
 
     // ── All Yahoo methods failed — ETF fallback ──
@@ -220,11 +225,14 @@ export function useMarketData() {
                   const prev = t.prevDay?.c || t.day?.o || price;
                   pulse[t.ticker] = { price, change: prev ? ((price - prev) / prev) * 100 : 0, label: '' };
                 });
-              } catch {}
+              } catch (e) {
+                if (import.meta.env.DEV) console.warn('[useMarketData] Polygon batch snapshot failed:', e?.message || e);
+              }
             }
           }
           polygonWorked = Object.keys(pulse).length > 0;
-        } catch {
+        } catch (e) {
+          if (import.meta.env.DEV) console.warn('[useMarketData] Polygon snapshot outer failed:', e?.message || e);
           polygonWorked = false;
         }
       }

@@ -71,7 +71,13 @@ async function fetchWithRetry(url, retries = 2) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (e) {
-      if (i === retries) return null;
+      if (i === retries) {
+        // All retries exhausted — log in DEV so we notice when the
+        // screener is returning null because a URL is broken vs
+        // genuinely returning no matches.
+        if (import.meta.env.DEV) console.warn('[screener] fetch failed after retries:', url, e?.message || e);
+        return null;
+      }
       await new Promise(r => setTimeout(r, 500));
     }
   }

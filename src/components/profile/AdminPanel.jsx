@@ -68,28 +68,32 @@ export default function AdminPanel({ session, profile }) {
 
   const isAnyScanRunning = scanning52w || scanningVol || scanningGap || scanningMA || scanningAll || scanningFlow;
 
+  // Catches in these scan handlers push the error message to the UI status
+  // card — good for the admin, useless for the developer. Pair with a
+  // console.error so when the admin reports "scanner's broken" we have a
+  // stack trace instead of just a string.
   const handle52wScan = async () => {
     setScanning52w(true); setScan52wProgress(0); setScan52wStatus(null);
     try { const { inserted } = await run52wHighScan(DEFAULT_THRESHOLD, setScan52wProgress); setScan52wStatus({ inserted }); }
-    catch (e) { setScan52wStatus({ error: e.message }); }
+    catch (e) { console.error('[admin] 52w scan failed:', e); setScan52wStatus({ error: e.message }); }
     finally { setScanning52w(false); }
   };
   const handleVolScan = async () => {
     setScanningVol(true); setScanVolProgress(0); setScanVolStatus(null);
     try { const { inserted } = await runVolSurgeScan(DEFAULT_VOL_MULTIPLIER, setScanVolProgress); setScanVolStatus({ inserted }); }
-    catch (e) { setScanVolStatus({ error: e.message }); }
+    catch (e) { console.error('[admin] vol scan failed:', e); setScanVolStatus({ error: e.message }); }
     finally { setScanningVol(false); }
   };
   const handleGapScan = async () => {
     setScanningGap(true); setScanGapProgress(0); setScanGapStatus(null);
     try { const { inserted } = await runGapUpScan(DEFAULT_GAP_THRESHOLD, setScanGapProgress); setScanGapStatus({ inserted }); }
-    catch (e) { setScanGapStatus({ error: e.message }); }
+    catch (e) { console.error('[admin] gap scan failed:', e); setScanGapStatus({ error: e.message }); }
     finally { setScanningGap(false); }
   };
   const handleMAScan = async () => {
     setScanningMA(true); setScanMAProgress(0); setScanMAStatus(null);
     try { const { inserted } = await runMACrossScan(DEFAULT_SHORT_MA, DEFAULT_LONG_MA, setScanMAProgress); setScanMAStatus({ inserted }); }
-    catch (e) { setScanMAStatus({ error: e.message }); }
+    catch (e) { console.error('[admin] MA scan failed:', e); setScanMAStatus({ error: e.message }); }
     finally { setScanningMA(false); }
   };
   const handleFlowScan = async () => {
@@ -101,6 +105,7 @@ export default function AdminPanel({ session, profile }) {
       // Re-flag featured after flow data comes in
       await flagFeaturedAlerts();
     } catch (e) {
+      console.error('[admin] flow scan failed:', e);
       setScanFlowStatus({ error: e.message || 'Flow scan failed' });
     } finally {
       setScanningFlow(false);
@@ -184,25 +189,25 @@ export default function AdminPanel({ session, profile }) {
       setScanAllProgress('⚡ 52W High…');
       setScanning52w(true);
       try { const { inserted } = await run52wHighScan(DEFAULT_THRESHOLD, setScan52wProgress); setScan52wStatus({ inserted }); }
-      catch (e) { setScan52wStatus({ error: e.message }); }
+      catch (e) { console.error('[admin] scanAll 52w failed:', e); setScan52wStatus({ error: e.message }); }
       finally { setScanning52w(false); }
 
       setScanAllProgress('🔥 Vol Surge…');
       setScanningVol(true);
       try { const { inserted } = await runVolSurgeScan(DEFAULT_VOL_MULTIPLIER, setScanVolProgress); setScanVolStatus({ inserted }); }
-      catch (e) { setScanVolStatus({ error: e.message }); }
+      catch (e) { console.error('[admin] scanAll vol failed:', e); setScanVolStatus({ error: e.message }); }
       finally { setScanningVol(false); }
 
       setScanAllProgress('📈 Gap Up…');
       setScanningGap(true);
       try { const { inserted } = await runGapUpScan(DEFAULT_GAP_THRESHOLD, setScanGapProgress); setScanGapStatus({ inserted }); }
-      catch (e) { setScanGapStatus({ error: e.message }); }
+      catch (e) { console.error('[admin] scanAll gap failed:', e); setScanGapStatus({ error: e.message }); }
       finally { setScanningGap(false); }
 
       setScanAllProgress('🔀 MA Cross…');
       setScanningMA(true);
       try { const { inserted } = await runMACrossScan(DEFAULT_SHORT_MA, DEFAULT_LONG_MA, setScanMAProgress); setScanMAStatus({ inserted }); }
-      catch (e) { setScanMAStatus({ error: e.message }); }
+      catch (e) { console.error('[admin] scanAll MA failed:', e); setScanMAStatus({ error: e.message }); }
       finally { setScanningMA(false); }
 
       // After all scans, flag top 4 as featured for History
@@ -226,6 +231,7 @@ export default function AdminPanel({ session, profile }) {
       setConfluenceResults(results);
       setConfluenceStatus({ inserted, count: results.length });
     } catch (e) {
+      console.error('[admin] confluence scan failed:', e);
       setConfluenceStatus({ error: e.message });
     } finally {
       setScanningAll(false);

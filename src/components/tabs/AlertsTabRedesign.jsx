@@ -359,6 +359,14 @@ export default function AlertsTab({ session, group, darkMode, isAdmin = false })
         .order('alert_time', { ascending: false }).limit(1000),
       supabase.from('market_data').select('*'),
     ]);
+    // Log any failed branch in DEV so we notice when the stats card is
+    // stale or blank because one specific query errored — the UI just
+    // shows empty rows otherwise with no trail back to the cause.
+    if (import.meta.env.DEV) {
+      if (alertsRes.error) console.warn('[AlertsTab] loadData breakout_alerts failed:', alertsRes.error?.message || alertsRes.error);
+      if (perfRes.error)   console.warn('[AlertsTab] loadData alert_performance failed:', perfRes.error?.message || perfRes.error);
+      if (marketRes.error) console.warn('[AlertsTab] loadData market_data failed:', marketRes.error?.message || marketRes.error);
+    }
     if (alertsRes.data) setLiveAlerts(alertsRes.data);
     if (perfRes.data) setPerfHistory(perfRes.data);
     if (marketRes.data) {

@@ -48,7 +48,13 @@ export async function fetchStockContext(tickers) {
       const lastEarnings = earningsData?.find(e => e.epsActual !== null);
       if (!p) return null;
       return `${ticker}: price $${p.price}, sector ${p.sector}, mktcap $${(p.marketCap / 1e9).toFixed(1)}B, next earnings ${nextEarnings?.date || 'unknown'}, last EPS actual ${lastEarnings?.epsActual ?? 'N/A'} vs est ${lastEarnings?.epsEstimated ?? 'N/A'}`;
-    } catch { return null; }
+    } catch (e) {
+      // Null drops this ticker from the context string — by design. Log
+      // so we notice when stock context is missing because FMP broke
+      // (vs the ticker legitimately having no data).
+      if (import.meta.env.DEV) console.warn(`[aiAgent] fetchStockContext failed for ${ticker}:`, e?.message || e);
+      return null;
+    }
   }));
   const valid = stockData.filter(Boolean);
   return valid.length > 0 ? `\n\nREAL-TIME STOCK DATA:\n${valid.join('\n')}` : '';

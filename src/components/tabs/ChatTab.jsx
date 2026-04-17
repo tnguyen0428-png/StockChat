@@ -515,7 +515,13 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
             message_id: data.id,
             user_id: session.user.id,
           }));
-          supabase.from('ticker_mentions').insert(rows).then(() => {});
+          // Fire-and-forget: we don't want the send UI to wait on this,
+          // but we do want to know when it fails — otherwise trending
+          // tickers silently stops tracking for this message and we
+          // have no trail back to the cause.
+          supabase.from('ticker_mentions').insert(rows).then(({ error: tmErr }) => {
+            if (tmErr && import.meta.env.DEV) console.warn('[chat] ticker_mentions insert failed:', tmErr?.message || tmErr);
+          });
         }
       }
 

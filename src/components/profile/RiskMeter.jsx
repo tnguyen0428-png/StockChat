@@ -44,7 +44,12 @@ export default function RiskMeter({ session }) {
           else setRisk({ level: 'Low', bars: 2, color: '#2a7d4b', note: 'Well diversified' });
         }
         setLoading(false);
-      } catch { setLoading(false); }
+      } catch (e) {
+        // Meter renders undefined risk on failure — log so we can tell
+        // "user has no positions" from "sector fetch crashed".
+        if (import.meta.env.DEV) console.warn('[RiskMeter] sector fetch failed:', e?.message || e);
+        setLoading(false);
+      }
     })();
     return () => { cancelled = true; };
   }, [session?.user?.id]);

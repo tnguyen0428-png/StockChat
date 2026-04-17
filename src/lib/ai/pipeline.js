@@ -171,9 +171,13 @@ export async function runPipeline(userMessage, conversationHistory, supabase, us
   response = checkForHallucination(response, context, routing.agent);
   if (cardBlock) response = `${cardBlock}\n${response}`.trim();
 
-  // Cache it, update memory (non-blocking)
+  // Cache it, update memory (non-blocking). We don't want memory write
+  // failures to block the reply, but silent swallow means stale context
+  // on the next turn with no trace — log in DEV so regressions surface.
   setCache(userMessage, response);
-  updateMemory(supabase, userId, userMessage, routing, memory).catch(() => {});
+  updateMemory(supabase, userId, userMessage, routing, memory).catch(e => {
+    if (import.meta.env.DEV) console.warn('[ai/pipeline] updateMemory failed:', e?.message || e);
+  });
 
   const hallucinationBlocked = response !== stripMarkdown(rawResponse);
   const ms = Date.now() - start;
@@ -189,7 +193,9 @@ export async function runPipeline(userMessage, conversationHistory, supabase, us
     hallucinationBlocked,
     processingMs: ms,
     userLevel: memory.level,
-  }).catch(() => {});
+  }).catch(e => {
+    if (import.meta.env.DEV) console.warn('[ai/pipeline] logResponse failed:', e?.message || e);
+  });
 
   const result = {
     reply: response,

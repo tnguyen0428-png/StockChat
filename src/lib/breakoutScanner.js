@@ -129,7 +129,10 @@ async function fetchPolygonAggs(symbol, days) {
       };
     }
     return null;
-  } catch {
+  } catch (e) {
+    // Returning null is the documented contract (caller falls back to FMP),
+    // but log in DEV so we notice when Polygon is the cause of empty scans.
+    if (import.meta.env.DEV) console.warn(`[scanner] Polygon aggs failed for ${symbol}:`, e?.message || e);
     return null;
   }
 }
@@ -155,7 +158,8 @@ async function fetchFMPQuote(symbol) {
       changesPercentage: q.changesPercentage ?? null,
       sector:            q.sector ?? null,
     };
-  } catch {
+  } catch (e) {
+    if (import.meta.env.DEV) console.warn(`[scanner] FMP quote failed for ${symbol}:`, e?.message || e);
     return null;
   }
 }
@@ -174,7 +178,8 @@ async function fetchFMPDailyCloses(symbol, days) {
     // FMP returns newest-first; reverse so index 0 = oldest
     const closes = (data?.historical ?? []).map(d => d.close).reverse();
     return closes.length >= days ? closes : null;
-  } catch {
+  } catch (e) {
+    if (import.meta.env.DEV) console.warn(`[scanner] FMP daily closes failed for ${symbol}:`, e?.message || e);
     return null;
   }
 }
