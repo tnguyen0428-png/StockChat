@@ -11,6 +11,7 @@ import { useTheme } from './alertsCasinoComponents';
 import { safeGet, safeSet } from '../../lib/safeStorage';
 import { getHomeStyles } from './homeStyles';
 import BriefCard from '../home/BriefCard';
+import InstallPrompt from '../home/InstallPrompt';
 
 // ── Hooks ──
 import { useMarketData } from '../../hooks/useMarketData';
@@ -912,6 +913,11 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
             </div>
           </div>
         )}
+
+        {/* ═══ INSTALL PROMPT (iOS Safari only, visit 2+, one-time) ═══
+             Silent on every other platform/state, so it's a no-op cost for
+             most users. When it fires it's a tiny inline card, not a modal. */}
+        <InstallPrompt t={t} />
 
       </div>
     </div>
