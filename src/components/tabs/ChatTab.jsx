@@ -684,6 +684,14 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
         </div>
       ) : (
         <div ref={messagesAreaRef} style={styles.messagesArea}>
+          {/* marginTop:auto on the inner wrapper implements the classic
+               iMessage/WhatsApp pattern: when the message list is short,
+               the wrapper gets pushed to the bottom of the flex container
+               so the newest message sits just above the input bar — no
+               big blank space. When the list overflows, marginTop:auto
+               resolves to 0 and scrolling works normally. Pinning here
+               (not with justify-content) preserves native scroll. */}
+          <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column' }}>
           {messages.length === 0 && (
             <div style={styles.emptyState}>
               <div style={styles.emptyText}>Be the first to start the conversation! Try mentioning a stock like $AAPL or ask @AI a question.</div>
@@ -719,6 +727,7 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
             </div>
           )}
           <div ref={messagesEndRef} />
+          </div>
         </div>
       ))}
 
@@ -831,6 +840,11 @@ const styles = {
     flex: 1, overflowY: 'auto',
     padding: '8px 14px',
     WebkitOverflowScrolling: 'touch',
+    // display:flex + flexDirection:column enables the marginTop:auto
+    // bottom-pin trick on the inner content wrapper, so short message
+    // lists sit just above the input bar instead of floating at the top.
+    display: 'flex',
+    flexDirection: 'column',
   },
   feedbackRow: {
     display: 'flex', alignItems: 'center', gap: 6,
