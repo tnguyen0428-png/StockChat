@@ -237,14 +237,20 @@ export default function DashboardPage({ session }) {
   return (
     <div ref={pageRef} style={{ ...styles.page, ...vpStyle }}>
 
-      <Header
-        profile={profile}
-        onSignOut={handleSignOut}
-        onHomePress={() => setActiveTab('home')}
-        onProfilePress={() => setActiveTab('profile')}
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-      />
+      {/* Hide the navy Uptik app bar on Chat tab — messaging apps don't show
+           app chrome above the conversation. Reclaims ~80px for messages.
+           Home/Alerts/Challenge/Profile still get the Header. The slim chat
+           header inside ChatTab handles the top safe-area on iPhones. */}
+      {activeTab !== 'chat' && (
+        <Header
+          profile={profile}
+          onSignOut={handleSignOut}
+          onHomePress={() => setActiveTab('home')}
+          onProfilePress={() => setActiveTab('profile')}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+        />
+      )}
 
       {/* Broadcast Banner */}
       {activeBroadcast && (() => {

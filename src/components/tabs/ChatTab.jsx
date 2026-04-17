@@ -710,7 +710,13 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
 
 // ── Styles ──
 const styles = {
-  wrap: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  // paddingTop: env(safe-area-inset-top) protects the topmost element (slim
+  // chat header OR list selector) from the iPhone notch now that the navy
+  // Uptik Header is hidden on this tab. Falls back to 0 on Android/desktop.
+  wrap: {
+    flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+    paddingTop: 'env(safe-area-inset-top, 0px)',
+  },
   // Slim 46px chat header — back chevron + group name + member/status line.
   // Reclaims ~110px vs the old selector-card-on-top layout so more messages
   // fit above the keyboard on small screens.
