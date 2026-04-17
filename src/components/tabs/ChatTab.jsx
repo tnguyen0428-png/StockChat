@@ -3,7 +3,7 @@
 // Group view: Chat only
 // ============================================
 
-import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
 import { askUpTikAI } from '../../lib/aiAgent';
@@ -389,24 +389,68 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   // Tabs use display:none (not unmount), so the component instance survives
   // tab switches; this effect re-runs on every activation transition.
   //
-  // Multi-pass snap because a single rAF is not reliable here:
-  //   - rAF: display:none→flex layout settle
-  //   - 150ms: async child content (ticker mention cards load async)
-  //   - 400ms: iOS keyboard animation when input auto-focuses
-  //   - 800ms: slow-network ticker cards on 3G
-  // Each pass is cheap (one scrollTop write) and idempotent, so the
-  // redundancy is worth it for reliability.
+  // Three-layer approach to handle every timing edge case:
+  //   1. useLayoutEffect does a SYNCHRONOUS scroll right after React
+  //      commits the display:none→display:flex change but before the
+  //      browser paints. Reading scrollHeight forces layout so the
+  //      value we write to scrollTop is based on the real post-commit
+  //      dimensions, not a stale display:none layout.
+  //   2. A ResizeObserver watches the messages area for ANY size change
+  //      during the first 1500ms after activation — this catches
+  //      ticker mention cards that fetch prices async, AI placeholders,
+  //      fade-outs, and any other layout shift from child renders.
+  //      Fixed-delay timeouts can't cover every async render path;
+  //      the observer reacts to actual DOM size changes instead.
+  //   3. A handful of setTimeout passes at 50/150/300/600/1000/1400ms
+  //      cover the non-resize paths (iOS keyboard accessory bar
+  //      animation, focus ring paint) where scrollHeight stays the same
+  //      but clientHeight shifts.
+  // The 1500ms cutoff is intentional — leaving the observer on forever
+  // would yank the user back down whenever a new ticker card loaded,
+  // even if they intentionally scrolled up to read history.
+  useLayoutEffect(() => {
+    if (activeTab !== 'chat' || viewMode !== 'chat' || loading) return;
+    const el = messagesAreaRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [activeTab, viewMode, loading, group?.id]);
+
   useEffect(() => {
     if (activeTab !== 'chat' || viewMode !== 'chat' || loading) return;
+    const area = messagesAreaRef.current;
+    if (!area) return;
+    let active = true;
     const snap = () => {
+      if (!active) return;
       const el = messagesAreaRef.current;
       if (el) el.scrollTop = el.scrollHeight;
     };
-    requestAnimationFrame(snap);
-    const t1 = setTimeout(snap, 150);
-    const t2 = setTimeout(snap, 400);
-    const t3 = setTimeout(snap, 800);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    // One more rAF + nested rAF to catch post-paint layout
+    const r1 = requestAnimationFrame(() => {
+      snap();
+      requestAnimationFrame(snap);
+    });
+    // Dense-then-spaced timeout passes — covers iOS keyboard animation,
+    // focus ring paint, and the first few async renders.
+    const timeouts = [50, 150, 300, 600, 1000, 1400].map(ms => setTimeout(snap, ms));
+    // ResizeObserver catches every container-size change (ticker cards
+    // loading, AI placeholder expanding, image decode) within the window.
+    let ro = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(snap);
+      ro.observe(area);
+    }
+    const tEnd = setTimeout(() => {
+      active = false;
+      if (ro) { ro.disconnect(); ro = null; }
+    }, 1500);
+    return () => {
+      active = false;
+      cancelAnimationFrame(r1);
+      timeouts.forEach(clearTimeout);
+      clearTimeout(tEnd);
+      if (ro) ro.disconnect();
+    };
   }, [activeTab, viewMode, loading, group?.id]);
 
   // Hard-pin scroll to bottom on any new message or AI loading state.
