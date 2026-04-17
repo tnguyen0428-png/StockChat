@@ -72,17 +72,47 @@ const IGNORE_TICKERS = new Set(['AI', 'AM', 'PM', 'OK', 'US', 'CEO', 'IPO', 'ETF
 // These are real tickers that overlap with common words — allow when stock context is present
 const CONTEXT_TICKERS = new Set(['BE', 'IT', 'AI', 'ON', 'GO']);
 
-// Detect if message has stock-related context around a word
-// NOTE: the `word` param is currently ignored — this only checks message-level
-// signals. Callers pass a candidate ticker (e.g. "BE") expecting word-local
-// context. Flagged as a routing logic bug — leaving the signature for now and
-// underscoring the unused param to silence lint.
-function hasStockContext(message, _word) {
-  const lower = message.toLowerCase();
-  const stockSignals = ['stock', 'ticker', 'share', 'price', 'earnings', 'buy', 'sell', 'trade',
-    'analyze', 'analysis', 'tell me about', 'what about', 'how is', "how's", 'look at',
-    'check', 'guidance', 'outlook', 'forecast', 'revenue', 'eps', 'valuation'];
-  return stockSignals.some(s => lower.includes(s));
+// Detect if a candidate word appears in stock-related context.
+// Only called for CONTEXT_TICKERS (BE, IT, AI, ON, GO) — tokens that overlap
+// with common English words and therefore need local evidence that the user
+// actually means the ticker, not the word.
+//
+// Two signals count as evidence:
+//   (a) an explicit "$BE"-style ticker marker anywhere in the message, or
+//   (b) a stock-context word within ±50 chars (~8 words) of the candidate.
+//
+// The message-level check this replaced ("any stock word anywhere") produced
+// both false positives ("let's trade Pokemon cards or BE friends" → BE) and
+// false negatives that we don't care about here (the gate defaults to "not
+// a ticker" for CONTEXT_TICKERS, which is the safe fallback).
+const STOCK_CONTEXT_SIGNALS = [
+  'stock', 'ticker', 'share', 'price', 'earnings', 'buy', 'sell', 'trade',
+  'analyze', 'analysis', 'tell me about', 'what about', 'how is', "how's",
+  'look at', 'check', 'guidance', 'outlook', 'forecast', 'revenue', 'eps',
+  'valuation', 'chart', 'calls', 'puts', 'options', 'dividend',
+];
+const STOCK_CONTEXT_WINDOW = 50;
+
+function hasStockContext(message, word) {
+  if (!message || !word) return false;
+  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // (a) "$BE" form is an unambiguous ticker marker — route through even if
+  // the proximity window would otherwise miss.
+  if (new RegExp(`\\$${escaped}\\b`, 'i').test(message)) return true;
+
+  // (b) Proximity scan: any occurrence of the candidate word near a stock
+  // signal counts.
+  const wordRe = new RegExp(`\\b${escaped}\\b`, 'gi');
+  let m;
+  while ((m = wordRe.exec(message)) !== null) {
+    const start = Math.max(0, m.index - STOCK_CONTEXT_WINDOW);
+    const end = Math.min(message.length, m.index + m[0].length + STOCK_CONTEXT_WINDOW);
+    const around = message.slice(start, end).toLowerCase();
+    if (STOCK_CONTEXT_SIGNALS.some(s => around.includes(s))) return true;
+  }
+
+  return false;
 }
 
 // Detect if user is asking about guidance/outlook (needs transcript)
