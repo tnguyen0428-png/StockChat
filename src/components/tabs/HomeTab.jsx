@@ -23,11 +23,11 @@ import { useGroup } from '../../context/GroupContext';
 
 const SIGNAL_LABELS = {
   gap_up: 'Gap Up',
+  '52w_high': '52W High',
   vol_surge: 'Vol Surge',
   ma_cross: 'MA Cross',
-  high_52w: '52W High',
   flow_signal: 'Flow',
-  confluence: 'Confluence',
+  confluence: 'Top Pick',
 };
 
 const QUICK_ADD = ['NVDA', 'AAPL', 'TSLA', 'AMD', 'SPY', 'META'];
@@ -547,7 +547,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
               {hotMovers.map((mover, i) => {
                 const isPopular = mover.signal_type === 'popular';
-                const chg = isPopular ? null : Number(mover.change_pct ?? 0);
+                const chg = (!isPopular && mover.change_pct != null) ? Number(mover.change_pct) : null;
                 const priceData = researchPrices[mover.ticker];
                 const isConfluence = mover.signal_type === 'confluence';
                 const tierColors = { S: '#d4af37', A: '#22c55e', B: '#3b82f6', C: '#888' };
@@ -567,7 +567,11 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                       )}
                     </div>
                     <div style={{ fontSize: 11, color: t.text3, marginBottom: 3 }}>
-                      {isPopular ? `${mover._watchCount || 0} watching` : `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`}
+                      {isPopular
+                        ? `${mover._watchCount || 0} watching`
+                        : chg != null
+                          ? `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`
+                          : (SIGNAL_LABELS[mover.signal_type] || mover.signal_type || '—')}
                     </div>
                     {priceData && (
                       <div style={{ fontSize: 10, color: t.text2 }}>
