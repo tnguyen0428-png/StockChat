@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { polyFetch } from '../../lib/polygonClient';
+import { FMP_KEY } from '../../lib/constants';
 import { runScreener, SECTOR_MAP } from '../../lib/screener';
 import { run52wHighScan, DEFAULT_THRESHOLD, runVolSurgeScan, DEFAULT_VOL_MULTIPLIER, runGapUpScan, DEFAULT_GAP_THRESHOLD, runMACrossScan, DEFAULT_SHORT_MA, DEFAULT_LONG_MA, runConfluenceScan } from '../../lib/breakoutScanner';
 import { runFlowScan } from '../../lib/institutionalFlow';
@@ -362,7 +362,22 @@ export default function AdminPanel({ session, profile }) {
     setNewsLoading(true);
     setSelectedNews([]);
     try {
-      const data = await polyFetch(`/v2/reference/news?limit=40`);
+      if (!FMP_KEY) throw new Error('FMP API key missing');
+      const res = await fetch(`https://financialmodelingprep.com/stable/news/stock-latest?page=0&limit=40&apikey=${FMP_KEY}`);
+      if (!res.ok) throw new Error(`FMP news fetch failed: ${res.status}`);
+      const raw = await res.json();
+      // Map FMP shape → existing UI/briefing shape
+      // FMP: { symbol, publishedDate, publisher, title, image, site, text, url }
+      // UI expects: { id, title, description, tickers[], article_url, publisher:{name}, published_utc }
+      const mapped = (Array.isArray(raw) ? raw : []).map(item => ({
+        id: item.url || `${item.symbol}-${item.publishedDate}`,
+        title: item.title || '',
+        description: item.text || '',
+        tickers: item.symbol ? [item.symbol] : [],
+        article_url: item.url,
+        publisher: { name: item.publisher || item.site || '' },
+        published_utc: item.publishedDate ? new Date(item.publishedDate.replace(' ', 'T') + 'Z').toISOString() : null,
+      }));
       const FILTER_OUT = [
         'class action', 'securities fraud', 'securities litigation', 'law firm',
         'lawsuit investigation', 'reminds investors', 'reminds shareholders',
@@ -377,7 +392,7 @@ export default function AdminPanel({ session, profile }) {
         'top picks for', 'best investments for', 'stocks you should buy',
         'hot stocks for', 'must-buy stocks',
       ];
-      const filtered = (data.results || []).filter(item => {
+      const filtered = mapped.filter(item => {
         const text = `${item.title} ${item.description || ''}`.toLowerCase();
         return !FILTER_OUT.some(keyword => text.includes(keyword));
       });
