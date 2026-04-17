@@ -404,19 +404,34 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
   }, [group?.id, activeGroup?.name, profile?.username, watchlist, aiLastTicker, session?.user?.id]);
 
   const handleSend = useCallback(async () => {
+    // Dismiss mobile keyboard FIRST — synchronously, inside the user gesture.
+    // iOS/Android will only reliably close the on-screen keyboard if blur()
+    // fires before any awaits or state-triggered re-renders.
+    inputRef.current?.blur();
     if (sendingRef.current) return;
     const text = aiMode ? `@AI ${inputText.trim()}` : inputText.trim();
     if (!inputText.trim() || !profile || !group) return;
     sendingRef.current = true;
     try {
       setInputText('');
-      inputRef.current?.blur();
       const { data, error } = await supabase.from('chat_messages').insert({
         group_id: group.id, user_id: session.user.id,
         username: profile.username, user_color: profile.color,
         text, type: 'user', is_admin: isAdmin,
       }).select().single();
-      if (data) setMessages(prev => [...prev, data]);
+      if (data) {
+        setMessages(prev => [...prev, data]);
+        // User just pressed send. Pin to bottom NOW (keyboard still up) and
+        // again after the keyboard-dismiss animation completes (~300ms) so
+        // the viewport resize doesn't leave their message hidden above the
+        // new bottom edge.
+        const pinBottom = () => {
+          const el = messagesAreaRef.current;
+          if (el) el.scrollTop = el.scrollHeight;
+        };
+        requestAnimationFrame(pinBottom);
+        setTimeout(pinBottom, 350);
+      }
 
       // Track $TICKER mentions for Trending (fire-and-forget)
       if (data) {
