@@ -366,6 +366,21 @@ export default function AdminPanel({ session, profile }) {
       const res = await fetch(`https://financialmodelingprep.com/stable/news/stock-latest?page=0&limit=40&apikey=${FMP_KEY}`);
       if (!res.ok) throw new Error(`FMP news fetch failed: ${res.status}`);
       const raw = await res.json();
+      // FMP publishedDate is in America/New_York (ET), not UTC. Parse DST-aware.
+      const fmpETtoUTC = (s) => {
+        if (!s || typeof s !== 'string') return null;
+        const m = s.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+        if (!m) return null;
+        const y = +m[1], mo = +m[2], d = +m[3], h = +m[4], mi = +m[5], se = +m[6];
+        // Determine whether New York is in EDT (UTC-4) or EST (UTC-5) on that date
+        const probe = new Date(Date.UTC(y, mo - 1, d, 12));
+        const tzName = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/New_York',
+          timeZoneName: 'short',
+        }).formatToParts(probe).find(p => p.type === 'timeZoneName')?.value;
+        const offsetHours = tzName === 'EDT' ? 4 : 5;
+        return new Date(Date.UTC(y, mo - 1, d, h + offsetHours, mi, se)).toISOString();
+      };
       // Map FMP shape → existing UI/briefing shape
       // FMP: { symbol, publishedDate, publisher, title, image, site, text, url }
       // UI expects: { id, title, description, tickers[], article_url, publisher:{name}, published_utc }
@@ -376,7 +391,7 @@ export default function AdminPanel({ session, profile }) {
         tickers: item.symbol ? [item.symbol] : [],
         article_url: item.url,
         publisher: { name: item.publisher || item.site || '' },
-        published_utc: item.publishedDate ? new Date(item.publishedDate.replace(' ', 'T') + 'Z').toISOString() : null,
+        published_utc: fmpETtoUTC(item.publishedDate),
       }));
       const FILTER_OUT = [
         'class action', 'securities fraud', 'securities litigation', 'law firm',
