@@ -88,18 +88,40 @@ export default function DashboardPage({ session }) {
       const isKB = shrinkage > 100 || vv.offsetTop > 0;
       setKeyboardOpen(isKB);
       if (isKB) {
-        // Size the page to the visible viewport above the keyboard so
-        // our bottom-anchored input bar sits flush with the keyboard's
-        // accessory bar.
-        setVpStyle({
+        // Runtime detection for interactive-widget=resizes-content support.
+        // When it works (most modern iOS Safari + Chrome/Android), the layout
+        // viewport — window.innerHeight — shrinks to match the visual viewport
+        // above the keyboard. When it doesn't (iOS 17+ Safari Private mode),
+        // window.innerHeight stays at full screen height while only vv.height
+        // shrinks.
+        //
+        // Two different fixes for two different bugs, same root cause of
+        // "where does the visible area end":
+        //
+        //   • resizes-content WORKS  → use bottom:0. The layout viewport is
+        //     already the exact visible area, so bottom:0 fills it flush to
+        //     the keyboard's accessory bar with no body-background strip.
+        //     (Using height:vv.height here leaves a gap because vv.height
+        //     slightly under-reports vs the resized layout viewport.)
+        //
+        //   • resizes-content BROKEN → use height:vv.height. The layout
+        //     viewport is still full screen, so bottom:0 would extend the
+        //     page below the keyboard and hide the input bar. Sizing to
+        //     vv.height keeps the input bar above the keyboard.
+        const layoutMatchesVisual = Math.abs(window.innerHeight - vv.height) < 20;
+        const base = {
           position: 'fixed',
           top: `${vv.offsetTop}px`,
           left: 0,
           right: 0,
-          height: `${vv.height}px`,
           maxWidth: 480,
           margin: '0 auto',
-        });
+        };
+        setVpStyle(
+          layoutMatchesVisual
+            ? { ...base, bottom: 0 }
+            : { ...base, height: `${vv.height}px` }
+        );
       } else {
         setVpStyle({});
       }
