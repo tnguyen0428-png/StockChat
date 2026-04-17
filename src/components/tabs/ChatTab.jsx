@@ -662,6 +662,10 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
               display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, cursor: 'pointer',
               transition: 'all 0.15s',
             }}
+            // Prevent the tap from stealing focus off the input. Without this,
+            // Android/iOS blur the field on pointerdown and dismiss the soft
+            // keyboard — the exact friction we're trying to remove.
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => { setAiMode(prev => !prev); inputRef.current?.focus(); }}
           >
             <span style={{ fontSize: 10, fontWeight: 700, color: '#8B5CF6' }}>AI</span>
@@ -691,6 +695,12 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
           />
           <button
             style={{ ...styles.sendBtn, background: aiMode ? '#8B5CF6' : 'var(--green)', opacity: inputText.trim() ? 1 : 0.4 }}
+            // preventDefault on pointerdown/mousedown stops the button from
+            // taking focus away from the input when tapped. On Android this
+            // is what keeps the soft keyboard up across consecutive sends —
+            // the tap on the send button would otherwise blur the input and
+            // trigger the keyboard dismiss animation before onClick fires.
+            onMouseDown={(e) => e.preventDefault()}
             onClick={handleSend}
             disabled={!inputText.trim()}
           >
