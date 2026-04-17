@@ -26,7 +26,7 @@ scripts/query-*
 scripts/wipe-*
 
 # Mockups (design artifacts, not runtime)
-mockup-confluence-2sig-rule.html
+mockup-*.html
 
 # OS
 .DS_Store
