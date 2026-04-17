@@ -66,7 +66,6 @@ export default function JoinGroupModal({ open, onClose, onJoined }) {
           placeholder="e.g. ABC123"
           maxLength={24}
           onKeyDown={e => e.key === 'Enter' && !loading && handleJoin()}
-          // eslint-disable-next-line jsx-a11y/no-autofocus
           autoFocus
         />
 
