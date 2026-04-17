@@ -664,8 +664,11 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
             }}
             // Prevent the tap from stealing focus off the input. Without this,
             // Android/iOS blur the field on pointerdown and dismiss the soft
-            // keyboard — the exact friction we're trying to remove.
-            onMouseDown={(e) => e.preventDefault()}
+            // keyboard — the exact friction we're trying to remove. Using
+            // onPointerDown (vs onMouseDown) unifies mouse/touch/pen and is
+            // the more future-proof way to cancel the focus transfer across
+            // all input stacks; click still fires normally afterwards.
+            onPointerDown={(e) => e.preventDefault()}
             onClick={() => { setAiMode(prev => !prev); inputRef.current?.focus(); }}
           >
             <span style={{ fontSize: 10, fontWeight: 700, color: '#8B5CF6' }}>AI</span>
@@ -695,12 +698,14 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
           />
           <button
             style={{ ...styles.sendBtn, background: aiMode ? '#8B5CF6' : 'var(--green)', opacity: inputText.trim() ? 1 : 0.4 }}
-            // preventDefault on pointerdown/mousedown stops the button from
-            // taking focus away from the input when tapped. On Android this
-            // is what keeps the soft keyboard up across consecutive sends —
-            // the tap on the send button would otherwise blur the input and
-            // trigger the keyboard dismiss animation before onClick fires.
-            onMouseDown={(e) => e.preventDefault()}
+            // preventDefault on pointerdown stops the button from taking
+            // focus away from the input when tapped. This is what keeps the
+            // soft keyboard up across consecutive sends on Android/iOS —
+            // without it, the tap blurs the input and fires the keyboard
+            // dismiss animation before onClick runs. onPointerDown (vs
+            // onMouseDown) unifies mouse/touch/pen for maximum cross-device
+            // coverage; click still fires normally afterwards.
+            onPointerDown={(e) => e.preventDefault()}
             onClick={handleSend}
             disabled={!inputText.trim()}
           >
