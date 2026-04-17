@@ -4,7 +4,7 @@
 // Left: portfolio + buy | Right: game cards
 // ============================================
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useTheme } from './alertsCasinoComponents';
 import SellModal from '../portfolio/SellModal';
 
@@ -14,7 +14,7 @@ import { useLeaderboard, BADGE_DEFS, TIER_DEFS, getTier } from '../../hooks/useL
 import { useSmackTalk, REACTIONS } from '../../hooks/useSmackTalk';
 import { getPortfolioStyles } from './portfolioStyles';
 
-export default function PortfolioTab({ session, darkMode, keyboardOpen = false }) {
+export default function PortfolioTab({ session, darkMode, keyboardOpen = false, activeTab }) {
   const [showPortfolio, setShowPortfolio]     = useState(false);
   const [showAllRankings, setShowAllRankings] = useState(false);
 
@@ -28,6 +28,11 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false }
   // the scroll container when it gets focus. Default iOS auto-scroll parks
   // the input mid-viewport, leaving a huge empty gap above the keyboard.
   const smackInputRef = useRef(null);
+
+  // Ref on the smack talk messages scroll container so we can snap it to
+  // the bottom (newest message) when the Challenge tab becomes active and
+  // when new smack arrives — iMessage/WhatsApp default.
+  const smackMsgsRef = useRef(null);
 
   // ── Hooks ──
   const portfolio = usePortfolio(session);
@@ -55,6 +60,52 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false }
     trashTalkMsgs, trashTalkInput, setTrashTalkInput,
     chatReactions, sendTrashTalk, toggleReaction,
   } = smack;
+
+  // ── Auto-scroll Smack Talk to the newest message ──
+  // iMessage / WhatsApp behavior:
+  //   1. When the Challenge tab becomes active, the smack list shows the
+  //      latest message with zero extra taps.
+  //   2. When a new message arrives, it pulls into view — unless the user
+  //      has scrolled up to read history, in which case we leave them.
+  //
+  // The "is the user near the bottom?" flag is kept in a ref and updated
+  // on the scroll event (BEFORE any new-message re-render), so the
+  // length-change effect has accurate prior state to read.
+  const smackNearBottomRef = useRef(true);
+  useEffect(() => {
+    const el = smackMsgsRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      smackNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+  // Tab activation: always snap to bottom on entry (fresh look at latest).
+  // Deps are [activeTab] ONLY — we intentionally DO NOT re-run on message
+  // arrivals, because that would override the nearBottom check below and
+  // yank users out of scrollback whenever new smack came in.
+  useEffect(() => {
+    if (activeTab !== 'challenge') return;
+    const snap = () => {
+      if (smackMsgsRef.current) {
+        smackMsgsRef.current.scrollTop = smackMsgsRef.current.scrollHeight;
+        smackNearBottomRef.current = true;
+      }
+    };
+    requestAnimationFrame(snap);
+    const t = setTimeout(snap, 120);
+    return () => clearTimeout(t);
+  }, [activeTab]);
+  // New message arrives (and initial message load): pull down only if the
+  // user was at/near the bottom when the message landed. smackNearBottomRef
+  // starts true, so the very first load will scroll.
+  useEffect(() => {
+    if (!smackNearBottomRef.current) return;
+    requestAnimationFrame(() => {
+      if (smackMsgsRef.current) smackMsgsRef.current.scrollTop = smackMsgsRef.current.scrollHeight;
+    });
+  }, [trashTalkMsgs.length]);
 
   // ── handleSellComplete: portfolio side + leaderboard/activity refresh ──
   const handleSellComplete = () => {
@@ -99,6 +150,10 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false }
     const pin = () => {
       if (scrollRef.current) scrollRef.current.scrollTop = saved;
     };
+    // Force the inner smackMsgs list to pull down on the realtime round-trip
+    // so the user always sees their own message land, even if they had
+    // scrolled up earlier in the session.
+    smackNearBottomRef.current = true;
     sendTrashTalk();
     requestAnimationFrame(pin);
     setTimeout(pin, 120);
@@ -480,7 +535,7 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false }
         {/* SMACK TALK */}
         <div style={s.smackWrap}>
           <div style={s.smackHdr}><span>💬 Smack Talk</span><div style={s.smackLive}><div style={s.smackDot} /> LIVE</div></div>
-          <div style={{ ...s.smackMsgs, maxHeight: 150 }}>
+          <div ref={smackMsgsRef} style={{ ...s.smackMsgs, maxHeight: 150 }}>
             {trashTalkMsgs.length === 0 ? (
               <div style={{ fontSize: 11, color: t.text3, padding: '8px 0' }}>No smack yet — be the first</div>
             ) : trashTalkMsgs.map((m) => {

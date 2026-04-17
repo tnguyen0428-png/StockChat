@@ -266,7 +266,7 @@ function getMarketStatus() {
 }
 
 // ── Main ChatTab ──
-export default function ChatTab({ session, profile, group, isAdmin, isModerator, setUnreadChat, allGroups, publicGroups, customGroups, enterGroup, onCreateGroup, onJoinGroup }) {
+export default function ChatTab({ session, profile, group, isAdmin, isModerator, setUnreadChat, allGroups, publicGroups, customGroups, enterGroup, onCreateGroup, onJoinGroup, activeTab }) {
   const { activeGroup } = useGroup();
   const [watchlist, setWatchlist] = useState([]);
   const [memberCounts, setMemberCounts] = useState({});
@@ -381,6 +381,25 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
     hasScrolledInit.current = true;
     requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
   }, [messages.length]);
+
+  // iMessage / WhatsApp behavior: every time the Chat tab becomes active
+  // (or the user returns from the group-list subview to the chat subview),
+  // snap the messages area to the bottom so the latest message is the
+  // first thing they see — zero scroll friction to the live conversation.
+  // Tabs use display:none (not unmount), so the component instance survives
+  // tab switches; this effect re-runs on every activation transition.
+  useEffect(() => {
+    if (activeTab !== 'chat' || viewMode !== 'chat' || loading) return;
+    const el = messagesAreaRef.current;
+    if (!el) return;
+    const snap = () => { if (messagesAreaRef.current) messagesAreaRef.current.scrollTop = messagesAreaRef.current.scrollHeight; };
+    // Two passes: once this frame, once after layout settles (display:none
+    // → flex flip can leave scrollHeight stale on the first rAF on some
+    // browsers, especially after a tab that was never scrolled).
+    requestAnimationFrame(snap);
+    const t = setTimeout(snap, 120);
+    return () => clearTimeout(t);
+  }, [activeTab, viewMode, loading, group?.id]);
 
   // Hard-pin scroll to bottom on any new message or AI loading state.
   // Uses the container directly + ResizeObserver so tall AI answers that
