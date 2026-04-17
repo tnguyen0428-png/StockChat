@@ -1,5 +1,5 @@
 import { guardrail } from './guardrail';
-import { checkCache, setCache, clearCache } from './cache';
+import { checkCache, setCache } from './cache';
 import { route } from './router';
 import { dataAgent } from './agents/dataAgent';
 import { knowledgeAgent } from './agents/knowledgeAgent';

@@ -45,6 +45,7 @@ export default function JoinGroupModal({ open, onClose, onJoined }) {
       onJoined({ id: data.group_id, name: data.group_name });
       onClose();
     } catch (err) {
+      if (import.meta.env.DEV) console.warn('[JoinGroupModal] join_custom_group failed:', err?.message || err);
       setError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);

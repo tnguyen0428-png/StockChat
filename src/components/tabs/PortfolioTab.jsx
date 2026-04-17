@@ -4,13 +4,13 @@
 // Left: portfolio + buy | Right: game cards
 // ============================================
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTheme } from './alertsCasinoComponents';
 import SellModal from '../portfolio/SellModal';
 
-import { SEASON_START, SEASON_END } from '../../lib/constants';
+import { SEASON_END } from '../../lib/constants';
 import { usePortfolio } from '../../hooks/usePortfolio';
-import { useLeaderboard, BADGE_DEFS, TIER_DEFS, getTier } from '../../hooks/useLeaderboard';
+import { useLeaderboard, BADGE_DEFS, getTier } from '../../hooks/useLeaderboard';
 import { useSmackTalk, REACTIONS } from '../../hooks/useSmackTalk';
 import { getPortfolioStyles } from './portfolioStyles';
 
@@ -51,8 +51,8 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
 
   const {
     leaderboard, expandedUser, setExpandedUser,
-    lbLoading, myRank, aheadUser, activity,
-    userBadges, sectorData, riskLevel,
+    lbLoading, myRank, aheadUser,
+    userBadges,
     loadLeaderboard, loadActivity,
   } = lb;
 
@@ -182,21 +182,7 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
   const s = getPortfolioStyles(t);
 
   // ── Season dates ──
-  const daysLeft       = Math.max(0, Math.ceil((SEASON_END - new Date()) / 86400000));
-  const seasonProgress = Math.min(100, Math.max(0, ((new Date() - SEASON_START) / (SEASON_END - SEASON_START)) * 100));
-
-  // ── Ticker tape text — others only (memoized) ──
-  const myUid    = session?.user?.id;
-  const tapeText = useMemo(() => {
-    const others = activity.filter(a => a.user_id !== myUid);
-    if (others.length === 0) return 'Waiting for group activity…';
-    return others.map(a => {
-      const who  = a.profiles?.username || 'Someone';
-      const verb = a.status === 'closed' ? 'sold' : 'bought';
-      const amt  = a.dollar_amount ? ` $${(Number(a.dollar_amount) / 1000).toFixed(0)}k` : '';
-      return `${who} ${verb} ${a.ticker}${amt}`;
-    }).join(' · ');
-  }, [activity, myUid]);
+  const daysLeft = Math.max(0, Math.ceil((SEASON_END - new Date()) / 86400000));
 
   // ── Helpers ──
   const timeAgo = (ts) => {
@@ -206,13 +192,6 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     return `${Math.floor(diff / 86400)}d ago`;
-  };
-
-  const sectorColor = (avg) => {
-    if (avg > 1)  return { bg: '#EAF3DE', color: '#27500A' };
-    if (avg > 0)  return { bg: '#E1F5EE', color: '#085041' };
-    if (avg > -1) return { bg: '#FAEEDA', color: '#633806' };
-    return { bg: '#FCEBEB', color: '#791F1F' };
   };
 
   // ── Loading ──

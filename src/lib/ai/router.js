@@ -73,7 +73,11 @@ const IGNORE_TICKERS = new Set(['AI', 'AM', 'PM', 'OK', 'US', 'CEO', 'IPO', 'ETF
 const CONTEXT_TICKERS = new Set(['BE', 'IT', 'AI', 'ON', 'GO']);
 
 // Detect if message has stock-related context around a word
-function hasStockContext(message, word) {
+// NOTE: the `word` param is currently ignored — this only checks message-level
+// signals. Callers pass a candidate ticker (e.g. "BE") expecting word-local
+// context. Flagged as a routing logic bug — leaving the signature for now and
+// underscoring the unused param to silence lint.
+function hasStockContext(message, _word) {
   const lower = message.toLowerCase();
   const stockSignals = ['stock', 'ticker', 'share', 'price', 'earnings', 'buy', 'sell', 'trade',
     'analyze', 'analysis', 'tell me about', 'what about', 'how is', "how's", 'look at',

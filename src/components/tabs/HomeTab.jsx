@@ -19,7 +19,6 @@ import { useWatchlist } from '../../hooks/useWatchlist';
 import { useSectorResearch } from '../../hooks/useSectorResearch';
 import { useLeaderboard } from '../../hooks/useLeaderboard';
 import { usePortfolio } from '../../hooks/usePortfolio';
-import { useGroup } from '../../context/GroupContext';
 
 const SIGNAL_LABELS = {
   gap_up: 'Gap Up',
@@ -34,14 +33,13 @@ const QUICK_ADD = ['NVDA', 'AAPL', 'TSLA', 'AMD', 'SPY', 'META'];
 
 export default function HomeTab({ session, onTabChange, darkMode }) {
   const t = useTheme(darkMode);
-  const { profile } = useGroup();
 
   // ── Market data ──
   const { marketPulse, marketIndicators, futuresData, futuresLabels, marketStatus, loadMarketIndicators } = useMarketData();
 
   // ── Portfolio & Leaderboard ──
-  const { trades, prices, totalReturn, loadingData: portfolioLoading } = usePortfolio(session);
-  const { myRank, aheadUser, loadLeaderboard } = useLeaderboard(session, trades, prices);
+  const { trades, prices, loadingData: portfolioLoading } = usePortfolio(session);
+  const { loadLeaderboard } = useLeaderboard(session, trades, prices);
 
   // ── Watchlist ──
   const {
@@ -273,8 +271,6 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   // DERIVED DATA
   // ═══════════════════════════════════════
   const hasJoinedChallenge = trades.length > 0;
-  const isPositive = (totalReturn || 0) >= 0;
-  const username = profile?.username || 'Trader';
 
   const DEFAULT_ITEMS = [{ label: 'S&P 500', key: 'SPY' }, { label: 'Nasdaq', key: 'QQQ' }, { label: 'Dow', key: 'DIA' }];
 
@@ -720,7 +716,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                   )
                 ) : (
                   <>
-                  {researchStocks.map((stock, i) => {
+                  {researchStocks.map((stock) => {
                     const isOpen = researchExpanded === stock.id;
                     const isMyList = researchSector === '__mylist__';
                     const priceData = researchPrices[stock.ticker];

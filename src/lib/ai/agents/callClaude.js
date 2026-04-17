@@ -78,7 +78,7 @@ function needsSonnet(msg) {
   return score > 0.5;
 }
 
-function isWeakAnswer(text, userMessage) {
+function isWeakAnswer(text, _userMessage) {
   // Super short = genuinely weak
   if (text.length < 40) return true;
 

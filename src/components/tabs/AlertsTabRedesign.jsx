@@ -149,7 +149,6 @@ function typeFor(raw) { return TYPE_CONFIG[raw] || TYPE_CONFIG.vol_surge; }
 // dropped confluence_score and no one noticed).
 function _warnNoMetric(h) {
   if (import.meta.env?.DEV) {
-    // eslint-disable-next-line no-console
     console.warn('[historyMetric] no metric for signal_type=%s ticker=%s', h?.signal_type, h?.ticker, h);
   }
 }
@@ -303,7 +302,7 @@ function mapAlert(a) {
 }
 
 // ===== MAIN COMPONENT =====
-export default function AlertsTab({ session, group, darkMode, isAdmin = false }) {
+export default function AlertsTab({ darkMode, isAdmin = false }) {
   const t = useTheme(darkMode);
   const [liveAlerts, setLiveAlerts] = useState([]);
   const [fearScore, setFearScore] = useState(null);

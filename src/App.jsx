@@ -3,7 +3,7 @@
 // Main app entry — handles routing only
 // ============================================
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import { safeGet, safeSet, safeRemove } from './lib/safeStorage';
@@ -83,7 +83,7 @@ export default function App() {
 
     if (tokenHash && type) {
       supabase.auth.verifyOtp({ token_hash: tokenHash, type })
-        .then(({ data, error }) => {
+        .then(({ error }) => {
           const url = new URL(window.location.href);
           url.searchParams.delete('token_hash');
           url.searchParams.delete('type');

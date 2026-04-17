@@ -10,7 +10,7 @@ import { runScreener, SECTOR_MAP } from '../../lib/screener';
 import { run52wHighScan, DEFAULT_THRESHOLD, runVolSurgeScan, DEFAULT_VOL_MULTIPLIER, runGapUpScan, DEFAULT_GAP_THRESHOLD, runMACrossScan, DEFAULT_SHORT_MA, DEFAULT_LONG_MA, runConfluenceScan } from '../../lib/breakoutScanner';
 import { runFlowScan } from '../../lib/institutionalFlow';
 
-export default function AdminPanel({ session, profile }) {
+export default function AdminPanel() {
   const [activeSection, setActiveSection] = useState(null);
 
   // Groups state

@@ -95,7 +95,7 @@ export default function ProfileTab({ session, profile, group, isAdmin, onSignOut
 
       <RiskMeter session={session} />
 
-      {isAdmin && <AdminPanel session={session} profile={profile} />}
+      {isAdmin && <AdminPanel />}
 
       {group && (
         <>

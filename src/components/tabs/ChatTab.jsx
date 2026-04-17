@@ -176,7 +176,6 @@ const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiv
   }
 
   const nameColor = isAI ? '#8B5CF6' : (msg.user_color || '#2a7d4b');
-  const initials = (msg.username || '?').slice(0, 2).toUpperCase();
 
   // Determine display text (collapse long messages)
   const displayText = (!isAI && isLong && !expanded)
@@ -266,7 +265,7 @@ function getMarketStatus() {
 }
 
 // ── Main ChatTab ──
-export default function ChatTab({ session, profile, group, isAdmin, isModerator, setUnreadChat, allGroups, publicGroups, customGroups, enterGroup, onCreateGroup, onJoinGroup, activeTab }) {
+export default function ChatTab({ session, profile, group, isAdmin, setUnreadChat, publicGroups, customGroups, enterGroup, onCreateGroup, activeTab }) {
   const { activeGroup } = useGroup();
   const [watchlist, setWatchlist] = useState([]);
   const [memberCounts, setMemberCounts] = useState({});
