@@ -78,7 +78,14 @@ export default function DashboardPage({ session }) {
     const vv = window.visualViewport;
     if (!vv) return;
     const update = () => {
-      const isKB = vv.height < initialVH.current * 0.75;
+      // Detect keyboard: any meaningful viewport shrinkage (>100px) OR any
+      // offsetTop shift. The old 75% threshold missed cases where the iOS
+      // accessory bar + QuickType + shorter keyboard together didn't eat
+      // quite enough of the viewport — leaving the page sized to 100dvh
+      // while the keyboard was clearly up, and creating a visible gap
+      // between the input bar and the keyboard's accessory bar.
+      const shrinkage = initialVH.current - vv.height;
+      const isKB = shrinkage > 100 || vv.offsetTop > 0;
       setKeyboardOpen(isKB);
       if (isKB) {
         setVpStyle({

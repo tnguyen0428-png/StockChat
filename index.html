@@ -2,7 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <!-- interactive-widget=resizes-content: tells modern iOS/Android browsers to
+         shrink the layout viewport when the on-screen keyboard opens, so 100dvh
+         naturally drops to exactly "the space above the keyboard + accessory
+         bar". Older browsers ignore the flag and fall back to the JS
+         visualViewport listener in DashboardPage. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
 
     <!-- PWA / mobile -->
     <meta name="theme-color" content="#1AAD5E" />

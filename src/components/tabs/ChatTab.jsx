@@ -602,8 +602,19 @@ export default function ChatTab({ session, profile, group, isAdmin, isModerator,
           onKeyDown={handleKeyDown}
           placeholder={aiMode ? 'Ask AI about any stock...' : 'Chat with your group...'}
           enterKeyHint="send"
+          // Hints to iOS Safari that this is a chat message field, not a
+          // credential. Without these, Safari shows the "uptikalerts.com"
+          // AutoFill chip + password-manager nav in the form accessory
+          // bar, inflating the chrome between the input and the keyboard.
+          type="text"
+          name="chat-message"
+          inputMode="text"
           autoComplete="off"
-          autoCorrect="off"
+          autoCorrect="on"
+          autoCapitalize="sentences"
+          spellCheck={true}
+          data-1p-ignore="true"
+          data-lpignore="true"
         />
         <button
           style={{ ...styles.sendBtn, background: aiMode ? '#8B5CF6' : 'var(--green)', opacity: inputText.trim() ? 1 : 0.4 }}
