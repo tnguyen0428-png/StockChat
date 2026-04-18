@@ -16,6 +16,10 @@ import HomeTab from '../components/tabs/HomeTab';
 // Join-group modal — shown from chat tab
 import JoinGroupModal from '../components/chat/JoinGroupModal';
 
+// Share-invite modal — shown right after creating a private group,
+// and re-openable from the chat header "Invite" pill.
+import ShareInviteModal from '../components/chat/ShareInviteModal';
+
 // Everything else is lazy — split into separate chunks, fetched on first tab visit
 const AlertsTab    = lazy(() => import('../components/tabs/AlertsTabRedesign'));
 const ChatTab      = lazy(() => import('../components/tabs/ChatTab'));
@@ -61,6 +65,13 @@ export default function DashboardPage({ session }) {
 
   const [activeTab, setActiveTab]   = useState(activeTabInit);
   const [showJoinModal, setShowJoinModal] = useState(false);
+
+  // Invite-modal state — `inviteGroup` controls visibility; `inviteJustCreated`
+  // swaps the copy between celebratory (post-create) and neutral (reopen from
+  // chat header pill). Keeping them as separate pieces of state avoids the
+  // footgun of resetting `justCreated` inside the close handler.
+  const [inviteGroup, setInviteGroup] = useState(null);
+  const [inviteJustCreated, setInviteJustCreated] = useState(false);
 
   // Track which tabs have been visited so we can lazy-mount but never unmount
   const [mountedTabs, setMountedTabs] = useState(new Set(['home']));
@@ -205,8 +216,26 @@ export default function DashboardPage({ session }) {
     if (!name?.trim()) return;
     const { group, error } = await createCustomGroup(name.trim());
     if (error) { alert(error); return; }
-    if (group) enterGroup(group);
+    if (group) {
+      enterGroup(group);
+      // Surface the invite link immediately — without this, testers create a
+      // group and have no idea how to add members. This is the friction the
+      // ShareInviteModal exists to remove.
+      setInviteJustCreated(true);
+      setInviteGroup(group);
+    }
   };
+
+  const handleShowInvite = useCallback((g) => {
+    setInviteJustCreated(false);
+    setInviteGroup(g);
+  }, []);
+
+  const handleCloseInvite = useCallback(() => {
+    setInviteGroup(null);
+    // Leave `inviteJustCreated` as-is — the modal is unmounted so the flag
+    // doesn't show, and the next opener sets it explicitly anyway.
+  }, []);
 
   const handleGroupJoined = async ({ id }) => {
     safeSet('uptik_active_group', id);
@@ -342,6 +371,7 @@ export default function DashboardPage({ session }) {
                 enterGroup={enterGroup}
                 onCreateGroup={handleCreateGroup}
                 onJoinGroup={() => setShowJoinModal(true)}
+                onShowInvite={handleShowInvite}
                 activeTab={activeTab}
               />
             </Suspense>
@@ -391,6 +421,13 @@ export default function DashboardPage({ session }) {
         open={showJoinModal}
         onClose={() => setShowJoinModal(false)}
         onJoined={handleGroupJoined}
+      />
+
+      <ShareInviteModal
+        open={!!inviteGroup}
+        group={inviteGroup}
+        onClose={handleCloseInvite}
+        justCreated={inviteJustCreated}
       />
 
     </div>

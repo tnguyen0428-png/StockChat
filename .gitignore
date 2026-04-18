@@ -27,6 +27,7 @@ scripts/wipe-*
 
 # Mockups (design artifacts, not runtime)
 mockup-*.html
+*-mock.html
 
 # OS
 .DS_Store

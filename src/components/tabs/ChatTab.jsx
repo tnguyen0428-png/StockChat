@@ -265,7 +265,7 @@ function getMarketStatus() {
 }
 
 // ── Main ChatTab ──
-export default function ChatTab({ session, profile, group, isAdmin, setUnreadChat, publicGroups, customGroups, enterGroup, onCreateGroup, activeTab }) {
+export default function ChatTab({ session, profile, group, isAdmin, setUnreadChat, publicGroups, customGroups, enterGroup, onCreateGroup, onShowInvite, activeTab }) {
   const { activeGroup } = useGroup();
   const [watchlist, setWatchlist] = useState([]);
   const [memberCounts, setMemberCounts] = useState({});
@@ -637,6 +637,25 @@ export default function ChatTab({ session, profile, group, isAdmin, setUnreadCha
               {marketStatus}
             </div>
           </div>
+          {/* Invite pill — only shown for private groups, the only groups
+              where an invite code matters. Public groups join by sector pick,
+              so adding a pill there would be empty noise. Tapping reopens
+              the same ShareInviteModal the post-create flow uses. */}
+          {!group?.is_public && onShowInvite && (
+            <button
+              onClick={() => onShowInvite(group)}
+              aria-label="Invite people"
+              style={styles.invitePill}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="8.5" cy="7" r="4"/>
+                <line x1="20" y1="8" x2="20" y2="14"/>
+                <line x1="23" y1="11" x2="17" y2="11"/>
+              </svg>
+              <span>Invite</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -794,6 +813,22 @@ const styles = {
     fontSize: 11, color: 'var(--text3)',
     marginTop: 2, lineHeight: 1.15,
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  },
+  invitePill: {
+    // Compact pill so it never starves the group-name line on 320px screens.
+    display: 'flex', alignItems: 'center', gap: 5,
+    flexShrink: 0,
+    padding: '6px 10px',
+    marginRight: 6,
+    background: 'rgba(26,173,94,0.14)',
+    color: '#1AAD5E',
+    border: '1px solid rgba(26,173,94,0.35)',
+    borderRadius: 999,
+    fontFamily: 'inherit',
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+    lineHeight: 1,
   },
   messagesArea: {
     flex: 1, overflowY: 'auto',
