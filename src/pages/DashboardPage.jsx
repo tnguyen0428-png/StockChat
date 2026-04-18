@@ -16,6 +16,9 @@ import HomeTab from '../components/tabs/HomeTab';
 // Join-group modal — shown from chat tab
 import JoinGroupModal from '../components/chat/JoinGroupModal';
 
+// Create-group modal — replaces the old window.prompt() naming flow.
+import CreateGroupModal from '../components/chat/CreateGroupModal';
+
 // Share-invite modal — shown right after creating a private group,
 // and re-openable from the chat header "Invite" pill.
 import ShareInviteModal from '../components/chat/ShareInviteModal';
@@ -65,6 +68,7 @@ export default function DashboardPage({ session }) {
 
   const [activeTab, setActiveTab]   = useState(activeTabInit);
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Invite-modal state — `inviteGroup` controls visibility; `inviteJustCreated`
   // swaps the copy between celebratory (post-create) and neutral (reopen from
@@ -211,20 +215,29 @@ export default function DashboardPage({ session }) {
   }, [publicGroups, loading, activeGroup]);
 
   // ── Group Handlers ──
-  const handleCreateGroup = async () => {
-    const name = window.prompt('Group name:');
-    if (!name?.trim()) return;
-    const { group, error } = await createCustomGroup(name.trim());
-    if (error) { alert(error); return; }
+  // Opens the CreateGroupModal. The old window.prompt() flow looked like a
+  // browser debugger crash to testers on iOS — replacing it with a real
+  // sheet is the single biggest friction reduction on this screen.
+  const handleCreateGroup = useCallback(() => {
+    setShowCreateModal(true);
+  }, []);
+
+  // Called by CreateGroupModal on submit. Returns a result shape the modal
+  // understands so it can render its own inline error without alert().
+  const handleCreateGroupSubmit = useCallback(async (name) => {
+    const { group, error } = await createCustomGroup(name);
+    if (error) return { error };
     if (group) {
       enterGroup(group);
-      // Surface the invite link immediately — without this, testers create a
-      // group and have no idea how to add members. This is the friction the
-      // ShareInviteModal exists to remove.
+      // Close the create sheet, then open the invite sheet. The ordering
+      // matters: unmounting Create first avoids a frame where two modals
+      // stack on screen during the React commit between the two setStates.
+      setShowCreateModal(false);
       setInviteJustCreated(true);
       setInviteGroup(group);
     }
-  };
+    return { ok: true };
+  }, [createCustomGroup, enterGroup]);
 
   const handleShowInvite = useCallback((g) => {
     setInviteJustCreated(false);
@@ -421,6 +434,12 @@ export default function DashboardPage({ session }) {
         open={showJoinModal}
         onClose={() => setShowJoinModal(false)}
         onJoined={handleGroupJoined}
+      />
+
+      <CreateGroupModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreate={handleCreateGroupSubmit}
       />
 
       <ShareInviteModal
