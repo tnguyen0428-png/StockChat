@@ -201,6 +201,17 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
     }
   }, [watchlist]);
 
+  // Fetch prices whenever we're viewing the watchlist and it has rows.
+  // Covers the returning-user case: useSectorResearch seeds `researchSector`
+  // from localStorage, so on mount `researchSector === '__mylist__'` and the
+  // auto-expand effect above skips. Without this, prices only populated when
+  // the user toggled the Watchlist button off/on. See: [HomeTab] bug report.
+  useEffect(() => {
+    if (researchSector === '__mylist__' && watchlist.length > 0) {
+      fetchResearchPrices(watchlist.map(w => w.symbol));
+    }
+  }, [researchSector, watchlist]);
+
   // ═══════════════════════════════════════
   // BRIEFING
   // ═══════════════════════════════════════
@@ -371,6 +382,10 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
 
   const completedCount = onboardingStepDefs.filter(s => s.done).length;
   const onboardingComplete = completedCount === 4;
+  // Only show rows the user still has to do — completed items collapse out of
+  // view so the card shrinks as progress is made. Progress bar + "N/4 complete"
+  // still reflect the full step count.
+  const pendingSteps = onboardingStepDefs.filter(s => !s.done);
 
   // ── Styles ──
   const S = getHomeStyles(t);
@@ -832,40 +847,35 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
           <div style={{ padding: '8px 14px 14px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: t.text1, marginBottom: 8 }}>Get Started</div>
             <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden' }}>
-              {onboardingStepDefs.map((step, i, arr) => (
+              {pendingSteps.map((step, i, arr) => (
                 <div
                   key={step.key}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: '12px 14px',
                     borderBottom: i < arr.length - 1 ? `1px solid ${t.border}` : 'none',
-                    opacity: step.done ? 0.6 : 1,
                   }}
                 >
                   <div style={{
                     width: 20, height: 20, borderRadius: 10, flexShrink: 0,
-                    border: `2px solid ${step.done ? '#1AAD5E' : t.border}`,
-                    background: step.done ? '#1AAD5E' : 'transparent',
+                    border: `2px solid ${t.border}`,
+                    background: 'transparent',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {step.done && <span style={{ fontSize: 10, color: '#fff', fontWeight: 700 }}>✓</span>}
-                  </div>
+                  }} />
                   <span style={{ fontSize: 20, flexShrink: 0 }}>{step.emoji}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginBottom: 2, textDecoration: step.done ? 'line-through' : 'none' }}>{step.title}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginBottom: 2 }}>{step.title}</div>
                     <div style={{ fontSize: 11, color: t.text3, lineHeight: 1.4 }}>{step.desc}</div>
                   </div>
-                  {!step.done && (
-                    <button
-                      style={{
-                        background: 'transparent', border: `1px solid ${t.green}`,
-                        color: t.green, borderRadius: 7,
-                        padding: '5px 10px', fontSize: 11, fontWeight: 600,
-                        cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
-                      }}
-                      onClick={step.action}
-                    >{step.actionLabel}</button>
-                  )}
+                  <button
+                    style={{
+                      background: 'transparent', border: `1px solid ${t.green}`,
+                      color: t.green, borderRadius: 7,
+                      padding: '5px 10px', fontSize: 11, fontWeight: 600,
+                      cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
+                    }}
+                    onClick={step.action}
+                  >{step.actionLabel}</button>
                 </div>
               ))}
             </div>
