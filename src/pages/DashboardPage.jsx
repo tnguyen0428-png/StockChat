@@ -395,7 +395,7 @@ export default function DashboardPage({ session }) {
         {mountedTabs.has('challenge') && (
           <div style={{ display: activeTab === 'challenge' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflow: 'auto' }}>
             <Suspense fallback={<TabFallback />}>
-              <PortfolioTab session={session} darkMode={darkMode} keyboardOpen={keyboardOpen} activeTab={activeTab} />
+              <PortfolioTab session={session} darkMode={darkMode} keyboardOpen={keyboardOpen} activeTab={activeTab} onNavigate={setActiveTab} />
             </Suspense>
           </div>
         )}

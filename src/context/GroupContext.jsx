@@ -16,6 +16,11 @@ export function GroupProvider({ session, children }) {
   const [publicGroups, setPublicGroups] = useState([]);
   const [privateGroup, setPrivateGroup] = useState(null);
   const [loading, setLoading]       = useState(true);
+  // DM peer lookup: { [groupId]: { userId, username, color } }. DM groups
+  // store a generic "DM" name, so to render them in the private chat list
+  // we need the OTHER participant's display info. Populated during
+  // loadProfile and refreshed whenever the membership graph changes.
+  const [dmPeers, setDmPeers]       = useState({});
 
   useEffect(() => {
     if (!session?.user) return;
@@ -57,6 +62,108 @@ export function GroupProvider({ session, children }) {
       // Find private group
       const priv = groups.find(g => g.is_public === false);
       if (priv) setPrivateGroup(priv);
+
+      // DM surfacing — do this INDEPENDENTLY of the group_members join above.
+      // The find_or_create_dm RPC is supposed to insert a group_members row
+      // for both participants (so chat_messages RLS accepts their messages),
+      // but older deployments don't, and the user_a row in particular has
+      // gone missing in production. Using dm_participants as the source of
+      // truth for "which DM groups does this user belong to" keeps the
+      // sidebar populated regardless of that drift.
+      //
+      // We do a two-step fetch (participants, then profiles by id) rather
+      // than a PostgREST embedded join — dm_participants has two FKs into
+      // profiles (user_id + other_user_id) so embed joins need explicit FK
+      // disambiguation, and that FK name isn't guaranteed stable across
+      // environments.
+      const { data: dmRows, error: dmError } = await supabase
+        .from('dm_participants')
+        .select('group_id, other_user_id')
+        .eq('user_id', session.user.id);
+
+      if (dmError) {
+        console.error('[GroupContext] dm_participants lookup failed:', dmError.message);
+        setDmPeers({});
+      } else if (dmRows && dmRows.length > 0) {
+        // Heal missing group_members rows. The deployed find_or_create_dm
+        // RPC skipped the user_a insert for some DMs, leaving our own row
+        // missing from group_members. Without that row, chat_messages RLS
+        // rejects our sends. An upsert is idempotent and safe to run every
+        // load — but to avoid an unnecessary write on every mount we only
+        // fire it for DM groups where we can't already see our membership.
+        const dmGroupIds = dmRows.map(r => r.group_id);
+        const knownMembershipGroupIds = new Set(
+          (data.group_members || []).map(gm => gm.group_id)
+        );
+        const missingMembershipIds = dmGroupIds.filter(id => !knownMembershipGroupIds.has(id));
+        if (missingMembershipIds.length > 0) {
+          const rows = missingMembershipIds.map(gid => ({
+            group_id: gid,
+            user_id: session.user.id,
+            role: 'member',
+          }));
+          const { error: healErr } = await supabase
+            .from('group_members')
+            .upsert(rows, { onConflict: 'group_id,user_id' });
+          if (healErr && import.meta.env.DEV) {
+            console.warn('[GroupContext] DM group_members heal failed:', healErr.message);
+          }
+        }
+
+        // Fetch peer profiles
+        const otherIds = [...new Set(dmRows.map(r => r.other_user_id).filter(Boolean))];
+        const profileMap = {};
+        if (otherIds.length > 0) {
+          const { data: profs, error: profsError } = await supabase
+            .from('profiles')
+            .select('id, username, color')
+            .in('id', otherIds);
+          if (profsError) {
+            console.error('[GroupContext] DM peer profiles lookup failed:', profsError.message);
+          } else if (profs) {
+            profs.forEach(pr => { profileMap[pr.id] = pr; });
+          }
+        }
+
+        // Fetch DM group rows for any DM groups we're not already seeing
+        // via group_members — so allGroups contains every DM this user is
+        // in, not just the ones where group_members was properly wired.
+        const knownIds = new Set(groups.map(g => g.id));
+        const missingIds = dmGroupIds.filter(id => !knownIds.has(id));
+        let missingGroups = [];
+        if (missingIds.length > 0) {
+          const { data: extraGroups, error: extraErr } = await supabase
+            .from('groups')
+            .select('*')
+            .in('id', missingIds);
+          if (extraErr) {
+            console.error('[GroupContext] DM group fetch failed:', extraErr.message);
+          } else if (extraGroups) {
+            missingGroups = extraGroups;
+          }
+        }
+        if (missingGroups.length > 0) {
+          const mergedSeen = new Set();
+          const merged = [...groups, ...missingGroups].filter(g => mergedSeen.has(g.id) ? false : mergedSeen.add(g.id));
+          setAllGroups(merged);
+        }
+
+        const map = {};
+        dmRows.forEach(r => {
+          const prof = profileMap[r.other_user_id];
+          if (!prof && import.meta.env.DEV) {
+            console.warn('[GroupContext] DM peer profile missing for', { group_id: r.group_id, other_user_id: r.other_user_id });
+          }
+          map[r.group_id] = {
+            userId: r.other_user_id,
+            username: prof?.username || 'User',
+            color: prof?.color,
+          };
+        });
+        setDmPeers(map);
+      } else {
+        setDmPeers({});
+      }
 
       // Restore last active group
       const savedId = safeGet('uptik_active_group');
@@ -183,25 +290,90 @@ export function GroupProvider({ session, children }) {
     await loadAll();
   };
 
+  // ── DM: open or create a 1:1 conversation with another user ──
+  // Calls the SECURITY DEFINER RPC that either returns the existing DM
+  // group's id or creates the group + both dm_participants rows + both
+  // group_members rows in one round trip. Then re-hydrates the profile so
+  // the new DM shows up in customGroups / dmPeers and enters it.
+  const openDm = async (otherUserId) => {
+    if (!session?.user?.id) return { error: 'Not signed in' };
+    if (!otherUserId || otherUserId === session.user.id) {
+      return { error: 'Invalid DM target' };
+    }
+
+    const { data: groupId, error } = await supabase.rpc('find_or_create_dm', {
+      user_a: session.user.id,
+      user_b: otherUserId,
+    });
+    if (error) {
+      console.error('[GroupContext] find_or_create_dm failed:', error.message);
+      return { error: error.message };
+    }
+    if (!groupId) return { error: 'DM creation returned no id' };
+
+    // Belt-and-suspenders: ensure the caller's own group_members row exists.
+    // The deployed find_or_create_dm RPC is supposed to insert this, but in
+    // production user_a's row is frequently missing — which breaks chat_messages
+    // RLS and makes sending messages fail silently. Upserting here is
+    // idempotent and cheap.
+    const { error: membershipErr } = await supabase
+      .from('group_members')
+      .upsert(
+        { group_id: groupId, user_id: session.user.id, role: 'member' },
+        { onConflict: 'group_id,user_id' }
+      );
+    if (membershipErr && import.meta.env.DEV) {
+      console.warn('[GroupContext] openDm membership backfill failed:', membershipErr.message);
+    }
+
+    // Re-hydrate so the new DM appears in allGroups + dmPeers
+    await loadProfile();
+
+    // Fetch the group row so we can setActiveGroup directly (loadProfile may
+    // not have propagated allGroups yet when we set state below).
+    const { data: group, error: groupErr } = await supabase
+      .from('groups')
+      .select('*')
+      .eq('id', groupId)
+      .maybeSingle();
+    if (groupErr) {
+      console.error('[GroupContext] openDm group fetch failed:', groupErr.message);
+      return { error: groupErr.message };
+    }
+    if (group) {
+      setActiveGroup(group);
+      safeSet('uptik_active_group', group.id);
+    }
+    return { group };
+  };
+
   // ── Derived state ──
   const isAdmin = profile?.is_admin || false;
   const isModerator = profile?.group_members?.find(
     gm => gm.group_id === activeGroup?.id
   )?.role === 'moderator';
 
-  // Split groups into sector (public) and custom (private, no sector)
-  const sectorGroups = allGroups.filter(g => g.is_public);
-  const customGroups = allGroups.filter(g => !g.is_public && !g.sector);
+  // Split groups into sector (public, non-DM) and custom (private + DM).
+  // NOTE: DM groups were created by find_or_create_dm() without explicitly
+  // setting is_public, so they inherit the table default (true). We do NOT
+  // want DMs in the public/sector rail — they land under Private Chats and
+  // render with the peer's display info (see ChatTab private-rows block).
+  // The filter keys off is_dm first so this stays correct regardless of
+  // what is_public says on legacy DM rows.
+  const sectorGroups = allGroups.filter(g => g.is_public && !g.is_dm);
+  const customGroups = allGroups.filter(g => g.is_dm || (!g.is_public && !g.sector));
 
   return (
     <GroupContext.Provider value={{
       profile, activeGroup, allGroups,
       publicGroups, privateGroup,
       sectorGroups, customGroups,
+      dmPeers,
       isAdmin, isModerator, loading,
       enterGroup, refreshGroups,
       setActiveGroup,
       createCustomGroup, leaveCustomGroup,
+      openDm,
     }}>
       {children}
     </GroupContext.Provider>

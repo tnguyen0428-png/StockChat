@@ -17,7 +17,7 @@ export function useSmackTalk(session) {
   const loadTrashTalk = useCallback(async () => {
     const { data, error } = await supabase
       .from('challenge_chat')
-      .select('*, profiles(username)')
+      .select('*, profiles(username, color)')
       .order('created_at', { ascending: false })
       .limit(10);
     if (error) console.error('[SmackTalk] loadTrashTalk failed:', error.message);

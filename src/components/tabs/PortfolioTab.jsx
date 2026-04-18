@@ -4,9 +4,11 @@
 // Left: portfolio + buy | Right: game cards
 // ============================================
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTheme } from './alertsCasinoComponents';
 import SellModal from '../portfolio/SellModal';
+import UserProfilePopup from '../chat/UserProfilePopup';
+import { useGroup } from '../../context/GroupContext';
 
 import { SEASON_END } from '../../lib/constants';
 import { usePortfolio } from '../../hooks/usePortfolio';
@@ -14,7 +16,35 @@ import { useLeaderboard, BADGE_DEFS, getTier } from '../../hooks/useLeaderboard'
 import { useSmackTalk, REACTIONS } from '../../hooks/useSmackTalk';
 import { getPortfolioStyles } from './portfolioStyles';
 
-export default function PortfolioTab({ session, darkMode, keyboardOpen = false, activeTab }) {
+export default function PortfolioTab({ session, darkMode, keyboardOpen = false, activeTab, onNavigate }) {
+  // DM wiring: tapping a smack-talk username opens the shared
+  // UserProfilePopup. "Message" routes through openDm (2-person private
+  // group) and then switches the tab to Chat so the conversation is
+  // immediately visible — otherwise the DM would open silently in the
+  // background and the user wouldn't see what happened.
+  const { openDm } = useGroup();
+  const [profilePopup, setProfilePopup] = useState(null);
+
+  const handleUsernameClick = useCallback((user) => {
+    if (!user?.userId || user.userId === session?.user?.id) return;
+    setProfilePopup(user);
+  }, [session?.user?.id]);
+
+  const handleCloseProfilePopup = useCallback(() => {
+    setProfilePopup(null);
+  }, []);
+
+  const handleOpenDm = useCallback(async (user) => {
+    if (!user?.userId) { setProfilePopup(null); return; }
+    const res = await openDm(user.userId);
+    if (res?.error) {
+      if (import.meta.env.DEV) console.warn('[PortfolioTab] openDm failed:', res.error);
+    } else if (onNavigate) {
+      // Jump to the Chat tab so the user lands directly in the DM thread.
+      onNavigate('chat');
+    }
+    setProfilePopup(null);
+  }, [openDm, onNavigate]);
   const [showPortfolio, setShowPortfolio]     = useState(false);
   const [showAllRankings, setShowAllRankings] = useState(false);
 
@@ -526,20 +556,53 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
               const tier     = lbEntry ? getTier(lbEntry.pctReturn) : null;
               const medalBg  = rank === 1 ? t.medalGold : rank === 2 ? t.medalSilver : rank === 3 ? t.medalBronze : t.border;
               const rxns     = chatReactions[m.id] || {};
+              // iMessage-style: your own smack lands on the right, everyone
+              // else's on the left. Flipping flex direction keeps the medal
+              // avatar + username meta next to the body on the correct side.
+              const isOwn    = !!session?.user?.id && m.user_id === session.user.id;
               return (
                 <div key={m.id} style={s.smackMsg}>
-                  <div style={s.smackMsgTop}>
+                  <div style={{ ...s.smackMsgTop, flexDirection: isOwn ? 'row-reverse' : 'row' }}>
                     <div style={{ ...s.smackAv, background: medalBg, color: rank && rank <= 3 ? '#fff' : t.text3 }}>{(m.profiles?.username || '?')[0].toUpperCase()}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: t.text1 }}>{m.profiles?.username || 'Anon'}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexDirection: isOwn ? 'row-reverse' : 'row' }}>
+                        {/* Clickable username — opens DM popup. Own-row taps
+                            are noops (same guard as ChatTab). Using a <span>
+                            instead of a <button> preserves the existing
+                            typography; cursor + role convey affordance. */}
+                        {isOwn ? (
+                          <span style={{ fontSize: 11, fontWeight: 600, color: t.text1 }}>{m.profiles?.username || 'Anon'}</span>
+                        ) : (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUsernameClick({
+                                userId: m.user_id,
+                                username: m.profiles?.username || 'Anon',
+                                color: m.profiles?.color,
+                              });
+                            }}
+                            style={{ fontSize: 11, fontWeight: 600, color: t.text1, cursor: 'pointer' }}
+                          >
+                            {m.profiles?.username || 'Anon'}
+                          </span>
+                        )}
                         {tier && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: tier.bg, color: tier.color, fontWeight: 500 }}>{tier.short}</span>}
-                        <span style={{ fontSize: 9, color: t.text3, marginLeft: 'auto' }}>{timeAgo(m.created_at)}</span>
+                        {/* marginLeft/Right auto push the timestamp to the
+                            outer edge of the row — right for incoming, left
+                            for own — so it always hugs the wall farthest
+                            from the avatar. */}
+                        <span style={{ fontSize: 9, color: t.text3, [isOwn ? 'marginRight' : 'marginLeft']: 'auto' }}>{timeAgo(m.created_at)}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: t.text1, lineHeight: 1.35, marginTop: 2 }}>{m.message}</div>
+                      <div style={{
+                        fontSize: 12, color: t.text1, lineHeight: 1.35, marginTop: 2,
+                        textAlign: isOwn ? 'right' : 'left',
+                      }}>{m.message}</div>
                     </div>
                   </div>
-                  <div style={s.rxnRow}>
+                  <div style={{ ...s.rxnRow, [isOwn ? 'marginRight' : 'marginLeft']: 30, [isOwn ? 'marginLeft' : 'marginRight']: 0, justifyContent: isOwn ? 'flex-end' : 'flex-start' }}>
                     {REACTIONS.map(r => { const users = rxns[r.label] || []; const myReacted = users.includes(session?.user?.id); if (users.length === 0 && !myReacted) return null; return (<div key={r.label} style={{ ...s.rxnPill, ...(myReacted ? s.rxnLit : {}) }} onClick={() => toggleReaction(m.id, r.label)}><span style={{ fontSize: 12 }}>{r.emoji}</span><span style={{ ...s.rxnCt, ...(myReacted ? { color: t.green } : {}) }}>{users.length}</span></div>); })}
                     <div style={s.rxnAdd} onClick={() => { const firstUnused = REACTIONS.find(r => !(rxns[r.label] || []).includes(session?.user?.id)); if (firstUnused) toggleReaction(m.id, firstUnused.label); }}>+</div>
                   </div>
@@ -573,6 +636,15 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
       {sellTrade && (
         <SellModal session={session} trade={sellTrade} onClose={() => setSellTrade(null)} onComplete={handleSellComplete} />
       )}
+
+      {/* Shared username-tap popup — Message creates/opens a DM and jumps
+          to the Chat tab. */}
+      <UserProfilePopup
+        open={!!profilePopup}
+        user={profilePopup}
+        onCancel={handleCloseProfilePopup}
+        onMessage={handleOpenDm}
+      />
     </div>
   );
 }

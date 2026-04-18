@@ -10,6 +10,9 @@ import { askUpTikAI } from '../../lib/aiAgent';
 import FadingMessage from '../shared/FadingMessage';
 import TickerMentionCard from '../shared/TickerMentionCard';
 import { STICKERS, isSticker, getStickerId } from '../shared/StickerPicker';
+import SwipeableGroupRow from '../chat/SwipeableGroupRow';
+import ConfirmLeaveGroupModal from '../chat/ConfirmLeaveGroupModal';
+import UserProfilePopup from '../chat/UserProfilePopup';
 
 // ── UptikCard: renders the ```uptik {json}``` envelope as a clean card ──
 const UptikCard = ({ card }) => {
@@ -84,10 +87,14 @@ const UptikCard = ({ card }) => {
 // ── Message Item ──
 const MSG_COLLAPSE_LEN = 150;
 
-const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiven, isGrouped }) => {
+const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiven, isGrouped, onUsernameClick }) => {
   const [expanded, setExpanded] = useState(false);
   const isAdmin = msg.is_admin;
   const isAI    = msg.user_id === 'user_ai' || msg.type === 'ai';
+  // iMessage-style alignment: your own messages land on the right, everyone
+  // else's on the left. AI messages stay full-width since they carry cards
+  // and feedback controls that don't translate to a side bubble.
+  const isOwn   = !isAI && !!currentUserId && msg.user_id === currentUserId;
   const isLong  = !isAI && (msg.text || '').length > MSG_COLLAPSE_LEN;
 
   // Extract $TICKER symbols from message text
@@ -160,17 +167,42 @@ const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiv
     const stickerColor = msg.user_color || '#2a7d4b';
     return (
       <div style={{
-        background: 'var(--card)', border: '1px solid var(--border)',
-        borderRadius: 10, padding: '8px 10px',
+        display: 'flex',
+        justifyContent: isOwn ? 'flex-end' : 'flex-start',
         marginTop: isGrouped ? 2 : 6,
       }}>
-        {!isGrouped && (
-          <div style={styles.msgTop}>
-            <span style={{ ...styles.msgName, color: stickerColor }}>{msg.username}</span>
-            <span style={{ ...styles.msgTime, marginLeft: 'auto' }}>{formatTime(msg.created_at)}</span>
-          </div>
-        )}
-        <span style={{ fontSize: 32, lineHeight: 1 }} title={s?.label}>{s?.emoji || '?'}</span>
+        <div style={{
+          background: isOwn ? 'var(--green-bg)' : 'var(--card)',
+          border: isOwn ? '1px solid rgba(42,125,75,0.25)' : '1px solid var(--border)',
+          borderRadius: 10, padding: '8px 10px',
+          maxWidth: '80%',
+        }}>
+          {!isGrouped && !isOwn && (
+            <div style={styles.msgTop}>
+              {/* Tappable username — opens the DM popup for this user. We keep
+                  it a <span> (not a <button>) so the existing msgName styling
+                  stays untouched, but role="button" and a pointer cursor
+                  communicate affordance. */}
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUsernameClick?.({
+                    userId: msg.user_id,
+                    username: msg.username,
+                    color: stickerColor,
+                  });
+                }}
+                style={{ ...styles.msgName, color: stickerColor, cursor: 'pointer' }}
+              >
+                {msg.username}
+              </span>
+              <span style={{ ...styles.msgTime, marginLeft: 'auto' }}>{formatTime(msg.created_at)}</span>
+            </div>
+          )}
+          <span style={{ fontSize: 32, lineHeight: 1 }} title={s?.label}>{s?.emoji || '?'}</span>
+        </div>
       </div>
     );
   }
@@ -182,57 +214,104 @@ const MessageItem = memo(({ msg, currentUserId, groupId, onFeedback, feedbackGiv
     ? msg.text.slice(0, MSG_COLLAPSE_LEN) + '...'
     : msg.text;
 
+  // Bubble background, border, and text color are what sell the "this is
+  // MY message" read at a glance. Own messages pick up the app's green
+  // accent; AI stays on its lavender tint; everyone else gets the neutral
+  // card background so incoming messages still feel like separate voices.
+  const bubbleBackground = isAI
+    ? 'rgba(139,92,246,0.04)'
+    : isOwn
+      ? 'var(--green-bg)'
+      : 'var(--card)';
+  const bubbleBorder = isAI
+    ? '1px solid rgba(139,92,246,0.15)'
+    : isOwn
+      ? '1px solid rgba(42,125,75,0.25)'
+      : '1px solid var(--border)';
+
   return (
     <div style={{
-      background: isAI ? 'rgba(139,92,246,0.04)' : 'var(--card)',
-      border: isAI ? '1px solid rgba(139,92,246,0.15)' : '1px solid var(--border)',
-      borderRadius: 10, padding: '8px 10px',
+      // Row-level alignment — right for own messages, left for everyone else.
+      // AI messages stay left too since they host cards/feedback and belong
+      // with the "incoming" thread of voices, not the "me" thread.
+      display: 'flex',
+      justifyContent: isOwn ? 'flex-end' : 'flex-start',
       marginTop: isGrouped ? 2 : 6,
     }}>
-      {!isGrouped && (
-        <div style={styles.msgTop}>
-          <span style={{ ...styles.msgName, color: nameColor }}>{msg.username}</span>
-          {isAdmin && <span style={styles.adminBadge}>Admin</span>}
-          {isAI    && <span style={styles.aiBadge}>AI</span>}
-          <span style={{ ...styles.msgTime, marginLeft: 'auto' }}>{formatTime(msg.created_at)}</span>
-        </div>
-      )}
-      <div style={styles.msgText}>
-        {isAI ? renderAIBody(msg.text) : parseText(displayText)}
-        {isLong && (
-          <span
-            onClick={() => setExpanded(e => !e)}
-            style={{ color: 'var(--green)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginLeft: 4 }}
-          >
-            {expanded ? 'show less' : 'show more'}
-          </span>
+      <div style={{
+        background: bubbleBackground,
+        border: bubbleBorder,
+        borderRadius: 10, padding: '8px 10px',
+        // Cap the bubble width so long messages don't stretch edge to edge;
+        // AI bubbles keep full width to host cards/feedback controls.
+        maxWidth: isAI ? '100%' : '80%',
+        minWidth: 0,
+      }}>
+        {!isGrouped && !isOwn && (
+          <div style={styles.msgTop}>
+            {/* Username is a tap target for DMs. AI messages bypass this —
+                no DM target — so the span stays non-interactive there. */}
+            {isAI ? (
+              <span style={{ ...styles.msgName, color: nameColor }}>{msg.username}</span>
+            ) : (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUsernameClick?.({
+                    userId: msg.user_id,
+                    username: msg.username,
+                    color: nameColor,
+                  });
+                }}
+                style={{ ...styles.msgName, color: nameColor, cursor: 'pointer' }}
+              >
+                {msg.username}
+              </span>
+            )}
+            {isAdmin && <span style={styles.adminBadge}>Admin</span>}
+            {isAI    && <span style={styles.aiBadge}>AI</span>}
+            <span style={{ ...styles.msgTime, marginLeft: 'auto' }}>{formatTime(msg.created_at)}</span>
+          </div>
         )}
-      </div>
-      {/* Ticker mention cards — show inline card for each $TICKER */}
-      {!isAI && uniqueTickers.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-          {uniqueTickers.map(t => (
-            <TickerMentionCard
-              key={t}
-              ticker={t}
-              groupId={groupId || msg.group_id}
-              userId={currentUserId}
-            />
-          ))}
-        </div>
-      )}
-      {isAI && onFeedback && (
-        <div style={styles.feedbackRow}>
-          {feedbackGiven ? (
-            <span style={styles.feedbackThanks}>{feedbackGiven === 'up' ? '👍' : '👎'} Thanks!</span>
-          ) : (
-            <>
-              <button onClick={() => onFeedback(msg.id, 'up')} style={styles.feedbackBtn}>👍</button>
-              <button onClick={() => onFeedback(msg.id, 'down')} style={styles.feedbackBtn}>👎</button>
-            </>
+        <div style={styles.msgText}>
+          {isAI ? renderAIBody(msg.text) : parseText(displayText)}
+          {isLong && (
+            <span
+              onClick={() => setExpanded(e => !e)}
+              style={{ color: 'var(--green)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginLeft: 4 }}
+            >
+              {expanded ? 'show less' : 'show more'}
+            </span>
           )}
         </div>
-      )}
+        {/* Ticker mention cards — show inline card for each $TICKER */}
+        {!isAI && uniqueTickers.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+            {uniqueTickers.map(t => (
+              <TickerMentionCard
+                key={t}
+                ticker={t}
+                groupId={groupId || msg.group_id}
+                userId={currentUserId}
+              />
+            ))}
+          </div>
+        )}
+        {isAI && onFeedback && (
+          <div style={styles.feedbackRow}>
+            {feedbackGiven ? (
+              <span style={styles.feedbackThanks}>{feedbackGiven === 'up' ? '👍' : '👎'} Thanks!</span>
+            ) : (
+              <>
+                <button onClick={() => onFeedback(msg.id, 'up')} style={styles.feedbackBtn}>👍</button>
+                <button onClick={() => onFeedback(msg.id, 'down')} style={styles.feedbackBtn}>👎</button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 });
@@ -266,15 +345,68 @@ function getMarketStatus() {
 
 // ── Main ChatTab ──
 export default function ChatTab({ session, profile, group, isAdmin, setUnreadChat, publicGroups, customGroups, enterGroup, onCreateGroup, onShowInvite, activeTab }) {
-  const { activeGroup } = useGroup();
+  const { activeGroup, leaveCustomGroup, openDm, dmPeers } = useGroup();
   const [watchlist, setWatchlist] = useState([]);
   const [memberCounts, setMemberCounts] = useState({});
+
+  // Username-tap popup: { userId, username, color } of the tapped user, or
+  // null when nothing's open. Routed from MessageItem's onUsernameClick so
+  // the message list stays memo-friendly and the popup mounts once.
+  const [profilePopup, setProfilePopup] = useState(null);
+
+  // Full-swipe on a private row opens a confirmation modal rather than
+  // deleting immediately. The modal's Leave button calls confirmLeave which
+  // actually runs leaveCustomGroup. Keeps destructive actions a deliberate
+  // two-step: gesture triggers the ask, tap commits the action.
+  const [leavePending, setLeavePending] = useState(null);
+
+  const handleRequestLeave = useCallback((g) => {
+    setLeavePending(g);
+  }, []);
+
+  const handleCancelLeave = useCallback(() => {
+    setLeavePending(null);
+  }, []);
+
+  const handleConfirmLeave = useCallback(async (g) => {
+    try {
+      await leaveCustomGroup(g.id);
+    } catch (err) {
+      if (import.meta.env.DEV) console.warn('[ChatTab] leaveCustomGroup failed:', err?.message || err);
+    } finally {
+      setLeavePending(null);
+    }
+  }, [leaveCustomGroup]);
 
   // viewMode: 'chat' (slim header + messages + input) vs 'list' (group selector).
   // Default is 'chat' — landing on the Chat tab should show messages with zero
   // taps. Users hit the back chevron to browse groups; tapping a group snaps
   // back to chat. Keeps the primary action (read/send) on screen.
   const [viewMode, setViewMode] = useState('chat');
+
+  // Username-tap popup handlers. Kept here (not above) so setViewMode is in
+  // scope for handleOpenDm — tapping Message on the popup jumps into the DM.
+  const handleUsernameClick = useCallback((user) => {
+    // Don't offer DM-to-self; just swallow the tap.
+    if (!user?.userId || user.userId === session?.user?.id) return;
+    setProfilePopup(user);
+  }, [session?.user?.id]);
+
+  const handleCloseProfilePopup = useCallback(() => {
+    setProfilePopup(null);
+  }, []);
+
+  const handleOpenDm = useCallback(async (user) => {
+    if (!user?.userId) { setProfilePopup(null); return; }
+    const res = await openDm(user.userId);
+    if (res?.error) {
+      if (import.meta.env.DEV) console.warn('[ChatTab] openDm failed:', res.error);
+    } else {
+      // Snap into chat view so the DM messages are immediately visible.
+      setViewMode('chat');
+    }
+    setProfilePopup(null);
+  }, [openDm]);
 
   // Re-compute market status once a minute so the sub-line updates around 9:30
   // and 16:00 ET without requiring a tab switch.
@@ -585,26 +717,44 @@ export default function ChatTab({ session, profile, group, isAdmin, setUnreadCha
             </span>
           </div>
 
-          {/* Private group rows + New Group button — always shown */}
+          {/* Private group rows + New Group button — always shown. DM rows
+              (2-person private groups) render the OTHER participant's name
+              and color instead of the generic "DM" sentinel the groups
+              table stores, and swap the lock icon for a person icon so the
+              chat type is obvious at a glance. */}
           {privateGroups.map(g => {
-            const color = g.color || '#7B68EE';
+            const peer = g.is_dm ? dmPeers?.[g.id] : null;
+            const displayName = peer?.username ? peer.username : g.name;
+            const color = peer?.color || g.color || '#7B68EE';
+            const isActive = group?.id === g.id;
             return (
-              <div
+              <SwipeableGroupRow
                 key={g.id}
-                onClick={() => openGroup(g)}
-                style={{ ...selectorStyles.row, background: group?.id === g.id ? `${color}15` : 'transparent' }}
+                onEnter={() => openGroup(g)}
+                onDelete={() => handleRequestLeave(g)}
+                rowStyle={{ ...selectorStyles.row, background: isActive ? `${color}15` : 'transparent' }}
               >
                 <div style={{ ...selectorStyles.iconWrap, background: `${color}20` }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
+                  {g.is_dm ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                      <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                  )}
                 </div>
                 <div style={selectorStyles.rowText}>
-                  <div style={selectorStyles.rowName}>{g.name}</div>
-                  {memberCounts[g.id] > 0 && <div style={selectorStyles.rowSub}>{memberCounts[g.id]} members</div>}
+                  <div style={selectorStyles.rowName}>{displayName}</div>
+                  {g.is_dm
+                    ? <div style={selectorStyles.rowSub}>Direct message</div>
+                    : (memberCounts[g.id] > 0 && <div style={selectorStyles.rowSub}>{memberCounts[g.id]} members</div>)
+                  }
                 </div>
-                {group?.id === g.id && <div style={{ ...selectorStyles.activeDot, background: color }} />}
-              </div>
+                {isActive && <div style={{ ...selectorStyles.activeDot, background: color }} />}
+              </SwipeableGroupRow>
             );
           })}
           <div style={{ padding: '8px 12px' }}>
@@ -626,22 +776,36 @@ export default function ChatTab({ session, profile, group, isAdmin, setUnreadCha
             </svg>
           </button>
           <div style={styles.chatHeaderText}>
-            <div style={styles.chatHeaderName}>{displayGroupName(group?.name)}</div>
+            <div style={styles.chatHeaderName}>
+              {group?.is_dm
+                ? (dmPeers?.[group.id]?.username || 'Direct message')
+                : displayGroupName(group?.name)}
+            </div>
             <div style={styles.chatHeaderSub}>
-              {memberCounts[group?.id] > 0 && (
+              {group?.is_dm ? (
+                // DMs are always 2-person, so "members" is redundant noise.
+                // Show the peer-context line instead.
+                <>Direct message{marketStatus && ' · '}{marketStatus}</>
+              ) : (
                 <>
-                  {memberCounts[group?.id]} member{memberCounts[group?.id] === 1 ? '' : 's'}
-                  {marketStatus && ' · '}
+                  {memberCounts[group?.id] > 0 && (
+                    <>
+                      {memberCounts[group?.id]} member{memberCounts[group?.id] === 1 ? '' : 's'}
+                      {marketStatus && ' · '}
+                    </>
+                  )}
+                  {marketStatus}
                 </>
               )}
-              {marketStatus}
             </div>
           </div>
           {/* Invite pill — only shown for private groups, the only groups
               where an invite code matters. Public groups join by sector pick,
-              so adding a pill there would be empty noise. Tapping reopens
-              the same ShareInviteModal the post-create flow uses. */}
-          {!group?.is_public && onShowInvite && (
+              so adding a pill there would be empty noise. DMs are 2-person
+              by definition — no inviting a third party — so they're excluded
+              here too. Tapping reopens the same ShareInviteModal the
+              post-create flow uses. */}
+          {!group?.is_public && !group?.is_dm && onShowInvite && (
             <button
               onClick={() => onShowInvite(group)}
               aria-label="Invite people"
@@ -687,18 +851,18 @@ export default function ChatTab({ session, profile, group, isAdmin, setUnreadCha
             if (isAI) {
               return (
                 <FadingMessage key={msg.id} delay={60000} duration={5000} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
-                  <MessageItem msg={msg} currentUserId={session?.user?.id} groupId={group?.id} onFeedback={handleFeedback} feedbackGiven={feedbackMap[msg.id]}isGrouped={isGrouped} />
+                  <MessageItem msg={msg} currentUserId={session?.user?.id} groupId={group?.id} onFeedback={handleFeedback} feedbackGiven={feedbackMap[msg.id]} isGrouped={isGrouped} onUsernameClick={handleUsernameClick} />
                 </FadingMessage>
               );
             }
             if (isAIQuestion) {
               return (
                 <FadingMessage key={msg.id} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
-                  <MessageItem msg={msg} currentUserId={session?.user?.id} groupId={group?.id}isGrouped={isGrouped} />
+                  <MessageItem msg={msg} currentUserId={session?.user?.id} groupId={group?.id} isGrouped={isGrouped} onUsernameClick={handleUsernameClick} />
                 </FadingMessage>
               );
             }
-            return <MessageItem key={msg.id} msg={msg} currentUserId={session?.user?.id} groupId={group?.id}isGrouped={isGrouped} />;
+            return <MessageItem key={msg.id} msg={msg} currentUserId={session?.user?.id} groupId={group?.id} isGrouped={isGrouped} onUsernameClick={handleUsernameClick} />;
           })}
           {aiLoading && (
             <div style={styles.aiLoading}>
@@ -771,6 +935,23 @@ export default function ChatTab({ session, profile, group, isAdmin, setUnreadCha
           </button>
         </div>
       )}
+
+      {/* Confirm-before-delete sheet for full-swiped private group rows. */}
+      <ConfirmLeaveGroupModal
+        open={!!leavePending}
+        group={leavePending}
+        onCancel={handleCancelLeave}
+        onConfirm={handleConfirmLeave}
+      />
+
+      {/* Username-tap popup: appears when you tap someone's name. Primary
+          action opens (or creates) a DM with them and jumps into it. */}
+      <UserProfilePopup
+        open={!!profilePopup}
+        user={profilePopup}
+        onCancel={handleCloseProfilePopup}
+        onMessage={handleOpenDm}
+      />
 
     </div>
   );
