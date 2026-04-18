@@ -66,7 +66,20 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   const [briefingExpanded, setBriefingExpanded] = useState(false);
 
   // ── Onboarding ──
-  const [onboarding, setOnboarding] = useState(() => safeGet('uptik_onboarding') || {});
+  // NOTE: safeSet/safeGet are string-only wrappers. We JSON-stringify on write
+  // and JSON.parse on read. Prior version stored the object directly, which
+  // coerced to the literal string "[object Object]" and made chat/sectors
+  // onboarding steps un-persist across reloads.
+  const [onboarding, setOnboarding] = useState(() => {
+    try {
+      const raw = safeGet('uptik_onboarding');
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  });
 
   // ── Recent Activity ──
   const [recentActivity, setRecentActivity] = useState([]);
@@ -329,7 +342,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   const markDone = (key) => {
     const updated = { ...onboarding, [key]: true };
     setOnboarding(updated);
-    safeSet('uptik_onboarding', updated);
+    safeSet('uptik_onboarding', JSON.stringify(updated));
   };
 
   const onboardingStepDefs = [
