@@ -81,6 +81,20 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
     }
   });
 
+  // Auto-complete the "Explore sector picks" onboarding step from real behavior
+  // instead of requiring the user to click the specific button inside the Get
+  // Started card. Any time `researchSector` holds a real sector (not null, not
+  // `__mylist__`), we treat that as engagement and flip the flag. Covers the
+  // sector dropdown, the Get Started button, and mount-time restore from
+  // `uptik_last_sector`.
+  useEffect(() => {
+    if (onboarding.sectors) return;
+    if (!researchSector || researchSector === '__mylist__') return;
+    const updated = { ...onboarding, sectors: true };
+    setOnboarding(updated);
+    safeSet('uptik_onboarding', JSON.stringify(updated));
+  }, [researchSector, onboarding.sectors]);
+
   // ── Recent Activity ──
   const [recentActivity, setRecentActivity] = useState([]);
 
@@ -388,7 +402,10 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
       title: 'Explore sector picks',
       desc: 'Browse analyst-curated stock picks by sector',
       done: !!onboarding.sectors,
-      action: () => { markDone('sectors'); setShowSectorDropdown(true); },
+      // No markDone() here on purpose — the step auto-completes via the
+      // useEffect above the moment a real sector is actually selected,
+      // regardless of entry point. Opening the dropdown isn't engagement.
+      action: () => { setShowSectorDropdown(true); },
       actionLabel: 'Browse Sectors',
     },
   ];
