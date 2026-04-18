@@ -153,18 +153,38 @@ export default function App() {
 
         // Handle pending invite after sign-in — await RPC before propagating session
         // so GroupContext sees the membership immediately on first load.
+        //
+        // IMPORTANT: only clear `uptik_pending_invite` after we actually get a
+        // structured response from the RPC. Transport/RPC-layer failures (network
+        // hiccup, CORS, thrown exception) leave the code in place so the next
+        // sign-in retries — otherwise a flaky connection silently burns the
+        // user's invite and they have to click the link again.
         if (event === 'SIGNED_IN' && newSession) {
           const pendingCode = safeGet('uptik_pending_invite');
           if (pendingCode) {
-            safeRemove('uptik_pending_invite');
             try {
               const { data, error } = await supabase.rpc('join_custom_group', { p_invite_code: pendingCode });
-              if (error) console.error('[App] Pending invite join failed:', error.message);
-              else if (data?.success && data.group_id) {
-                safeSet('uptik_active_group', data.group_id);
-                safeSet('uptik_join_redirect', 'chat');
+              if (error) {
+                // Transport/RPC-layer error — treat as transient, keep the code
+                // so a subsequent sign-in can retry.
+                console.error('[App] Pending invite join failed (will retry on next sign-in):', error.message);
+              } else {
+                // Structured response came back — clear the pending code either
+                // way. Keeping it on `success:false` (e.g. "Invalid invite code")
+                // would just loop on every future sign-in with no path to
+                // recovery.
+                safeRemove('uptik_pending_invite');
+                if (data?.success && data.group_id) {
+                  safeSet('uptik_active_group', data.group_id);
+                  safeSet('uptik_join_redirect', 'chat');
+                } else if (import.meta.env.DEV) {
+                  console.warn('[App] Pending invite RPC rejected:', data?.error, { code: pendingCode });
+                }
               }
-            } catch (err) { console.error('[App] Pending invite RPC crashed:', err); }
+            } catch (err) {
+              // Thrown exception (network, parse, etc.) — transient, keep code.
+              console.error('[App] Pending invite RPC crashed (will retry on next sign-in):', err);
+            }
           }
         }
 
