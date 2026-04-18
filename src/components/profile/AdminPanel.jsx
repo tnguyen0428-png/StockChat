@@ -263,9 +263,14 @@ export default function AdminPanel() {
 
   const createGroup = async () => {
     if (!newGroupName.trim()) return;
+    // created_by is required by the groups INSERT RLS policy. We set it to
+    // the admin's id so every group has a proper owner.
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { alert('Not signed in'); return; }
     const { error } = await supabase.from('groups').insert({
       name: newGroupName.trim(), is_public: newGroupPublic,
       sector: newGroupSector.trim() || null,
+      created_by: user.id,
     });
     if (error) { console.error('[AdminPanel] Create group failed:', error.message); alert('Failed to create group: ' + error.message); return; }
     setNewGroupName(''); setNewGroupSector('');
