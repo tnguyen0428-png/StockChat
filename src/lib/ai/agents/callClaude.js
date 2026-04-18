@@ -5,7 +5,7 @@ const MODELS = {
   smart: 'claude-sonnet-4-6',
 };
 
-export async function callClaude(systemPrompt, userMessage, history = [], tier = 'auto', maxTokens = null, temp = null) {
+export async function callClaude(systemPrompt, userMessage, history = [], tier = 'auto', maxTokens = null, temp = null, useWebSearch = false) {
   // Keep more history for natural conversation flow
   const recent = (history || []).slice(-12).map(msg => ({
     role: msg.role === 'assistant' ? 'assistant' : 'user',
@@ -13,12 +13,32 @@ export async function callClaude(systemPrompt, userMessage, history = [], tier =
   }));
 
   let model;
-  if (tier === 'fast') model = MODELS.fast;
-  else if (tier === 'smart') model = MODELS.smart;
-  else model = needsSonnet(userMessage) ? MODELS.smart : MODELS.fast;
+  if (useWebSearch) {
+    model = MODELS.smart;
+  } else if (tier === 'fast') {
+    model = MODELS.fast;
+  } else if (tier === 'smart') {
+    model = MODELS.smart;
+  } else {
+    model = needsSonnet(userMessage) ? MODELS.smart : MODELS.fast;
+  }
+
+  const effectiveMaxTokens = useWebSearch ? 2000 : (maxTokens || 300);
 
   // Lower temperature = better instruction following. Agents can override.
   const temperature = temp ?? 0.4;
+
+  const requestBody = {
+    model,
+    max_tokens: effectiveMaxTokens,
+    temperature,
+    system: systemPrompt,
+    messages: [...recent, { role: 'user', content: userMessage }]
+  };
+
+  if (useWebSearch) {
+    requestBody.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }];
+  }
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -28,23 +48,17 @@ export async function callClaude(systemPrompt, userMessage, history = [], tier =
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true',
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: maxTokens || 300,
-      temperature,
-      system: systemPrompt,
-      messages: [...recent, { role: 'user', content: userMessage }]
-    })
+    body: JSON.stringify(requestBody)
   });
 
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
 
-  const text = data.content[0].text;
+  const text = extractText(data.content);
 
   // If Haiku gave a truly empty or broken answer, retry with Sonnet
   // Don't penalize honest hedging like "I don't have live data"
-  if (model === MODELS.fast && isWeakAnswer(text, userMessage)) {
+  if (!useWebSearch && model === MODELS.fast && isWeakAnswer(text, userMessage)) {
     const retry = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -67,6 +81,55 @@ export async function callClaude(systemPrompt, userMessage, history = [], tier =
   }
 
   return text;
+}
+
+function extractText(contentBlocks) {
+  let text = '';
+  const sourcesMap = new Map();
+
+  for (const block of contentBlocks) {
+    if (block.type === 'text') {
+      text += block.text;
+      if (block.citations?.length) {
+        for (const cite of block.citations) {
+          if (cite.url && !sourcesMap.has(cite.url)) {
+            sourcesMap.set(cite.url, {
+              title: cite.title || cite.url,
+              pageAge: cite.page_age || null,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  if (sourcesMap.size > 0) {
+    const sourceList = [...sourcesMap.values()]
+      .map(s => `${shortenPublisher(s.title)}${s.pageAge ? ` (${formatDate(s.pageAge)})` : ''}`)
+      .join(', ');
+    text += `\n\nSources: ${sourceList}`;
+  }
+
+  return text;
+}
+
+function formatDate(pageAge) {
+  if (!pageAge) return '';
+  try {
+    const d = new Date(pageAge);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch {
+    return pageAge;
+  }
+}
+
+function shortenPublisher(title) {
+  if (!title) return 'Source';
+  return title
+    .replace(/\s[-|–]\s.*$/, '')
+    .replace(/\s*[|–]\s*\w+\s*$/, '')
+    .trim()
+    .slice(0, 40) || 'Source';
 }
 
 function needsSonnet(msg) {

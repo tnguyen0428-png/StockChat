@@ -91,6 +91,10 @@ async function fetchGuidance(ticker) {
   }
 }
 
+function isNewsQuery(question) {
+  return /\b(news|latest|recent|headline|what'?s happening|any news|article|press|announcement|why (is|are|did)|catalyst)\b/i.test(question);
+}
+
 export const dataAgent = {
   async fetchContext(supabase, params) {
     const ticker = params?.ticker?.toUpperCase();
@@ -274,7 +278,13 @@ CARD TEMPLATES — use the type selected in STEP 1:
 
 JSON rules: THREE backticks to open and close. Valid JSON only. Omit fields you don't have.${buildFeedbackContext(memory)}`;
 
+    const newsMode = isNewsQuery(question);
+    let finalPrompt = systemPrompt;
+    if (newsMode) {
+      finalPrompt += `\n\nNEWS MODE: The user is asking for news or recent developments. Use web search to find 1-5 relevant articles published recently. Summarize the key news in plain prose — what happened, why it matters, and any market impact. Cite your sources.`;
+    }
+
     // Use Sonnet for data agent — better at card selection and meaningful prose
-    return await callClaude(systemPrompt, question, history, 'smart', null, 0.4);
+    return await callClaude(finalPrompt, question, history, 'smart', newsMode ? 2000 : null, 0.4, newsMode);
   }
 };

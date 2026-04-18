@@ -5,6 +5,10 @@ import { buildFeedbackContext } from '../feedbackContext';
 // ignored by Vite's code splitter and just produced a build warning.
 import { lookupPrice } from '../tools/priceLookup';
 
+function isNewsQuery(question) {
+  return /\b(news|latest|recent|headline|what'?s happening|any news|article|press|announcement|why (is|are|did)|catalyst)\b/i.test(question);
+}
+
 export const macroAgent = {
   async fetchContext(supabase) {
     // Fetch today's alerts to see which sectors are active
@@ -108,6 +112,12 @@ RULES:
 - ${marketClosed ? 'Markets are closed — say "as of last close" not "today"' : 'Markets are open — use current data'}
 - Don't guess at sentiment if VIX data is missing${buildFeedbackContext(memory)}`;
 
-    return await callClaude(systemPrompt, question, history, 'auto', null, 0.4);
+    const newsMode = isNewsQuery(question);
+    let finalPrompt = systemPrompt;
+    if (newsMode) {
+      finalPrompt += `\n\nNEWS MODE: The user is asking for news or recent macro developments. Use web search to find 1-5 relevant articles (Fed decisions, tariff updates, Powell statements, economic data releases). Summarize the key news in plain prose — what happened, why it matters, and any market impact. Cite your sources.`;
+    }
+
+    return await callClaude(finalPrompt, question, history, 'auto', newsMode ? 2000 : null, 0.4, newsMode);
   }
 };
