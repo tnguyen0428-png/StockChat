@@ -115,7 +115,7 @@ RULES:
     const newsMode = isNewsQuery(question);
     let finalPrompt = systemPrompt;
     if (newsMode) {
-      finalPrompt += `\n\nNEWS MODE: The user is asking for news or recent macro developments. Use web search to find 1-5 relevant articles (Fed decisions, tariff updates, Powell statements, economic data releases). Summarize the key news in plain prose — what happened, why it matters, and any market impact. Cite your sources.`;
+      finalPrompt += `\n\n=== NEWS MODE OVERRIDE (takes priority over all rules above) ===\nThe user is asking for news. You MUST use the web_search tool — do not answer from memory.\nAfter searching:\n- Summarize 1-5 recent articles in plain prose (3-5 sentences total)\n- Connect the dots across articles\n- Do NOT emit uptik cards in news mode. Prose only.\n- Do NOT quote specific stock prices or price targets from articles. Skip any $ amounts $5 or higher.\n- Do NOT include a "Sources:" line — appended automatically from citations.\nEnd your response with the exact marker __NEWS_MODE_END__ on its own line.`;
     }
 
     return await callClaude(finalPrompt, question, history, 'auto', newsMode ? 2000 : null, 0.4, newsMode);

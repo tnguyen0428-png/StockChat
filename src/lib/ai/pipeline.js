@@ -167,8 +167,14 @@ export async function runPipeline(userMessage, conversationHistory, supabase, us
     bodyText = rawResponse.replace(cardBlock, '').trim();
   }
 
+  const isNewsMode = bodyText.includes('__NEWS_MODE_END__');
+  if (isNewsMode) {
+    bodyText = bodyText.replace(/__NEWS_MODE_END__\s*/g, '').trim();
+  }
   let response = stripMarkdown(bodyText);
-  response = checkForHallucination(response, context, routing.agent);
+  if (!isNewsMode) {
+    response = checkForHallucination(response, context, routing.agent);
+  }
   if (cardBlock) response = `${cardBlock}\n${response}`.trim();
 
   // Cache it, update memory (non-blocking). We don't want memory write
