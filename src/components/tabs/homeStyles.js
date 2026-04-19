@@ -29,20 +29,56 @@ export function getHomeStyles(t) {
     content: { flex: 1, overflowY: 'auto', paddingBottom: 8, background: t.bg, position: 'relative', zIndex: 1 },
     sectionDivider: { height: 1, background: t.border, margin: '0 14px' },
 
-    // ── Briefing ──
-    briefSection: { padding: '8px 14px 6px' },
-    briefHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    briefTitle: { fontSize: 14, fontWeight: 700, color: t.text1, letterSpacing: '-0.01em' },
-    briefTime: { fontSize: 11, color: t.text3 },
-    briefToggle: { fontSize: 12, color: t.green, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' },
-    briefCard: {
-      background: t.card, border: `1px solid ${t.border}`, borderRadius: 12,
-      padding: '10px 12px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10,
+    // ── Briefing (editorial / morning-paper layout) ──
+    briefSection: { padding: '10px 14px 8px' },
+    briefHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
+    briefKicker: {
+      fontFamily: "'Fraunces', Georgia, serif", fontSize: 22, fontWeight: 500,
+      color: t.text1, letterSpacing: '-0.02em', lineHeight: 1.15,
     },
-    bfTickers: { fontSize: 11, fontWeight: 700, color: t.green, marginBottom: 2 },
-    bfTitle: { fontSize: 13, color: t.text1, fontWeight: 500, lineHeight: 1.3 },
-    bfLink: { color: t.green, fontSize: 12, fontWeight: 600, textDecoration: 'none', flexShrink: 0 },
-    briefEmpty: { background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, padding: 16, textAlign: 'center', fontSize: 13, color: t.text3 },
+    briefMeta: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 10 },
+    briefTime: { fontSize: 11, color: t.text3 },
+    moodPill: {
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
+      padding: '3px 8px', borderRadius: 20,
+    },
+    moodDot: { width: 6, height: 6, borderRadius: '50%', flexShrink: 0 },
+    briefArticlesHead: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 },
+    briefArticlesLabel: {
+      fontSize: 9, fontWeight: 700, color: t.text3,
+      textTransform: 'uppercase', letterSpacing: 1, flexShrink: 0,
+    },
+    briefArticlesRule: { flex: 1, height: 1, background: t.border },
+    briefArticlesCount: { fontSize: 9, fontWeight: 700, color: t.text3, flexShrink: 0 },
+    briefRow: {
+      display: 'flex', alignItems: 'flex-start', gap: 10,
+      padding: '8px 0', borderBottom: `1px solid ${t.border}`,
+      textDecoration: 'none', color: 'inherit',
+    },
+    briefRowNum: {
+      fontSize: 10, fontWeight: 700, color: t.text3,
+      width: 18, flexShrink: 0, paddingTop: 2, fontFamily: 'monospace',
+    },
+    briefRowBody: { flex: 1, minWidth: 0 },
+    briefRowTickers: { display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 3 },
+    briefTicker: {
+      fontSize: 9, fontWeight: 700, color: t.green,
+      background: 'rgba(26,173,94,0.1)', borderRadius: 3,
+      padding: '1px 5px', letterSpacing: 0.5,
+    },
+    briefRowTitle: { fontSize: 13, color: t.text1, fontWeight: 500, lineHeight: 1.35 },
+    briefRowPublisher: { fontSize: 10, color: t.text3, marginTop: 2 },
+    briefExpand: {
+      marginTop: 8, fontSize: 10, fontWeight: 700, color: t.green,
+      textTransform: 'uppercase', letterSpacing: 0.8,
+      background: 'none', border: 'none', cursor: 'pointer',
+      fontFamily: 'inherit', padding: 0, display: 'flex', alignItems: 'center', gap: 4,
+    },
+    briefEmpty: {
+      background: t.card, border: `1px solid ${t.border}`, borderRadius: 12,
+      padding: '20px 16px', textAlign: 'center',
+    },
 
     // ── Stocks section (inline) ──
     stocksSection: { padding: '0 14px 6px' },

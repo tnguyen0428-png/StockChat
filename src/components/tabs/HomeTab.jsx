@@ -20,6 +20,20 @@ import { useSectorResearch } from '../../hooks/useSectorResearch';
 import { useLeaderboard } from '../../hooks/useLeaderboard';
 import { usePortfolio } from '../../hooks/usePortfolio';
 
+function MoodPill({ mood, S, t }) {
+  const config = {
+    'risk-on': { label: 'Risk-On', color: '#1AAD5E', bg: 'rgba(26,173,94,0.1)', dot: '#1AAD5E' },
+    'risk-off': { label: 'Risk-Off', color: '#E24B4A', bg: 'rgba(226,75,74,0.1)', dot: '#E24B4A' },
+    'neutral': { label: 'Mixed', color: '#7a8ea3', bg: 'rgba(122,142,163,0.1)', dot: '#7a8ea3' },
+  }[mood] || { label: 'Mixed', color: '#7a8ea3', bg: 'rgba(122,142,163,0.1)', dot: '#7a8ea3' };
+  return (
+    <div style={{ ...S.moodPill, background: config.bg, color: config.color }}>
+      <span style={{ ...S.moodDot, background: config.dot }} />
+      {config.label}
+    </div>
+  );
+}
+
 const SIGNAL_LABELS = {
   gap_up: 'Gap Up',
   '52w_high': '52W High',
@@ -499,40 +513,51 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
         {/* ── TODAY'S MARKET (briefing) ── */}
         <div style={S.briefSection}>
           <div style={S.briefHeader}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={S.briefTitle}>Daily Briefing</span>
-              {briefing && (
-                <span style={S.briefTime}>
-                  {(() => {
-                    const briefDate = new Date(briefing.created_at);
-                    const todayMidnight = new Date();
-                    todayMidnight.setHours(0, 0, 0, 0);
-                    const isToday = briefDate >= todayMidnight;
-                    const timeStr = briefDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-                    return (isToday ? '' : 'Yesterday · ') + timeStr + ' EST';
-                  })()}
-                </span>
-              )}
-            </div>
-            {briefingArticles.length > 1 && (
-              <button style={S.briefToggle} onClick={() => setBriefingExpanded(p => !p)}>
-                {briefingExpanded ? 'Less ▲' : `+${briefingArticles.length - 1} more ▼`}
-              </button>
+            <div style={S.briefKicker}>Morning Briefing</div>
+          </div>
+          <div style={S.briefMeta}>
+            {briefing && (
+              <span style={S.briefTime}>
+                {(() => {
+                  const briefDate = new Date(briefing.created_at);
+                  const todayMidnight = new Date();
+                  todayMidnight.setHours(0, 0, 0, 0);
+                  const isToday = briefDate >= todayMidnight;
+                  const timeStr = briefDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                  return (isToday ? '' : 'Yesterday · ') + timeStr + ' EST';
+                })()}
+              </span>
             )}
+            {briefing?.mood && <MoodPill mood={briefing.mood} S={S} t={t} />}
           </div>
 
           {briefingArticles.length > 0 ? (
             <>
-              <BriefCard article={briefingArticles[0]} S={S} />
-              {briefingExpanded && briefingArticles.slice(1).map((a, i) => (
-                <BriefCard key={i} article={a} S={S} />
+              <div style={S.briefArticlesHead}>
+                <span style={S.briefArticlesLabel}>What's Moving</span>
+                <div style={S.briefArticlesRule} />
+                <span style={S.briefArticlesCount}>{briefingArticles.length}</span>
+              </div>
+              {(briefingExpanded ? briefingArticles : briefingArticles.slice(0, 3)).map((a, i) => (
+                <BriefCard key={i} article={a} S={S} index={i} />
               ))}
+              {briefingArticles.length > 3 && (
+                <button style={S.briefExpand} onClick={() => setBriefingExpanded(p => !p)}>
+                  {briefingExpanded ? 'Show Less ▲' : `Read ${briefingArticles.length - 3} More →`}
+                </button>
+              )}
             </>
           ) : (
-            <div style={{ ...S.briefEmpty, textAlign: 'center', padding: '16px 14px' }}>
-              <div style={{ fontSize: 24, marginBottom: 6 }}>📰</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: t.text1, marginBottom: 4 }}>Briefing posts weekdays at 9:00 AM EST</div>
-              <div style={{ fontSize: 11, color: t.text3 }}>AI-generated market summary with today's top headlines and alerts</div>
+            <div style={S.briefEmpty}>
+              <div style={{
+                width: 40, height: 40, borderRadius: '50%',
+                background: 'rgba(26,173,94,0.1)', border: '1.5px solid rgba(26,173,94,0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 10px',
+                fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, fontWeight: 500, color: '#1AAD5E',
+              }}>U</div>
+              <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 16, fontWeight: 500, color: t.text1, marginBottom: 6 }}>Tomorrow at 9:00 AM</div>
+              <div style={{ fontSize: 11, color: t.text3, lineHeight: 1.5 }}>AI-curated market summary with top headlines, movers, and alerts — delivered every weekday morning.</div>
             </div>
           )}
         </div>
