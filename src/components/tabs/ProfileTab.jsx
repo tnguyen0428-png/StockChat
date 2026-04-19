@@ -17,6 +17,16 @@ export default function ProfileTab({ session, profile, group, isAdmin, onSignOut
   const [newUsername, setNewUsername] = useState('');
   const [savingName, setSavingName] = useState(false);
 
+  // ── Change Password (in-app) ──
+  // Inline reveal — click the row to expose a single new-password input.
+  // Uses supabase.auth.updateUser({ password }) which works against the
+  // user's current authenticated session (no re-auth required).
+  const [editingPw, setEditingPw] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [savingPw, setSavingPw] = useState(false);
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState(false);
+
   useEffect(() => {
     if (!session?.user?.id) return;
     let cancelled = false;
@@ -55,6 +65,45 @@ export default function ProfileTab({ session, profile, group, isAdmin, onSignOut
       console.error('[ProfileTab] Toggle notification failed:', error.message);
       setNotifications(notifications); // revert on failure
     }
+  };
+
+  const savePassword = async () => {
+    if (savingPw) return;
+    if (newPassword.length < 6) {
+      setPwError('Password must be at least 6 characters.');
+      return;
+    }
+    setPwError('');
+    setSavingPw(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setSavingPw(false);
+    if (error) {
+      const msg = (error.message || '').toLowerCase();
+      if (msg.includes('different from the old') || msg.includes('same as')) {
+        setPwError('New password must be different from your current password.');
+      } else if (msg.includes('weak') || msg.includes('at least') || msg.includes('character')) {
+        setPwError(error.message);
+      } else {
+        setPwError(error.message || 'Could not update password. Please try again.');
+      }
+      return;
+    }
+    // Success — show checkmark, clear input, auto-collapse after 2s.
+    setNewPassword('');
+    setPwSuccess(true);
+    setTimeout(() => {
+      setPwSuccess(false);
+      setEditingPw(false);
+    }, 2000);
+    document.activeElement?.blur();
+  };
+
+  const cancelPasswordEdit = () => {
+    setEditingPw(false);
+    setNewPassword('');
+    setPwError('');
+    setPwSuccess(false);
+    document.activeElement?.blur();
   };
 
   const saveUsername = async () => {
@@ -154,9 +203,52 @@ export default function ProfileTab({ session, profile, group, isAdmin, onSignOut
             </div>
           )}
         </div>
-        <div style={styles.settingRow}>
+        <div style={{ ...styles.settingRow, borderBottom: '1px solid var(--border)' }}>
           <span style={styles.settingLabel}>Email</span>
           <span style={styles.settingValue}>{session?.user?.email?.split('@')[0] + '...'}</span>
+        </div>
+        <div style={styles.settingRow}>
+          {pwSuccess ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              <span style={styles.settingLabel}>Password</span>
+              <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>✓ Updated</span>
+            </div>
+          ) : editingPw ? (
+            <div style={{ width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+                <input
+                  style={styles.nameInput}
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="New password (min 6)"
+                  autoFocus
+                  onKeyDown={e => e.key === 'Enter' && savePassword()}
+                  // Don't let the browser autofill the user's existing saved
+                  // password here — that would submit their old password and
+                  // Supabase rejects it with "new password should be different
+                  // from the old password".
+                  autoComplete="new-password"
+                  name="new-password"
+                  enterKeyHint="done"
+                />
+                <button style={styles.nameSaveBtn} onClick={savePassword} disabled={savingPw}>
+                  {savingPw ? '..' : 'Save'}
+                </button>
+                <button style={styles.nameCancelBtn} onClick={cancelPasswordEdit}>✕</button>
+              </div>
+              {pwError && <div style={{ fontSize: 12, color: '#EF4444', marginTop: 8 }}>{pwError}</div>}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', cursor: 'pointer' }}
+              onClick={() => { setEditingPw(true); setNewPassword(''); setPwError(''); }}>
+              <span style={styles.settingLabel}>Password</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={styles.settingValue}>••••••••</span>
+                <span style={{ fontSize: 10, color: '#3B6D11', fontWeight: 500 }}>change</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

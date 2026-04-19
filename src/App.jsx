@@ -59,9 +59,24 @@ function ProtectedRoute({ session, children }) {
   return children;
 }
 
+// Detect recovery mode SYNCHRONOUSLY at module load — before React's first
+// render and before Supabase's async _initialize() can clear the URL hash.
+// Without this, a cold-load with #type=recovery races:
+//  - If Supabase clears the hash before useEffect runs, hash detection misses it.
+//  - Supabase's PASSWORD_RECOVERY event may fire before onAuthStateChange's
+//    listener is attached — events are not buffered, so it's silently lost.
+// Reading the URL here guarantees recoveryMode is true on the very first render
+// regardless of which path the Supabase email link redirects to (/, /login, /app).
+const RECOVERY_ON_LOAD = (() => {
+  if (typeof window === 'undefined') return false;
+  const hash = window.location.hash || '';
+  const params = new URLSearchParams(window.location.search);
+  return hash.includes('type=recovery') || params.get('type') === 'recovery';
+})();
+
 export default function App() {
   const [session, setSession]           = useState(undefined);
-  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recoveryMode, setRecoveryMode] = useState(RECOVERY_ON_LOAD);
 
   useEffect(() => {
     // ── Handle email confirmation / password recovery token in URL ──
@@ -195,6 +210,15 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Recovery mode is a TOP-LEVEL override — show the reset form regardless of
+  // the URL path. The Supabase email link may land on /, /login, /app, or
+  // anywhere else depending on dashboard config (Site URL + Redirect URLs
+  // allowlist). Gating only on /login meant a misconfigured dashboard silently
+  // auto-logged the user into /app with no way to reach the reset form.
+  if (recoveryMode) {
+    return <LoginPage recoveryMode onPasswordReset={() => setRecoveryMode(false)} />;
+  }
+
   return (
     <Routes>
       <Route
@@ -204,11 +228,9 @@ export default function App() {
       <Route
         path="/login"
         element={
-          recoveryMode
-            ? <LoginPage recoveryMode onPasswordReset={() => setRecoveryMode(false)} />
-            : session
-              ? <Navigate to="/app" replace />
-              : <LoginPage />
+          session
+            ? <Navigate to="/app" replace />
+            : <LoginPage />
         }
       />
       <Route
