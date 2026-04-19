@@ -850,14 +850,14 @@ export default function ChatTab({ session, profile, group, isAdmin, setUnreadCha
             const isAIQuestion = msg.type === 'user' && /@AI\b/i.test(msg.text);
             if (isAI) {
               return (
-                <FadingMessage key={msg.id} delay={60000} duration={5000} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
+                <FadingMessage key={msg.id} delay={120000} duration={10000} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
                   <MessageItem msg={msg} currentUserId={session?.user?.id} groupId={group?.id} onFeedback={handleFeedback} feedbackGiven={feedbackMap[msg.id]} isGrouped={isGrouped} onUsernameClick={handleUsernameClick} />
                 </FadingMessage>
               );
             }
             if (isAIQuestion) {
               return (
-                <FadingMessage key={msg.id} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
+                <FadingMessage key={msg.id} delay={120000} duration={10000} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
                   <MessageItem msg={msg} currentUserId={session?.user?.id} groupId={group?.id} isGrouped={isGrouped} onUsernameClick={handleUsernameClick} />
                 </FadingMessage>
               );
