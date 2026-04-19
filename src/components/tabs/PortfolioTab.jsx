@@ -76,7 +76,7 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
     selectedTicker, showPresets, customAmount, setCustomAmount,
     showCustom, setShowCustom, buyError, buying,
     handleSelectTicker, executeBuy, clearSelection, onSellComplete,
-    totalPositionsValue, cashBalance, totalValue, totalReturn, isPositive, marketOpen,
+    totalPositionsValue, totalCostBasis, cashBalance, totalValue, totalReturn, isPositive, marketOpen,
   } = portfolio;
 
   const {
@@ -301,7 +301,7 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
             <div style={s.portCash}>
               <div style={s.portCashItem}><div style={s.portCashLabel}>Total</div><div style={{ ...s.portCashVal, color: t.green }}>${totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
               <div style={{ ...s.portCashItem, borderLeft: `1px solid ${t.border}` }}><div style={s.portCashLabel}>Cash</div><div style={s.portCashVal}>${cashBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
-              <div style={{ ...s.portCashItem, borderLeft: `1px solid ${t.border}` }}><div style={s.portCashLabel}>Invested</div><div style={s.portCashVal}>${totalPositionsValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
+              <div style={{ ...s.portCashItem, borderLeft: `1px solid ${t.border}` }}><div style={s.portCashLabel}>Invested</div><div style={s.portCashVal}>${totalCostBasis.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div></div>
             </div>
             <div style={s.portSecLabel}>Positions · {trades.length}</div>
             {trades.length === 0 ? (

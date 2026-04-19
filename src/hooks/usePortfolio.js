@@ -292,6 +292,9 @@ export function usePortfolio(session) {
     const curPrice = prices[t.ticker] || Number(t.entry_price);
     return sum + (Number(t.shares) * curPrice);
   }, 0), [trades, prices]);
+  const totalCostBasis = useMemo(() => trades.reduce((sum, t) => {
+    return sum + (Number(t.shares) * Number(t.entry_price));
+  }, 0), [trades]);
   const cashBalance = Number(portfolio?.cash_balance || 0);
   const totalValue  = cashBalance + totalPositionsValue;
   const totalReturn = ((totalValue - STARTING_CASH) / STARTING_CASH) * 100;
@@ -311,6 +314,6 @@ export function usePortfolio(session) {
     buyError, buying,
     loadPortfolio, fetchPrices, loadClosedTrades,
     handleSelectTicker, executeBuy, clearSelection, onSellComplete,
-    totalPositionsValue, cashBalance, totalValue, totalReturn, isPositive, marketOpen,
+    totalPositionsValue, totalCostBasis, cashBalance, totalValue, totalReturn, isPositive, marketOpen,
   };
 }
