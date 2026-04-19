@@ -1054,12 +1054,12 @@ const styles = {
     letterSpacing: '0.4px', border: '1px solid rgba(139,92,246,0.15)',
   },
   msgText: {
-    fontSize: 13, color: 'var(--text1)',
+    fontSize: 14, color: 'var(--text1)',
     lineHeight: 1.5, wordBreak: 'break-word',
   },
   tickerMention: {
     background: 'rgba(212,160,23,0.1)', color: '#D4A017',
-    fontSize: 13, fontWeight: 600,
+    fontSize: 14, fontWeight: 600,
     padding: '1px 5px', borderRadius: 4,
     border: '1px solid rgba(212,160,23,0.25)',
   },
