@@ -541,6 +541,24 @@ export default function ChatTab({ session, profile, group, isAdmin, setUnreadCha
     el.scrollTop = el.scrollHeight;
   }, [activeTab, viewMode, loading, group?.id]);
 
+  // Capture "was the user near the bottom" on every scroll event, BEFORE
+  // any new content can grow scrollHeight. A long AI response (or any
+  // >150px content bump on one render tick) otherwise makes the post-render
+  // nearBottom check below return false even though the user was pinned to
+  // the bottom the instant before the response landed — which was the root
+  // cause of "ask @AI, response appears below the fold, chat doesn't scroll."
+  const wasNearBottomRef = useRef(true);
+  useEffect(() => {
+    const el = messagesAreaRef.current;
+    if (!el) return;
+    const update = () => {
+      wasNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    };
+    update(); // seed from initial mount
+    el.addEventListener('scroll', update, { passive: true });
+    return () => el.removeEventListener('scroll', update);
+  }, []);
+
   // Hard-pin scroll to bottom on any new message or AI loading state —
   // only when the user was already near the bottom. Fires ONLY on
   // [messages.length, aiLoading] changes, never on scroll or viewport
@@ -548,12 +566,13 @@ export default function ChatTab({ session, profile, group, isAdmin, setUnreadCha
   useEffect(() => {
     const el = messagesAreaRef.current;
     if (!el) return;
-    // Only auto-scroll if user is near bottom — don't yank them away from reading history
-    const nearBottom = () => el.scrollHeight - el.scrollTop - el.clientHeight < 150;
-    if (!nearBottom()) return;
+    // Gate on the PRE-render near-bottom state (captured by the scroll
+    // listener above) — not the post-render DOM, which lies when the new
+    // content is taller than the 150px tolerance.
+    if (!wasNearBottomRef.current) return;
     const pin = () => {
-      if (!nearBottom()) return;
       el.scrollTop = el.scrollHeight;
+      wasNearBottomRef.current = true;
     };
     const raf = requestAnimationFrame(pin);
     const t = setTimeout(pin, 120);
