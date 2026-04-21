@@ -3,11 +3,12 @@
 // ============================================
 
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { signIn, signUp, supabase } from '../lib/supabase';
 
 export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,6 +44,14 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
       el?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
     }, 280);
   };
+
+  // Pre-fill mode and email from landing page redirect params
+  useEffect(() => {
+    const modeParam = searchParams.get('mode');
+    const emailParam = searchParams.get('email');
+    if (modeParam === 'signup') setMode('signup');
+    if (emailParam) setEmail(emailParam);
+  }, []);
 
   // Clear stale errors when entering recovery mode
   useEffect(() => {

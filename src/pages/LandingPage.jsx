@@ -34,6 +34,10 @@ export default function LandingPage() {
     e.preventDefault();
     if (!email.trim()) { showError('Enter your email'); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { showError('Invalid email'); return; }
+    if (spotsOpen > 0) {
+      navigate(`/login?mode=signup&email=${encodeURIComponent(email.trim().toLowerCase())}`);
+      return;
+    }
     setSubmitting(true);
     const { error } = await supabase
       .from('waitlist')
@@ -264,7 +268,7 @@ export default function LandingPage() {
                       transition: 'background 0.15s',
                     }}
                   >
-                    {submitting ? '…' : btnError || 'Get early access'}
+                    {submitting ? '…' : btnError || (spotsOpen > 0 ? 'Create account' : 'Join waitlist')}
                   </button>
                 </form>
               )}
