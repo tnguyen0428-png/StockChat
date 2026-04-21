@@ -115,25 +115,25 @@ export default function LandingPage() {
             padding: '12px 20px', maxWidth: 600, margin: '0 auto',
           }}>
             {/* Logo */}
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <svg width="26" height="26" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0"
-                strokeLinecap="round" strokeLinejoin="round"
-                style={{ marginRight: -2, position: 'relative', top: 3 }}>
-                <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3.5"/>
-                <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.5" opacity="0.6"/>
-                <path d="M25 22 L25 30" strokeWidth="1.8" opacity="0.35"/>
-                <path d="M35 8 L29 14 M35 8 L41 14" strokeWidth="3.5"/>
-              </svg>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'baseline' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <svg width="26" height="26" viewBox="0 0 50 50" fill="none" stroke="#8cd9a0"
+                  strokeLinecap="round" strokeLinejoin="round"
+                  style={{ marginTop: -2 }}>
+                  <path d="M15 14 L15 32 C15 42 35 42 35 32 L35 8" strokeWidth="3.5"/>
+                  <path d="M20 18 L20 31 C20 38 30 38 30 31 L30 14" strokeWidth="2.5" opacity="0.6"/>
+                  <path d="M25 22 L25 30" strokeWidth="1.8" opacity="0.35"/>
+                  <path d="M35 8 L29 14 M35 8 L41 14" strokeWidth="3.5"/>
+                </svg>
+                <div style={{ display: 'flex', alignItems: 'baseline', marginLeft: -4 }}>
                   <span style={{ fontSize: 18, fontWeight: 500, color: '#8cd9a0' }}>p</span>
                   <span style={{ fontSize: 18, fontWeight: 500, color: '#f0ede8' }}>tik</span>
                 </div>
-                <div style={{
-                  fontSize: 9, color: '#d4e4f2', letterSpacing: 1.5,
-                  fontFamily: "'Outfit', sans-serif", marginTop: -2, paddingLeft: 2,
-                }}>a l e r t s</div>
               </div>
+              <div style={{
+                fontSize: 9, color: '#d4e4f2', letterSpacing: 1.5,
+                fontFamily: "'Outfit', sans-serif", marginTop: -2, paddingLeft: 24,
+              }}>a l e r t s</div>
             </div>
             {/* Right */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
