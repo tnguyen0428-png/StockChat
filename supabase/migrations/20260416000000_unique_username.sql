@@ -30,8 +30,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS profiles_username_lower_unique
 
 -- 3. Replace handle_new_user() so a collision appends a random suffix
 --    instead of raising and aborting the auth.users insert.
+--
+--    IMPORTANT: SECURITY DEFINER functions in Supabase run with an empty
+--    search_path by default (security hardening), so unqualified 'profiles'
+--    resolves to nothing and the insert fails with 42P01 "relation profiles
+--    does not exist" — surfaced to the client as the generic "Database error
+--    saving new user". Fix it two ways: SET search_path on the function AND
+--    schema-qualify every table reference as public.profiles.
 CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS trigger AS $$
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
 DECLARE
   v_username text;
   v_candidate text;
@@ -45,18 +56,18 @@ BEGIN
 
   -- Try up to 5 times with a random suffix to resolve collisions.
   WHILE EXISTS (
-    SELECT 1 FROM profiles WHERE lower(username) = lower(v_candidate)
+    SELECT 1 FROM public.profiles WHERE lower(username) = lower(v_candidate)
   ) AND v_attempt < 5 LOOP
     v_candidate := v_username || substr(md5(random()::text || clock_timestamp()::text), 1, 4);
     v_attempt := v_attempt + 1;
   END LOOP;
 
-  INSERT INTO profiles (id, username, color)
+  INSERT INTO public.profiles (id, username, color)
   VALUES (new.id, v_candidate, '#1AAD5E');
 
   RETURN new;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Trigger itself (on_auth_user_created) was created in supabase_tables.sql
 -- and doesn't need to be re-created — CREATE OR REPLACE FUNCTION swaps in
