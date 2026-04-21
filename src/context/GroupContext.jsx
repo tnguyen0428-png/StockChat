@@ -276,6 +276,19 @@ export function GroupProvider({ session, children }) {
 
     if (error) return { error: error.message };
 
+    // For DM groups, also remove our dm_participants row. loadProfile() uses
+    // dm_participants as the source of truth for DM surfacing, so without
+    // this the DM re-appears on the next reload even after the group_members
+    // delete succeeds. Safe no-op when the row doesn't exist (non-DM group).
+    const { error: dmError } = await supabase
+      .from('dm_participants')
+      .delete()
+      .eq('group_id', groupId)
+      .eq('user_id', session.user.id);
+    if (dmError && import.meta.env.DEV) {
+      console.warn('[GroupContext] dm_participants delete failed:', dmError.message);
+    }
+
     // If leaving the active group, clear it
     if (activeGroup?.id === groupId) {
       setActiveGroup(null);
