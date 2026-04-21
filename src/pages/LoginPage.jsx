@@ -20,10 +20,29 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
   const [newPassword, setNewPassword] = useState('');
   const [resetDone, setResetDone] = useState(false);
 
+  // Show/hide password toggles (independent for login and recovery forms)
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
   // Refs for focus management when switching between login/signup tabs.
   // autoFocus only runs on mount, so switching modes wouldn't move focus.
+  // Password refs also act as a fallback read path on submit: iOS autofill
+  // occasionally writes values to the DOM without firing React's onChange,
+  // so controlled-input state can lag.
   const usernameRef = useRef(null);
   const emailRef = useRef(null);
+  const passwordRef = useRef(null);
+  const newPasswordRef = useRef(null);
+
+  // iOS Safari + standalone PWA sometimes leaves a focused input hidden
+  // behind the keyboard. Defer past the keyboard-open animation, then
+  // center the input in the visible viewport.
+  const scrollFocusedIntoView = (e) => {
+    const el = e.currentTarget;
+    setTimeout(() => {
+      el?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    }, 280);
+  };
 
   // Clear stale errors when entering recovery mode
   useEffect(() => {
@@ -71,14 +90,19 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
     return () => clearTimeout(timer);
   }, [resetDone]);
 
-  const handlePasswordReset = async () => {
-    if (newPassword.length < 6) {
+  const handlePasswordReset = async (e) => {
+    e?.preventDefault?.();
+    // Ref fallback: iOS autofill / password managers can populate the DOM
+    // without firing React's onChange, so controlled state may lag.
+    const pw = newPassword || newPasswordRef.current?.value || '';
+    if (pw !== newPassword) setNewPassword(pw);
+    if (pw.length < 6) {
       setError('Password must be at least 6 characters.');
       return;
     }
     setError('');
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    const { error } = await supabase.auth.updateUser({ password: pw });
     setLoading(false);
     if (error) {
       // Surface the real Supabase error so users know what to fix instead
@@ -133,29 +157,47 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
               </button>
             </>
           ) : (
-            <>
+            <form onSubmit={handlePasswordReset} noValidate>
               <div style={styles.resetTitle}>Set New Password</div>
               <div style={styles.fieldWrap}>
-                <label style={styles.label}>New Password</label>
-                <input
-                  style={styles.input}
-                  type="password"
-                  placeholder="Min 6 characters"
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handlePasswordReset()}
-                  autoFocus
-                  // autoComplete="new-password" tells the browser NOT to autofill
-                  // the user's existing saved password here — otherwise they'll
-                  // submit their old password and Supabase rejects it with
-                  // "new password should be different from the old password".
-                  autoComplete="new-password"
-                  name="new-password"
-                />
+                <label style={styles.label} htmlFor="lp-new-password">New Password</label>
+                <div style={styles.passwordWrap}>
+                  <input
+                    id="lp-new-password"
+                    ref={newPasswordRef}
+                    style={{ ...styles.input, paddingRight: 64 }}
+                    type={showNewPassword ? 'text' : 'password'}
+                    placeholder="Min 6 characters"
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    onFocus={scrollFocusedIntoView}
+                    disabled={loading}
+                    autoFocus
+                    // autoComplete="new-password" tells the browser NOT to autofill
+                    // the user's existing saved password here — otherwise they'd
+                    // submit their old password and Supabase rejects it with
+                    // "new password should be different from the old password".
+                    // It also lets iOS/password managers offer to save the update.
+                    autoComplete="new-password"
+                    name="new-password"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    enterKeyHint="go"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(v => !v)}
+                    aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                    style={styles.passwordToggle}
+                  >
+                    {showNewPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
               </div>
               {error && <div style={styles.error}>{error}</div>}
               <button
-                onClick={handlePasswordReset}
+                type="submit"
                 disabled={loading}
                 style={{ ...styles.submitBtn, ...(loading ? styles.submitDisabled : {}) }}
               >
@@ -166,7 +208,7 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
                   </div>
                 ) : 'Update Password'}
               </button>
-            </>
+            </form>
           )}
         </div>
 
@@ -177,20 +219,30 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
     );
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e?.preventDefault?.();
     setError('');
     setSuccess('');
 
+    // Ref fallback: iOS autofill / password managers can populate the DOM
+    // without firing React's onChange. Prefer state, fall back to live DOM.
+    const emailVal    = (email    || emailRef.current?.value    || '').trim();
+    const passwordVal =  password || passwordRef.current?.value || '';
+    const usernameVal = (username || usernameRef.current?.value || '').trim();
+    if (emailVal    !== email)    setEmail(emailVal);
+    if (passwordVal !== password) setPassword(passwordVal);
+    if (usernameVal !== username) setUsername(usernameVal);
+
     // Basic validation
-    if (!email.trim() || !password.trim()) {
+    if (!emailVal || !passwordVal) {
       setError('Please enter your email and password.');
       return;
     }
-    if (mode === 'signup' && !username.trim()) {
+    if (mode === 'signup' && !usernameVal) {
       setError('Please enter a username.');
       return;
     }
-    if (password.length < 6) {
+    if (passwordVal.length < 6) {
       setError('Password must be at least 6 characters.');
       return;
     }
@@ -198,7 +250,7 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
     setLoading(true);
 
     if (mode === 'login') {
-      const { error } = await signIn(email.trim(), password);
+      const { error } = await signIn(emailVal, passwordVal);
       if (error) {
         const msg = (error.message || '').toLowerCase();
         if (msg.includes('email not confirmed') || msg.includes('not confirmed') || msg.includes('confirm your email')) {
@@ -215,7 +267,7 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
       // which triggers <Navigate to="/app"> in the /login route automatically.
       // Navigating manually causes a flash because session hasn't propagated yet.
     } else {
-      const { data, error } = await signUp(email.trim(), password, username.trim());
+      const { data, error } = await signUp(emailVal, passwordVal, usernameVal);
       if (error) {
         const msg = (error.message || '').toLowerCase();
         if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('already been registered')) {
@@ -238,10 +290,6 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
     }
 
     setLoading(false);
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') handleSubmit();
   };
 
   return (
@@ -268,12 +316,14 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
         {/* Mode Toggle */}
         <div style={styles.toggle}>
           <button
+            type="button"
             onClick={() => { setMode('login'); setError(''); setSuccess(''); }}
             style={{ ...styles.toggleBtn, ...(mode === 'login' ? styles.toggleActive : {}) }}
           >
             Sign In
           </button>
           <button
+            type="button"
             onClick={() => { setMode('signup'); setError(''); setSuccess(''); }}
             style={{ ...styles.toggleBtn, ...(mode === 'signup' ? styles.toggleActive : {}) }}
           >
@@ -281,109 +331,152 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
           </button>
         </div>
 
-        {/* Username field - signup only */}
-        {mode === 'signup' && (
-          <div style={styles.fieldWrap}>
-            <label style={styles.label}>Trader Name</label>
-            <input
-              ref={usernameRef}
-              style={styles.input}
-              type="text"
-              placeholder="e.g. TonyT"
-              value={username}
-              onChange={e => setUsername(e.target.value.replace(/[^a-zA-Z0-9_.]/g, '').slice(0, 20))}
-              onKeyDown={handleKeyDown}
-              maxLength={20}
-            />
-            <div style={styles.hint}>Letters, numbers, <code>_</code> and <code>.</code> only</div>
-          </div>
-        )}
+        <form onSubmit={handleSubmit} noValidate>
 
-        {/* Email */}
-        <div style={styles.fieldWrap}>
-          <label style={styles.label}>Email</label>
-          <input
-            ref={emailRef}
-            style={styles.input}
-            type="email"
-            placeholder="you@email.com"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-
-        {/* Password */}
-        <div style={styles.fieldWrap}>
-          <label style={styles.label}>Password</label>
-          <input
-            style={styles.input}
-            type="password"
-            placeholder={mode === 'signup' ? 'Min 6 characters' : 'Your password'}
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div style={styles.error}>{error}</div>
-        )}
-
-        {/* Success */}
-        {success && (
-          <div style={styles.successMsg}>{success}</div>
-        )}
-
-        {/* Submit Button */}
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          style={{ ...styles.submitBtn, ...(loading ? styles.submitDisabled : {}) }}
-        >
-          {loading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <div style={styles.spinner} />
-              {mode === 'login' ? 'Signing in...' : 'Creating account...'}
+          {/* Username field - signup only */}
+          {mode === 'signup' && (
+            <div style={styles.fieldWrap}>
+              <label style={styles.label} htmlFor="lp-username">Trader Name</label>
+              <input
+                id="lp-username"
+                ref={usernameRef}
+                style={styles.input}
+                type="text"
+                placeholder="e.g. TonyT"
+                value={username}
+                onChange={e => setUsername(e.target.value.replace(/[^a-zA-Z0-9_.]/g, '').slice(0, 20))}
+                onFocus={scrollFocusedIntoView}
+                disabled={loading}
+                maxLength={20}
+                autoComplete="username"
+                name="username"
+                inputMode="text"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="next"
+              />
+              <div style={styles.hint}>Letters, numbers, <code>_</code> and <code>.</code> only</div>
             </div>
-          ) : (
-            mode === 'login' ? 'Sign In' : 'Create Account'
           )}
-        </button>
 
-        {/* Forgot password */}
-        {mode === 'login' && (
-          <div style={styles.forgotWrap}>
-            <button
-              onClick={async () => {
-                if (loading) return;
-                if (!email.trim()) { setError('Enter your email first.'); return; }
-                setError('');
-                setSuccess('');
-                setLoading(true);
-                const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-                  redirectTo: `${window.location.origin}/login`,
-                });
-                setLoading(false);
-                if (error) {
-                  const msg = (error.message || '').toLowerCase();
-                  if (msg.includes('rate') || msg.includes('too many')) {
-                    setError('Too many reset attempts. Please wait a minute and try again.');
-                  } else {
-                    setError(error.message || 'Could not send reset email. Please try again.');
-                  }
-                } else {
-                  setSuccess('✓ Check your email for a reset link (and your spam folder).');
-                }
-              }}
+          {/* Email */}
+          <div style={styles.fieldWrap}>
+            <label style={styles.label} htmlFor="lp-email">Email</label>
+            <input
+              id="lp-email"
+              ref={emailRef}
+              style={styles.input}
+              type="email"
+              placeholder="you@email.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onFocus={scrollFocusedIntoView}
               disabled={loading}
-              style={{ ...styles.forgotBtn, ...(loading ? { opacity: 0.5 } : {}) }}
-            >
-              Forgot password?
-            </button>
+              autoComplete="email"
+              name="email"
+              inputMode="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="next"
+            />
           </div>
-        )}
+
+          {/* Password */}
+          <div style={styles.fieldWrap}>
+            <label style={styles.label} htmlFor="lp-password">Password</label>
+            <div style={styles.passwordWrap}>
+              <input
+                id="lp-password"
+                ref={passwordRef}
+                style={{ ...styles.input, paddingRight: 64 }}
+                type={showPassword ? 'text' : 'password'}
+                placeholder={mode === 'signup' ? 'Min 6 characters' : 'Your password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onFocus={scrollFocusedIntoView}
+                disabled={loading}
+                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                name={mode === 'signup' ? 'new-password' : 'current-password'}
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="go"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                style={styles.passwordToggle}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div style={styles.error}>{error}</div>
+          )}
+
+          {/* Success */}
+          {success && (
+            <div style={styles.successMsg}>{success}</div>
+          )}
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ ...styles.submitBtn, ...(loading ? styles.submitDisabled : {}) }}
+          >
+            {loading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <div style={styles.spinner} />
+                {mode === 'login' ? 'Signing in...' : 'Creating account...'}
+              </div>
+            ) : (
+              mode === 'login' ? 'Sign In' : 'Create Account'
+            )}
+          </button>
+
+          {/* Forgot password */}
+          {mode === 'login' && (
+            <div style={styles.forgotWrap}>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (loading) return;
+                  const emailVal = (email || emailRef.current?.value || '').trim();
+                  if (!emailVal) { setError('Enter your email first.'); return; }
+                  setError('');
+                  setSuccess('');
+                  setLoading(true);
+                  const { error } = await supabase.auth.resetPasswordForEmail(emailVal, {
+                    redirectTo: `${window.location.origin}/login`,
+                  });
+                  setLoading(false);
+                  if (error) {
+                    const msg = (error.message || '').toLowerCase();
+                    if (msg.includes('rate') || msg.includes('too many')) {
+                      setError('Too many reset attempts. Please wait a minute and try again.');
+                    } else {
+                      setError(error.message || 'Could not send reset email. Please try again.');
+                    }
+                  } else {
+                    setSuccess('✓ Check your email for a reset link (and your spam folder).');
+                  }
+                }}
+                disabled={loading}
+                style={{ ...styles.forgotBtn, ...(loading ? { opacity: 0.5 } : {}) }}
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
+
+        </form>
 
       </div>
 
@@ -407,7 +500,10 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '24px 20px',
+    paddingTop:    'max(24px, env(safe-area-inset-top, 24px))',
+    paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
+    paddingLeft: 20,
+    paddingRight: 20,
   },
   logoWrap: {
     textAlign: 'center',
@@ -453,7 +549,8 @@ const styles = {
   },
   toggleBtn: {
     flex: 1,
-    padding: '8px 0',
+    padding: '10px 0',
+    minHeight: 44,
     borderRadius: 6,
     fontSize: 13,
     fontWeight: 500,
@@ -484,10 +581,14 @@ const styles = {
     background: 'var(--card2)',
     border: '1.5px solid var(--border)',
     borderRadius: 8,
-    padding: '11px 14px',
-    fontSize: 14,
+    padding: '12px 14px',
+    // 16px minimum prevents iOS Safari from auto-zooming the viewport
+    // when the input receives focus. Anything < 16 triggers the zoom.
+    fontSize: 16,
+    lineHeight: 1.3,
     color: 'var(--text1)',
     transition: 'border-color 0.15s',
+    WebkitAppearance: 'none',
   },
   hint: {
     fontSize: 11,
@@ -516,12 +617,14 @@ const styles = {
     width: '100%',
     background: 'var(--green)',
     color: '#fff',
-    padding: '13px 0',
+    padding: '14px 0',
+    minHeight: 44,
     borderRadius: 10,
     fontSize: 15,
     fontWeight: 600,
     marginTop: 4,
     transition: 'opacity 0.15s',
+    WebkitTapHighlightColor: 'transparent',
   },
   submitDisabled: {
     opacity: 0.7,
@@ -543,6 +646,27 @@ const styles = {
     color: 'var(--text2)',
     fontSize: 12,
     textDecoration: 'underline',
+    padding: '12px 16px',
+    minHeight: 44,
+    WebkitTapHighlightColor: 'transparent',
+  },
+  passwordWrap: {
+    position: 'relative',
+  },
+  passwordToggle: {
+    position: 'absolute',
+    right: 4,
+    top: '50%',
+    transform: 'translateY(-50%)',
+    minWidth: 44,
+    minHeight: 44,
+    background: 'none',
+    border: 'none',
+    color: 'var(--text2)',
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+    WebkitTapHighlightColor: 'transparent',
   },
   resetTitle: {
     fontSize: 16,
