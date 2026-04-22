@@ -21,6 +21,11 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
   const [newPassword, setNewPassword] = useState('');
   const [resetDone, setResetDone] = useState(false);
 
+  // Resend-verification link state for the "email not confirmed" login error.
+  // 'hidden' = no link shown. 'idle' = link visible. 'sent' = success label shown.
+  const [resendState, setResendState] = useState('hidden');
+  const [resendLoading, setResendLoading] = useState(false);
+
   // Show/hide password toggles (independent for login and recovery forms)
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -43,6 +48,13 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
     setTimeout(() => {
       el?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
     }, 280);
+  };
+
+  // Clear the inline auth error (and hide the resend link) whenever the user
+  // edits a field — the stale message no longer describes what they're typing.
+  const clearError = () => {
+    setError('');
+    setResendState('hidden');
   };
 
   // Pre-fill mode and email from landing page redirect params
@@ -261,37 +273,63 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
     if (mode === 'login') {
       const { error } = await signIn(emailVal, passwordVal);
       if (error) {
-        const msg = (error.message || '').toLowerCase();
-        if (msg.includes('email not confirmed') || msg.includes('not confirmed') || msg.includes('confirm your email')) {
-          setError('Please confirm your email first. Check your inbox (and spam folder) for the confirmation link.');
-        } else if (msg.includes('rate') || msg.includes('too many')) {
+        const msg    = (error.message || '').toLowerCase();
+        const code   = error.code || '';
+        const status = error.status;
+        if (code === 'invalid_credentials' || msg.includes('invalid login credentials')) {
+          // Supabase intentionally doesn't distinguish wrong-password from
+          // nonexistent-email (to prevent username enumeration), so we don't
+          // either — "Email or password" covers both honestly.
+          setError('Email or password is incorrect. Please try again.');
+        } else if (code === 'email_not_confirmed' || msg.includes('email not confirmed')) {
+          setError('Your account hasn’t been verified yet. Check your inbox for the confirmation email.');
+          setResendState('idle');
+        } else if (status === 429 || msg.includes('rate limit')) {
           setError('Too many attempts. Please wait a minute and try again.');
-        } else if (msg.includes('invalid') || msg.includes('credentials')) {
-          setError('Invalid email or password. Please try again.');
         } else {
-          setError(error.message || 'Something went wrong. Please try again.');
+          setError('Something went wrong. Please try again.');
         }
       }
       // Don't navigate here — App.jsx onAuthStateChange will set session,
       // which triggers <Navigate to="/app"> in the /login route automatically.
       // Navigating manually causes a flash because session hasn't propagated yet.
     } else {
-      const { data, error } = await signUp(emailVal, passwordVal, usernameVal);
-      if (error) {
-        const msg = (error.message || '').toLowerCase();
-        if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('already been registered')) {
-          setError('This email is already registered. Try signing in, or reset your password.');
-        } else if (msg.includes('password')) {
-          setError(error.message);
-        } else if (msg.includes('rate') || msg.includes('too many')) {
-          setError('Too many attempts. Please wait a minute and try again.');
-        } else {
-          setError(error.message || 'Could not create account. Please try again.');
+      // Pre-check: username availability (case-insensitive). ILIKE so "Neal"
+      // and "neal" don't become two accounts. The allowed charset includes
+      // `_`, which is an ILIKE wildcard — escape it (and `%` defensively) so
+      // "foo_bar" doesn't also match "fooXbar".
+      if (usernameVal) {
+        const pattern = usernameVal.replace(/[_%]/g, (c) => '\\' + c);
+        const { data: existingUser } = await supabase
+          .from('profiles')
+          .select('username')
+          .ilike('username', pattern)
+          .maybeSingle();
+        if (existingUser) {
+          setError('This username is already taken.');
+          setLoading(false);
+          return;
         }
-      } else if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-        // Supabase returns a fake user with empty identities[] when the email
-        // already exists and confirmations are ON. Don't pretend it worked.
-        setError('This email is already registered. Try signing in, or reset your password.');
+      }
+
+      const { data, error } = await signUp(emailVal, passwordVal, usernameVal);
+      // Supabase returns a fake user with empty identities[] when the email
+      // already exists and confirmations are ON. Check this before `error`
+      // because the API reports no error in that case.
+      if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        setError('This email is already in use. Try signing in instead.');
+      } else if (error) {
+        const msg  = (error.message || '').toLowerCase();
+        const code = error.code || '';
+        if (code === 'user_already_exists' || msg.includes('user already registered')) {
+          setError('This email is already in use. Try signing in instead.');
+        } else if (msg.includes('password should be at least')) {
+          setError('Password must be at least 6 characters.');
+        } else if (code === 'validation_failed' || msg.includes('valid email')) {
+          setError('Please enter a valid email address.');
+        } else {
+          setError('Could not create account. Please try again.');
+        }
       } else {
         setSuccess('Account created! Please check your email to confirm, then log in.');
         setMode('login');
@@ -326,14 +364,14 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
         <div style={styles.toggle}>
           <button
             type="button"
-            onClick={() => { setMode('login'); setError(''); setSuccess(''); }}
+            onClick={() => { setMode('login'); setError(''); setSuccess(''); setResendState('hidden'); }}
             style={{ ...styles.toggleBtn, ...(mode === 'login' ? styles.toggleActive : {}) }}
           >
             Sign In
           </button>
           <button
             type="button"
-            onClick={() => { setMode('signup'); setError(''); setSuccess(''); }}
+            onClick={() => { setMode('signup'); setError(''); setSuccess(''); setResendState('hidden'); }}
             style={{ ...styles.toggleBtn, ...(mode === 'signup' ? styles.toggleActive : {}) }}
           >
             Create Account
@@ -353,7 +391,7 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
                 type="text"
                 placeholder="e.g. TonyT"
                 value={username}
-                onChange={e => setUsername(e.target.value.replace(/[^a-zA-Z0-9_.]/g, '').slice(0, 20))}
+                onChange={e => { setUsername(e.target.value.replace(/[^a-zA-Z0-9_.]/g, '').slice(0, 20)); clearError(); }}
                 onFocus={scrollFocusedIntoView}
                 disabled={loading}
                 maxLength={20}
@@ -379,7 +417,7 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
               type="email"
               placeholder="you@email.com"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={e => { setEmail(e.target.value); clearError(); }}
               onFocus={scrollFocusedIntoView}
               disabled={loading}
               autoComplete="email"
@@ -403,7 +441,7 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
                 type={showPassword ? 'text' : 'password'}
                 placeholder={mode === 'signup' ? 'Min 6 characters' : 'Your password'}
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={e => { setPassword(e.target.value); clearError(); }}
                 onFocus={scrollFocusedIntoView}
                 disabled={loading}
                 autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
@@ -426,7 +464,36 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
 
           {/* Error */}
           {error && (
-            <div style={styles.error}>{error}</div>
+            <div style={styles.error}>
+              {error}
+              {resendState !== 'hidden' && (
+                <div style={{ marginTop: 6 }}>
+                  {resendState === 'sent' ? (
+                    <span style={styles.resendSent}>Verification email sent ✓</span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={resendLoading}
+                      onClick={async () => {
+                        if (resendLoading) return;
+                        const emailVal = (email || emailRef.current?.value || '').trim();
+                        if (!emailVal) return;
+                        setResendLoading(true);
+                        const { error: resendErr } = await supabase.auth.resend({
+                          type: 'signup',
+                          email: emailVal,
+                        });
+                        setResendLoading(false);
+                        if (!resendErr) setResendState('sent');
+                      }}
+                      style={{ ...styles.resendLink, ...(resendLoading ? { opacity: 0.6, cursor: 'default' } : {}) }}
+                    >
+                      {resendLoading ? 'Sending…' : 'Resend verification email'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Success */}
@@ -658,6 +725,22 @@ const styles = {
     padding: '12px 16px',
     minHeight: 44,
     WebkitTapHighlightColor: 'transparent',
+  },
+  resendLink: {
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    color: 'var(--red)',
+    fontSize: 12,
+    fontWeight: 500,
+    textDecoration: 'underline',
+    cursor: 'pointer',
+    WebkitTapHighlightColor: 'transparent',
+  },
+  resendSent: {
+    fontSize: 12,
+    color: 'var(--red)',
+    opacity: 0.75,
   },
   passwordWrap: {
     position: 'relative',
