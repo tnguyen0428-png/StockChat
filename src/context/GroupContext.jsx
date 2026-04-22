@@ -16,6 +16,13 @@ export function GroupProvider({ session, children }) {
   const [publicGroups, setPublicGroups] = useState([]);
   const [privateGroup, setPrivateGroup] = useState(null);
   const [loading, setLoading]       = useState(true);
+  // Surface profile-load failures instead of silently leaving the user on a
+  // broken dashboard. Values: null | 'missing' | 'query_error'. 'missing'
+  // means auth succeeded but no profiles row exists for this user (orphan
+  // from a historical handle_new_user trigger failure). 'query_error' means
+  // the query itself failed (network / RLS / transient). See GroupProviderBody
+  // below for how this renders.
+  const [profileError, setProfileError] = useState(null);
   // DM peer lookup: { [groupId]: { userId, username, color } }. DM groups
   // store a generic "DM" name, so to render them in the private chat list
   // we need the OTHER participant's display info. Populated during
@@ -41,15 +48,43 @@ export function GroupProvider({ session, children }) {
 
   const loadProfile = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*, group_members(*, groups(*))')
-        .eq('id', session.user.id)
-        .maybeSingle();
+      // Two-attempt fetch. A missing profile almost always means the user is
+      // an orphan — auth.users row exists but handle_new_user never wrote the
+      // profiles row (historical trigger bug, or a still-in-flight insert
+      // right after signup). One retry + 500ms backoff absorbs the in-flight
+      // case; a second miss means it's really missing and we surface that to
+      // the user instead of silently rendering an empty dashboard.
+      let data = null;
+      let error = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const res = await supabase
+          .from('profiles')
+          .select('*, group_members(*, groups(*))')
+          .eq('id', session.user.id)
+          .maybeSingle();
+        data = res.data;
+        error = res.error;
+        if (error || data) break;
+        if (attempt === 0) await new Promise(r => setTimeout(r, 500));
+      }
 
-      if (error) { console.error('[GroupContext] loadProfile query error:', error.message); return; }
-      if (!data) return;
+      if (error) {
+        console.error('[GroupContext] loadProfile query error:', error.message);
+        setProfileError('query_error');
+        return;
+      }
+      if (!data) {
+        console.warn('[GroupContext] loadProfile: no profile row for auth user', {
+          user_id: session?.user?.id,
+          email: session?.user?.email,
+        });
+        setProfileError('missing');
+        return;
+      }
 
+      // Clear any prior error state on a successful load (e.g. after a
+      // transient query_error followed by a retry triggered elsewhere).
+      setProfileError(null);
       setProfile(data);
       const rawGroups = (data.group_members || [])
         .map(gm => gm.groups)
@@ -376,9 +411,63 @@ export function GroupProvider({ session, children }) {
   const sectorGroups = allGroups.filter(g => g.is_public && !g.is_dm);
   const customGroups = allGroups.filter(g => g.is_dm || (!g.is_public && !g.sector));
 
+  // If the profile failed to load after retry, show a clear error screen
+  // instead of rendering a broken dashboard. Only intercept once loading has
+  // finished — during initial load we still want children to mount so they
+  // can show their own loading UI. Sign-out is the only recovery path the
+  // user can take themselves; support can then heal the orphan server-side.
+  if (!loading && profileError) {
+    const handleSignOut = async () => {
+      try { await supabase.auth.signOut(); }
+      finally { window.location.assign('/login'); }
+    };
+    const heading = profileError === 'missing'
+      ? "We couldn't finish setting up your account"
+      : "We couldn't load your account";
+    const body = profileError === 'missing'
+      ? "Your sign-in worked, but we couldn't find your profile. Please contact support so we can finish setting up your account."
+      : "Something went wrong loading your profile. Check your connection and try again.";
+    return (
+      <div style={{
+        minHeight: '100dvh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+        background: 'var(--bg1, #0b0f14)',
+        color: 'var(--text1, #e6edf3)',
+        textAlign: 'center',
+      }}>
+        <div style={{ maxWidth: 420, width: '100%' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>{heading}</div>
+          <div style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--text2, #9aa4af)', marginBottom: 24 }}>
+            {body}
+          </div>
+          <button
+            onClick={handleSignOut}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              borderRadius: 10,
+              border: '1px solid var(--border, #2a313a)',
+              background: 'var(--green, #1AAD5E)',
+              color: '#fff',
+              fontWeight: 600,
+              fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <GroupContext.Provider value={{
-      profile, activeGroup, allGroups,
+      profile, profileError, activeGroup, allGroups,
       publicGroups, privateGroup,
       sectorGroups, customGroups,
       dmPeers,

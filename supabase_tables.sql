@@ -271,10 +271,22 @@ alter publication supabase_realtime add table group_tickers;
 -- ============================================
 -- AUTO CREATE PROFILE ON SIGNUP
 -- ============================================
+-- IMPORTANT: SECURITY DEFINER functions in Supabase run with an empty
+-- search_path by default (security hardening), so unqualified 'profiles'
+-- resolves to nothing and the insert fails with 42P01 "relation profiles
+-- does not exist" — surfaced to the client as the generic "Database error
+-- saving new user", and the auth.users row rolls back. Prevent this two
+-- ways: SET search_path on the function AND schema-qualify public.profiles.
+-- Keep this in sync with supabase/migrations/20260416000000_unique_username.sql
+-- which layers collision-retry on top of this body.
 create or replace function handle_new_user()
-returns trigger as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 begin
-  insert into profiles (id, username, color)
+  insert into public.profiles (id, username, color)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'username', 'Trader'),
@@ -282,7 +294,7 @@ begin
   );
   return new;
 end;
-$$ language plpgsql security definer;
+$$;
 
 create trigger on_auth_user_created
   after insert on auth.users
