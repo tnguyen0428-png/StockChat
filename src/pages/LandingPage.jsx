@@ -178,6 +178,16 @@ export default function LandingPage() {
               <span style={{ color: '#8cd9a0' }}>crew</span>
             </h1>
 
+            {/* Tagline */}
+            <p className={cls(1)} style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: 16, fontWeight: 400,
+              color: '#d4e4f2', letterSpacing: 0.3,
+              lineHeight: 1.35, margin: 0,
+            }}>
+              Learn to invest. <em>Skip the hype.</em>
+            </p>
+
             {/* Feature pills */}
             <div className={cls(2)} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
               {['AI research', 'Smart alerts', 'Paper challenge', 'Group chat'].map(f => (
@@ -197,17 +207,23 @@ export default function LandingPage() {
               borderRadius: 16, padding: '18px 20px',
               border: '1px solid rgba(255,255,255,0.1)',
             }}>
-              {/* Header row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>
-                  {spotsOpen} of {TOTAL_SPOTS} spots open
-                </span>
+              {/* Counter */}
+              <div style={{ marginBottom: 10 }}>
                 <div style={{
-                  fontSize: 10, fontWeight: 700, color: '#8cd9a0',
-                  background: 'rgba(26,173,94,0.15)', border: '1px solid rgba(26,173,94,0.3)',
-                  padding: '2px 8px', borderRadius: 10, letterSpacing: '0.05em',
-                  textTransform: 'uppercase',
-                }}>Beta</div>
+                  fontFamily: "'Outfit', sans-serif",
+                  fontSize: 12, fontWeight: 600,
+                  color: '#d4e4f2', letterSpacing: 1.5,
+                }}>
+                  BETA PHASE
+                </div>
+                <div style={{
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: 16, fontWeight: 600,
+                  color: '#fff', letterSpacing: 0.2,
+                  marginTop: 4,
+                }}>
+                  {TOTAL_SPOTS} users · {spotsOpen} {spotsOpen === 1 ? 'spot' : 'spots'} open
+                </div>
               </div>
 
               {/* Progress bar — 4px */}

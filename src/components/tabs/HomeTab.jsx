@@ -20,6 +20,29 @@ import { useSectorResearch } from '../../hooks/useSectorResearch';
 import { useLeaderboard } from '../../hooks/useLeaderboard';
 import { usePortfolio } from '../../hooks/usePortfolio';
 
+// ── Briefing timestamp formatter ──
+// Uses the user's local browser timezone (Intl default).
+//   Today      → "Updated 10 PM"   (hour only, 12-hour, no minutes, no TZ)
+//   Other day  → "Updated Apr 22"  (short month + day, no time)
+function formatBriefingTimestamp(timestamp) {
+  if (!timestamp) return '';
+  const briefingDate = new Date(timestamp);
+  if (isNaN(briefingDate.getTime())) return '';
+  const now = new Date();
+
+  const isSameDay =
+    briefingDate.getFullYear() === now.getFullYear() &&
+    briefingDate.getMonth() === now.getMonth() &&
+    briefingDate.getDate() === now.getDate();
+
+  if (isSameDay) {
+    const hour12 = briefingDate.toLocaleString('en-US', { hour: 'numeric', hour12: true });
+    return `Updated ${hour12}`;
+  }
+  const dateStr = briefingDate.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+  return `Updated ${dateStr}`;
+}
+
 function MoodPill({ mood, S, t }) {
   const config = {
     'risk-on': { label: 'Risk-On', color: '#1AAD5E', bg: 'rgba(26,173,94,0.1)', dot: '#1AAD5E' },
@@ -513,19 +536,12 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
         {/* ── TODAY'S MARKET (briefing) ── */}
         <div style={S.briefSection}>
           <div style={S.briefHeader}>
-            <div style={S.briefKicker}>Morning Briefing</div>
+            <div style={S.briefKicker}>Latest Briefing</div>
           </div>
           <div style={S.briefMeta}>
             {briefing && (
               <span style={S.briefTime}>
-                {(() => {
-                  const briefDate = new Date(briefing.created_at);
-                  const todayMidnight = new Date();
-                  todayMidnight.setHours(0, 0, 0, 0);
-                  const isToday = briefDate >= todayMidnight;
-                  const timeStr = briefDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-                  return (isToday ? '' : 'Yesterday · ') + timeStr + ' EST';
-                })()}
+                {formatBriefingTimestamp(briefing.created_at)}
               </span>
             )}
             {briefing?.mood && <MoodPill mood={briefing.mood} S={S} t={t} />}
