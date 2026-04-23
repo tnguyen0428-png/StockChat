@@ -195,6 +195,7 @@ export function useMarketData() {
 
           (data.results || []).forEach(t => {
             const s = t.session;
+            if (!s) return;
             const ms = t.market_status;
             let change = s.regular_trading_change_percent;
             let price = s.close || s.price;
