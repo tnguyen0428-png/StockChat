@@ -71,21 +71,46 @@ export function SentimentPill({ score, darkMode }) {
   const s = Math.min(Math.max(score, 0), 100);
   const label = s > 55 ? 'Greed' : s > 45 ? 'Neutral' : s > 25 ? 'Fear' : 'Extreme Fear';
   const color = s > 55 ? '#22c55e' : s > 45 ? '#eab308' : s > 25 ? '#f97316' : '#ef4444';
+
+  const gradientBg = darkMode
+    ? (s > 55 ? 'linear-gradient(135deg, rgba(34,197,94,0.15), rgba(20,83,45,0.3))'
+      : s > 45 ? 'linear-gradient(135deg, rgba(234,179,8,0.15), rgba(113,63,18,0.3))'
+      : s > 25 ? 'linear-gradient(135deg, rgba(249,115,22,0.15), rgba(124,45,18,0.3))'
+      :          'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(127,29,29,0.3))')
+    : (s > 55 ? 'linear-gradient(135deg, #dcfce7, #bbf7d0)'
+      : s > 45 ? 'linear-gradient(135deg, #fef9c3, #fde68a)'
+      : s > 25 ? 'linear-gradient(135deg, #fed7aa, #fdba74)'
+      :          'linear-gradient(135deg, #fecaca, #fca5a5)');
+
+  const labelColor = darkMode ? color : (
+    s > 55 ? '#14532d' : s > 45 ? '#713f12' : s > 25 ? '#7c2d12' : '#7f1d1d'
+  );
+  const mktColor = darkMode ? color : labelColor;
+
   return (
     <div
       title={`Market gauge: ${label} (${Math.round(s)}/100) — based on VIX and market sentiment`}
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 4,
-        padding: '3px 8px', borderRadius: 999,
-        background: darkMode ? 'rgba(30,61,98,0.55)' : 'rgba(0,0,0,0.035)',
-        border: `1px solid ${darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        padding: '4px 10px', borderRadius: 999,
+        background: gradientBg,
+        border: `1px solid ${color}40`,
+        boxShadow: darkMode ? '0 1px 2px rgba(0,0,0,0.3)' : '0 1px 2px rgba(19,45,82,0.04)',
         fontFamily: "'DM Sans', sans-serif",
       }}
     >
-      <span style={{ fontSize: 9, color: darkMode ? '#5a7a9a' : '#7a8ea3', fontWeight: 500 }}>
+      <style>{`@keyframes uptik-sentiment-pulse{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
+      <span style={{
+        width: 6, height: 6, borderRadius: '50%',
+        background: color,
+        boxShadow: `0 0 0 2px ${color}40`,
+        animation: 'uptik-sentiment-pulse 2s infinite',
+        flexShrink: 0,
+      }} />
+      <span style={{ fontSize: 9, color: mktColor, fontWeight: 500, opacity: 0.7 }}>
         Mkt
       </span>
-      <span style={{ fontSize: 10, fontWeight: 600, color, letterSpacing: 0.3, textTransform: 'uppercase' }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: labelColor, letterSpacing: 0.3, textTransform: 'uppercase' }}>
         {label} {Math.round(s)}
       </span>
     </div>

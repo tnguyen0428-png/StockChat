@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useTheme, SentimentPill, timeAgo } from './alertsCasinoComponents';
-import { isMarketOpen } from '../../utils/marketUtils';
 import { lifecycleStateFor } from '../../lib/alertLifecycle';
 import { MIN_SAMPLES_FLOOR } from '../../lib/signalConfidence';
 
@@ -127,15 +126,6 @@ function chipSize(pct) {
 function fmtMoney(v) {
   if (!v) return '—';
   return v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : `$${(v / 1e3).toFixed(0)}K`;
-}
-
-function nextMarketDay() {
-  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const d = now.getDay(), h = now.getHours();
-  if (d >= 1 && d <= 4) return days[d + 1];
-  if (d === 5 && h < 16) return 'today';
-  return 'Mon';
 }
 
 function typeFor(raw) { return TYPE_CONFIG[raw] || TYPE_CONFIG.vol_surge; }
@@ -606,7 +596,6 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
   }, [alertHistory, perfHistory]);
 
   const selectedAlert = selectedId ? uniqueAlerts.find(a => a.id === selectedId) : null;
-  const marketOpen = isMarketOpen();
   const hasAlerts = uniqueAlerts.length > 0;
 
   if (loading) {
@@ -623,15 +612,19 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
 
       {/* ═══ HEADER ═══ */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, textTransform: 'uppercase', letterSpacing: 1.2, fontFamily: "'Outfit', sans-serif" }}>
-            Action alerts
+        <div style={{ position: 'relative', paddingLeft: 10 }}>
+          <div style={{
+            position: 'absolute', left: 0, top: 2, bottom: 2, width: 3,
+            borderRadius: 2,
+            background: darkMode
+              ? 'linear-gradient(180deg, #4a90d9, #3a7cc0)'
+              : 'linear-gradient(180deg, #132d52, #1a3a5e)',
+          }} />
+          <div style={{ fontSize: 14, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.01em' }}>
+            Action Alerts
           </div>
           <div style={{ fontSize: 11, color: t.text3, marginTop: 2 }}>
-            {marketOpen
-              ? <>Last scan: <span style={{ color: t.green, fontWeight: 600 }}>{liveAlerts.length > 0 ? timeAgo(liveAlerts[0]?.created_at) : 'pending'}</span> · {uniqueAlerts.length} alert{uniqueAlerts.length !== 1 ? 's' : ''} live</>
-              : <>Market closed · opens <span style={{ color: t.green, fontWeight: 600 }}>{nextMarketDay()} 9:30am</span></>
-            }
+            Last scan: <span style={{ color: t.green, fontWeight: 600 }}>{liveAlerts.length > 0 ? timeAgo(liveAlerts[0]?.created_at) : 'pending'}</span> · {uniqueAlerts.length} alert{uniqueAlerts.length !== 1 ? 's' : ''} live
           </div>
         </div>
         <SentimentPill score={fearScore} darkMode={darkMode} />
@@ -641,8 +634,15 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
       {hasAlerts && (
         <div style={{
           position: 'relative', height: selectedAlert ? 100 : 170,
-          background: t.surface, borderRadius: 10, border: `1px solid ${t.border}`,
+          borderRadius: 10,
           marginBottom: 10, overflow: 'hidden', transition: 'height 0.3s ease',
+          background: darkMode
+            ? 'radial-gradient(ellipse 60% 40% at 50% 35%, rgba(80,110,160,0.25) 0%, transparent 60%), radial-gradient(ellipse at 50% 50%, #1e2a42 0%, #151d30 45%, #0c1220 95%, #060a14 100%)'
+            : 'radial-gradient(ellipse 60% 40% at 50% 35%, rgba(255,255,255,0.8) 0%, transparent 60%), radial-gradient(ellipse at 50% 50%, #ffffff 0%, #f0f5fb 45%, #c9d5e4 95%, #b0becf 100%)',
+          border: darkMode ? '1px solid rgba(80,110,160,0.25)' : '1px solid rgba(150,170,195,0.5)',
+          boxShadow: darkMode
+            ? 'inset 0 2px 6px rgba(150,180,220,0.1), inset 0 -2px 10px rgba(0,0,0,0.6), inset 0 0 50px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.5)'
+            : 'inset 0 2px 6px rgba(255,255,255,0.8), inset 0 -2px 10px rgba(19,45,82,0.1), inset 0 0 50px rgba(19,45,82,0.05), 0 2px 8px rgba(19,45,82,0.08)',
         }}>
           {uniqueAlerts.map((alert, i) => {
             const isSelected = selectedId === alert.id;
@@ -666,22 +666,23 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
                 <div style={{
                   width: size, height: size, borderRadius: '50%',
                   background: alert.isConfluence
-                    ? 'radial-gradient(circle at 40% 40%, #ffe082, #d4af37)'
+                    ? 'radial-gradient(circle at 32% 28%, #fff0a8 0%, #e5c94e 55%, #c89820 100%)'
                     : alert.isFlow
-                      ? 'radial-gradient(circle at 40% 40%, #c4a7ff, #7c3aed)'
+                      ? 'radial-gradient(circle at 32% 28%, #d4bcff 0%, #7c3aed 65%, #5a25c0 100%)'
                       : isUp
-                        ? 'radial-gradient(circle at 40% 40%, #7dffb0, #2ebd68)'
-                        : 'radial-gradient(circle at 40% 40%, #ff9e9e, #c94444)',
-                  border: `2px solid ${alert.isConfluence ? '#d4af37' : alert.isFlow ? '#9f6cf0' : isUp ? '#5eed8a' : '#F09595'}`,
+                        ? 'radial-gradient(circle at 32% 28%, #9affb8 0%, #2ebd68 70%, #24a055 100%)'
+                        : 'radial-gradient(circle at 32% 28%, #ffb5b5 0%, #c94444 70%, #a03030 100%)',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: isSelected
-                    ? '0 0 0 3px rgba(123,140,222,0.5)'
-                    : alert.isFlow
-                      ? '0 0 0 3px rgba(124,58,237,0.15), 0 0 12px rgba(124,58,237,0.25)'
-                      : isHot
-                        ? '0 0 8px rgba(94,237,138,0.35)'
-                        : undefined,
-                  animation: isHot && !isSelected && !alert.isFlow ? 'freshPulse 2.5s ease-in-out infinite' : undefined,
+                  boxShadow: [
+                    'inset 1.5px 1.5px 2px rgba(255,255,255,0.6)',
+                    'inset -1.5px -1.5px 2px rgba(0,0,0,0.25)',
+                    `inset 0 0 0 2px ${alert.isConfluence ? 'rgba(212,175,55,0.95)' : alert.isFlow ? 'rgba(159,108,240,0.9)' : isUp ? 'rgba(94,237,138,0.9)' : 'rgba(240,149,149,0.9)'}`,
+                    `inset 0 0 0 3px ${alert.isConfluence ? 'rgba(138,110,30,0.5)' : alert.isFlow ? 'rgba(74,32,150,0.5)' : isUp ? 'rgba(26,138,69,0.4)' : 'rgba(155,70,70,0.4)'}`,
+                    isSelected ? '0 0 0 3px rgba(123,140,222,0.5)' : null,
+                    !isSelected && alert.isFlow ? '0 0 0 3px rgba(124,58,237,0.15)' : null,
+                    !isSelected && alert.isFlow ? '0 0 12px rgba(124,58,237,0.25)' : null,
+                    !isSelected && !alert.isFlow && isHot ? '0 0 8px rgba(94,237,138,0.35)' : null,
+                  ].filter(Boolean).join(', '),
                   transition: 'box-shadow 0.2s ease',
                 }}>
                   <span style={{
@@ -714,7 +715,10 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
             );
           })}
           {!selectedAlert && (
-            <div style={{ position: 'absolute', bottom: 5, width: '100%', textAlign: 'center', fontSize: 8, color: t.text3 }}>
+            <div style={{
+              position: 'absolute', bottom: 5, width: '100%', textAlign: 'center', fontSize: 8,
+              color: darkMode ? 'rgba(150,175,210,0.6)' : 'rgba(122,142,163,0.7)',
+            }}>
               tap any chip for details
             </div>
           )}
@@ -733,7 +737,7 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
       )}
 
       {/* ═══ EDUCATION ═══ */}
-      <EducationZone t={t} />
+      <EducationZone t={t} darkMode={darkMode} />
 
       {/* ═══ STATS STRIP ═══ */}
       {(alertStats.total > 0 || alertStats.resolvedCount > 0) && (
@@ -744,16 +748,17 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
               value={alertStats.hasPerf ? alertStats.resolvedCount : alertStats.total}
               color={t.text1}
               t={t}
+              darkMode={darkMode}
             />
             {alertStats.hasPerf ? (
               <>
-                <StatCard label="Win rate" value={`${alertStats.winRate}%`} color={alertStats.winRate >= 50 ? t.green : t.red} t={t} />
-                <StatCard label="Avg return" value={`${alertStats.avgReturn >= 0 ? '+' : ''}${alertStats.avgReturn.toFixed(1)}%`} color={alertStats.avgReturn >= 0 ? t.green : t.red} t={t} />
+                <StatCard label="Win rate" value={`${alertStats.winRate}%`} color={alertStats.winRate >= 50 ? t.green : t.red} t={t} darkMode={darkMode} />
+                <StatCard label="Avg return" value={`${alertStats.avgReturn >= 0 ? '+' : ''}${alertStats.avgReturn.toFixed(1)}%`} color={alertStats.avgReturn >= 0 ? t.green : t.red} t={t} darkMode={darkMode} />
               </>
             ) : (
               <>
-                <StatCard label="Breakouts" value={alertStats.byType['52w_high'] || 0} color="#fbbf24" t={t} />
-                <StatCard label="Big money" value={alertStats.byType['flow_signal'] || 0} color="#5eed8a" t={t} />
+                <StatCard label="Breakouts" value={alertStats.byType['52w_high'] || 0} color="#fbbf24" t={t} darkMode={darkMode} />
+                <StatCard label="Big money" value={alertStats.byType['flow_signal'] || 0} color="#5eed8a" t={t} darkMode={darkMode} />
               </>
             )}
           </div>
@@ -765,29 +770,51 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
             canRefresh={isAdmin}
             tick={tick}
             t={t}
+            darkMode={darkMode}
           />
         </>
       )}
 
       {/* ═══ ALERT HISTORY ═══ */}
       {alertHistory.length > 0 && (
-        <div style={{ background: t.card, borderRadius: 10, border: `1px solid ${t.border}`, overflow: 'hidden', marginTop: 10 }}>
-          <div style={{ padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{
+          borderRadius: 12,
+          overflow: 'hidden', marginTop: 10,
+          background: darkMode
+            ? 'radial-gradient(ellipse 70% 50% at 50% 30%, rgba(80,110,160,0.18) 0%, transparent 65%), radial-gradient(ellipse at 50% 50%, #1a2538 0%, #131b2d 50%, #0a1020 100%)'
+            : 'radial-gradient(ellipse 70% 50% at 50% 30%, rgba(255,255,255,0.85) 0%, transparent 65%), radial-gradient(ellipse at 50% 50%, #ffffff 0%, #f4f8fd 50%, #d6e0ed 100%)',
+          border: darkMode ? '1px solid rgba(80,110,160,0.2)' : '1px solid rgba(165,180,205,0.5)',
+          boxShadow: darkMode
+            ? 'inset 0 1.5px 4px rgba(150,180,220,0.08), inset 0 -1.5px 5px rgba(0,0,0,0.5), inset 0 0 25px rgba(0,0,0,0.3), 0 1.5px 5px rgba(0,0,0,0.4)'
+            : 'inset 0 1.5px 4px rgba(255,255,255,0.85), inset 0 -1.5px 5px rgba(19,45,82,0.07), inset 0 0 25px rgba(19,45,82,0.035), 0 1.5px 5px rgba(19,45,82,0.06)',
+        }}>
+          <div style={{
+            padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            borderBottom: darkMode ? '1px solid rgba(100,130,170,0.2)' : '1px solid rgba(165,180,205,0.3)',
+            background: darkMode
+              ? 'linear-gradient(180deg, rgba(80,110,160,0.08), transparent)'
+              : 'linear-gradient(180deg, rgba(255,255,255,0.6), transparent)',
+          }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: "'Outfit', sans-serif" }}>Recent alerts</span>
             <div style={{ display: 'flex', gap: 4 }}>
               {HISTORY_FILTERS.map(f => {
                 const active = historyFilter === f.key;
-                const fc = f.key === 'all'        ? { color: t.blue,    bg: t.blueBg }
-                  : f.key === 'confluence'         ? { color: '#d4af37', bg: 'rgba(212,175,55,0.1)' }
-                  : f.key === 'stocks'             ? { color: '#a78bfa', bg: 'rgba(167,139,250,0.1)' }
-                  : { color: '#5eed8a', bg: 'rgba(94,237,138,0.08)' };
                 return (
                   <span key={f.key} onClick={() => setHistoryFilter(f.key)}
                     style={{
-                      fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 4, cursor: 'pointer',
-                      background: active ? fc.bg : 'transparent',
-                      color: active ? fc.color : t.text3,
-                      border: active ? `0.5px solid ${fc.color}30` : '0.5px solid transparent',
+                      fontSize: 10.5, fontWeight: 600,
+                      padding: '4px 10px', borderRadius: 999,
+                      cursor: 'pointer',
+                      background: active
+                        ? (darkMode ? '#4a90d9' : '#132d52')
+                        : 'transparent',
+                      color: active ? '#fff' : t.text3,
+                      border: active
+                        ? (darkMode ? '0.5px solid #4a90d9' : '0.5px solid #132d52')
+                        : '0.5px solid transparent',
+                      boxShadow: active
+                        ? (darkMode ? '0 2px 6px rgba(74,144,217,0.3)' : '0 2px 6px rgba(19,45,82,0.2)')
+                        : 'none',
                     }}>{f.label}</span>
                 );
               })}
@@ -804,7 +831,10 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
             return (
               <>
                 {visible.length === 0 && (
-                  <div style={{ padding: '14px 12px', textAlign: 'center', color: t.text3, fontSize: 12, borderTop: `1px solid ${t.border}` }}>
+                  <div style={{
+                    padding: '14px 12px', textAlign: 'center', color: t.text3, fontSize: 12,
+                    borderTop: `1px solid ${darkMode ? 'rgba(100,130,170,0.25)' : 'rgba(165,180,205,0.35)'}`,
+                  }}>
                     {historyFilter === 'confluence' ? 'No top-tier confluence alerts today'
                       : historyFilter === 'flow' ? 'No institutional flow signals today'
                       : 'No alerts yet'}
@@ -813,8 +843,15 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
                 {visible.map(h => {
                   const tc = typeFor(h.signal_type);
                   const m = historyMetric(h, t);
+                  const dividerColor = darkMode ? 'rgba(100,130,170,0.25)' : 'rgba(165,180,205,0.35)';
                   return (
-                    <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderTop: `1px solid ${t.border}` }}>
+                    <div key={h.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
+                      backgroundImage: `linear-gradient(90deg, ${dividerColor} 0%, ${dividerColor} 60%, transparent 100%)`,
+                      backgroundSize: 'calc(100% - 12px) 1px',
+                      backgroundPosition: 'top right',
+                      backgroundRepeat: 'no-repeat',
+                    }}>
                       <span style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, color: t.text1, width: 44, fontSize: 12 }}>{h.ticker}</span>
                       <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 3, background: tc.bg, color: tc.color }}>{tc.label}</span>
                       <span style={{ color: t.text3, fontSize: 11, flex: 1 }}>{h.price ? `$${Number(h.price).toFixed(2)}` : ''}</span>
@@ -825,7 +862,10 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
                 })}
                 {filtered.length > 5 && (
                   <div onClick={() => setShowAllHistory(prev => !prev)}
-                    style={{ padding: '8px 12px', textAlign: 'center', borderTop: `1px solid ${t.border}`, cursor: 'pointer' }}>
+                    style={{
+                      padding: '8px 12px', textAlign: 'center', cursor: 'pointer',
+                      borderTop: `1px solid ${darkMode ? 'rgba(100,130,170,0.25)' : 'rgba(165,180,205,0.35)'}`,
+                    }}>
                     <span style={{ fontSize: 11, fontWeight: 600, color: t.blue }}>
                       {showAllHistory ? 'Show less ▴' : `Show more (${filtered.length - 5}) ▾`}
                     </span>
@@ -842,9 +882,18 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
 
 // ═══ SUB-COMPONENTS ═══
 
-function StatCard({ label, value, color, t }) {
+function StatCard({ label, value, color, t, darkMode }) {
   return (
-    <div style={{ flex: 1, background: t.card, borderRadius: 8, padding: '8px 6px', textAlign: 'center', border: `1px solid ${t.border}` }}>
+    <div style={{
+      flex: 1, padding: '10px 6px 8px', textAlign: 'center', borderRadius: 10,
+      background: darkMode
+        ? 'radial-gradient(ellipse 70% 50% at 50% 30%, rgba(80,110,160,0.18) 0%, transparent 65%), radial-gradient(ellipse at 50% 50%, #1a2538 0%, #131b2d 50%, #0a1020 100%)'
+        : 'radial-gradient(ellipse 70% 50% at 50% 30%, rgba(255,255,255,0.85) 0%, transparent 65%), radial-gradient(ellipse at 50% 50%, #ffffff 0%, #f4f8fd 50%, #d6e0ed 100%)',
+      border: darkMode ? '1px solid rgba(80,110,160,0.2)' : '1px solid rgba(165,180,205,0.5)',
+      boxShadow: darkMode
+        ? 'inset 0 1.5px 4px rgba(150,180,220,0.08), inset 0 -1.5px 5px rgba(0,0,0,0.5), inset 0 0 25px rgba(0,0,0,0.3), 0 1.5px 5px rgba(0,0,0,0.4)'
+        : 'inset 0 1.5px 4px rgba(255,255,255,0.85), inset 0 -1.5px 5px rgba(19,45,82,0.07), inset 0 0 25px rgba(19,45,82,0.035), 0 1.5px 5px rgba(19,45,82,0.06)',
+    }}>
       <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3 }}>{label}</div>
       <div style={{ fontSize: 18, fontWeight: 600, color, marginTop: 2, fontFamily: "'Outfit', sans-serif" }}>{value}</div>
     </div>
@@ -860,7 +909,7 @@ function StatCard({ label, value, color, t }) {
 // (rather than showing a disabled button) avoids the "why is this button
 // broken?" friction that would otherwise hurt the stickiness goal.
 // eslint-disable-next-line no-unused-vars
-function FreshnessBar({ lastUpdated, connState, onRefresh, refreshing, canRefresh, tick, t }) {
+function FreshnessBar({ lastUpdated, connState, onRefresh, refreshing, canRefresh, tick, t, darkMode }) {
   // Compute staleness in seconds (tick forces re-render)
   const ageSec = lastUpdated ? Math.max(0, Math.round((Date.now() - lastUpdated.getTime()) / 1000)) : null;
   const ageLabel = ageSec == null
@@ -894,8 +943,13 @@ function FreshnessBar({ lastUpdated, connState, onRefresh, refreshing, canRefres
       title={!canRefresh ? undefined : refreshing ? 'Refreshing scores…' : 'Tap to refresh'}
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
-        padding: '4px 8px', marginBottom: 10,
+        padding: '6px 10px', marginBottom: 10,
         fontSize: 10, color: t.text3,
+        background: darkMode
+          ? 'linear-gradient(90deg, rgba(94,237,138,0.12) 0%, transparent 100%)'
+          : 'linear-gradient(90deg, rgba(26,173,94,0.07) 0%, transparent 100%)',
+        borderLeft: `2px solid ${darkMode ? '#5eed8a' : '#1AAD5E'}`,
+        borderRadius: 4,
         cursor: clickable ? 'pointer' : refreshing ? 'progress' : 'default',
         userSelect: 'none',
         opacity: refreshing ? 0.75 : 1,
@@ -1049,12 +1103,29 @@ function DetailPanel({ alert, rawAlert, perfRow, cohort, t }) {
   );
 }
 
-function EducationZone({ t }) {
+function EducationZone({ t, darkMode }) {
   const [expanded, setExpanded] = useState(null);
 
   return (
-    <div style={{ background: t.surface, borderRadius: 10, border: `1px solid ${t.border}`, padding: '12px 10px', marginBottom: 10 }}>
-      <div style={{ fontSize: 15, fontWeight: 500, color: t.text1, textAlign: 'center', marginBottom: 10, fontFamily: "'Outfit', sans-serif" }}>
+    <div style={{
+      borderRadius: 14,
+      padding: '14px 12px',
+      marginBottom: 10,
+      background: darkMode
+        ? 'radial-gradient(ellipse 70% 50% at 50% 30%, rgba(80,110,160,0.18) 0%, transparent 65%), radial-gradient(ellipse at 50% 50%, #1a2538 0%, #131b2d 50%, #0a1020 100%)'
+        : 'radial-gradient(ellipse 70% 50% at 50% 30%, rgba(255,255,255,0.85) 0%, transparent 65%), radial-gradient(ellipse at 50% 50%, #ffffff 0%, #f4f8fd 50%, #d6e0ed 100%)',
+      border: darkMode ? '1px solid rgba(80,110,160,0.2)' : '1px solid rgba(165,180,205,0.5)',
+      boxShadow: darkMode
+        ? 'inset 0 1.5px 4px rgba(150,180,220,0.08), inset 0 -1.5px 5px rgba(0,0,0,0.5), inset 0 0 25px rgba(0,0,0,0.3), 0 1.5px 5px rgba(0,0,0,0.4)'
+        : 'inset 0 1.5px 4px rgba(255,255,255,0.85), inset 0 -1.5px 5px rgba(19,45,82,0.07), inset 0 0 25px rgba(19,45,82,0.035), 0 1.5px 5px rgba(19,45,82,0.06)',
+    }}>
+      <div style={{
+        fontSize: 17, fontWeight: 500, color: t.text1,
+        textAlign: 'center', marginBottom: 12,
+        fontFamily: "'Fraunces', Georgia, serif",
+        letterSpacing: '-0.01em',
+      }}>
+        <span style={{ color: '#d4af37', fontSize: 13, margin: '0 6px' }}>✦</span>
         How alerts work
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'flex-start' }}>
@@ -1062,7 +1133,12 @@ function EducationZone({ t }) {
           const isOpen = expanded === p.id;
           return (
             <div key={p.id} onClick={() => setExpanded(prev => prev === p.id ? null : p.id)}
-              style={{ flex: 1, background: p.bg, borderRadius: 8, border: `0.5px solid ${p.border}`, overflow: 'hidden', cursor: 'pointer' }}>
+              style={{
+                flex: 1, background: p.bg, borderRadius: 10,
+                border: `0.5px solid ${p.border}`,
+                borderTop: `2px solid ${p.color}`,
+                overflow: 'hidden', cursor: 'pointer',
+              }}>
               <div style={{ padding: '8px 8px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: p.color, fontFamily: "'Outfit', sans-serif" }}>{p.title}</div>
