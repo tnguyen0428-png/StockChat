@@ -550,12 +550,19 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
           {briefingArticles.length > 0 ? (
             <>
               <div style={S.briefArticlesHead}>
-                <span style={S.briefArticlesLabel}>What's Moving</span>
+                <span style={S.briefArticlesLabel}>In the News</span>
                 <div style={S.briefArticlesRule} />
                 <span style={S.briefArticlesCount}>{briefingArticles.length}</span>
               </div>
-              {(briefingExpanded ? briefingArticles : briefingArticles.slice(0, 3)).map((a, i) => (
-                <BriefCard key={i} article={a} S={S} index={i} />
+              {(briefingExpanded ? briefingArticles : briefingArticles.slice(0, 3)).map((a, i, arr) => (
+                <BriefCard
+                  key={i}
+                  article={a}
+                  S={S}
+                  index={i}
+                  isLast={i === arr.length - 1}
+                  researchPrices={researchPrices}
+                />
               ))}
               {briefingArticles.length > 3 && (
                 <button style={S.briefExpand} onClick={() => setBriefingExpanded(p => !p)}>
