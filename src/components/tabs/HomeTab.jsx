@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { useTheme } from './alertsCasinoComponents';
 
 // ── Extracted modules ──
-import { safeGet, safeSet } from '../../lib/safeStorage';
+import { safeGet } from '../../lib/safeStorage';
 import { getHomeStyles } from './homeStyles';
 import BriefCard from '../home/BriefCard';
 import InstallPrompt from '../home/InstallPrompt';
@@ -103,20 +103,8 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   const [briefingExpanded, setBriefingExpanded] = useState(false);
 
   // ── Onboarding ──
-  // NOTE: safeSet/safeGet are string-only wrappers. We JSON-stringify on write
-  // and JSON.parse on read. Prior version stored the object directly, which
-  // coerced to the literal string "[object Object]" and made chat/sectors
-  // onboarding steps un-persist across reloads.
-  const [onboarding, setOnboarding] = useState(() => {
-    try {
-      const raw = safeGet('uptik_onboarding');
-      if (!raw) return {};
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch {
-      return {};
-    }
-  });
+  // Chat derived from chat_messages; sectors persists on profiles.onboarding. No localStorage.
+  const [onboarding, setOnboarding] = useState({});
 
   // Auto-complete the "Explore sector picks" onboarding step from real behavior
   // instead of requiring the user to click the specific button inside the Get
@@ -129,7 +117,8 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
     if (!researchSector || researchSector === '__mylist__') return;
     const updated = { ...onboarding, sectors: true };
     setOnboarding(updated);
-    safeSet('uptik_onboarding', JSON.stringify(updated));
+    supabase.from('profiles').update({ onboarding: updated }).eq('id', session?.user?.id)
+      .then(({ error }) => { if (error) console.error('[Onboarding] Sectors save failed:', error.message); });
   }, [researchSector, onboarding.sectors]);
 
   // ── Recent Activity ──
@@ -151,6 +140,28 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
+      // Load onboarding state from profiles
+      if (session?.user?.id) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('onboarding')
+          .eq('id', session.user.id)
+          .single();
+
+        // Derive chat completion from actual messages
+        const { data: chatCheck, error: chatErr } = await supabase
+          .from('chat_messages')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .limit(1)
+          .maybeSingle();
+        if (chatErr) console.warn('Chat onboarding check failed:', chatErr);
+        const chatDone = !!chatCheck;
+
+        const dbOnboarding = profileData?.onboarding || {};
+        if (!cancelled) setOnboarding({ ...dbOnboarding, chat: chatDone || dbOnboarding.chat });
+      }
+
       await Promise.allSettled([
         loadBriefing(),
         loadMarketIndicators(),
@@ -390,10 +401,14 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   const hasWatchlist = watchlist.length > 0;
 
   // ── Onboarding helpers ──
-  const markDone = (key) => {
+  const markDone = async (key) => {
     const updated = { ...onboarding, [key]: true };
     setOnboarding(updated);
-    safeSet('uptik_onboarding', JSON.stringify(updated));
+    const { error } = await supabase
+      .from('profiles')
+      .update({ onboarding: updated })
+      .eq('id', session?.user?.id);
+    if (error) console.error('[Onboarding] Save failed:', error.message);
   };
 
   const onboardingStepDefs = [
@@ -430,7 +445,7 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
       title: 'Say hello in chat',
       desc: 'Introduce yourself to the group',
       done: !!onboarding.chat,
-      action: () => { markDone('chat'); onTabChange?.('chat'); },
+      action: () => { onTabChange?.('chat'); },
       actionLabel: 'Open Chat',
     },
     {
