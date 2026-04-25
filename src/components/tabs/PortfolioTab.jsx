@@ -405,35 +405,35 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
                 const medalBg  = [t.medalGold, t.medalSilver, t.medalBronze][idx];
                 const pctColor = [t.pctGold, t.pctSilver, t.pctBronze][idx];
                 const isMe     = entry.userId === session?.user?.id;
+                const isExpanded = expandedUser === entry.userId;
                 const topStock = entry.positions?.[0];
                 const note     = topStock
                   ? `${topStock.ticker} ${topStock.pctGain >= 0 ? '+' : ''}${topStock.pctGain.toFixed(0)}% since buy`
                   : entry.openCount === 0 ? 'Watching from the sidelines' : `${entry.openCount} positions active`;
                 return (
-                  <div key={entry.userId} style={{ ...s.topRow, ...(isMe ? { background: `${t.green}08` } : {}) }}
-                    onClick={() => setExpandedUser(expandedUser === entry.userId ? null : entry.userId)}>
-                    <div style={{ ...s.topMedal, background: medalBg }}>{idx + 1}</div>
-                    <div style={s.topInfo}>
-                      <div style={s.topName}>{entry.username}{isMe ? ' ★' : ''}</div>
-                      <div style={s.topNote}>{note}</div>
+                  <div key={entry.userId}>
+                    <div style={{ ...s.topRow, ...(isMe ? { background: `${t.green}08` } : {}) }}
+                      onClick={() => setExpandedUser(isExpanded ? null : entry.userId)}>
+                      <div style={{ ...s.topMedal, background: medalBg }}>{idx + 1}</div>
+                      <div style={s.topInfo}>
+                        <div style={s.topName}>{entry.username}{isMe ? ' ★' : ''}</div>
+                        <div style={s.topNote}>{note}</div>
+                      </div>
+                      <div style={{ ...s.topPct, color: pctColor }}>{entry.pctReturn >= 0 ? '+' : ''}{entry.pctReturn.toFixed(1)}%</div>
                     </div>
-                    <div style={{ ...s.topPct, color: pctColor }}>{entry.pctReturn >= 0 ? '+' : ''}{entry.pctReturn.toFixed(1)}%</div>
+                    {isExpanded && entry.positions?.length > 0 && (
+                      <div style={s.expandedPositions}>
+                        {entry.positions.map((p, i) => (
+                          <div key={i} style={s.expandedChip}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: t.text1 }}>{p.ticker}</span>
+                            <span style={{ fontSize: 10, color: p.pctGain >= 0 ? t.green : t.red }}>{p.pctGain >= 0 ? '+' : ''}{p.pctGain.toFixed(1)}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
-              {/* Expanded positions for any expanded user */}
-              {leaderboard.map(entry => (
-                expandedUser === entry.userId && entry.positions?.length > 0 ? (
-                  <div key={`exp-${entry.userId}`} style={s.expandedPositions}>
-                    {entry.positions.map((p, i) => (
-                      <div key={i} style={s.expandedChip}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: t.text1 }}>{p.ticker}</span>
-                        <span style={{ fontSize: 10, color: p.pctGain >= 0 ? t.green : t.red }}>{p.pctGain >= 0 ? '+' : ''}{p.pctGain.toFixed(1)}%</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null
-              ))}
               {leaderboard.length > 3 && <div style={s.rankDivider} />}
               {leaderboard.slice(3, showAllRankings ? undefined : 5).map((entry, idx) => {
                 const rank       = idx + 4;
