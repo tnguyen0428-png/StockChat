@@ -8,10 +8,12 @@ import { supabase } from '../../lib/supabase';
 import { useTheme } from './alertsCasinoComponents';
 
 // ── Extracted modules ──
-import { safeGet } from '../../lib/safeStorage';
+import { safeGet, safeSet } from '../../lib/safeStorage';
 import { getHomeStyles } from './homeStyles';
 import BriefCard from '../home/BriefCard';
 import InstallPrompt from '../home/InstallPrompt';
+import NewInvestorsCard from '../home/NewInvestorsCard';
+import LongTermInvestingCard from '../home/LongTermInvestingCard';
 
 // ── Hooks ──
 import { useMarketData } from '../../hooks/useMarketData';
@@ -106,12 +108,14 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
   // Chat derived from chat_messages; sectors persists on profiles.onboarding. No localStorage.
   const [onboarding, setOnboarding] = useState({});
 
-  // Auto-complete the "Explore sector picks" onboarding step from real behavior
-  // instead of requiring the user to click the specific button inside the Get
-  // Started card. Any time `researchSector` holds a real sector (not null, not
-  // `__mylist__`), we treat that as engagement and flip the flag. Covers the
-  // sector dropdown, the Get Started button, and mount-time restore from
-  // `uptik_last_sector`.
+  // Auto-complete the "Pick a sector" step from real behavior. Any time
+  // `researchSector` holds a real sector (not null, not `__mylist__`), we
+  // treat that as engagement and flip `onboarding.sectors` to true in the
+  // profiles table. Covers all entry points: the Sectors button + dropdown,
+  // the New Investors card's "Open the Sectors menu" CTA, and the mount-time
+  // restore from `uptik_last_sector` in localStorage. The persistent flag is
+  // what NewInvestorsCard reads via the `sectorPicked` prop, so the ✓ stays
+  // checked even when the user later toggles back to Watchlist or another view.
   useEffect(() => {
     if (onboarding.sectors) return;
     if (!researchSector || researchSector === '__mylist__') return;
@@ -126,6 +130,34 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
 
   // ── Hot movers ──
   const [hotMovers, setHotMovers] = useState([]);
+
+  // ── New Investors progress (Alerts visited + Briefing engaged) ──
+  // Persisted via safeStorage so the ✓ marks survive reloads. The other 4
+  // steps (sector / chat / watchlist / challenge) auto-detect from existing
+  // app state — no flag needed.
+  const [alertsVisited, setAlertsVisited] = useState(() => safeGet('uptik_alerts_visited') === '1');
+  const [briefingEngaged, setBriefingEngaged] = useState(() => safeGet('uptik_briefing_engaged') === '1');
+  const markAlertsVisited = () => {
+    if (!alertsVisited) {
+      setAlertsVisited(true);
+      safeSet('uptik_alerts_visited', '1');
+    }
+  };
+  const markBriefingEngaged = () => {
+    if (!briefingEngaged) {
+      setBriefingEngaged(true);
+      safeSet('uptik_briefing_engaged', '1');
+    }
+  };
+
+  // ── New Investors view toggle ──
+  // The stocks section now hosts four mutually-exclusive views: Watchlist,
+  // Sectors (driven by researchSector), New Investors, and Long Term
+  // Investing. Kept as separate flags from researchSector so toggling back
+  // to Watchlist restores any previously-loaded sector list without
+  // touching it.
+  const [showNewInvestors, setShowNewInvestors] = useState(false);
+  const [showLongTerm, setShowLongTerm] = useState(false);
 
   // (moved to below loadHotMovers — single canonical copy)
 
@@ -400,74 +432,61 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
 
   const hasWatchlist = watchlist.length > 0;
 
-  // ── Onboarding helpers ──
-  const markDone = async (key) => {
-    const updated = { ...onboarding, [key]: true };
-    setOnboarding(updated);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ onboarding: updated })
-      .eq('id', session?.user?.id);
-    if (error) console.error('[Onboarding] Save failed:', error.message);
+  // ── Onboarding gate ──
+  // The legacy 4-step onboarding (sector + chat + watchlist + challenge) used
+  // to drive a dedicated checklist UI. That UI was replaced by NewInvestorsCard
+  // (which has its own 6-step model and tracks completion internally), but the
+  // gate is still used to decide whether Recent Activity shows. Computed inline
+  // here so there's no orphan step-definition list to maintain. Uses the
+  // persistent `onboarding.sectors` flag — set by the useEffect above the
+  // first time a real sector is picked — rather than the current researchSector
+  // value. Otherwise toggling back to Watchlist would flip onboardingComplete
+  // false and hide Recent Activity for users who actually finished setup.
+  const onboardingComplete =
+    !!onboarding.sectors &&
+    !!onboarding.chat &&
+    watchlist.length > 0 &&
+    trades.length > 0;
+
+  // Step actions for the New Investors card. Each step's "Try it" button
+  // routes through here. Home-tab steps adjust local state; cross-tab steps
+  // call onTabChange. Alerts/briefing also flip their persistent flags so
+  // the ✓ marks survive a reload.
+  const handleStepAction = (key) => {
+    if (key === 'sector') {
+      // Closes the New Investors view so the stocks card body can show the
+      // Sectors dropdown / sector list. Without this, showNewInvestors stays
+      // true and the dropdown opens against an obscured target.
+      setShowNewInvestors(false);
+      setShowSectorDropdown(true);
+    } else if (key === 'chat') {
+      onTabChange?.('chat');
+    } else if (key === 'watchlist') {
+      // Same fix — drop the New Investors view first so the Watchlist actually
+      // renders in the stocks card.
+      setShowNewInvestors(false);
+      setResearchSector('__mylist__');
+      setResearchExpanded(null);
+      const wlStocks = watchlist.map((w, i) => ({
+        id: w.id, ticker: w.symbol, ranking: i + 1,
+        score: null, thesis: null, notes: null, _isWatchlist: true,
+      }));
+      setResearchStocks(wlStocks);
+      setShowSearch(true);
+    } else if (key === 'challenge') {
+      onTabChange?.('challenge');
+    } else if (key === 'alerts') {
+      markAlertsVisited();
+      onTabChange?.('alerts');
+    } else if (key === 'briefing') {
+      // Briefing lives at the top of the home page — not in the stocks card —
+      // but we still drop New Investors so the user lands on the regular home
+      // view where the just-expanded briefing is visible.
+      setShowNewInvestors(false);
+      setBriefingExpanded(true);
+      markBriefingEngaged();
+    }
   };
-
-  const onboardingStepDefs = [
-    {
-      key: 'watchlist',
-      emoji: '🔍',
-      title: 'Add first stock',
-      desc: 'Search and add a stock to your watchlist',
-      done: watchlist.length > 0,
-      action: () => {
-        setResearchSector('__mylist__');
-        setResearchExpanded(null);
-        const wlStocks = watchlist.map((w, i) => ({
-          id: w.id, ticker: w.symbol, ranking: i + 1,
-          score: null, thesis: null, notes: null, _isWatchlist: true,
-        }));
-        setResearchStocks(wlStocks);
-        setShowSearch(true);
-      },
-      actionLabel: 'Search stocks',
-    },
-    {
-      key: 'challenge',
-      emoji: '🏆',
-      title: 'Join Challenge',
-      desc: 'Trade with $50K virtual cash and compete',
-      done: trades.length > 0,
-      action: () => onTabChange?.('challenge'),
-      actionLabel: 'Go to Challenge',
-    },
-    {
-      key: 'chat',
-      emoji: '💬',
-      title: 'Say hello in chat',
-      desc: 'Introduce yourself to the group',
-      done: !!onboarding.chat,
-      action: () => { onTabChange?.('chat'); },
-      actionLabel: 'Open Chat',
-    },
-    {
-      key: 'sectors',
-      emoji: '📊',
-      title: 'Explore sector picks',
-      desc: 'Browse analyst-curated stock picks by sector',
-      done: !!onboarding.sectors,
-      // No markDone() here on purpose — the step auto-completes via the
-      // useEffect above the moment a real sector is actually selected,
-      // regardless of entry point. Opening the dropdown isn't engagement.
-      action: () => { setShowSectorDropdown(true); },
-      actionLabel: 'Browse Sectors',
-    },
-  ];
-
-  const completedCount = onboardingStepDefs.filter(s => s.done).length;
-  const onboardingComplete = completedCount === 4;
-  // Only show rows the user still has to do — completed items collapse out of
-  // view so the card shrinks as progress is made. Progress bar + "N/4 complete"
-  // still reflect the full step count.
-  const pendingSteps = onboardingStepDefs.filter(s => !s.done);
 
   // ── Styles ──
   const S = getHomeStyles(t);
@@ -580,7 +599,12 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
                 />
               ))}
               {briefingArticles.length > 3 && (
-                <button style={S.briefExpand} onClick={() => setBriefingExpanded(p => !p)}>
+                <button style={S.briefExpand} onClick={() => {
+                  setBriefingExpanded(p => !p);
+                  // Tapping Read More counts as engagement for the New Investors card.
+                  // No-op if already marked.
+                  markBriefingEngaged();
+                }}>
                   {briefingExpanded ? 'Show Less ▲' : `Read ${briefingArticles.length - 3} More →`}
                 </button>
               )}
@@ -697,9 +721,46 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
         {/* ── STOCKS ── */}
         <div style={S.stocksSection}>
           <div style={S.stocksBtns}>
+            {/* New Investors — leftmost button. Mutually exclusive with
+                Watchlist, Sectors, and Long Term Investing; toggles the
+                stocks card body to show the 6-step walkthrough instead
+                of stock rows. */}
             <div
-              style={{ ...S.stocksBtn, ...(researchSector === '__mylist__' ? S.stocksBtnActive : {}) }}
+              style={{ ...S.stocksBtn, ...(showNewInvestors ? S.stocksBtnActive : {}) }}
               onClick={() => {
+                if (showNewInvestors) {
+                  setShowNewInvestors(false);
+                } else {
+                  setShowNewInvestors(true);
+                  setShowLongTerm(false);
+                  setShowSectorDropdown(false);
+                }
+              }}
+            >
+              New Investors
+            </div>
+            {/* Long Term — second from left, paired with New Investors as the
+                two educational surfaces. Toggles the stocks card body to show
+                the S&P-anchored compound returns calculator. */}
+            <div
+              style={{ ...S.stocksBtn, ...(showLongTerm ? S.stocksBtnActive : {}) }}
+              onClick={() => {
+                if (showLongTerm) {
+                  setShowLongTerm(false);
+                } else {
+                  setShowLongTerm(true);
+                  setShowNewInvestors(false);
+                  setShowSectorDropdown(false);
+                }
+              }}
+            >
+              Long Term
+            </div>
+            <div
+              style={{ ...S.stocksBtn, ...(!showNewInvestors && !showLongTerm && researchSector === '__mylist__' ? S.stocksBtnActive : {}) }}
+              onClick={() => {
+                setShowNewInvestors(false);
+                setShowLongTerm(false);
                 if (researchSector === '__mylist__') {
                   setResearchSector(null);
                   setResearchStocks([]);
@@ -720,8 +781,10 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
             </div>
             <div style={{ position: 'relative' }}>
               <div
-                style={{ ...S.stocksBtn, ...(researchSector && researchSector !== '__mylist__' ? S.stocksBtnActive : {}), ...(showSectorDropdown ? S.stocksBtnActive : {}) }}
+                style={{ ...S.stocksBtn, ...(!showNewInvestors && !showLongTerm && researchSector && researchSector !== '__mylist__' ? S.stocksBtnActive : {}), ...(showSectorDropdown ? S.stocksBtnActive : {}) }}
                 onClick={() => {
+                  setShowNewInvestors(false);
+                  setShowLongTerm(false);
                   if (showSectorDropdown) {
                     setShowSectorDropdown(false);
                   } else {
@@ -754,8 +817,23 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
             </div>
           </div>
 
-          {researchSector && (
+          {(showNewInvestors || showLongTerm || researchSector) && (
             <div style={S.stocksCard}>
+              {showLongTerm ? (
+                <LongTermInvestingCard t={t} />
+              ) : showNewInvestors ? (
+                <NewInvestorsCard
+                  t={t}
+                  watchlist={watchlist}
+                  trades={trades}
+                  sectorPicked={!!onboarding.sectors}
+                  chatDone={!!onboarding.chat}
+                  alertsVisited={alertsVisited}
+                  briefingEngaged={briefingEngaged}
+                  onStepAction={handleStepAction}
+                />
+              ) : (
+              <>
               <div style={S.stocksHeaderRow}>
                 {researchSector === '__mylist__' ? (
                   <>
@@ -931,57 +1009,11 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
               {researchSector === '__mylist__' && showSearch && searchLoading && (
                 <div style={{ padding: '6px 0', fontSize: 11, color: t.text3, textAlign: 'center' }}>Searching...</div>
               )}
+              </>
+              )}
             </div>
           )}
         </div>
-
-        {/* ═══ GET STARTED CHECKLIST ═══ */}
-        {!onboardingComplete && (
-          <div style={{ padding: '8px 14px 14px' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: t.text1, marginBottom: 8 }}>Get Started</div>
-            <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden' }}>
-              {pendingSteps.map((step, i, arr) => (
-                <div
-                  key={step.key}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px 14px',
-                    borderBottom: i < arr.length - 1 ? `1px solid ${t.border}` : 'none',
-                  }}
-                >
-                  <div style={{
-                    width: 20, height: 20, borderRadius: 10, flexShrink: 0,
-                    border: `2px solid ${t.border}`,
-                    background: 'transparent',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }} />
-                  <span style={{ fontSize: 20, flexShrink: 0 }}>{step.emoji}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: t.text1, marginBottom: 2 }}>{step.title}</div>
-                    <div style={{ fontSize: 11, color: t.text3, lineHeight: 1.4 }}>{step.desc}</div>
-                  </div>
-                  <button
-                    style={{
-                      background: 'transparent', border: `1px solid ${t.green}`,
-                      color: t.green, borderRadius: 7,
-                      padding: '5px 10px', fontSize: 11, fontWeight: 600,
-                      cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
-                    }}
-                    onClick={step.action}
-                  >{step.actionLabel}</button>
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: 10, height: 4, borderRadius: 2, background: t.border, overflow: 'hidden' }}>
-              <div style={{
-                height: '100%', borderRadius: 2, background: '#1AAD5E',
-                width: `${(completedCount / 4) * 100}%`,
-                transition: 'width 0.3s ease',
-              }} />
-            </div>
-            <div style={{ fontSize: 10, color: t.text3, marginTop: 4, textAlign: 'right' }}>{completedCount}/4 complete</div>
-          </div>
-        )}
 
         {/* ═══ RECENT ACTIVITY ═══ */}
         {onboardingComplete && recentActivity.length > 0 && (
