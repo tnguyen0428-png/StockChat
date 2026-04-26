@@ -131,9 +131,10 @@ export default function LongTermInvestingCard({ t }) {
                 {c.label}
               </div>
               <div style={{
-                fontSize: 17, fontWeight: 700, color: t.text1,
+                fontSize: 16, fontWeight: 700, color: t.text1,
                 fontFamily: "'Outfit', sans-serif",
                 fontVariantNumeric: 'tabular-nums',
+                whiteSpace: 'nowrap',
               }}>{fmt(c.value)}</div>
               <div style={{ fontSize: 9, color: t.text3, marginTop: 2 }}>at S&P avg ~10%</div>
             </div>
@@ -180,11 +181,13 @@ export default function LongTermInvestingCard({ t }) {
           t={t}
         />
 
-        {/* Rate hint markers under the rate slider */}
+        {/* Rate hint markers under the rate slider — spans the slider width
+            (which is now full-width inside SliderRow) so the labels actually
+            sit under the slider track instead of running past its right edge. */}
         <div style={{
           display: 'flex', justifyContent: 'space-between',
           fontSize: 9, color: t.text3,
-          margin: '0 0 14px 110px',
+          margin: '0 0 14px',
         }}>
           {RATE_HINTS.map(h => (
             <span key={h.value}>{h.label}</span>
@@ -243,28 +246,15 @@ export default function LongTermInvestingCard({ t }) {
   );
 }
 
-// Tiny inline slider row — one label + native range input + numeric readout.
-// Native range inputs adapt to mobile fine; styling them custom adds little.
+// Slider row — label + value on top, full-width native range input below.
+// Stacked layout (vs side-by-side) prevents label-column wrapping at narrow
+// widths ("Monthly contribution" was wrapping to two lines under the old
+// fixed-100px label column) and gives the slider the full content width for
+// a bigger touch target. The label/value pair uses space-between so the
+// readout stays right-aligned without a brittle minWidth.
 function SliderRow({ label, value, min, max, step, onChange, display, t }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      marginBottom: 10,
-    }}>
-      <span style={{
-        fontSize: 11, color: t.text3, width: 100, flexShrink: 0,
-      }}>{label}</span>
-      <input
-        type="range"
-        min={min} max={max} step={step} value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        style={{ flex: 1, accentColor: '#4a90d9' }}
-      />
-      <span style={{
-        fontSize: 11, fontWeight: 600, color: t.text1,
-        minWidth: 70, textAlign: 'right',
-        fontVariantNumeric: 'tabular-nums',
-      }}>{display}</span>
-    </div>
-  );
-}
+    <div style={{ marginBottom: 10 }}>
+      <div style={{
+        display: 'flex', alignItems: 'baseline',
+        justifyContent: '
