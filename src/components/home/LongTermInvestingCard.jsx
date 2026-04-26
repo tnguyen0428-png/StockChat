@@ -257,4 +257,21 @@ function SliderRow({ label, value, min, max, step, onChange, display, t }) {
     <div style={{ marginBottom: 10 }}>
       <div style={{
         display: 'flex', alignItems: 'baseline',
-        justifyContent: '
+        justifyContent: 'space-between', gap: 8,
+        marginBottom: 4,
+      }}>
+        <span style={{ fontSize: 11, color: t.text3 }}>{label}</span>
+        <span style={{
+          fontSize: 11, fontWeight: 600, color: t.text1,
+          fontVariantNumeric: 'tabular-nums',
+        }}>{display}</span>
+      </div>
+      <input
+        type="range"
+        min={min} max={max} step={step} value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{ width: '100%', accentColor: '#4a90d9', display: 'block', margin: 0 }}
+      />
+    </div>
+  );
+}
