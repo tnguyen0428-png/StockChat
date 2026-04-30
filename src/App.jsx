@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import { safeGet, safeSet, safeRemove } from './lib/safeStorage';
+import { usePresenceTracker } from './hooks/usePresence';
 
 // Pages
 import LoginPage            from './pages/LoginPage';
@@ -77,6 +78,11 @@ const RECOVERY_ON_LOAD = (() => {
 export default function App() {
   const [session, setSession]           = useState(undefined);
   const [recoveryMode, setRecoveryMode] = useState(RECOVERY_ON_LOAD);
+
+  // Broadcast presence on the global 'online-users' channel whenever the
+  // user is signed in. The hook is a no-op when userId is falsy (logged-out
+  // landing/login routes) and cleans up on sign-out / tab close.
+  usePresenceTracker(session?.user?.id || null);
 
   useEffect(() => {
     // ── Handle email confirmation / password recovery token in URL ──

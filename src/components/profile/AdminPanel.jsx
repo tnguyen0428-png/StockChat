@@ -3,12 +3,13 @@
 // Admin-only tools: scanners, screener, briefing, groups, users
 // ============================================
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { FMP_KEY } from '../../lib/constants';
 import { runScreener, SECTOR_MAP } from '../../lib/screener';
 import { run52wHighScan, DEFAULT_THRESHOLD, runVolSurgeScan, DEFAULT_VOL_MULTIPLIER, runGapUpScan, DEFAULT_GAP_THRESHOLD, runMACrossScan, DEFAULT_SHORT_MA, DEFAULT_LONG_MA, runConfluenceScan } from '../../lib/breakoutScanner';
 import { runFlowScan } from '../../lib/institutionalFlow';
+import { useOnlineUserIds } from '../../hooks/usePresence';
 
 export default function AdminPanel() {
   const [activeSection, setActiveSection] = useState(null);
@@ -21,6 +22,24 @@ export default function AdminPanel() {
 
   // Users state
   const [users, setUsers] = useState([]);
+
+  // Live presence — Set of user IDs currently connected to the app.
+  // Subscription lasts the lifetime of AdminPanel (mounted only for admins
+  // viewing the Profile tab), so it doesn't add cost for normal users.
+  const onlineUserIds = useOnlineUserIds();
+  // Single pass: partition into online/offline (online-first ordering — admin's
+  // most useful sort, stable on tie since we preserve loadUsers() order) and
+  // derive the count from the partition rather than walking users twice.
+  const { sortedUsers, onlineCount } = useMemo(() => {
+    const online = [], offline = [];
+    for (const u of users) {
+      (onlineUserIds.has(u.id) ? online : offline).push(u);
+    }
+    return {
+      sortedUsers: [...online, ...offline],
+      onlineCount: online.length,
+    };
+  }, [users, onlineUserIds]);
 
   // Briefing state
   const [briefingText, setBriefingText]       = useState('');
@@ -467,13 +486,26 @@ export default function AdminPanel() {
     { id: 'users',        label: 'Manage Users'  },
   ];
 
+  // Show "Manage Users · 3 online" only when the users list has been loaded
+  // — before then we don't yet know the membership, so a count would imply
+  // certainty we don't have. activeSection === 'users' is the trigger that
+  // fires loadUsers().
+  const usersLabelSuffix = (activeSection === 'users' && users.length > 0)
+    ? ` · ${onlineCount} online`
+    : '';
+
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={adminStyles.secLabel}>Admin Panel</div>
       {sections.map(s => (
         <div key={s.id} style={adminStyles.accordion}>
           <div style={adminStyles.accordionHeader} onClick={() => setActiveSection(activeSection === s.id ? null : s.id)}>
-            <span style={adminStyles.accordionLabel}>{s.label}</span>
+            <span style={adminStyles.accordionLabel}>
+              {s.label}
+              {s.id === 'users' && usersLabelSuffix && (
+                <span style={adminStyles.onlineCountSuffix}>{usersLabelSuffix}</span>
+              )}
+            </span>
             <span style={adminStyles.accordionArrow}>{activeSection === s.id ? '▲' : '▼'}</span>
           </div>
 
@@ -721,22 +753,39 @@ export default function AdminPanel() {
               </div>
             ) : s.id === 'users' ? (
               <div style={adminStyles.body}>
-                {users.map(u => (
-                  <div key={u.id} style={adminStyles.listRow}>
-                    <div style={{ flex: 1 }}>
-                      <div style={adminStyles.listName}>{u.username}</div>
-                      <div style={adminStyles.listSub}>{u.group_members?.map(gm => `${gm.groups?.name} (${gm.role})`).join(', ') || 'No groups'}</div>
+                {sortedUsers.map(u => {
+                  const isOnline = onlineUserIds.has(u.id);
+                  return (
+                    <div key={u.id} style={adminStyles.listRow}>
+                      <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
+                        {/* Live presence dot — green when connected, dim grey otherwise.
+                            Title tooltip lets the admin hover to confirm meaning. */}
+                        <span
+                          role="img"
+                          aria-label={isOnline ? 'Online' : 'Offline'}
+                          title={isOnline ? 'Online' : 'Offline'}
+                          style={{
+                            ...adminStyles.presenceDot,
+                            background: isOnline ? 'var(--green)' : 'var(--border)',
+                            boxShadow: isOnline ? '0 0 0 2px rgba(140, 217, 160, 0.18)' : 'none',
+                          }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={adminStyles.listName}>{u.username}</div>
+                          <div style={adminStyles.listSub}>{u.group_members?.map(gm => `${gm.groups?.name} (${gm.role})`).join(', ') || 'No groups'}</div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {u.group_members?.filter(gm => gm.role !== 'moderator' && gm.role !== 'admin').map(gm => (
+                          <button key={`mod_${gm.group_id}`} style={adminStyles.promoteBtn} onClick={() => promoteUser(u.id, gm.group_id)}>Mod</button>
+                        ))}
+                        {u.group_members?.map(gm => (
+                          <button key={`rm_${gm.group_id}`} style={adminStyles.removeBtn} onClick={() => removeUser(u.id, gm.group_id)}>Remove</button>
+                        ))}
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {u.group_members?.filter(gm => gm.role !== 'moderator' && gm.role !== 'admin').map(gm => (
-                        <button key={`mod_${gm.group_id}`} style={adminStyles.promoteBtn} onClick={() => promoteUser(u.id, gm.group_id)}>Mod</button>
-                      ))}
-                      {u.group_members?.map(gm => (
-                        <button key={`rm_${gm.group_id}`} style={adminStyles.removeBtn} onClick={() => removeUser(u.id, gm.group_id)}>Remove</button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : null
           )}
@@ -770,4 +819,6 @@ const adminStyles = {
   knob:            { position: 'absolute', top: 3, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left 0.2s, right 0.2s' },
   promoteBtn:      { background: 'var(--green)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
   removeBtn:       { background: 'transparent', color: 'var(--red)', border: '1px solid var(--red)', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer' },
+  presenceDot:     { display: 'inline-block', width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 5 },
+  onlineCountSuffix:{ fontSize: 11, fontWeight: 400, color: 'var(--text3)', marginLeft: 4 },
 };
