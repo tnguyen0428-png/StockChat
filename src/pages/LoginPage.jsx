@@ -26,6 +26,75 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
   const [resendState, setResendState] = useState('hidden');
   const [resendLoading, setResendLoading] = useState(false);
 
+  // Post-signup banner: shows the "check your inbox" success state with a resend
+  // button inline, so users who don't try to log in still find their way to resend.
+  const [signupSucceeded, setSignupSucceeded] = useState(false);
+
+  // Shared 60s cooldown for both resend call sites (signup-success banner + the
+  // login "email not confirmed" path). Single source of truth so a click in one
+  // place rate-limits the other — Supabase's resend endpoint is per-email AND
+  // per-project, so a second click within 60s would silently burn the project's
+  // hourly quota for everyone.
+  const [resendCooldownUntil, setResendCooldownUntil] = useState(0);
+  const [tickNow, setTickNow] = useState(() => Date.now());
+
+  // Tick once a second while a cooldown is active so the countdown text refreshes.
+  // Depend ONLY on resendCooldownUntil — keeping tickNow in deps would tear down
+  // and recreate the interval on every tick. The interval self-clears once the
+  // cooldown elapses so it doesn't keep firing after countdown ends.
+  useEffect(() => {
+    if (resendCooldownUntil === 0) return;
+    const id = setInterval(() => {
+      const now = Date.now();
+      setTickNow(now);
+      if (resendCooldownUntil <= now) clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [resendCooldownUntil]);
+
+  const cooldownRemaining = Math.max(0, Math.ceil((resendCooldownUntil - tickNow) / 1000));
+  const onCooldown = cooldownRemaining > 0;
+
+  // Shared resend handler — pulls email from state with the usual ref fallback
+  // (iOS autofill can lag controlled state). Cooldown is set BEFORE the await so
+  // it throttles clicks regardless of API result — including 429s, which are
+  // exactly the case the cooldown exists to keep users from worsening.
+  const handleResend = async () => {
+    if (resendLoading || onCooldown) return;
+    const emailVal = (email || emailRef.current?.value || '').trim();
+    if (!emailVal) return;
+    setResendCooldownUntil(Date.now() + 60_000);
+    setResendLoading(true);
+    const { error: resendErr } = await supabase.auth.resend({
+      type: 'signup',
+      email: emailVal,
+    });
+    setResendLoading(false);
+    if (resendErr) {
+      if (import.meta.env.DEV) {
+        console.warn('[resend] failed', { status: resendErr.status, message: resendErr.message, email: emailVal });
+      }
+      const msg = (resendErr.message || '').toLowerCase();
+      if (resendErr.status === 429 || msg.includes('rate') || msg.includes('too many')) {
+        setError('Too many requests. Wait a minute, then try again.');
+      } else {
+        setError('Couldn’t resend right now. Please try again in a moment.');
+      }
+    } else {
+      setError('');
+      setResendState('sent');
+    }
+  };
+
+  // The active countdown is itself the "sent" confirmation — after it elapses,
+  // the button returns to its idle label so a user who genuinely never received
+  // the email can request another send.
+  const resendButtonText = resendLoading
+    ? 'Sending…'
+    : onCooldown
+      ? `Resend in ${cooldownRemaining}s`
+      : 'Resend verification email';
+
   // Show/hide password toggles (independent for login and recovery forms)
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -331,7 +400,16 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
           setError('Could not create account. Please try again.');
         }
       } else {
-        setSuccess('Account created! Please check your email to confirm, then log in.');
+        // Detect a likely silent send failure: Supabase returns success here
+        // even when the confirmation email was never queued (e.g. project hit
+        // its 2/hour rate limit). confirmation_sent_at is the canonical signal
+        // that the email actually went out. Per CLAUDE.md rule 22, surface in
+        // dev so we don't accumulate invisible failures in production.
+        if (import.meta.env.DEV && data?.user && !data.user.confirmation_sent_at && !data?.session) {
+          console.warn('[signup] confirmation_sent_at missing — email may not have been queued', { email: emailVal, user: data.user });
+        }
+        setSuccess('Account created — check your inbox (and spam folder) for a confirmation link. Didn’t get it?');
+        setSignupSucceeded(true);
         setMode('login');
       }
     }
@@ -364,14 +442,14 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
         <div style={styles.toggle}>
           <button
             type="button"
-            onClick={() => { setMode('login'); setError(''); setSuccess(''); setResendState('hidden'); }}
+            onClick={() => { setMode('login'); setError(''); setSuccess(''); setResendState('hidden'); setSignupSucceeded(false); }}
             style={{ ...styles.toggleBtn, ...(mode === 'login' ? styles.toggleActive : {}) }}
           >
             Sign In
           </button>
           <button
             type="button"
-            onClick={() => { setMode('signup'); setError(''); setSuccess(''); setResendState('hidden'); }}
+            onClick={() => { setMode('signup'); setError(''); setSuccess(''); setResendState('hidden'); setSignupSucceeded(false); }}
             style={{ ...styles.toggleBtn, ...(mode === 'signup' ? styles.toggleActive : {}) }}
           >
             Create Account
@@ -468,29 +546,14 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
               {error}
               {resendState !== 'hidden' && (
                 <div style={{ marginTop: 6 }}>
-                  {resendState === 'sent' ? (
-                    <span style={styles.resendSent}>Verification email sent ✓</span>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={resendLoading}
-                      onClick={async () => {
-                        if (resendLoading) return;
-                        const emailVal = (email || emailRef.current?.value || '').trim();
-                        if (!emailVal) return;
-                        setResendLoading(true);
-                        const { error: resendErr } = await supabase.auth.resend({
-                          type: 'signup',
-                          email: emailVal,
-                        });
-                        setResendLoading(false);
-                        if (!resendErr) setResendState('sent');
-                      }}
-                      style={{ ...styles.resendLink, ...(resendLoading ? { opacity: 0.6, cursor: 'default' } : {}) }}
-                    >
-                      {resendLoading ? 'Sending…' : 'Resend verification email'}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    disabled={resendLoading || onCooldown}
+                    onClick={handleResend}
+                    style={{ ...styles.resendLink, ...((resendLoading || onCooldown) ? { opacity: 0.6, cursor: 'default' } : {}) }}
+                  >
+                    {resendButtonText}
+                  </button>
                 </div>
               )}
             </div>
@@ -498,7 +561,21 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
 
           {/* Success */}
           {success && (
-            <div style={styles.successMsg}>{success}</div>
+            <div style={styles.successMsg}>
+              {success}
+              {signupSucceeded && (
+                <div style={{ marginTop: 6 }}>
+                  <button
+                    type="button"
+                    disabled={resendLoading || onCooldown}
+                    onClick={handleResend}
+                    style={{ ...styles.resendLinkGreen, ...((resendLoading || onCooldown) ? { opacity: 0.6, cursor: 'default' } : {}) }}
+                  >
+                    {resendButtonText}
+                  </button>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Submit Button */}
@@ -737,10 +814,16 @@ const styles = {
     cursor: 'pointer',
     WebkitTapHighlightColor: 'transparent',
   },
-  resendSent: {
+  resendLinkGreen: {
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    color: 'var(--green)',
     fontSize: 12,
-    color: 'var(--red)',
-    opacity: 0.75,
+    fontWeight: 600,
+    textDecoration: 'underline',
+    cursor: 'pointer',
+    WebkitTapHighlightColor: 'transparent',
   },
   passwordWrap: {
     position: 'relative',
