@@ -7,7 +7,6 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo } from 
 import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../context/GroupContext';
 import { askUpTikAI } from '../../lib/aiAgent';
-import FadingMessage from '../shared/FadingMessage';
 import TickerMentionCard from '../shared/TickerMentionCard';
 import { STICKERS, isSticker, getStickerId } from '../shared/StickerPicker';
 import SwipeableGroupRow from '../chat/SwipeableGroupRow';
@@ -480,7 +479,7 @@ export default function ChatTab({ session, profile, group, isAdmin, setUnreadCha
         .eq('group_id', group.id)
         .order('created_at', { ascending: false })
         .limit(100);
-      if (data) setMessages(data.reverse().filter(m => m.type !== 'ai' && !/@AI\b/i.test(m.text)));
+      if (data) setMessages([...data].reverse());
       setLoading(false);
     };
     loadMessages();
@@ -866,22 +865,18 @@ export default function ChatTab({ session, profile, group, isAdmin, setUnreadCha
             const prev = idx > 0 ? messages[idx - 1] : null;
             const isGrouped = prev && prev.user_id === msg.user_id && !isSticker(prev.text) && !isSticker(msg.text);
             const isAI = msg.user_id === 'user_ai' || msg.type === 'ai';
-            const isAIQuestion = msg.type === 'user' && /@AI\b/i.test(msg.text);
-            if (isAI) {
-              return (
-                <FadingMessage key={msg.id} delay={120000} duration={10000} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
-                  <MessageItem msg={msg} currentUserId={session?.user?.id} groupId={group?.id} onFeedback={handleFeedback} feedbackGiven={feedbackMap[msg.id]} isGrouped={isGrouped} onUsernameClick={handleUsernameClick} />
-                </FadingMessage>
-              );
-            }
-            if (isAIQuestion) {
-              return (
-                <FadingMessage key={msg.id} delay={120000} duration={10000} onRemove={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}>
-                  <MessageItem msg={msg} currentUserId={session?.user?.id} groupId={group?.id} isGrouped={isGrouped} onUsernameClick={handleUsernameClick} />
-                </FadingMessage>
-              );
-            }
-            return <MessageItem key={msg.id} msg={msg} currentUserId={session?.user?.id} groupId={group?.id} isGrouped={isGrouped} onUsernameClick={handleUsernameClick} />;
+            return (
+              <MessageItem
+                key={msg.id}
+                msg={msg}
+                currentUserId={session?.user?.id}
+                groupId={group?.id}
+                onFeedback={isAI ? handleFeedback : undefined}
+                feedbackGiven={isAI ? feedbackMap[msg.id] : undefined}
+                isGrouped={isGrouped}
+                onUsernameClick={handleUsernameClick}
+              />
+            );
           })}
           {aiLoading && (
             <div style={styles.aiLoading}>
@@ -1073,12 +1068,12 @@ const styles = {
     letterSpacing: '0.4px', border: '1px solid rgba(139,92,246,0.15)',
   },
   msgText: {
-    fontSize: 14, color: 'var(--text1)',
+    fontSize: 15, color: 'var(--text1)',
     lineHeight: 1.5, wordBreak: 'break-word',
   },
   tickerMention: {
     background: 'rgba(212,160,23,0.1)', color: '#D4A017',
-    fontSize: 14, fontWeight: 600,
+    fontSize: 15, fontWeight: 600,
     padding: '1px 5px', borderRadius: 4,
     border: '1px solid rgba(212,160,23,0.25)',
   },
