@@ -63,12 +63,16 @@ Deno.serve(async () => {
   try {
     const vix = quotes["^VIX"];
     if (vix) {
-      await supabase.from("market_data").upsert({
+      const { error: dbErr } = await supabase.from("market_data").upsert({
         key: "vix_score",
         value: { score: vix.price, change: vix.change },
         updated_at: new Date().toISOString(),
       });
-      results.vix = vix.price;
+      if (dbErr) {
+        errors.vix = `DB upsert failed: ${dbErr.message}`;
+      } else {
+        results.vix = vix.price;
+      }
     } else if (!errors.yahoo) {
       errors.vix = "Yahoo returned no ^VIX quote";
     }
@@ -80,12 +84,16 @@ Deno.serve(async () => {
   try {
     const spy = quotes["SPY"];
     if (spy) {
-      await supabase.from("market_data").upsert({
+      const { error: dbErr } = await supabase.from("market_data").upsert({
         key: "spy_price",
         value: { price: spy.price, change: spy.change },
         updated_at: new Date().toISOString(),
       });
-      results.spy = spy.price;
+      if (dbErr) {
+        errors.spy = `DB upsert failed: ${dbErr.message}`;
+      } else {
+        results.spy = spy.price;
+      }
     } else if (!errors.yahoo) {
       errors.spy = "Yahoo returned no SPY quote";
     }
@@ -101,12 +109,16 @@ Deno.serve(async () => {
       if (q) sectors.push({ name, perf: q.change });
     }
     if (sectors.length > 0) {
-      await supabase.from("market_data").upsert({
+      const { error: dbErr } = await supabase.from("market_data").upsert({
         key: "sector_performance",
         value: sectors,
         updated_at: new Date().toISOString(),
       });
-      results.sectors = sectors.length;
+      if (dbErr) {
+        errors.sectors = `DB upsert failed: ${dbErr.message}`;
+      } else {
+        results.sectors = sectors.length;
+      }
     } else if (!errors.yahoo) {
       errors.sectors = "Yahoo returned no sector quotes";
     }
@@ -133,7 +145,7 @@ Deno.serve(async () => {
       if (score == null) {
         errors.fear_greed = `CNN missing score field. Top keys: ${Object.keys(fg || {}).join(",") || "(empty)"}`;
       } else {
-        await supabase.from("market_data").upsert({
+        const { error: dbErr } = await supabase.from("market_data").upsert({
           key: "fear_greed",
           value: {
             score: Math.round(score),
@@ -142,7 +154,11 @@ Deno.serve(async () => {
           },
           updated_at: new Date().toISOString(),
         });
-        results.fear_greed = Math.round(score);
+        if (dbErr) {
+          errors.fear_greed = `DB upsert failed: ${dbErr.message}`;
+        } else {
+          results.fear_greed = Math.round(score);
+        }
       }
     }
   } catch (e) {
