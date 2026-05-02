@@ -140,9 +140,17 @@ function sleep(ms: number) {
 
 // ── Polygon helpers ──────────────────────────────────────────────────────────
 
+// 10-second per-request timeout. Without it a slow Polygon endpoint can
+// hang the whole scan past the cron cadence (and past Supabase's edge
+// function wall-clock limit) instead of failing fast and letting the
+// next cron tick retry.
+const FETCH_TIMEOUT_MS = 10_000;
+
 async function polyGet(path: string, apiKey: string): Promise<any> {
   const sep = path.includes('?') ? '&' : '?';
-  const res = await fetch(`${POLYGON_BASE}${path}${sep}apiKey=${apiKey}`);
+  const res = await fetch(`${POLYGON_BASE}${path}${sep}apiKey=${apiKey}`, {
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
   if (res.status === 429) {
     throw new Error('Polygon rate limit — back off and retry next cycle');
   }
@@ -799,13 +807,18 @@ Deno.serve(async (req) => {
       return json({ skipped: true, reason: 'outside market hours' });
     }
 
-    const polygonKey = Deno.env.get('POLYGON_API_KEY');
-    if (!polygonKey) throw new Error('Missing env var: POLYGON_API_KEY');
+    // Validate every required env var up front so a missing secret returns
+    // a clear 500 with the offending key name instead of a downstream
+    // Supabase / Polygon error that's harder to diagnose. Same pattern as
+    // fetch-flow-data's UW_API_KEY check, extended to all three keys.
+    const polygonKey      = Deno.env.get('POLYGON_API_KEY');
+    const supabaseUrl     = Deno.env.get('SUPABASE_URL');
+    const supabaseSrvRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!polygonKey)      throw new Error('Missing env var: POLYGON_API_KEY');
+    if (!supabaseUrl)     throw new Error('Missing env var: SUPABASE_URL');
+    if (!supabaseSrvRole) throw new Error('Missing env var: SUPABASE_SERVICE_ROLE_KEY');
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    );
+    const supabase = createClient(supabaseUrl, supabaseSrvRole);
 
     console.log(`[confluence] Scanning ${TICKERS.length} tickers`);
     const { scored, insertedTickers, errors } = await runConfluenceScan(supabase, polygonKey);
