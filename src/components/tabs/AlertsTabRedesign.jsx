@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useTheme, SentimentPill, timeAgo } from './alertsCasinoComponents';
+import { useTheme, timeAgo } from "./alertsCasinoComponents";
 import { lifecycleStateFor } from '../../lib/alertLifecycle';
 import { MIN_SAMPLES_FLOOR } from '../../lib/signalConfidence';
+import { useMarketData } from '../../hooks/useMarketData';
 
 // ── Constants ──
 // Polygon replaced FMP as the exit-price source for alert scoring on 2026-04-14.
@@ -58,55 +59,6 @@ const HISTORY_FILTERS = [
   { key: 'flow',       label: 'Big $' },
 ];
 
-const EDUCATION_PANELS = [
-  {
-    id: 'vol', title: 'Stocks on the move', subtitle: 'Manual · admin triggered',
-    color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.2)', divider: 'rgba(167,139,250,0.15)',
-    what: <>Scans ~250 stocks and flags any trading at <span style={{ color: '#a78bfa', fontWeight: 500 }}>2x or more</span> their normal daily volume.</>,
-    why: 'Volume often leads price. A sudden spike means something is happening — earnings, news, or insider moves.',
-    scans: [
-      ['Volume ratio', "today's volume vs 20-day avg (must be 2x+)"],
-      ['Price change', 'how much the stock moved today (%)'],
-      ['Current price', 'live stock price at time of scan'],
-      ['Avg volume', '20-day average daily trading volume'],
-      ['Sector', 'which industry the stock belongs to'],
-    ],
-    example: <><span style={{ color: '#a78bfa', fontWeight: 500 }}>CRWD</span> at <span style={{ color: '#a78bfa' }}>3.2x</span> avg volume → something is driving unusual interest in CrowdStrike today</>,
-    exBg: 'rgba(167,139,250,0.06)', exBorder: 'rgba(167,139,250,0.1)',
-  },
-  {
-    id: 'ai', title: 'Options & dark pools', subtitle: 'Smart · auto-scored',
-    color: '#5eed8a', bg: 'rgba(94,237,138,0.06)', border: 'rgba(94,237,138,0.15)', divider: 'rgba(94,237,138,0.1)',
-    what: <>Tracks where institutions are placing large bets through <span style={{ color: '#5eed8a', fontWeight: 500 }}>options sweeps</span> and <span style={{ color: '#5eed8a', fontWeight: 500 }}>dark pool trades</span>, then scores and ranks by conviction.</>,
-    why: "Institutions trade through hidden channels. Unusually large or aggressive bets often signal they know something retail doesn't.",
-    scans: [
-      ['Sweeps', 'large orders split across exchanges to fill fast (urgency)'],
-      ['Premium size', 'total $ bet on options ($100K+ flagged, $1M+ high alert)'],
-      ['Dark pool prints', 'hidden block trades ($500K+ flagged, $10M+ high alert)'],
-      ['Direction', 'bullish (call buys) or bearish (put buys)'],
-      ['Multi-day conviction', 'same ticker active 3+ days = high confidence'],
-      ['Cross-signal', 'options + dark pool on same stock = strongest signal'],
-    ],
-    example: <><span style={{ color: '#5eed8a', fontWeight: 500 }}>PLTR</span> — 3 bullish sweeps · $2.1M premium · $4.5M dark pool → institutions loading up aggressively</>,
-    exBg: 'rgba(94,237,138,0.04)', exBorder: 'rgba(94,237,138,0.1)',
-  },
-  {
-    id: 'confluence', title: 'Confluence score', subtitle: 'Smart · multi-signal',
-    color: '#d4af37', bg: 'rgba(212,175,55,0.06)', border: 'rgba(212,175,55,0.2)', divider: 'rgba(212,175,55,0.15)',
-    what: <>Combines multiple technical signals into a single <span style={{ color: '#d4af37', fontWeight: 500 }}>point-weighted score</span>. High scores mean several independent indicators agree at once.</>,
-    why: 'One signal can be noise. When RSI, ADX, VWAP, and volume all line up on the same stock, the edge compounds.',
-    scans: [
-      ['RSI momentum', '14-day RSI above 60 scores +15pts (overbought zone adds urgency)'],
-      ['ADX trend strength', 'ADX > 25 scores +20pts (strong directional trend confirmed)'],
-      ['VWAP position', 'price above VWAP scores +15pts (institutions buying above fair value)'],
-      ['Volume surge', 'volume ratio ≥ 2x scores +25pts (crowd participation)'],
-      ['52W High proximity', 'within 2% of high scores +10pts (breakout zone)'],
-      ['Tier cutoffs', 'S-Tier ≥ 85pts · A-Tier ≥ 70pts · B-Tier ≥ 55pts'],
-    ],
-    example: <><span style={{ color: '#d4af37', fontWeight: 500 }}>NVDA</span> — RSI 68 · ADX 31 · above VWAP · 3.1x vol · at 52W High → <span style={{ color: '#d4af37' }}>87pts S-Tier</span></>,
-    exBg: 'rgba(212,175,55,0.04)', exBorder: 'rgba(212,175,55,0.1)',
-  },
-];
 
 // ── Helpers ──
 function freshness(createdAt) {
@@ -121,6 +73,112 @@ function freshness(createdAt) {
 function chipSize(pct) {
   const a = Math.abs(pct || 0);
   return a >= 8 ? 80 : a >= 5 ? 72 : a >= 3 ? 64 : a >= 1.5 ? 58 : 54;
+}
+
+// ── Tier classification ──────────────────────────────────────────────
+// Maps cohort historical hit rate → one of five plain-English tiers used
+// for chip color + label. Thresholds are symmetric around 50% so the
+// scale reads as a balanced "track record": Climbing (≥60%), Rising
+// (53–60%), Flat (47–53%), Slipping (40–47%), Falling (<40%). Below
+// MIN_SAMPLES_FLOOR (50) the cohort isn't statistically meaningful, so
+// we fall back to 'flat' rather than letting noisy small-sample rates
+// drive a confident-looking color.
+export function tierFor(hitRatePct, nSamples = 0) {
+  if (!Number.isFinite(hitRatePct) || nSamples < MIN_SAMPLES_FLOOR) return 'flat';
+  if (hitRatePct >= 60) return 'climbing';
+  if (hitRatePct >= 53) return 'rising';
+  if (hitRatePct >= 47) return 'flat';
+  if (hitRatePct >= 40) return 'slipping';
+  return 'falling';
+}
+
+const TIER_LABELS = {
+  climbing: 'Climbing',
+  rising:   'Rising',
+  flat:     'Flat',
+  slipping: 'Slipping',
+  falling:  'Falling',
+};
+
+// 3-stop radial gradients matching the static mock. Same lightness
+// contour across tiers — only the hue moves green → yellow → red — so
+// chip depth/dimension stay consistent regardless of tier.
+const TIER_GRADIENTS = {
+  climbing: 'radial-gradient(circle at 32% 28%, #b6f6c7 0%, #5eed8a 55%, #2fa860 100%)',
+  rising:   'radial-gradient(circle at 32% 28%, #d4eccd 0%, #aed8a0 55%, #7eb070 100%)',
+  flat:     'radial-gradient(circle at 32% 28%, #f6e8b3 0%, #e8d068 55%, #c4a228 100%)',
+  slipping: 'radial-gradient(circle at 32% 28%, #f6cccc 0%, #e89898 55%, #c46868 100%)',
+  falling:  'radial-gradient(circle at 32% 28%, #f0a0a0 0%, #d65555 55%, #a02828 100%)',
+};
+
+// Two-ring inset border (inner accent + outer shadow) — same alpha
+// across tiers, only hue changes.
+const TIER_BORDERS = {
+  climbing: { inner: 'rgba(94,237,138,0.9)',  outer: 'rgba(26,138,69,0.4)'  },
+  rising:   { inner: 'rgba(173,216,160,0.9)', outer: 'rgba(126,176,112,0.4)' },
+  flat:     { inner: 'rgba(232,208,104,0.9)', outer: 'rgba(184,138,40,0.4)'  },
+  slipping: { inner: 'rgba(232,152,152,0.9)', outer: 'rgba(196,104,104,0.4)' },
+  falling:  { inner: 'rgba(214,85,85,0.9)',   outer: 'rgba(160,40,40,0.5)'   },
+};
+
+// Falling chips are the only ones dark enough to need light text;
+// everything else uses near-black tinted toward the chip hue.
+const TIER_TEXT = {
+  climbing: { primary: '#0a3a18', secondary: 'rgba(0,0,0,0.6)',  tertiary: 'rgba(0,0,0,0.45)' },
+  rising:   { primary: '#1c3d18', secondary: 'rgba(0,0,0,0.6)',  tertiary: 'rgba(0,0,0,0.45)' },
+  flat:     { primary: '#3d2c08', secondary: 'rgba(0,0,0,0.62)', tertiary: 'rgba(0,0,0,0.48)' },
+  slipping: { primary: '#3d1010', secondary: 'rgba(0,0,0,0.62)', tertiary: 'rgba(0,0,0,0.48)' },
+  falling:  { primary: '#fff',    secondary: 'rgba(255,255,255,0.92)', tertiary: 'rgba(255,255,255,0.7)' },
+};
+
+// Solid headline color per tier. For tier word rendered on normal
+// background (e.g. market-trend card, detail-card tier badge).
+const TIER_HEADER_COLORS = {
+  climbing: '#1f7a3a',
+  rising:   '#5b8a3a',
+  flat:     '#b08010',
+  slipping: '#c46868',
+  falling:  '#b03030',
+};
+
+// Map broad-market % change onto the same 5-tier scale. Tighter
+// thresholds than alert tiers — broad indices move less than single
+// stocks, so 0.5% is a meaningful S&P day, not 5%.
+export function marketTierFor(pctChange) {
+  const p = Number(pctChange);
+  if (!Number.isFinite(p)) return 'flat';
+  if (p >= 0.5)   return 'climbing';
+  if (p >= 0.15)  return 'rising';
+  if (p >= -0.15) return 'flat';
+  if (p >= -0.5)  return 'slipping';
+  return 'falling';
+}
+
+// CNN-style Fear & Greed bands (0–100). Returns descriptive label and
+// the color we tint the headline number with.
+export function fearBand(score) {
+  const s = Number(score);
+  if (!Number.isFinite(s)) return { label: '—', color: '#9aa6b8' };
+  if (s < 25) return { label: 'Extreme fear',  color: '#b03030' };
+  if (s < 45) return { label: 'Fear',          color: '#b08010' };
+  if (s < 55) return { label: 'Neutral',       color: '#6b7a92' };
+  if (s < 75) return { label: 'Greed',         color: '#5b8a3a' };
+  return       { label: 'Extreme greed', color: '#1f7a3a' };
+}
+
+// VIX is on a totally different scale than F&G — typical 10–80, where
+// low = calm and high = panic. We label and color it with VIX-native
+// thresholds so a 27 reads as "Elevated" (which it is) instead of
+// being mashed into a 0–100 fear/greed bar that mislabels it as Fear.
+export function vixBand(vix) {
+  const v = Number(vix);
+  if (!Number.isFinite(v)) return { label: '—', color: '#9aa6b8' };
+  if (v < 15) return { label: 'Calm',     color: '#1f7a3a' };
+  if (v < 20) return { label: 'Normal',   color: '#5b8a3a' };
+  if (v < 25) return { label: 'Moderate', color: '#b08010' };
+  if (v < 30) return { label: 'Elevated', color: '#c46868' };
+  if (v < 40) return { label: 'Nervous',  color: '#b03030' };
+  return       { label: 'Panic', color: '#8a1010' };
 }
 
 function fmtMoney(v) {
@@ -294,8 +352,13 @@ function mapAlert(a) {
 // ===== MAIN COMPONENT =====
 export default function AlertsTab({ darkMode, isAdmin = false }) {
   const t = useTheme(darkMode);
+  // Futures + SPY pulse feed the Market trend card above the chip field.
+  // loadMarketIndicators() is the public entrypoint — it fetches futures
+  // when the market is closed and pulse when open. Same source HomeTab uses.
+  const { futuresData, marketPulse, marketStatus, loadMarketIndicators } = useMarketData();
   const [liveAlerts, setLiveAlerts] = useState([]);
   const [fearScore, setFearScore] = useState(null);
+  const [vixScore, setVixScore] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [perfHistory, setPerfHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -359,9 +422,15 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
     if (alertsRes.data) setLiveAlerts(alertsRes.data);
     if (perfRes.data) setPerfHistory(perfRes.data);
     if (marketRes.data) {
-      const fg = marketRes.data.find(r => r.key === 'fear_greed');
+      // VIX and Fear & Greed are different metrics on different scales
+      // (VIX 10–80 volatility index, F&G 0–100 sentiment index). Render
+      // them as separate cards rather than collapsing one into the
+      // other. fear_greed stays strictly null when missing so the F&G
+      // pill renders "—" rather than mislabeling VIX as Fear.
+      const fg  = marketRes.data.find(r => r.key === 'fear_greed');
       const vix = marketRes.data.find(r => r.key === 'vix_score');
-      setFearScore((fg || vix)?.value?.score ?? null);
+      setFearScore(fg?.value?.score ?? null);
+      setVixScore(vix?.value?.score ?? null);
     }
     // FreshnessBar lives under the STATS strip (Scored / Win rate / Avg return)
     // so it has to reflect when the SCORING data was last updated, not just
@@ -410,6 +479,15 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
     })();
     return () => { cancelled = true; };
   }, [loadCohortStats]);
+
+  // Fetch market data once on mount so the Market trend card can render.
+  // Not memoized in the hook (it closes over fetch helpers that change
+  // per render), so we run it once with empty deps to avoid a render→
+  // fetch→render loop. Re-fetched on focus alongside loadData().
+  useEffect(() => {
+    loadMarketIndicators();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Manual scorer trigger — wired to the FreshnessBar's ↻ button.
   //
@@ -503,8 +581,10 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
         }
       }).subscribe(onSubStatus);
 
-    // Catch the "tab was backgrounded / laptop slept" case — refetch on focus
-    const onFocus = () => { loadData(); };
+    // Catch the "tab was backgrounded / laptop slept" case — refetch on focus.
+    // Also re-pull market data so the Market trend card doesn't show a stale
+    // snapshot from before the user backgrounded the app.
+    const onFocus = () => { loadData(); loadMarketIndicators(); };
     window.addEventListener('focus', onFocus);
 
     // Re-render the "Xs ago" label every 15s so it stays fresh
@@ -548,11 +628,68 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
       .filter(a => a.ticker !== '—' && (Math.abs(a.changePct) > 0.05 || a.flowDollars > 0));
   }, [liveAlerts]);
 
+  // Build the 8-chip grid in two passes so the tier color spread is
+  // always visible. gap_up fires in batches of 8+ daily, while confluence
+  // / flow_signal / ma_cross fire only when their conditions hit — a
+  // simple "most-recent 8" picker would let gap_up monopolize the grid
+  // and the page would look like a wall of one tier (today: all red).
+  //
+  // Pass 1: take the most-recent alert from each signal_type. Guarantees
+  //   one chip per scanner so the user sees the full Climbing→Falling
+  //   range whenever any of those types has fired in the last 7 days.
+  // Pass 2: fill the remaining slots with most-recent alerts of any type
+  //   that don't duplicate a ticker we've already shown.
+  // Both passes preserve the input order (createdAt desc), so each
+  // signal_type's representative is its newest alert, and the fillers
+  // are the next-newest unseen-ticker alerts.
+  // Build the 8-chip grid with a fixed tier distribution: 3 up, 2 flat,
+  // 3 down. Guarantees the user always sees the full Climbing→Falling
+  // color range whenever the database has any of those tiers in the
+  // last 7 days, regardless of which scanner happens to be firing
+  // most that day. (gap_up alone produces ~46 alerts/week; without
+  // bucketing it would always dominate the most-recent-N picker and
+  // the page would look like a wall of red.)
+  //
+  // Pass 1: walk most-recent → least-recent, drop each alert into its
+  //   tier bucket up to that bucket's target. Dedupe by ticker so the
+  //   same symbol doesn't appear twice on the field.
+  // Pass 2: if any bucket couldn't reach its target (e.g. no Climbing
+  //   alerts in the window), fill remaining slots by pure recency from
+  //   any tier so the grid always shows 8 chips when 8+ are available.
   const uniqueAlerts = useMemo(() => {
-    const seen = new Map();
-    displayAlerts.forEach(a => { if (!seen.has(a.ticker)) seen.set(a.ticker, a); });
-    return [...seen.values()].slice(0, 8);
-  }, [displayAlerts]);
+    const TIER_BUCKET = {
+      climbing: 'up',   rising:   'up',
+      flat:     'flat',
+      slipping: 'down', falling:  'down',
+    };
+    const TARGETS = { up: 3, flat: 2, down: 3 };
+    const buckets = { up: [], flat: [], down: [] };
+    const usedTickers = new Set();
+
+    // Pass 1: bucket-target fill.
+    for (const a of displayAlerts) {
+      if (usedTickers.has(a.ticker)) continue;
+      const cohort = cohortFor(a.type);
+      const tier = tierFor(Number(cohort?.hit_rate_pct), Number(cohort?.n_samples) || 0);
+      const bucket = TIER_BUCKET[tier] || 'flat';
+      if (buckets[bucket].length < TARGETS[bucket]) {
+        buckets[bucket].push(a);
+        usedTickers.add(a.ticker);
+      }
+    }
+
+    const result = [...buckets.up, ...buckets.flat, ...buckets.down];
+
+    // Pass 2: backfill any unfilled slots by recency, regardless of tier.
+    for (const a of displayAlerts) {
+      if (result.length >= 8) break;
+      if (usedTickers.has(a.ticker)) continue;
+      usedTickers.add(a.ticker);
+      result.push(a);
+    }
+
+    return result;
+  }, [displayAlerts, cohortFor]);
 
   // Derive history from liveAlerts instead of a separate query.
   // When a confluence row exists for a ticker, hide the individual signal rows
@@ -611,7 +748,10 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
       <style>{FLOAT_KEYFRAMES}</style>
 
       {/* ═══ HEADER ═══ */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+      {/* SentimentPill removed — fear is now rendered in the larger
+          Fear-gauge card below (with a CNN-style horizontal gauge).
+          Showing both was redundant. */}
+      <div style={{ marginBottom: 10 }}>
         <div style={{ position: 'relative', paddingLeft: 10 }}>
           <div style={{
             position: 'absolute', left: 0, top: 2, bottom: 2, width: 3,
@@ -627,8 +767,101 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
             Last scan: <span style={{ color: t.green, fontWeight: 600 }}>{liveAlerts.length > 0 ? timeAgo(liveAlerts[0]?.created_at) : 'pending'}</span> · {uniqueAlerts.length} alert{uniqueAlerts.length !== 1 ? 's' : ''} live
           </div>
         </div>
-        <SentimentPill score={fearScore} darkMode={darkMode} />
       </div>
+
+      {/* ═══ MARKET TREND + FEAR GAUGE ═══ */}
+      {(() => {
+        // Pick the freshest source: SPY (market open) → ES=F futures
+        // (after-hours / weekend) → SPY ETF fallback.
+        const isOpen = marketStatus === 'open';
+        const spy   = isOpen ? marketPulse?.['SPY'] : null;
+        const esF   = futuresData?.['ES=F'];
+        const spyEt = futuresData?.['SPY'];
+        const sp = spy || esF || spyEt;
+        const spChange = sp && Number.isFinite(Number(sp.change)) ? Number(sp.change) : null;
+        const mTier = marketTierFor(spChange);
+        const fb = fearBand(fearScore);
+        const vb = vixBand(vixScore);
+        // Guard against null/undefined → Number() coercion landing at 0,
+        // which would otherwise mask a missing row as a real "0" reading.
+        const fearNum = fearScore == null ? NaN : Number(fearScore);
+        const vixNum  = vixScore  == null ? NaN : Number(vixScore);
+        const cardStyle = {
+          background: t.card,
+          border: `1px solid ${t.border}`,
+          borderRadius: 8,
+          padding: '4px 8px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 5,
+          minHeight: 26,
+        };
+        const lblStyle = {
+          fontSize: 7, color: t.text3,
+          letterSpacing: 0.4, textTransform: 'uppercase',
+          fontWeight: 700,
+          flex: '0 0 auto',
+        };
+        const valStyle = (color) => ({
+          fontSize: 11, fontWeight: 800, color, letterSpacing: -0.2,
+        });
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 8 }}>
+            {/* MKT — broad market direction (S&P proxy) */}
+            <div style={cardStyle}>
+              <span style={lblStyle}>Mkt</span>
+              <span style={valStyle(TIER_HEADER_COLORS[mTier])}>
+                {TIER_LABELS[mTier]}
+              </span>
+              {Number.isFinite(spChange) && (
+                <span style={{ fontSize: 8, color: t.text3, marginLeft: 'auto' }}>
+                  {spChange >= 0 ? '+' : ''}{spChange.toFixed(2)}%
+                </span>
+              )}
+            </div>
+
+            {/* VIX — volatility index, native scale + native labels */}
+            <div style={cardStyle}>
+              <span style={lblStyle}>VIX</span>
+              <span style={valStyle(vb.color)}>
+                {Number.isFinite(vixNum) ? vixNum.toFixed(1) : '—'}
+              </span>
+              <span style={{ fontSize: 8, color: t.text3, marginLeft: 'auto' }}>
+                {vb.label}
+              </span>
+            </div>
+
+            {/* F&G — CNN Fear & Greed, 0–100 with horizontal gauge bar.
+                Renders "—" when fear_greed row is missing rather than
+                falling back to VIX (which has different scale semantics). */}
+            <div style={cardStyle}>
+              <span style={lblStyle}>F&amp;G</span>
+              <span style={valStyle(fb.color)}>
+                {Number.isFinite(fearNum) ? Math.round(fearNum) : '—'}
+              </span>
+              {Number.isFinite(fearNum) ? (
+                <div style={{
+                  position: 'relative',
+                  flex: 1, height: 3, borderRadius: 2,
+                  background: 'linear-gradient(90deg, #d65555 0%, #d65555 22%, #e8a070 30%, #e8d068 45%, #aed8a0 60%, #5eed8a 78%, #5eed8a 100%)',
+                }}>
+                  <div style={{
+                    position: 'absolute', top: -2,
+                    left: `${Math.max(0, Math.min(100, fearNum))}%`,
+                    width: 7, height: 7, borderRadius: '50%',
+                    background: '#fff',
+                    border: `1.5px solid ${darkMode ? '#1a2538' : '#0d2240'}`,
+                    transform: 'translateX(-50%)',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
+                  }} />
+                </div>
+              ) : (
+                <span style={{ fontSize: 8, color: t.text3, marginLeft: 'auto' }}>—</span>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ═══ CHIP ZONE ═══ */}
       {hasAlerts && (
@@ -647,10 +880,22 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
           {uniqueAlerts.map((alert, i) => {
             const isSelected = selectedId === alert.id;
             const size = alert.isFlow ? chipSize(alert.flowDollars / 500000) : chipSize(alert.changePct);
-            const isUp = alert.isFlow ? alert.flowDollars > 0 : alert.changePct >= 0;
-            const tc = typeFor(alert.type);
             const f = freshness(alert.created_at);
             const isHot = f >= 0.85;
+            // Cohort lookup → tier → color + label. tierFor() falls back
+            // to 'flat' when cohort is missing or below MIN_SAMPLES_FLOOR
+            // so we never paint a confident color on noisy data.
+            const cohort = cohortFor(alert.type);
+            const winRate = Number(cohort?.hit_rate_pct);
+            const samples = Number(cohort?.n_samples) || 0;
+            const tier = tierFor(winRate, samples);
+            const tierLabel = TIER_LABELS[tier];
+            const tierGradient = TIER_GRADIENTS[tier];
+            const tierBorders = TIER_BORDERS[tier];
+            const tierText = TIER_TEXT[tier];
+            const winRateLabel = (Number.isFinite(winRate) && samples >= MIN_SAMPLES_FLOOR)
+              ? `${tierLabel} · ${Math.round(winRate)}%`
+              : tierLabel;
             return (
               <div key={alert.id} onClick={() => setSelectedId(prev => prev === alert.id ? null : alert.id)}
                 style={{
@@ -660,55 +905,44 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
                   transition: 'opacity 0.3s ease', cursor: 'pointer',
                   zIndex: isSelected ? 10 : isHot ? 5 : 1,
                 }}>
-                {/* Flow chips get their own violet styling — different
-                    color, larger primary text, inner text on white — so the
-                    eye lands on flow first (our differentiated signal). */}
+                {/* Chip color + label come from the historical cohort tier
+                    (Climbing → Falling). Same chrome (highlight, shadow,
+                    inset border) as before — only the hue family changes
+                    per tier. Selected/fresh effects are tier-agnostic. */}
                 <div style={{
                   width: size, height: size, borderRadius: '50%',
-                  background: alert.isConfluence
-                    ? 'radial-gradient(circle at 32% 28%, #fff0a8 0%, #e5c94e 55%, #c89820 100%)'
-                    : alert.isFlow
-                      ? 'radial-gradient(circle at 32% 28%, #d4bcff 0%, #7c3aed 65%, #5a25c0 100%)'
-                      : isUp
-                        ? 'radial-gradient(circle at 32% 28%, #9affb8 0%, #2ebd68 70%, #24a055 100%)'
-                        : 'radial-gradient(circle at 32% 28%, #ffb5b5 0%, #c94444 70%, #a03030 100%)',
+                  background: tierGradient,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                   boxShadow: [
                     'inset 1.5px 1.5px 2px rgba(255,255,255,0.6)',
                     'inset -1.5px -1.5px 2px rgba(0,0,0,0.25)',
-                    `inset 0 0 0 2px ${alert.isConfluence ? 'rgba(212,175,55,0.95)' : alert.isFlow ? 'rgba(159,108,240,0.9)' : isUp ? 'rgba(94,237,138,0.9)' : 'rgba(240,149,149,0.9)'}`,
-                    `inset 0 0 0 3px ${alert.isConfluence ? 'rgba(138,110,30,0.5)' : alert.isFlow ? 'rgba(74,32,150,0.5)' : isUp ? 'rgba(26,138,69,0.4)' : 'rgba(155,70,70,0.4)'}`,
+                    `inset 0 0 0 2px ${tierBorders.inner}`,
+                    `inset 0 0 0 3px ${tierBorders.outer}`,
                     isSelected ? '0 0 0 3px rgba(123,140,222,0.5)' : null,
-                    !isSelected && alert.isFlow ? '0 0 0 3px rgba(124,58,237,0.15)' : null,
-                    !isSelected && alert.isFlow ? '0 0 12px rgba(124,58,237,0.25)' : null,
-                    !isSelected && !alert.isFlow && isHot ? '0 0 8px rgba(94,237,138,0.35)' : null,
+                    !isSelected && isHot ? '0 0 8px rgba(94,237,138,0.35)' : null,
                   ].filter(Boolean).join(', '),
                   transition: 'box-shadow 0.2s ease',
                 }}>
                   <span style={{
                     fontSize: 11, fontWeight: 700,
-                    color: alert.isFlow ? '#fff' : '#000',
+                    color: tierText.primary,
                     lineHeight: 1, fontFamily: "'Outfit', sans-serif",
                   }}>{alert.ticker}</span>
                   <span style={{
-                    fontSize: alert.isFlow ? 10 : 9,
-                    fontWeight: alert.isFlow ? 700 : 500,
-                    color: alert.isFlow ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.6)',
-                    lineHeight: 1, marginTop: 1,
+                    fontSize: 9, fontWeight: 600,
+                    color: tierText.secondary,
+                    lineHeight: 1, marginTop: 2,
                   }}>
-                    {alert.isConfluence
-                      ? (alert.tier ? `${alert.tier}-Tier` : '—')
-                      : alert.isFlow
-                        ? (alert.flowDollars > 0 ? fmtMoney(alert.flowDollars) : '—')
-                        : `${alert.changePct >= 0 ? '+' : ''}${alert.changePct.toFixed(1)}%`}
+                    {`${alert.changePct >= 0 ? '+' : ''}${alert.changePct.toFixed(1)}%`}
                   </span>
                   <span style={{
-                    fontSize: 6.5, fontWeight: 700,
-                    color: alert.isFlow ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.45)',
+                    fontSize: 7, fontWeight: 700,
+                    color: tierText.tertiary,
                     lineHeight: 1, marginTop: 2,
-                    textTransform: 'uppercase', letterSpacing: 0.3, textAlign: 'center', maxWidth: size - 10,
+                    letterSpacing: 0.2, textAlign: 'center', maxWidth: size - 8,
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
-                    {tc.label}
+                    {winRateLabel}
                   </span>
                 </div>
               </div>
@@ -762,16 +996,20 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
               </>
             )}
           </div>
-          <FreshnessBar
-            lastUpdated={lastUpdated}
-            connState={connState}
-            onRefresh={refreshScores}
-            refreshing={refreshing}
-            canRefresh={isAdmin}
-            tick={tick}
-            t={t}
-            darkMode={darkMode}
-          />
+          {/* Stale-scores indicator is a dev/admin diagnostic. Hidden
+              entirely from regular users; admin keeps the bug-catching hook. */}
+          {isAdmin && (
+            <FreshnessBar
+              lastUpdated={lastUpdated}
+              connState={connState}
+              onRefresh={refreshScores}
+              refreshing={refreshing}
+              canRefresh={isAdmin}
+              tick={tick}
+              t={t}
+              darkMode={darkMode}
+            />
+          )}
         </>
       )}
 
@@ -976,30 +1214,10 @@ function FreshnessBar({ lastUpdated, connState, onRefresh, refreshing, canRefres
 }
 
 function DetailPanel({ alert, rawAlert, perfRow, cohort, t }) {
-  const tc = typeFor(alert.type);
-
-  // Derive confidence + lifecycle state for this alert. lifecycleStateFor is a
-  // pure function — safe to call every render. Falls back to "Insufficient" if
-  // the cohort view is missing or the sample is too small.
   const ls = lifecycleStateFor(rawAlert || alert, perfRow, cohort);
   const conf = ls.confidence;
-
-  const confLabelColor =
-    conf.label === 'Strong' ? t.green :
-    conf.label === 'Mixed'  ? '#fbbf24' :
-    conf.label === 'Weak'   ? t.red :
-    t.text3;
-
-  // Plain-English label mapping. Internal taxonomy (Strong/Mixed/Weak) stays
-  // as-is in signalConfidence.js; we only translate at render time so regular
-  // users read a sentence they understand, not a regulatory-looking rating.
-  // Avoids "Strong Buy / Buy / Hold / Sell" language (investment-adviser
-  // territory) while still telling the user what the cohort is saying.
-  const confDisplayLabel =
-    conf.label === 'Strong' ? 'Usually wins' :
-    conf.label === 'Mixed'  ? 'Coin-flip'    :
-    conf.label === 'Weak'   ? 'Usually loses':
-    conf.label;
+  const tier = tierFor(conf.hitRatePct, conf.nSamples);
+  const tierWord = TIER_LABELS[tier];
 
   const dotColor =
     ls.dotColor === 'live' ? '#4A90D9' :
@@ -1014,70 +1232,74 @@ function DetailPanel({ alert, rawAlert, perfRow, cohort, t }) {
     ls.stage === 'near_peak'     ? '#fbbf24' :
     t.text1;
 
+  const avgReturn = Number(conf.avgReturnPct);
+  const hasCohort = conf.label !== 'Insufficient' && conf.hitRatePct != null;
+
   return (
     <div style={{ background: t.card, borderRadius: 10, border: `1px solid ${t.border}`, padding: '10px 12px', marginBottom: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
         <span style={{ fontSize: 18, fontWeight: 700, color: t.text1, fontFamily: "'Outfit', sans-serif" }}>{alert.ticker}</span>
-        <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: tc.bg, color: tc.color, fontFamily: "'Outfit', sans-serif" }}>{tc.label}</span>
-        <span style={{ fontSize: 15, fontWeight: 700, color: alert.isFlow ? '#5eed8a' : (alert.changePct >= 0 ? t.green : t.red), marginLeft: 'auto' }}>
-          {alert.isFlow
-            ? (alert.flowDollars > 0 ? fmtMoney(alert.flowDollars) : '—')
-            : `${alert.changePct >= 0 ? '+' : ''}${alert.changePct.toFixed(1)}%`}
+        <span style={{
+          fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+          background: 'transparent',
+          color: TIER_HEADER_COLORS[tier],
+          border: `1px solid ${TIER_HEADER_COLORS[tier]}`,
+          fontFamily: "'Outfit', sans-serif",
+          letterSpacing: 0.3,
+        }}>{tierWord}{hasCohort ? ` · ${Math.round(conf.hitRatePct)}%` : ''}</span>
+        <span style={{ fontSize: 15, fontWeight: 700, color: alert.changePct >= 0 ? t.green : t.red, marginLeft: 'auto' }}>
+          {`${alert.changePct >= 0 ? '+' : ''}${alert.changePct.toFixed(1)}%`}
         </span>
       </div>
       <div style={{ fontSize: 11, color: t.text3, marginBottom: 8 }}>
         {alert.company && `${alert.company} · `}{alert.price && `$${Number(alert.price).toFixed(2)} · `}{timeAgo(alert.created_at)}
       </div>
 
-      {/* Confidence one-liner.
-          - Trustworthy cohort → colored label + stats (Strong · 62% win rate · 1d · 78 similar)
-          - Below the sample floor → muted "Building history" line so the feature is
-            always discoverable and users learn the rhythm of it filling up.
-          Layout stays identical so the line swaps in place without a jump. */}
-      {conf.label !== 'Insufficient' ? (
-        <div style={{
-          fontSize: 11, color: t.text2, marginBottom: 6,
-          fontVariantNumeric: 'tabular-nums',
-        }}>
-          <span style={{ fontWeight: 700, color: confLabelColor, letterSpacing: 0.2 }}>{confDisplayLabel}</span>
-          <span style={{ color: t.border, margin: '0 5px' }}>·</span>
-          {conf.hitRatePct != null ? `${conf.hitRatePct}%` : '—'}
-          <span style={{ color: t.border, margin: '0 5px' }}>·</span>
-          {conf.nSamples ?? '—'} alerts like this
-        </div>
-      ) : (
-        <div style={{
-          fontSize: 11, color: t.text3, marginBottom: 6,
-          fontVariantNumeric: 'tabular-nums', fontStyle: 'italic',
-        }}>
-          Building history
-          {conf.hitRatePct != null && (
-            <>
-              <span style={{ margin: '0 5px' }}>·</span>
-              {conf.hitRatePct}% so far
-            </>
-          )}
-          <span style={{ margin: '0 5px' }}>·</span>
-          {conf.nSamples ?? 0} of {MIN_SAMPLES_FLOOR} alerts like this
+      {/* Plain-English what-happened line (e.g. "Gapped up 2.1% at open") */}
+      {alert.explanation && (
+        <div style={{ fontSize: 12, color: t.text2, lineHeight: 1.5, marginBottom: 8 }}>
+          {alert.explanation}
         </div>
       )}
 
-      <div style={{ fontSize: 11, color: t.text2, lineHeight: 1.5, marginBottom: 10 }}>{alert.explanation}</div>
+      {/* Cohort sentence — past-tense, app-store-safe, plain English.
+          Replaces the "Usually wins/loses · 37% · 280 alerts" line which
+          read like a verdict. Stays past tense ("has gone up") so it's
+          never advice. */}
+      {hasCohort ? (
+        <div style={{
+          fontSize: 12, color: t.text2, lineHeight: 1.5,
+          padding: '8px 10px',
+          background: t.surface, borderRadius: 8,
+          borderLeft: `3px solid ${TIER_HEADER_COLORS[tier]}`,
+        }}>
+          When this kind of signal has fired before, the stock has gone up{' '}
+          <b style={{ color: TIER_HEADER_COLORS[tier] }}>
+            {Math.round(conf.hitRatePct)}%
+          </b>{' '}
+          of the time.
+          {Number.isFinite(avgReturn) && (
+            <>
+              {' '}Typical move was{' '}
+              <b style={{ color: avgReturn >= 0 ? t.green : t.red }}>
+                {avgReturn >= 0 ? '+' : ''}{avgReturn.toFixed(1)}%
+              </b>{' '}over the next 1–2 days.
+            </>
+          )}
+          <span style={{ display: 'block', fontSize: 10, color: t.text3, marginTop: 4 }}>
+            Based on {conf.nSamples} past signals
+          </span>
+        </div>
+      ) : (
+        <div style={{
+          fontSize: 11, color: t.text3, fontStyle: 'italic',
+          padding: '8px 10px', background: t.surface, borderRadius: 8,
+        }}>
+          Still tracking this kind of signal — {conf.nSamples ?? 0} of {MIN_SAMPLES_FLOOR} priors collected so far.
+        </div>
+      )}
 
-      <div style={{ display: 'flex', gap: 6 }}>
-        {alert.stats.map((s, i) => (
-          <div key={i} style={{ flex: 1, background: t.surface, borderRadius: 6, padding: '5px 4px', textAlign: 'center' }}>
-            <div style={{ fontSize: 9, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3 }}>{s.label}</div>
-            <div style={{
-              fontSize: 12, fontWeight: 600, marginTop: 2, fontFamily: "'Outfit', sans-serif",
-              color: s.color !== undefined ? (s.color ? t.green : t.red) : t.text1,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>{s.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Lifecycle status row — always rendered so users learn the rhythm */}
+      {/* Lifecycle status row — kept so users learn how alerts close out. */}
       <div style={{
         marginTop: 9, paddingTop: 9,
         borderTop: `1px dashed ${t.border}`,
@@ -1103,92 +1325,118 @@ function DetailPanel({ alert, rawAlert, perfRow, cohort, t }) {
   );
 }
 
+// Collapsible "How alerts work". Closed by default → zero footprint.
+// Tap → expands to three sub-blocks: signal types, how to read a bubble,
+// what each tier label means. App-store-safe wording throughout.
 function EducationZone({ t, darkMode }) {
-  const [expanded, setExpanded] = useState(null);
+  const [open, setOpen] = useState(false);
+
+  const tierRows = [
+    { tier: 'climbing', label: 'Climbing',  range: 'went up 60%+ of the time before' },
+    { tier: 'rising',   label: 'Rising',    range: 'went up 53–60%' },
+    { tier: 'flat',     label: 'Flat',      range: 'about a coin flip (~50%)' },
+    { tier: 'slipping', label: 'Slipping',  range: 'went up only 40–47%' },
+    { tier: 'falling',  label: 'Falling',   range: 'went up under 40% (rare)' },
+  ];
+
+  const sectionHeader = (txt) => (
+    <div style={{
+      fontSize: 9, color: t.text3, letterSpacing: 0.5,
+      textTransform: 'uppercase', fontWeight: 700,
+      marginBottom: 6, marginTop: 12,
+    }}>{txt}</div>
+  );
 
   return (
     <div style={{
-      borderRadius: 14,
-      padding: '14px 12px',
+      background: t.card,
+      border: `1px solid ${t.border}`,
+      borderRadius: 10,
       marginBottom: 10,
-      background: darkMode
-        ? 'radial-gradient(ellipse 70% 50% at 50% 30%, rgba(80,110,160,0.18) 0%, transparent 65%), radial-gradient(ellipse at 50% 50%, #1a2538 0%, #131b2d 50%, #0a1020 100%)'
-        : 'radial-gradient(ellipse 70% 50% at 50% 30%, rgba(255,255,255,0.85) 0%, transparent 65%), radial-gradient(ellipse at 50% 50%, #ffffff 0%, #f4f8fd 50%, #d6e0ed 100%)',
-      border: darkMode ? '1px solid rgba(80,110,160,0.2)' : '1px solid rgba(165,180,205,0.5)',
-      boxShadow: darkMode
-        ? 'inset 0 1.5px 4px rgba(150,180,220,0.08), inset 0 -1.5px 5px rgba(0,0,0,0.5), inset 0 0 25px rgba(0,0,0,0.3), 0 1.5px 5px rgba(0,0,0,0.4)'
-        : 'inset 0 1.5px 4px rgba(255,255,255,0.85), inset 0 -1.5px 5px rgba(19,45,82,0.07), inset 0 0 25px rgba(19,45,82,0.035), 0 1.5px 5px rgba(19,45,82,0.06)',
+      overflow: 'hidden',
     }}>
-      <div style={{
-        fontSize: 17, fontWeight: 500, color: t.text1,
-        textAlign: 'center', marginBottom: 12,
-        fontFamily: "'Fraunces', Georgia, serif",
-        letterSpacing: '-0.01em',
-      }}>
-        <span style={{ color: '#d4af37', fontSize: 13, margin: '0 6px' }}>✦</span>
-        How alerts work
+      <div onClick={() => setOpen(o => !o)}
+        style={{
+          padding: '10px 14px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          cursor: 'pointer',
+          fontSize: 12, fontWeight: 700, color: t.text1,
+          fontFamily: "'Outfit', sans-serif",
+        }}>
+        <span>How alerts work</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 10, color: t.text3, fontWeight: 500 }}>tap to learn</span>
+          <span style={{
+            fontSize: 11, color: t.text3,
+            transition: 'transform 0.2s',
+            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+          }}>▾</span>
+        </span>
       </div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'flex-start' }}>
-        {EDUCATION_PANELS.map(p => {
-          const isOpen = expanded === p.id;
-          return (
-            <div key={p.id} onClick={() => setExpanded(prev => prev === p.id ? null : p.id)}
-              style={{
-                flex: 1, background: p.bg, borderRadius: 10,
-                border: `0.5px solid ${p.border}`,
-                borderTop: `2px solid ${p.color}`,
-                overflow: 'hidden', cursor: 'pointer',
-              }}>
-              <div style={{ padding: '8px 8px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: p.color, fontFamily: "'Outfit', sans-serif" }}>{p.title}</div>
-                  <div style={{ fontSize: 11, color: t.text3, marginTop: 2 }}>{p.subtitle}</div>
-                </div>
-                <div style={{ fontSize: 11, color: t.text3, transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</div>
+
+      {open && (
+        <div style={{
+          padding: '4px 14px 14px',
+          borderTop: `1px solid ${t.borderLight}`,
+          fontSize: 11, color: t.text2, lineHeight: 1.55,
+        }}>
+          {sectionHeader('3 types of alerts')}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {[
+              { c: '#a78bfa', t: 'Stocks moving big', d: 'flagged when something unusual fires (sudden volume or price action)' },
+              { c: '#5eed8a', t: 'Big-money flow',    d: 'large options bets or hidden "dark pool" trades from institutions' },
+              { c: '#d4af37', t: 'Confluence',        d: 'when several signals stack on the same stock at once (the strongest kind)' },
+            ].map(row => (
+              <div key={row.t} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: row.c, flexShrink: 0, marginTop: 5 }} />
+                <span><b style={{ color: t.text1 }}>{row.t}</b> — {row.d}</span>
               </div>
-              <div style={{ maxHeight: isOpen ? 500 : 0, overflow: 'hidden', transition: 'max-height 0.3s ease' }}>
-                <div style={{ padding: '0 8px 8px', borderTop: `0.5px solid ${p.divider}` }}>
-                  <div style={{ fontSize: 13, color: t.text2, lineHeight: 1.6, marginTop: 6 }}>
-                    <span style={{ fontWeight: 500, color: t.text1 }}>What it does:</span> {p.what}
-                  </div>
-                  <div style={{ fontSize: 13, color: t.text2, lineHeight: 1.6, marginTop: 4 }}>
-                    <span style={{ fontWeight: 500, color: t.text1 }}>Why it matters:</span> {p.why}
-                  </div>
-                  <div style={{ marginTop: 6, fontSize: 13, fontWeight: 500, color: t.text1, textTransform: 'uppercase', letterSpacing: 0.4 }}>What we scan for</div>
-                  <div style={{ marginTop: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    {p.scans.map(([label, desc]) => (
-                      <div key={label} style={{ display: 'flex', alignItems: 'baseline', gap: 5, fontSize: 13, color: t.text2 }}>
-                        <div style={{ width: 4, height: 4, borderRadius: '50%', background: p.color, flexShrink: 0, marginTop: 5 }} />
-                        <span><span style={{ color: p.color, fontWeight: 500 }}>{label}</span> — {desc}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ marginTop: 6, padding: '5px 7px', background: p.exBg, borderRadius: 6, border: `0.5px solid ${p.exBorder}` }}>
-                    <div style={{ fontSize: 11, color: t.text3, fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2 }}>Example</div>
-                    <div style={{ fontSize: 13, color: t.text2 }}>{p.example}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 14, paddingTop: 8, borderTop: `0.5px solid ${t.border}` }}>
-        {[
-          { size: 12, bg: 'radial-gradient(circle at 35% 35%, #6aff9e, #1a8a45)', border: '#5eed8a', label: 'Up' },
-          { size: 12, bg: 'radial-gradient(circle at 35% 35%, #ff8a8a, #a03030)', border: '#F09595', label: 'Down' },
-          { size: 8, bg: t.card, border: t.text3, label: 'Small' },
-          { size: 16, bg: t.card, border: t.text3, label: 'Big' },
-        ].map(c => (
-          <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div style={{ width: c.size, height: c.size, borderRadius: '50%', background: c.bg, border: `1.5px solid ${c.border}` }} />
-            <span style={{ fontSize: 12, color: t.text3 }}>{c.label}</span>
+            ))}
           </div>
-        ))}
-      </div>
-      <div style={{ fontSize: 12, color: t.text3, textAlign: 'center', marginTop: 6 }}>
-        Scanners run during market hours · 9:30am–4pm EST
-      </div>
+
+          {sectionHeader('How to read a bubble')}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: '50%',
+              flex: '0 0 64px',
+              background: TIER_GRADIENTS.climbing,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              boxShadow: 'inset 1.5px 1.5px 2px rgba(255,255,255,0.6), inset -1.5px -1.5px 2px rgba(0,0,0,0.25), inset 0 0 0 2px rgba(94,237,138,0.9), inset 0 0 0 3px rgba(26,138,69,0.4)',
+            }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: '#0a3a18', lineHeight: 1 }}>NVDA</span>
+              <span style={{ fontSize: 9, fontWeight: 600, color: 'rgba(0,0,0,0.6)', lineHeight: 1, marginTop: 2 }}>+3.4%</span>
+              <span style={{ fontSize: 7, fontWeight: 700, color: 'rgba(0,0,0,0.45)', lineHeight: 1, marginTop: 2 }}>Climbing · 67%</span>
+            </div>
+            <span style={{ flex: 1 }}>
+              Each bubble shows the <b style={{ color: t.text1 }}>ticker</b>, today's <b style={{ color: t.text1 }}>% move</b>, and a{' '}
+              <b style={{ color: t.text1 }}>tier · %</b> at the bottom. Bigger bubbles = bigger move today. Color follows the tier scale below.
+            </span>
+          </div>
+
+          {sectionHeader('What the tier labels mean')}
+          <div style={{ marginBottom: 6 }}>
+            The label tells you how often this kind of signal has gone up <b style={{ color: t.text1 }}>in the past</b> — it's a track record, not a forecast.
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {tierRows.map(row => (
+              <div key={row.tier} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  width: 10, height: 10, borderRadius: '50%',
+                  background: TIER_HEADER_COLORS[row.tier],
+                  flexShrink: 0,
+                }} />
+                <span><b style={{ color: TIER_HEADER_COLORS[row.tier] }}>{row.label}</b> — {row.range}</span>
+              </div>
+            ))}
+          </div>
+
+          {sectionHeader('A few things to know')}
+          <div style={{ color: t.text2 }}>
+            · Scanners run during market hours (9:30am–4pm ET).<br />
+            · We're not a brokerage — every label describes what's happened before, not advice on what to do now.
+          </div>
+        </div>
+      )}
     </div>
   );
 }
