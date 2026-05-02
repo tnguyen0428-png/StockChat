@@ -160,8 +160,10 @@ function sleep(ms: number) {
 const FETCH_TIMEOUT_MS = 10_000;
 
 async function polyGet(path: string, apiKey: string): Promise<any> {
-  const sep = path.includes('?') ? '&' : '?';
-  const res = await fetch(`${POLYGON_BASE}${path}${sep}apiKey=${apiKey}`, {
+  // Bearer header instead of ?apiKey= query param so the key never
+  // lands in URL access logs or stack traces. Polygon supports both.
+  const res = await fetch(`${POLYGON_BASE}${path}`, {
+    headers: { "Authorization": `Bearer ${apiKey}` },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (res.status === 429) {

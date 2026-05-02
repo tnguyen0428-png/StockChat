@@ -49,8 +49,11 @@ function sleep(ms: number) {
 }
 
 async function polyGet(path: string, apiKey: string): Promise<any> {
-  const sep = path.includes('?') ? '&' : '?';
-  const res = await fetch(`${POLYGON_BASE}${path}${sep}apiKey=${apiKey}`);
+  // Bearer header instead of ?apiKey= query param so the key never
+  // lands in URL access logs or stack traces. Polygon supports both.
+  const res = await fetch(`${POLYGON_BASE}${path}`, {
+    headers: { "Authorization": `Bearer ${apiKey}` },
+  });
 
   if (res.status === 429) {
     throw new Error('Polygon rate limit — back off and retry next cycle');
