@@ -16,8 +16,9 @@ vite.config.js.timestamp-*
 # Supabase CLI scratch (linked-project, version caches, etc.)
 supabase/.temp/
 
-# Claude Code session data
-.claude/
+# Claude Code session data — but DO track CLAUDE.md (project context)
+.claude/*
+!.claude/CLAUDE.md
 
 # Scratch / diagnostic scripts (one-off debugging, not prod code)
 check_recording.mjs
