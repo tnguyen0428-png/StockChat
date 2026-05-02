@@ -37,12 +37,13 @@ SELECT cron.schedule(
       url     := 'https://zviplxkwqpvloljkrysx.supabase.co/functions/v1/scan-vol-surge',
       headers := jsonb_build_object(
         'Content-Type',  'application/json',
-        'Authorization', 'Bearer ' || current_setting('app.service_role_key', true)
+        'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key')
       ),
       body    := '{}'::jsonb
     );
   $$
 );
 
--- To register the service role key, run once in the SQL editor:
---   ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
+-- The service_role JWT is read from Supabase Vault. See the
+-- "pg_cron auth uses Supabase Vault" rule in .claude/CLAUDE.md and the
+-- one-time Vault setup documented in 20260415000000_track_alert_performance_cron.sql.

@@ -37,7 +37,7 @@ SELECT cron.schedule(
       url     := 'https://zviplxkwqpvloljkrysx.supabase.co/functions/v1/fetch-flow-data',
       headers := jsonb_build_object(
         'Content-Type',  'application/json',
-        'Authorization', 'Bearer ' || current_setting('app.service_role_key', true)
+        'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key')
       ),
       body    := '{}'::jsonb
     );

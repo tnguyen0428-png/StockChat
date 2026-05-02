@@ -18,11 +18,23 @@
 -- the edge function (it short-circuits on Sat/Sun unless ?force=true), so the
 -- cron stays simple and just fires the HTTP call.
 --
--- Prerequisites (enable once in Supabase dashboard):
---   Extensions > pg_cron   (enable)
---   Extensions > pg_net    (enable)
---   Database setting: app.service_role_key = '<service role jwt>'
---     (set once via: ALTER DATABASE postgres SET app.service_role_key = '...')
+-- Prerequisites (one-time setup, manual via SQL Editor):
+--   1. Enable Vault if not already enabled
+--      (Settings → Integrations → Vault, or check `\dx vault`)
+--   2. Insert the service_role JWT as a Vault secret:
+--      SELECT vault.create_secret(
+--        '<paste service_role JWT from Settings → API Keys → Legacy>',
+--        'service_role_key',
+--        'JWT for pg_cron HTTP auth to edge functions'
+--      );
+--   3. To rotate later, use vault.update_secret(<secret_id>, '<new jwt>', ...)
+--
+-- Why Vault and not `current_setting('app.service_role_key', true)`:
+--   The latter requires ALTER DATABASE which Supabase blocks for the
+--   postgres role (only true superuser can set it, and Supabase doesn't
+--   expose superuser via SQL Editor). Without it, current_setting returns
+--   NULL, the Authorization header is malformed, and edge functions 401.
+--   Discovered 2026-05-02 while wiring scan-confluence and flow-scan crons.
 -- ============================================
 
 -- Drop any prior schedule with the same name so this migration is idempotent
@@ -40,7 +52,7 @@ SELECT cron.schedule(
       url     := 'https://zviplxkwqpvloljkrysx.supabase.co/functions/v1/track-alert-performance',
       headers := jsonb_build_object(
         'Content-Type',  'application/json',
-        'Authorization', 'Bearer ' || current_setting('app.service_role_key', true)
+        'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key')
       ),
       body    := '{}'::jsonb
     );
