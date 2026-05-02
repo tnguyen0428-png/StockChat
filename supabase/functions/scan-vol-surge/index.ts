@@ -18,16 +18,27 @@ const AVG_DAYS      = 20;
 const POLY_DELAY_MS = 300; // ~3 req/s — stays within free tier limits
 
 // ── Market hours guard ────────────────────────────────────────────────────────
+// Uses Intl.DateTimeFormat with timeZone: America/New_York so the EDT/EST
+// switch is handled automatically. Does not need updating when DST changes.
 
 function isMarketHours(): boolean {
-  const now = new Date();
-  const dow = now.getUTCDay(); // 0 = Sun, 6 = Sat
-  if (dow === 0 || dow === 6) return false;
+  // Get current ET (handles EDT/EST automatically via IANA tzdb)
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
 
-  // Approximate ET: EDT = UTC-4 (Mar–Nov), EST = UTC-5 (Nov–Mar).
-  // We use -4 year-round; the cron window + this guard together prevent
-  // firing outside true market hours.
-  const etMinutes = (now.getUTCHours() - 4) * 60 + now.getUTCMinutes();
+  const weekday = parts.find(p => p.type === 'weekday')?.value;
+  if (weekday === 'Sat' || weekday === 'Sun') return false;
+
+  const hour   = Number(parts.find(p => p.type === 'hour')?.value ?? 0);
+  const minute = Number(parts.find(p => p.type === 'minute')?.value ?? 0);
+  const etMinutes = hour * 60 + minute;
+
+  // Market hours: 9:30 AM - 4:00 PM ET
   return etMinutes >= 9 * 60 + 30 && etMinutes < 16 * 60;
 }
 
