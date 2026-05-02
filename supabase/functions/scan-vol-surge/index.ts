@@ -13,7 +13,7 @@ const WATCHLIST = [
 ];
 
 const POLYGON_BASE  = 'https://api.polygon.io';
-const VOL_THRESHOLD = 0.1; // TEMP: lowered for testing (restore to 2.0)
+const VOL_THRESHOLD = 2.0; // volume must be 2× the 20-day average
 const AVG_DAYS      = 20;
 const POLY_DELAY_MS = 300; // ~3 req/s — stays within free tier limits
 
