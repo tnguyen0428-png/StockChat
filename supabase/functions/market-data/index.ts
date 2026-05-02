@@ -56,9 +56,12 @@ async function fetchPolygonQuotes(
 ): Promise<Record<string, { price: number; change: number }>> {
   const url =
     "https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=" +
-    encodeURIComponent(symbols.join(",")) +
-    `&apiKey=${apiKey}`;
-  const r = await fetch(url);
+    encodeURIComponent(symbols.join(","));
+  // Polygon supports both ?apiKey=... and Authorization: Bearer; prefer the
+  // header so the key never lands in URL access logs or stack traces.
+  const r = await fetch(url, {
+    headers: { "Authorization": `Bearer ${apiKey}` },
+  });
   if (!r.ok) throw new Error(`Polygon returned ${r.status}`);
   const j = await r.json();
   const out: Record<string, { price: number; change: number }> = {};
