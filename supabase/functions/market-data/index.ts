@@ -1,11 +1,17 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // market-data: refreshes vix_score, spy_price, sector_performance, and
-// fear_greed in market_data. Fully free-tier:
-//   - VIX, SPY, sector ETFs → Yahoo Finance (one batched HTTP call)
-//   - Fear & Greed → CNN's public endpoint
-// No FMP / no paid API. Both Yahoo and CNN need a browser User-Agent to
-// avoid silent 403s.
+// fear_greed in market_data.
+//
+// Data sources (chosen for reliability from Supabase edge function infra):
+//   - VIX        → CBOE official delayed quotes  (cdn.cboe.com)
+//   - SPY/sectors→ Polygon snapshot              (api.polygon.io)
+//   - Fear&Greed → CNN unofficial JSON           (production.dataviz.cnn.io)
+//
+// Why not Yahoo Finance: query[12].finance.yahoo.com both rate-limit Supabase's
+// edge function IP range (429 Too Many Requests on direct probes), so the v7
+// quote and v8 chart endpoints can't be used for cron-cadence calls. Confirmed
+// 2026-05-02. CBOE returns ^VIX cleanly with no auth.
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -21,27 +27,46 @@ const SECTOR_ETFS: Record<string, string> = {
   XLI: "Industrials",
 };
 
-// Browser-like UA — Yahoo and CNN both block requests without one.
+// Browser-like UA for CBOE and CNN (both serve different content without one).
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-// Pull all symbols (^VIX, SPY, sector ETFs) in one Yahoo call.
-// One round trip → less surface area for rate-limiting / partial failure.
-async function fetchYahooQuotes(symbols: string[]): Promise<Record<string, { price: number; change: number }>> {
+// ── VIX from CBOE ───────────────────────────────────────────────────────────
+// Returns shape: { timestamp, data: { symbol, last, price_change, price_change_percent,
+//                                    open, prev_day_close, ... } }
+// `last` is null right after market open; fall through to open → prev_close.
+async function fetchCboeVix(): Promise<{ score: number; change: number } | null> {
+  const r = await fetch(
+    "https://cdn.cboe.com/api/global/delayed_quotes/quotes/_VIX.json",
+    { headers: { "User-Agent": UA, "Accept": "application/json" } }
+  );
+  if (!r.ok) throw new Error(`CBOE returned ${r.status}`);
+  const j = await r.json();
+  const data = j?.data;
+  if (!data) return null;
+  const priceRaw = data.last ?? data.open ?? data.prev_day_close;
+  const changeRaw = data.price_change_percent ?? 0;
+  if (priceRaw == null) return null;
+  return { score: Number(priceRaw), change: Number(changeRaw) };
+}
+
+// ── SPY + sector ETFs from Polygon (one batched snapshot) ───────────────────
+async function fetchPolygonQuotes(
+  symbols: string[],
+  apiKey: string,
+): Promise<Record<string, { price: number; change: number }>> {
   const url =
-    "https://query1.finance.yahoo.com/v7/finance/quote?symbols=" +
-    encodeURIComponent(symbols.join(","));
-  const r = await fetch(url, {
-    headers: { "User-Agent": UA, "Accept": "application/json" },
-  });
-  if (!r.ok) throw new Error(`Yahoo returned ${r.status}`);
+    "https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=" +
+    encodeURIComponent(symbols.join(",")) +
+    `&apiKey=${apiKey}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`Polygon returned ${r.status}`);
   const j = await r.json();
   const out: Record<string, { price: number; change: number }> = {};
-  for (const q of j?.quoteResponse?.result || []) {
-    if (q.regularMarketPrice != null) {
-      out[q.symbol] = {
-        price: q.regularMarketPrice,
-        change: q.regularMarketChangePercent ?? 0,
-      };
+  for (const t of (j?.tickers ?? [])) {
+    const price = t.day?.c ?? t.prevDay?.c;
+    const change = t.todaysChangePerc ?? 0;
+    if (price != null) {
+      out[t.ticker] = { price: Number(price), change: Number(change) };
     }
   }
   return out;
@@ -51,51 +76,53 @@ Deno.serve(async () => {
   const results: Record<string, any> = {};
   const errors: Record<string, string> = {};
 
-  // ── Yahoo: VIX + SPY + sectors in one call ──
-  let quotes: Record<string, { price: number; change: number }> = {};
-  try {
-    quotes = await fetchYahooQuotes(["^VIX", "SPY", ...Object.keys(SECTOR_ETFS)]);
-  } catch (e) {
-    errors.yahoo = (e as Error).message;
+  const polygonKey = Deno.env.get("POLYGON_API_KEY");
+  if (!polygonKey) {
+    return new Response(
+      JSON.stringify({ error: "Missing env var: POLYGON_API_KEY" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   }
 
-  // VIX (^VIX index, not VIXY ETF — the ETF was the bug in the old version)
+  // ── VIX (CBOE) ──
   try {
-    const vix = quotes["^VIX"];
+    const vix = await fetchCboeVix();
     if (vix) {
       const { error: dbErr } = await supabase.from("market_data").upsert({
         key: "vix_score",
-        value: { score: vix.price, change: vix.change },
+        value: { score: vix.score, change: vix.change },
         updated_at: new Date().toISOString(),
       });
-      if (dbErr) {
-        errors.vix = `DB upsert failed: ${dbErr.message}`;
-      } else {
-        results.vix = vix.price;
-      }
-    } else if (!errors.yahoo) {
-      errors.vix = "Yahoo returned no ^VIX quote";
+      if (dbErr) errors.vix = `DB upsert failed: ${dbErr.message}`;
+      else results.vix = vix.score;
+    } else {
+      errors.vix = "CBOE returned no usable VIX data";
     }
   } catch (e) {
     errors.vix = (e as Error).message;
   }
 
+  // ── SPY + sectors (Polygon) ──
+  let polyQuotes: Record<string, { price: number; change: number }> = {};
+  try {
+    polyQuotes = await fetchPolygonQuotes(["SPY", ...Object.keys(SECTOR_ETFS)], polygonKey);
+  } catch (e) {
+    errors.polygon = (e as Error).message;
+  }
+
   // SPY
   try {
-    const spy = quotes["SPY"];
+    const spy = polyQuotes["SPY"];
     if (spy) {
       const { error: dbErr } = await supabase.from("market_data").upsert({
         key: "spy_price",
         value: { price: spy.price, change: spy.change },
         updated_at: new Date().toISOString(),
       });
-      if (dbErr) {
-        errors.spy = `DB upsert failed: ${dbErr.message}`;
-      } else {
-        results.spy = spy.price;
-      }
-    } else if (!errors.yahoo) {
-      errors.spy = "Yahoo returned no SPY quote";
+      if (dbErr) errors.spy = `DB upsert failed: ${dbErr.message}`;
+      else results.spy = spy.price;
+    } else if (!errors.polygon) {
+      errors.spy = "Polygon returned no SPY snapshot";
     }
   } catch (e) {
     errors.spy = (e as Error).message;
@@ -105,7 +132,7 @@ Deno.serve(async () => {
   try {
     const sectors: { name: string; perf: number }[] = [];
     for (const [symbol, name] of Object.entries(SECTOR_ETFS)) {
-      const q = quotes[symbol];
+      const q = polyQuotes[symbol];
       if (q) sectors.push({ name, perf: q.change });
     }
     if (sectors.length > 0) {
@@ -114,23 +141,16 @@ Deno.serve(async () => {
         value: sectors,
         updated_at: new Date().toISOString(),
       });
-      if (dbErr) {
-        errors.sectors = `DB upsert failed: ${dbErr.message}`;
-      } else {
-        results.sectors = sectors.length;
-      }
-    } else if (!errors.yahoo) {
-      errors.sectors = "Yahoo returned no sector quotes";
+      if (dbErr) errors.sectors = `DB upsert failed: ${dbErr.message}`;
+      else results.sectors = sectors.length;
+    } else if (!errors.polygon) {
+      errors.sectors = "Polygon returned no sector snapshots";
     }
   } catch (e) {
     errors.sectors = (e as Error).message;
   }
 
   // ── CNN Fear & Greed ──
-  // Free, unofficial JSON endpoint. Needs a browser UA — without one
-  // CNN silently 403s and the response parses as missing fields, which
-  // is how the previous version of this function failed silently and
-  // never wrote a fear_greed row.
   try {
     const fgRes = await fetch(
       "https://production.dataviz.cnn.io/index/fearandgreed/graphdata/",
@@ -154,11 +174,8 @@ Deno.serve(async () => {
           },
           updated_at: new Date().toISOString(),
         });
-        if (dbErr) {
-          errors.fear_greed = `DB upsert failed: ${dbErr.message}`;
-        } else {
-          results.fear_greed = Math.round(score);
-        }
+        if (dbErr) errors.fear_greed = `DB upsert failed: ${dbErr.message}`;
+        else results.fear_greed = Math.round(score);
       }
     }
   } catch (e) {
