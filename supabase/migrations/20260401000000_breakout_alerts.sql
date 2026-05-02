@@ -2,12 +2,19 @@
 -- Migration: vol_surge unique daily constraint + cron schedule
 -- Inserts into existing `alerts` table
 -- ============================================
+-- Idempotency note (added 2026-05-02): every DDL statement uses
+-- IF NOT EXISTS / CREATE OR REPLACE / DROP-then-CREATE so this migration
+-- can be safely re-applied against a populated database. The CREATE
+-- INDEX with the AT TIME ZONE cast also gets an extra layer of parens
+-- around the cast expression — required by PostgreSQL inside CREATE
+-- INDEX even though the same expression parses fine in SELECT.
+-- ============================================
 
 -- 1. Unique index: one vol_surge alert per ticker per ET calendar day.
 --    Prevents duplicate scanner inserts when the cron fires multiple times.
 --    Uses GIN index on tickers array + partial filter on alert_type.
 CREATE UNIQUE INDEX IF NOT EXISTS alerts_vol_surge_daily_uniq
-  ON alerts (alert_type, (created_at AT TIME ZONE 'America/New_York')::date)
+  ON alerts (alert_type, ((created_at AT TIME ZONE 'America/New_York')::date))
   WHERE alert_type = 'vol_surge' AND array_length(tickers, 1) = 1;
 
 -- Note: this index covers single-ticker vol_surge alerts (all scanner inserts).
