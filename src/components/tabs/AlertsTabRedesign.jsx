@@ -283,7 +283,13 @@ function mapAlert(a) {
 
   const change = isFlow ? (a.change_pct ?? 0) : (a.change_pct ?? a.gap_pct ?? 0);
   const changePct = Number(change) || 0;
-  const flowDollars = isFlow ? (Number(a.gap_pct) || 0) : 0;
+  // gap_pct holds totalDarkpoolValue and avg_volume holds totalPremium for
+  // flow rows (see fetch-flow-data/index.ts:706,708). Falling back to the
+  // premium when dark pool is zero lets options-only flow signals (sweeps
+  // + premium, no dark prints) clear the displayAlerts >0 filter and
+  // compete for bubble grid slots — without that fallback, stale dark-pool
+  // rows squat on the grid while fresh options-only signals never surface.
+  const flowDollars = isFlow ? (Number(a.gap_pct) || Number(a.avg_volume) || 0) : 0;
   const company = a.company ?? a.name ?? '';
   const price = a.price ?? a.current_price ?? null;
   const volRatio = a.volume_ratio ?? a.rel_volume ?? null;
@@ -932,8 +938,12 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
                     fontSize: 9, fontWeight: 600,
                     color: tierText.secondary,
                     lineHeight: 1, marginTop: 2,
+                    maxWidth: size - 8,
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
-                    {`${alert.changePct >= 0 ? '+' : ''}${alert.changePct.toFixed(1)}%`}
+                    {alert.isFlow
+                      ? fmtMoney(alert.flowDollars)
+                      : `${alert.changePct >= 0 ? '+' : ''}${alert.changePct.toFixed(1)}%`}
                   </span>
                   <span style={{
                     fontSize: 7, fontWeight: 700,

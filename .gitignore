@@ -31,6 +31,11 @@ mockup-*.html
 *-mock.html
 mock-*.html
 *-mockup.html
+alerts-bubbles-redesign.html
+alerts-poker-redesign.html
+
+# Email template drafts (separate feature, ship in their own PR)
+email-templates/
 
 # OS
 .DS_Store
