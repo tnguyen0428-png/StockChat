@@ -65,25 +65,39 @@ async function fetchPolygonSnapshots(symbols) {
           const dayVol  = t.day?.v ?? 0;
           const prevVol = t.prevDay?.v ?? 0;
 
+          // Polygon sometimes returns t.todaysChangePerc = null in the
+          // first 30 minutes of the session even when t.day.c and
+          // t.prevDay.c are both present. Compute the percentage ourselves
+          // as a fallback so downstream consumers don't store null when
+          // the data is sufficient to derive it. Without this, the alerts
+          // bubbles render "+0.0%" because change_pct never lands in the row.
+          const computeChangePerc = (last, prevClose) => {
+            if (last == null || prevClose == null || prevClose === 0) return null;
+            return ((last - prevClose) / prevClose) * 100;
+          };
+
           // If market is open use day data; otherwise fall back to prevDay
           if (dayVol > 0) {
+            const dayClose = t.day?.c ?? null;
+            const prevClose = t.prevDay?.c ?? null;
             map[t.ticker] = {
-              price:             t.day?.c ?? null,
+              price:             dayClose,
               open:              t.day?.o ?? null,
-              previousClose:     t.prevDay?.c ?? null,
+              previousClose:     prevClose,
               volume:            Math.round(dayVol),
               prevDayVolume:     prevVol > 0 ? Math.round(prevVol) : null,
-              changesPercentage: t.todaysChangePerc ?? null,
+              changesPercentage: t.todaysChangePerc ?? computeChangePerc(dayClose, prevClose),
               vwap:              t.day?.vw ?? null,
               dayHigh:           t.day?.h ?? null,
               dayLow:            t.day?.l ?? null,
             };
           } else if (prevVol > 0) {
-            // Market closed — use prevDay as "latest"
+            // Market closed — use prevDay as "latest". No day-before-prevDay
+            // in the snapshot, so we can't compute a fallback change percent.
             map[t.ticker] = {
               price:             t.prevDay?.c ?? null,
               open:              t.prevDay?.o ?? null,
-              previousClose:     null, // no day before prevDay in snapshot
+              previousClose:     null,
               volume:            Math.round(prevVol),
               prevDayVolume:     null,
               changesPercentage: t.todaysChangePerc ?? null,
@@ -326,23 +340,31 @@ export async function runConfluenceScan(onProgress) {
   onProgress?.('Merging signals…');
 
   // ── Step 2: merge results by ticker into a Map ──
-  const tickerMap = new Map(); // ticker → { signals: Set, data: {...} }
+  // Whole-row pass-through (CLAUDE.md rule #21): every key from the hit row
+  // is propagated into snapData. Null values are skipped so a later scan
+  // returning null for a shared field (e.g. change_pct) cannot overwrite a
+  // populated value from an earlier scan. Scanner-specific fields like
+  // gap_pct and volume_ratio are only present on their owning scanner's
+  // hits, so the null-skip rule is harmless for them.
+  const tickerMap = new Map(); // ticker → { signals: Set, snapData: {...} }
 
-  const merge = (hits, signalKey, dataFn) => {
+  const merge = (hits, signalKey) => {
     for (const h of hits) {
       if (!tickerMap.has(h.symbol)) {
-        tickerMap.set(h.symbol, { signals: new Set(), snapData: h });
+        tickerMap.set(h.symbol, { signals: new Set(), snapData: {} });
       }
       const entry = tickerMap.get(h.symbol);
       entry.signals.add(signalKey);
-      Object.assign(entry.snapData, dataFn(h));
+      for (const [k, v] of Object.entries(h)) {
+        if (v != null) entry.snapData[k] = v;
+      }
     }
   };
 
-  merge(hits52w, '52w_high',  h => ({ high_52w: h.high_52w, pct_from_high: h.pct_from_high, price: h.price, volume: h.volume, avg_volume: h.avg_volume, change_pct: h.change_pct, sector: h.sector }));
-  merge(hitsVol, 'vol_surge', h => ({ current_volume: h.current_volume, avg_volume: h.avg_volume, volume_ratio: h.volume_ratio, price: h.price, change_pct: h.change_pct }));
-  merge(hitsGap, 'gap_up',    h => ({ gap_pct: h.gap_pct, open_price: h.open_price, prev_close: h.prev_close, price: h.price, volume: h.volume, change_pct: h.change_pct }));
-  merge(hitsMA,  'ma_cross',  h => ({ short_ma: h.short_ma, long_ma: h.long_ma, price: h.price, volume: h.volume, change_pct: h.change_pct }));
+  merge(hits52w, '52w_high');
+  merge(hitsVol, 'vol_surge');
+  merge(hitsGap, 'gap_up');
+  merge(hitsMA,  'ma_cross');
 
   const tickers = [...tickerMap.keys()];
   onProgress?.(`Fetching RSI/ADX/VWAP for ${tickers.length} tickers…`);
@@ -521,6 +543,19 @@ export async function runConfluenceScan(onProgress) {
       : (sd.volume && sd.avg_volume
           ? parseFloat((sd.volume / sd.avg_volume).toFixed(2))
           : null));
+
+    // CLAUDE.md rule #22: a null change_pct ends up rendering as the "+0.0%"
+    // sentinel on the alerts bubble. Surface it in dev so a future regression
+    // (e.g. a sub-scanner stops populating change_pct, or Polygon changes its
+    // snapshot shape again) is visible at scan time instead of silently
+    // accumulating in production rows.
+    if (import.meta.env.DEV && sd.change_pct == null) {
+      console.warn(
+        `[scanner] change_pct null at insert — ticker=${r.ticker} ` +
+        `signals=${[...r.signals].join('+')} price=${sd.price} ` +
+        `prev_close=${sd.prev_close ?? 'n/a'}`
+      );
+    }
 
     // Shared fields — identical shape whether we file this as confluence
     // or as a base-signal row.

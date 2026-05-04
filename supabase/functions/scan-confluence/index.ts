@@ -206,14 +206,25 @@ async function fetchPolygonSnapshots(
       for (const t of (data?.tickers ?? [])) {
         const dayVol  = t.day?.v  ?? 0;
         const prevVol = t.prevDay?.v ?? 0;
+        // Polygon sometimes returns t.todaysChangePerc = null in the first
+        // 30 minutes of the session even when t.day.c and t.prevDay.c are
+        // both present. Compute the percentage ourselves as a fallback so
+        // breakout_alerts rows don't end up with change_pct = null (which
+        // renders as a "+0.0%" sentinel on the alert bubble).
+        const computeChangePerc = (last: number | null, prevClose: number | null) => {
+          if (last == null || prevClose == null || prevClose === 0) return null;
+          return ((last - prevClose) / prevClose) * 100;
+        };
         if (dayVol > 0) {
+          const dayClose  = t.day?.c     ?? null;
+          const prevClose = t.prevDay?.c ?? null;
           map.set(t.ticker, {
-            price:             t.day?.c ?? null,
+            price:             dayClose,
             open:              t.day?.o ?? null,
-            previousClose:     t.prevDay?.c ?? null,
+            previousClose:     prevClose,
             volume:            Math.round(dayVol),
             prevDayVolume:     prevVol > 0 ? Math.round(prevVol) : null,
-            changesPercentage: t.todaysChangePerc ?? null,
+            changesPercentage: t.todaysChangePerc ?? computeChangePerc(dayClose, prevClose),
             vwap:              t.day?.vw ?? null,
             dayHigh:           t.day?.h ?? null,
             dayLow:            t.day?.l ?? null,
