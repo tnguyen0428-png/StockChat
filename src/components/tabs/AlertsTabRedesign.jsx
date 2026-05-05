@@ -1257,8 +1257,8 @@ function DetailPanel({ alert, rawAlert, perfRow, cohort, t }) {
           fontFamily: "'Outfit', sans-serif",
           letterSpacing: 0.3,
         }}>{tierWord}{hasCohort ? ` · ${Math.round(conf.hitRatePct)}%` : ''}</span>
-        <span style={{ fontSize: 15, fontWeight: 700, color: alert.changePct >= 0 ? t.green : t.red, marginLeft: 'auto' }}>
-          {`${alert.changePct >= 0 ? '+' : ''}${alert.changePct.toFixed(1)}%`}
+        <span style={{ fontSize: 15, fontWeight: 700, color: alert.isFlow ? t.green : (alert.changePct >= 0 ? t.green : t.red), marginLeft: 'auto' }}>
+          {alert.isFlow ? fmtMoney(alert.flowDollars) : `${alert.changePct >= 0 ? '+' : ''}${alert.changePct.toFixed(1)}%`}
         </span>
       </div>
       <div style={{ fontSize: 11, color: t.text3, marginBottom: 8 }}>
@@ -1283,21 +1283,20 @@ function DetailPanel({ alert, rawAlert, perfRow, cohort, t }) {
           background: t.surface, borderRadius: 8,
           borderLeft: `3px solid ${TIER_HEADER_COLORS[tier]}`,
         }}>
-          When this kind of signal has fired before, the stock has gone up{' '}
+          {/* Class-level stat: the cohort row in v_signal_cohort_stats is keyed
+              by signal_type, not ticker, so every alert of the same type reads
+              the same numbers. Wording explicitly attributes the stat to the
+              signal class (not the stock) so stacked cards with identical
+              numbers don't read as a copy-paste bug. */}
+          Signals like this have moved up{' '}
+          <b style={{ color: avgReturn >= 0 ? t.green : t.red }}>
+            {Number.isFinite(avgReturn) ? `${avgReturn >= 0 ? '+' : ''}${avgReturn.toFixed(1)}%` : '—'}
+          </b>{' '}on average over the next 1–2 days, hitting{' '}
           <b style={{ color: TIER_HEADER_COLORS[tier] }}>
             {Math.round(conf.hitRatePct)}%
-          </b>{' '}
-          of the time.
-          {Number.isFinite(avgReturn) && (
-            <>
-              {' '}Typical move was{' '}
-              <b style={{ color: avgReturn >= 0 ? t.green : t.red }}>
-                {avgReturn >= 0 ? '+' : ''}{avgReturn.toFixed(1)}%
-              </b>{' '}over the next 1–2 days.
-            </>
-          )}
+          </b>{' '}of the time.
           <span style={{ display: 'block', fontSize: 10, color: t.text3, marginTop: 4 }}>
-            Based on {conf.nSamples} past signals
+            Based on {conf.nSamples} past {alert.isFlow ? 'flow signals' : alert.isConfluence ? 'confluence alerts' : 'alerts of this type'}
           </span>
         </div>
       ) : (

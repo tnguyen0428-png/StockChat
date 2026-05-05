@@ -66,7 +66,12 @@ export function lifecycleStateFor(alert, perfRow, cohort, nowMs = Date.now()) {
   };
 
   // ── Closed? ──
-  if (perfRow && perfRow.outcome) {
+  // Only hit/miss are real closures. 'no_data' is the dead-letter sentinel
+  // written by track-alert-performance for delisted tickers (PXD post-XOM,
+  // ATVI post-MSFT, etc.) — those rows have null snapshot_price/return_pct
+  // and should fall through to the "Window closed · no outcome recorded"
+  // branch below, not get rendered as a phantom miss.
+  if (perfRow && (perfRow.outcome === 'hit' || perfRow.outcome === 'miss')) {
     const closedPct = Number(perfRow.return_pct ?? changePct);
     const isWin = perfRow.outcome === 'hit' && closedPct >= 0;
     const closedIn = perfRow.tracked_at

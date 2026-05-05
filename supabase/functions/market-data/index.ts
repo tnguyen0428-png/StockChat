@@ -75,7 +75,19 @@ async function fetchPolygonQuotes(
   return out;
 }
 
-Deno.serve(async () => {
+// Defensive CORS — cron-only today, but matches track-alert-performance so a
+// future UI invoke doesn't 401 on preflight.
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, x-client-info",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
   const results: Record<string, any> = {};
   const errors: Record<string, string> = {};
 
@@ -83,7 +95,7 @@ Deno.serve(async () => {
   if (!polygonKey) {
     return new Response(
       JSON.stringify({ error: "Missing env var: POLYGON_API_KEY" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json", ...CORS_HEADERS } }
     );
   }
 
@@ -187,6 +199,6 @@ Deno.serve(async () => {
 
   return new Response(
     JSON.stringify({ ok: Object.keys(errors).length === 0, results, errors }),
-    { status: 200, headers: { "Content-Type": "application/json" } }
+    { status: 200, headers: { "Content-Type": "application/json", ...CORS_HEADERS } }
   );
 });

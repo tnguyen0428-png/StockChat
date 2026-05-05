@@ -556,7 +556,18 @@ function scoreAndRank(
 
 // ── Main handler ─────────────────────────────────────────────────────────────
 
+// Defensive CORS — cron-only today, but matches track-alert-performance so a
+// future UI invoke doesn't 401 on preflight.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
+};
+
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
   try {
     const url   = new URL(req.url);
     const force = url.searchParams.get('force') === 'true';
@@ -743,6 +754,6 @@ Deno.serve(async (req) => {
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
   });
 }
