@@ -188,6 +188,19 @@ function fmtMoney(v) {
 
 function typeFor(raw) { return TYPE_CONFIG[raw] || TYPE_CONFIG.vol_surge; }
 
+// Render a cohort horizon code as natural prose for the DetailPanel sentence.
+// Has to track whatever horizon cohortFor actually returned so the prose stays
+// honest if the picker fell back from 3d to 1d (or further) for a signal_type
+// that's missing the preferred horizon.
+function horizonProse(h) {
+  if (h === '1d')  return '1 day';
+  if (h === '3d')  return '3 days';
+  if (h === '7d')  return '7 days';
+  if (h === '14d') return '2 weeks';
+  if (h === '30d') return '30 days';
+  return 'few days';
+}
+
 // Dev-only warning for rows that can't produce a meaningful metric. Hitting
 // this in dev means either (a) real missing data worth filtering upstream,
 // or (b) a bug where the row shape lost a column we expected to read. Either
@@ -605,10 +618,24 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
   }, [loadData]);
 
   // Lookup: best cohort row for a given signal_type.
-  // "Best" = prefer the shortest horizon that has enough samples to score.
+  // Prefer 3d, then walk through 1d → 7d → 14d → 30d if 3d is missing.
+  // Why 3d over 1d: HIT_THRESHOLDS in track-alert-performance/index.ts:80-82
+  // makes 1d the laxest horizon — its threshold is 0%, so "hit" means "up by
+  // any amount end-of-day-1," which sits just ~5-7pp above the daily
+  // green-stock base rate (~53-55% of the market). 3d shares the 0% threshold
+  // but gives the move time to develop, and the cohort numbers across
+  // signal_types are materially more honest at 3d (e.g. flow_signal 60→69%,
+  // gap_up 36→48%, ma_cross 75→68%). 1d is the next fallback, then ascending
+  // horizons.
   const cohortFor = useMemo(() => {
     const byType = new Map();
-    const horizonRank = h => (h === '1d' ? 0 : h === '7d' ? 1 : h === '30d' ? 2 : 3);
+    const horizonRank = h => (
+      h === '3d'  ? 0 :
+      h === '1d'  ? 1 :
+      h === '7d'  ? 2 :
+      h === '14d' ? 3 :
+      h === '30d' ? 4 : 5
+    );
     (cohortStats || []).forEach(row => {
       const cur = byType.get(row.signal_type);
       if (!cur || horizonRank(row.horizon) < horizonRank(cur.horizon)) {
@@ -1291,7 +1318,7 @@ function DetailPanel({ alert, rawAlert, perfRow, cohort, t }) {
           Signals like this have moved up{' '}
           <b style={{ color: avgReturn >= 0 ? t.green : t.red }}>
             {Number.isFinite(avgReturn) ? `${avgReturn >= 0 ? '+' : ''}${avgReturn.toFixed(1)}%` : '—'}
-          </b>{' '}on average over the next 1–2 days, hitting{' '}
+          </b>{' '}on average over the next {horizonProse(conf.horizon)}, hitting{' '}
           <b style={{ color: TIER_HEADER_COLORS[tier] }}>
             {Math.round(conf.hitRatePct)}%
           </b>{' '}of the time.
