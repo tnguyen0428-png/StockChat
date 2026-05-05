@@ -823,7 +823,19 @@ async function runConfluenceScan(
 
 // ── Main handler ─────────────────────────────────────────────────────────────
 
+// Defensive CORS — this function is cron-only today, but adding the same
+// preflight + Allow-Origin block as track-alert-performance keeps it safe
+// if a UI ever calls supabase.functions.invoke('scan-confluence') directly.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
+};
+
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
   try {
     const url   = new URL(req.url);
     const force = url.searchParams.get('force') === 'true';
@@ -873,6 +885,6 @@ Deno.serve(async (req) => {
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
   });
 }
