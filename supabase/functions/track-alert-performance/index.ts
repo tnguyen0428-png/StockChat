@@ -47,6 +47,17 @@ const POLY_BATCH_SIZE = 200;
 // we must fetch the historical bar at the due moment instead.
 const OVERDUE_THRESHOLD_HOURS = 6;
 
+// Snapshots stuck without a price past this much overdue are dead-lettered
+// (outcome = 'no_data', tracked_at = now) so they stop blocking the FIFO
+// queue. 14 days is the floor — Polygon's free/starter tier can have multi-
+// day backfill delays for low-volume tickers, and we don't want to kill rows
+// that would have scored fine. Anything still un-priced at created+due+14d
+// is genuinely permanent (delisted ticker, ticker change). Observed case
+// 2026-05-04: PXD/MRO/ATVI/RUTW filling the first 14 slots of the
+// `tracked_at IS NULL ORDER BY created_at ASC` window indefinitely because
+// fetchHistoricalBars returns [] for delisted symbols.
+const DEAD_LETTER_THRESHOLD_HOURS = 14 * 24;
+
 // Throttle between per-ticker aggregates calls. Polygon's published rate
 // limits vary by plan (Basic/Starter = 5/min, Developer = 100/min, Advanced
 // = unlimited). Firing aggs back-to-back without pacing was producing
@@ -229,7 +240,26 @@ function round2(n: number): number {
 
 // ── Main handler ─────────────────────────────────────────────────────────────
 
+// CORS headers — required for browser-initiated invokes from the FreshnessBar
+// "↻" button (refreshScores in AlertsTabRedesign.jsx). Without these, the
+// browser preflight OPTIONS gets no Access-Control-Allow-Origin and the
+// follow-up POST never goes out — front end sees TypeError "Failed to fetch"
+// and the refresh button looks broken even though the click handler is firing.
+// pg_cron invocations don't need CORS, only the browser path does.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
+};
+
 Deno.serve(async (req) => {
+  // CORS preflight: respond before any body work. Falling through to the main
+  // handler on OPTIONS would still 200, but without CORS headers in the
+  // response the browser blocks the actual POST that follows.
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
   try {
     const url   = new URL(req.url);
     const force = url.searchParams.get('force') === 'true';
@@ -440,8 +470,10 @@ Deno.serve(async (req) => {
     // ══════════════════════════════════════════════════════════════════
     // SCORE each due snapshot with the price appropriate to its state
     // ══════════════════════════════════════════════════════════════════
-    const results = { tracked: 0, skipped_no_price: 0, skipped_bad_alert_price: 0, errors: 0 };
+    const results = { tracked: 0, skipped_no_price: 0, skipped_bad_alert_price: 0, dead_lettered: 0, errors: 0 };
     const sampleClosures: string[] = [];
+    const deadLetteredTickers = new Set<string>();
+    const deadLetterThresholdMs = DEAD_LETTER_THRESHOLD_HOURS * 3600_000;
 
     for (const snap of dueSnapshots) {
       if (!snap.alert_price || snap.alert_price <= 0) {
@@ -458,6 +490,31 @@ Deno.serve(async (req) => {
 
       if (!price) {
         results.skipped_no_price++;
+
+        // Queue starvation guard. Without this, delisted tickers (PXD, MRO,
+        // ATVI, RUTW post-acquisition) sit at the head of the
+        // `tracked_at IS NULL ORDER BY created_at ASC` window forever —
+        // Polygon returns [] for them, fetchHistoricalBars returns [],
+        // priceAt returns null, we hit this branch every run, the next pull
+        // grabs the same dead rows. Mark them dead-lettered so the queue
+        // advances and recent valid alerts can land a tracked_at.
+        const overdueByMs = now.getTime() - snap.dueMs;
+        if (overdueByMs > deadLetterThresholdMs) {
+          const { error: dlErr } = await supabase
+            .from('alert_performance_snapshots')
+            .update({
+              tracked_at: now.toISOString(),
+              outcome: 'no_data',
+            })
+            .eq('id', snap.id);
+          if (dlErr) {
+            console.error(`[perf-track] Dead-letter UPDATE failed ${snap.ticker}/${snap.interval_key}: ${dlErr.message}`);
+            results.errors++;
+          } else {
+            results.dead_lettered++;
+            deadLetteredTickers.add(snap.ticker);
+          }
+        }
         continue;
       }
 
@@ -490,14 +547,42 @@ Deno.serve(async (req) => {
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // PART B: Legacy 24h tracking — unchanged behavior
+    // PART B: Legacy 24h tracking — same dead-letter pattern as PART A
     // ══════════════════════════════════════════════════════════════════
-    const legacyResults = { tracked: 0, skipped: 0, errors: 0 };
+    const legacyResults = { tracked: 0, skipped: 0, dead_lettered: 0, errors: 0 };
+    const legacyDeadLetteredTickers = new Set<string>();
 
     for (const row of (legacyPending || [])) {
       const currentPrice = legacyPrices.get(row.ticker);
       if (!currentPrice || !row.alert_price || row.alert_price <= 0) {
         legacyResults.skipped++;
+
+        // Mirror of the PART A queue-starvation guard: legacy reads
+        // `outcome IS NULL ORDER BY alert_time ASC LIMIT 500`, so the
+        // same delisted tickers (PXD, MRO, ATVI post-acquisition) sit at
+        // the head of the queue forever, no tracked_at lands, and the
+        // FreshnessBar — which reads MAX(tracked_at) from this table —
+        // freezes. Dead-letter rows past the threshold so the queue
+        // advances. price_24h/return_pct stay null so alertStats'
+        // `return_pct != null` filter (AlertsTabRedesign.jsx:733)
+        // continues to exclude them from SCORED/WIN/AVG.
+        const overdueByMs = now.getTime() - new Date(row.alert_time).getTime();
+        if (overdueByMs > deadLetterThresholdMs) {
+          const { error: dlErr } = await supabase
+            .from('alert_performance')
+            .update({
+              tracked_at: now.toISOString(),
+              outcome: 'no_data',
+            })
+            .eq('id', row.id);
+          if (dlErr) {
+            console.error(`[perf-track] Legacy dead-letter UPDATE failed ${row.ticker}: ${dlErr.message}`);
+            legacyResults.errors++;
+          } else {
+            legacyResults.dead_lettered++;
+            legacyDeadLetteredTickers.add(row.ticker);
+          }
+        }
         continue;
       }
       const returnPct = round2(((currentPrice - row.alert_price) / row.alert_price) * 100);
@@ -513,6 +598,15 @@ Deno.serve(async (req) => {
         .eq('id', row.id);
       if (updateErr) legacyResults.errors++;
       else           legacyResults.tracked++;
+    }
+
+    if (results.dead_lettered > 0) {
+      const tickerList = [...deadLetteredTickers].sort().join(', ');
+      console.warn(`[perf-track] dead-lettered ${results.dead_lettered} snapshots for tickers: ${tickerList}`);
+    }
+    if (legacyResults.dead_lettered > 0) {
+      const tickerList = [...legacyDeadLetteredTickers].sort().join(', ');
+      console.warn(`[perf-track] legacy dead-lettered ${legacyResults.dead_lettered} rows for tickers: ${tickerList}`);
     }
 
     const summary = {
@@ -541,8 +635,10 @@ Deno.serve(async (req) => {
 });
 
 function json(body: unknown, status = 200) {
+  // Spread CORS_HEADERS into every response so the browser can read both
+  // success and error bodies — without Allow-Origin even a 200 fails fetch().
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
   });
 }
