@@ -618,20 +618,24 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
   }, [loadData]);
 
   // Lookup: best cohort row for a given signal_type.
-  // Prefer 3d, then walk through 1d → 7d → 14d → 30d if 3d is missing.
-  // Why 3d over 1d: HIT_THRESHOLDS in track-alert-performance/index.ts:80-82
-  // makes 1d the laxest horizon — its threshold is 0%, so "hit" means "up by
-  // any amount end-of-day-1," which sits just ~5-7pp above the daily
-  // green-stock base rate (~53-55% of the market). 3d shares the 0% threshold
-  // but gives the move time to develop, and the cohort numbers across
-  // signal_types are materially more honest at 3d (e.g. flow_signal 60→69%,
-  // gap_up 36→48%, ma_cross 75→68%). 1d is the next fallback, then ascending
-  // horizons.
+  // Default to 1d, falling back through 3d → 7d → 14d → 30d if 1d is missing.
+  // Why 1d despite being the laxest horizon (HIT_THRESHOLDS in
+  // track-alert-performance/index.ts:80-82 sets the 1d threshold to 0%): the
+  // bubble grid at line 651-665 wants a 3-up / 2-flat / 3-down tier
+  // distribution, and tierFor's tier thresholds are calibrated to the 1d
+  // cohort numbers. Switching to 3d ticks every signal_type up enough that
+  // gap_up (the only Falling-classified type) crosses into Flat, leaving the
+  // Falling bucket empty and the grid unable to render its intended visual
+  // spread. The cohort prose ("Signals like this have moved up...")
+  // communicates the class-level scope honestly, so the number being a 1d
+  // hit rate isn't misleading — it just means the prose says "over the next
+  // 1 day" instead of "next 3 days." If tierFor thresholds ever get
+  // recalibrated for a different default horizon, this picker should follow.
   const cohortFor = useMemo(() => {
     const byType = new Map();
     const horizonRank = h => (
-      h === '3d'  ? 0 :
-      h === '1d'  ? 1 :
+      h === '1d'  ? 0 :
+      h === '3d'  ? 1 :
       h === '7d'  ? 2 :
       h === '14d' ? 3 :
       h === '30d' ? 4 : 5
