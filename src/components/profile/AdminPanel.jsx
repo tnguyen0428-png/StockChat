@@ -49,6 +49,7 @@ export default function AdminPanel() {
   // Curated list state
   const [selectedGroup, setSelectedGroup] = useState('');
   const [listName, setListName]           = useState('');
+  const [curatedLists, setCuratedLists]   = useState([]);
 
   // Screener state
   const screenerGroupRef = useRef(null);
@@ -262,14 +263,34 @@ export default function AdminPanel() {
     if (activeSection === 'groups')   loadGroups();
     if (activeSection === 'users')    loadUsers();
     if (activeSection === 'briefing') loadGroups();
-    if (activeSection === 'lists')    loadGroups();
+    if (activeSection === 'lists')    { loadGroups(); loadCuratedLists(); }
     if (activeSection === 'screener') loadGroups();
     if (activeSection === 'news')     fetchNews();
   }, [activeSection]);
 
+  // Reload curated lists whenever the group filter changes while the section is open.
+  useEffect(() => {
+    if (activeSection === 'lists') loadCuratedLists();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGroup]);
+
   const loadGroups = async () => {
     const { data } = await supabase.from('groups').select('*').order('created_at');
     if (data) setGroups(data);
+  };
+
+  const loadCuratedLists = async () => {
+    // Pull lists with stock counts so the row can show "N stocks". Filter by
+    // selectedGroup if set, otherwise show every list (admin SELECT policy
+    // makes this visible to admins regardless of group membership).
+    let q = supabase
+      .from('curated_lists')
+      .select('id, name, sector, group_id, created_at, curated_stocks(count), groups(name)')
+      .order('created_at', { ascending: false });
+    if (selectedGroup) q = q.eq('group_id', selectedGroup);
+    const { data, error } = await q;
+    if (error) { console.error('[AdminPanel] Load curated lists failed:', error.message); return; }
+    if (data) setCuratedLists(data);
   };
 
   const loadUsers = async () => {
@@ -330,7 +351,18 @@ export default function AdminPanel() {
     const { error } = await supabase.from('curated_lists').insert({ group_id: selectedGroup, name: listName.trim() });
     if (error) { console.error('[AdminPanel] Create list failed:', error.message); alert('Failed to create list.'); return; }
     setListName('');
+    loadCuratedLists();
     alert('Curated list created!');
+  };
+
+  const deleteCuratedList = async (id, name, stockCount) => {
+    // Confirmation prompt mentions cascade so the admin understands stocks
+    // will go too (curated_stocks.list_id has ON DELETE CASCADE).
+    const stocksMsg = stockCount > 0 ? ` and its ${stockCount} stock${stockCount === 1 ? '' : 's'}` : '';
+    if (!window.confirm(`Delete "${name}"${stocksMsg}? This cannot be undone.`)) return;
+    const { error } = await supabase.from('curated_lists').delete().eq('id', id);
+    if (error) { console.error('[AdminPanel] Delete curated list failed:', error.message); alert('Failed to delete list: ' + error.message); return; }
+    loadCuratedLists();
   };
 
   const handleRunScreener = async () => {
@@ -691,13 +723,43 @@ export default function AdminPanel() {
             ) : s.id === 'lists' ? (
               <div style={adminStyles.body}>
                 <select style={{ ...adminStyles.select, marginTop: 10 }} value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)}>
-                  <option value="">Select group</option>
+                  <option value="">All groups</option>
                   {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
                 <div style={adminStyles.row}>
                   <input style={adminStyles.input} placeholder="List name" value={listName} onChange={e => setListName(e.target.value)} />
-                  <button style={adminStyles.btn} onClick={createCuratedList}>Create</button>
+                  <button style={adminStyles.btn} onClick={createCuratedList} disabled={!selectedGroup || !listName.trim()}>Create</button>
                 </div>
+                {curatedLists.length === 0 ? (
+                  <div style={{ ...adminStyles.listSub, padding: '12px 0' }}>No curated lists{selectedGroup ? ' in this group' : ''} yet.</div>
+                ) : (
+                  curatedLists.map(cl => {
+                    // curated_stocks(count) returns [{count: N}] when present.
+                    // 0 is a real value (empty list); only warn when the join is
+                    // missing entirely so silent schema drift doesn't hide.
+                    let stockCount = 0;
+                    if (Array.isArray(cl.curated_stocks)) {
+                      stockCount = cl.curated_stocks[0]?.count ?? 0;
+                    } else if (import.meta.env.DEV) {
+                      console.warn('[AdminPanel] curated_stocks count missing on row', cl.id, cl.name);
+                    }
+                    const groupName = cl.groups?.name || 'Unknown group';
+                    if (!cl.groups?.name && import.meta.env.DEV) {
+                      console.warn('[AdminPanel] groups.name missing on curated list', cl.id, 'group_id', cl.group_id);
+                    }
+                    return (
+                      <div key={cl.id} style={adminStyles.listRow}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={adminStyles.listName}>{cl.name}</div>
+                          <div style={adminStyles.listSub}>
+                            {groupName}{cl.sector ? ` · ${cl.sector}` : ''} · {stockCount} stock{stockCount === 1 ? '' : 's'}
+                          </div>
+                        </div>
+                        <button style={adminStyles.removeBtn} onClick={() => deleteCuratedList(cl.id, cl.name, stockCount)}>Delete</button>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             ) : s.id === 'groups' ? (
               <div style={adminStyles.body}>
