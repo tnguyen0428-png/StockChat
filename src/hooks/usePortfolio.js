@@ -46,13 +46,33 @@ export function usePortfolio(session) {
       .maybeSingle();
 
     if (!existingPf) {
-      await supabase.rpc('ensure_paper_portfolio');
+      const { error: rpcErr } = await supabase.rpc('ensure_paper_portfolio');
+      if (rpcErr) {
+        // SECURITY DEFINER search_path trap surfaces here. Fall back to a
+        // direct client insert so the user still gets a portfolio while the
+        // migration rolls out (and as a permanent safety net).
+        console.error('[Challenge] ensure_paper_portfolio RPC failed:', rpcErr.message);
+        const { error: insertErr } = await supabase
+          .from('paper_portfolios')
+          .insert({ user_id: session.user.id, cash_balance: STARTING_CASH });
+        // 23505 = unique_violation — another tab raced us; treat as success.
+        if (insertErr && insertErr.code !== '23505') {
+          console.error('[Challenge] paper_portfolios fallback insert failed:', insertErr.message);
+        }
+      }
     }
 
-    const [{ data: pf }, { data: openTrades }] = await Promise.all([
-      supabase.from('paper_portfolios').select('*').eq('user_id', session.user.id).single(),
+    const [{ data: pf, error: pfErr }, { data: openTrades }] = await Promise.all([
+      supabase.from('paper_portfolios').select('*').eq('user_id', session.user.id).maybeSingle(),
       supabase.from('paper_trades').select('*').eq('user_id', session.user.id).eq('status', 'open'),
     ]);
+
+    if (!pf) {
+      console.error('[Challenge] paper_portfolios row missing after ensure step', {
+        userId: session.user.id,
+        fetchErr: pfErr?.message,
+      });
+    }
 
     // Safety check: if portfolio exists but cash_balance got reset to starting amount
     // while user has trade history, something went wrong — log it
