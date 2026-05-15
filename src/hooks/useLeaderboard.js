@@ -91,13 +91,37 @@ export function useLeaderboard(session, trades, prices) {
     //     at the DB tier instead of in the client.
     //   1000 trades: covers roughly 10 open positions per portfolio at the
     //     100-user cap. Same warning applies — scale with the user count.
-    const [{ data: allPortfolios, error: pfErr }, { data: allTrades, error: trErr }] = await Promise.all([
-      supabase.from('paper_portfolios').select('*, profiles(username)').limit(100),
+    // Client-side join with profiles. paper_portfolios.user_id FK points
+    // at auth.users (not profiles) as of migration 20260426000000, so
+    // PostgREST can't resolve a `select('*, profiles(...)')` embed.
+    // Fetch portfolios + trades, then fetch profiles separately and
+    // stitch by user_id so `pf.profiles?.username` still works in the
+    // entries map below.
+    const [{ data: rawPortfolios, error: pfErr }, { data: allTrades, error: trErr }] = await Promise.all([
+      supabase.from('paper_portfolios').select('*').limit(100),
       supabase.from('paper_trades').select('*').limit(1000),
     ]);
     if (pfErr) console.error('[Leaderboard] loadLeaderboard portfolios failed:', pfErr.message);
     if (trErr) console.error('[Leaderboard] loadLeaderboard trades failed:', trErr.message);
-    if (!allPortfolios) { setLbLoading(false); return; }
+    if (!rawPortfolios) { setLbLoading(false); return; }
+
+    const pfUserIds = [...new Set(rawPortfolios.map(p => p.user_id).filter(Boolean))];
+    let pfProfilesById = {};
+    if (pfUserIds.length > 0) {
+      const { data: profs, error: prErr } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', pfUserIds);
+      if (prErr) console.error('[Leaderboard] loadLeaderboard profiles failed:', prErr.message);
+      if (profs) pfProfilesById = Object.fromEntries(profs.map(p => [p.id, p]));
+    }
+    const allPortfolios = rawPortfolios.map(p => {
+      const profile = pfProfilesById[p.user_id] || null;
+      if (!profile && import.meta.env.DEV) {
+        console.warn('[Leaderboard] profile lookup missed for portfolio', { userId: p.user_id });
+      }
+      return { ...p, profiles: profile };
+    });
 
     const openTrades = (allTrades || []).filter(t => t.status === 'open');
     allTradesRef.current = openTrades;
@@ -183,13 +207,35 @@ export function useLeaderboard(session, trades, prices) {
 
   // ── Activity feed ──
   const loadActivity = useCallback(async () => {
-    const { data, error } = await supabase
+    // See loadLeaderboard above for the FK rationale — same shape, same
+    // client-side join. Renderer reads `trade.profiles?.username`.
+    const { data: rows, error } = await supabase
       .from('paper_trades')
-      .select('*, profiles(username)')
+      .select('*')
       .order('bought_at', { ascending: false })
       .limit(5);
-    if (error) console.error('[Leaderboard] loadActivity failed:', error.message);
-    if (data) setActivity(data);
+    if (error) {
+      console.error('[Leaderboard] loadActivity failed:', error.message);
+      return;
+    }
+    if (!rows) return;
+    const userIds = [...new Set(rows.map(r => r.user_id).filter(Boolean))];
+    let profilesById = {};
+    if (userIds.length > 0) {
+      const { data: profs, error: pErr } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', userIds);
+      if (pErr) console.error('[Leaderboard] loadActivity profiles failed:', pErr.message);
+      if (profs) profilesById = Object.fromEntries(profs.map(p => [p.id, p]));
+    }
+    setActivity(rows.map(r => {
+      const profile = profilesById[r.user_id] || null;
+      if (!profile && import.meta.env.DEV) {
+        console.warn('[Leaderboard] profile lookup missed for activity row', { tradeId: r.id, userId: r.user_id });
+      }
+      return { ...r, profiles: profile };
+    }));
   }, []);
 
   useEffect(() => { loadActivity(); }, [loadActivity]);

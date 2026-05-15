@@ -363,13 +363,39 @@ export default function HomeTab({ session, onTabChange, darkMode }) {
       // paper_trades uses bought_at (indexed) for trade timestamps; created_at
       // is not a column on the deployed table (the migration adds it but prod
       // was created earlier). Ordering and display both key off bought_at.
-      const { data, error } = await supabase
+      //
+      // paper_trades.user_id FK points at auth.users (not profiles) as of
+      // migration 20260426000000, so PostgREST can't resolve a
+      // `profiles(username)` embed. Fetch trades + profiles separately
+      // and stitch by user_id so `trade.profiles?.username` still works
+      // in the renderer below.
+      const { data: rows, error } = await supabase
         .from('paper_trades')
-        .select('ticker, status, bought_at, profiles(username)')
+        .select('user_id, ticker, status, bought_at')
         .order('bought_at', { ascending: false })
         .limit(5);
-      if (error) console.error('[HomeTab] recent activity error:', error.message);
-      if (data) setRecentActivity(data);
+      if (error) {
+        console.error('[HomeTab] recent activity error:', error.message);
+        return;
+      }
+      if (!rows) return;
+      const userIds = [...new Set(rows.map(r => r.user_id).filter(Boolean))];
+      let profilesById = {};
+      if (userIds.length > 0) {
+        const { data: profs, error: pErr } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', userIds);
+        if (pErr) console.error('[HomeTab] recent activity profiles error:', pErr.message);
+        if (profs) profilesById = Object.fromEntries(profs.map(p => [p.id, p]));
+      }
+      setRecentActivity(rows.map(r => {
+        const profile = profilesById[r.user_id] || null;
+        if (!profile && import.meta.env.DEV) {
+          console.warn('[HomeTab] profile lookup missed for activity row', { userId: r.user_id });
+        }
+        return { ...r, profiles: profile };
+      }));
     } catch (err) {
       console.error('[HomeTab] loadRecentActivity failed:', err.message);
     }
