@@ -37,8 +37,14 @@ export function usePortfolio(session) {
   const loadPortfolio = useCallback(async () => {
     if (!session?.user?.id) return;
 
-    // Check if portfolio already exists BEFORE calling ensure_paper_portfolio
-    // This prevents the RPC from potentially resetting an existing portfolio
+    // As of migration 20260514120000_handle_new_user_full_setup.sql the
+    // signup trigger inserts the paper_portfolios row inline with the
+    // auth.users insert, so for any user created after that migration the
+    // existingPf check below should always find the row and the RPC +
+    // fallback insert below are dead code on the happy path. They're kept
+    // as safety nets for: (a) users created before the consolidated
+    // trigger landed, (b) the edge case where the trigger's portfolio
+    // EXCEPTION block fired and only the profile got created.
     const { data: existingPf } = await supabase
       .from('paper_portfolios')
       .select('*')

@@ -245,7 +245,13 @@ export function GroupProvider({ session, children }) {
   };
 
   const enterGroup = async (group) => {
-    // Auto-join public group if not already a member
+    // Auto-join public group if not already a member.
+    // As of migration 20260514120000_handle_new_user_full_setup.sql the
+    // signup trigger already joins new users to UpTik Public, so this
+    // path is the SAFETY NET for the cases that don't go through signup:
+    // joining a sector group beyond the default, invite-link flows, users
+    // created before the consolidated trigger landed, and the edge case
+    // where the trigger's group_members EXCEPTION block fired.
     const isMember = allGroups.some(g => g.id === group.id);
     if (!isMember && group.is_public) {
       const { error } = await supabase.from('group_members').insert({
