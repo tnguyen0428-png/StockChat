@@ -239,7 +239,7 @@ export default function LandingPage() {
                   fontSize: 12, fontWeight: 600,
                   color: '#d4e4f2', letterSpacing: 1.5,
                 }}>
-                  BETA PHASE
+                  BETA PHASE CLOSED
                 </div>
                 <div style={{
                   fontFamily: "'DM Sans', sans-serif",
@@ -247,7 +247,7 @@ export default function LandingPage() {
                   color: '#fff', letterSpacing: 0.2,
                   marginTop: 4,
                 }}>
-                  {TOTAL_SPOTS} users · {spotsOpen} {spotsOpen === 1 ? 'spot' : 'spots'} open
+                  Circle 2 Waitlist
                 </div>
               </div>
 
