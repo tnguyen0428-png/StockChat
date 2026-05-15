@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import WaitlistForm from '../components/WaitlistForm';
 
 const TOTAL_SPOTS = 50;
 
@@ -86,6 +87,30 @@ export default function LandingPage() {
       `}</style>
 
       <div style={{ fontFamily: "'DM Sans', sans-serif", background: '#eef2f7', color: '#1a2d4a' }}>
+
+        {/* ══════════════════════════════════════
+            BANNER — Circle 1 full (permanent)
+        ══════════════════════════════════════ */}
+        <div
+          role="status"
+          style={{
+            width: '100%',
+            background: '#eef2f7',
+            borderBottom: '1px solid #d8e2ed',
+            color: '#1a2d4a',
+            padding: '10px 16px',
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: 13,
+            fontWeight: 500,
+            lineHeight: 1.4,
+            textAlign: 'center',
+            letterSpacing: 0.1,
+          }}
+        >
+          <span style={{ marginRight: 4 }} aria-hidden="true">🟢</span>
+          <strong style={{ fontWeight: 700 }}>Circle 1 is full</strong>{' '}
+          — 50/50 seats taken. Join the waitlist for Circle 2 below.
+        </div>
 
         {/* ══════════════════════════════════════
             SECTION 1 — HERO (navy gradient)
@@ -316,6 +341,18 @@ export default function LandingPage() {
             </div>
 
           </div>
+        </section>
+
+        {/* ══════════════════════════════════════
+            SECTION 1.5 — CIRCLE 2 WAITLIST FORM
+        ══════════════════════════════════════ */}
+        <section style={{
+          background: '#eef2f7',
+          padding: '28px 20px 8px',
+          display: 'flex',
+          justifyContent: 'center',
+        }}>
+          <WaitlistForm source="landing" />
         </section>
 
         {/* ══════════════════════════════════════
