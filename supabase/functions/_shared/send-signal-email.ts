@@ -159,13 +159,16 @@ export async function sendSignalAlertEmail(
   }
 }
 
-// "2:34 PM ET" — approximate, matches scanner's ET assumption.
+// "2:34 PM ET" — uses Intl.DateTimeFormat with timeZone: 'America/New_York'
+// so DST transitions (EDT/EST) are handled automatically. Hardcoding a
+// fixed UTC offset like -04:00 is wrong half the year (EST = UTC-5
+// Nov–Mar) and would put the user-visible time off by an hour.
 function formatEt(d: Date): string {
-  const etOffsetMs = 4 * 60 * 60 * 1000; // UTC-4 (matches scan-vol-surge note)
-  const et = new Date(d.getTime() - etOffsetMs);
-  let h = et.getUTCHours();
-  const m = et.getUTCMinutes().toString().padStart(2, '0');
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return `${h}:${m} ${ampm} ET`;
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  return `${fmt.format(d)} ET`;
 }
