@@ -56,11 +56,14 @@ export function usePortfolio(session) {
       if (rpcErr) {
         // SECURITY DEFINER search_path trap surfaces here. Fall back to a
         // direct client insert so the user still gets a portfolio while the
-        // migration rolls out (and as a permanent safety net).
+        // migration rolls out (and as a permanent safety net). Mirrors the
+        // handle_new_user trigger: cash_balance is omitted so the
+        // paper_portfolios column DEFAULT (50000) fills it — single source
+        // of truth lives in the schema, not the JS constant.
         console.error('[Challenge] ensure_paper_portfolio RPC failed:', rpcErr.message);
         const { error: insertErr } = await supabase
           .from('paper_portfolios')
-          .insert({ user_id: session.user.id, cash_balance: STARTING_CASH });
+          .insert({ user_id: session.user.id });
         // 23505 = unique_violation — another tab raced us; treat as success.
         if (insertErr && insertErr.code !== '23505') {
           console.error('[Challenge] paper_portfolios fallback insert failed:', insertErr.message);
