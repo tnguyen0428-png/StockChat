@@ -284,9 +284,12 @@ alter publication supabase_realtime add table group_tickers;
 --   (c) group_members row tying the user to UpTik Public
 --
 -- Keep this in sync with the consolidated migration
--- supabase/migrations/20260514120000_handle_new_user_full_setup.sql,
--- which supersedes 20260416000000_unique_username.sql and the portfolio
--- portion of 20260514000000_fix_ensure_paper_portfolio_search_path.sql.
+-- supabase/migrations/20260514120000_handle_new_user_full_setup.sql
+-- and its race-fix follow-up
+-- supabase/migrations/20260515000000_handle_new_user_username_race_fix.sql,
+-- which together supersede 20260416000000_unique_username.sql and the
+-- portfolio portion of
+-- 20260514000000_fix_ensure_paper_portfolio_search_path.sql.
 --
 -- Steps (b) and (c) are wrapped in EXCEPTION blocks so a failure there
 -- does NOT abort signup — losing a new auth.users row because UpTik
@@ -305,22 +308,30 @@ declare
   v_attempt int := 0;
   v_group_id uuid;
 begin
-  -- (a) Profile row.
+  -- (a) Profile row. Insert-then-catch-and-retry against the
+  -- profiles_username_lower_unique functional index so concurrent
+  -- signups racing on the same base username can't both pass an
+  -- EXISTS check and then both INSERT.
   v_username := coalesce(
     nullif(trim(new.raw_user_meta_data->>'username'), ''),
     'Trader'
   );
   v_candidate := v_username;
 
-  while exists (
-    select 1 from public.profiles where lower(username) = lower(v_candidate)
-  ) and v_attempt < 5 loop
-    v_candidate := v_username || substr(md5(random()::text || clock_timestamp()::text), 1, 4);
-    v_attempt := v_attempt + 1;
+  while v_attempt < 6 loop
+    begin
+      insert into public.profiles (id, username, color)
+      values (new.id, v_candidate, '#1AAD5E');
+      exit;
+    exception when unique_violation then
+      v_attempt := v_attempt + 1;
+      v_candidate := v_username || substr(md5(random()::text || clock_timestamp()::text), 1, 4);
+    end;
   end loop;
 
-  insert into public.profiles (id, username, color)
-  values (new.id, v_candidate, '#1AAD5E');
+  if v_attempt >= 6 then
+    raise exception '[handle_new_user] could not allocate unique username after 6 attempts (base=%)', v_username;
+  end if;
 
   -- (b) Paper-trading portfolio. cash_balance omitted so the column
   -- DEFAULT (50000) fills it.
