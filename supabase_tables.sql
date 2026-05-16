@@ -269,29 +269,90 @@ alter publication supabase_realtime add table broadcasts;
 alter publication supabase_realtime add table group_tickers;
 
 -- ============================================
--- AUTO CREATE PROFILE ON SIGNUP
+-- AUTO SET UP NEW USER ON SIGNUP
 -- ============================================
 -- IMPORTANT: SECURITY DEFINER functions in Supabase run with an empty
 -- search_path by default (security hardening), so unqualified 'profiles'
 -- resolves to nothing and the insert fails with 42P01 "relation profiles
 -- does not exist" — surfaced to the client as the generic "Database error
 -- saving new user", and the auth.users row rolls back. Prevent this two
--- ways: SET search_path on the function AND schema-qualify public.profiles.
--- Keep this in sync with supabase/migrations/20260416000000_unique_username.sql
--- which layers collision-retry on top of this body.
+-- ways: SET search_path on the function AND schema-qualify every table.
+--
+-- This trigger does the FULL new-user setup atomically:
+--   (a) profiles row (with username collision retry)
+--   (b) paper_portfolios row (cash_balance via column DEFAULT)
+--   (c) group_members row tying the user to UpTik Public
+--
+-- Keep this in sync with the consolidated migration
+-- supabase/migrations/20260514120000_handle_new_user_full_setup.sql,
+-- which supersedes 20260416000000_unique_username.sql and the portfolio
+-- portion of 20260514000000_fix_ensure_paper_portfolio_search_path.sql.
+--
+-- Steps (b) and (c) are wrapped in EXCEPTION blocks so a failure there
+-- does NOT abort signup — losing a new auth.users row because UpTik
+-- Public was renamed would be far worse than a missing safety-net row
+-- the client paths can heal on first visit. Step (a) does propagate
+-- so a profile-less user can't slip through.
 create or replace function handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+declare
+  v_username text;
+  v_candidate text;
+  v_attempt int := 0;
+  v_group_id uuid;
 begin
-  insert into public.profiles (id, username, color)
-  values (
-    new.id,
-    coalesce(new.raw_user_meta_data->>'username', 'Trader'),
-    '#1AAD5E'
+  -- (a) Profile row.
+  v_username := coalesce(
+    nullif(trim(new.raw_user_meta_data->>'username'), ''),
+    'Trader'
   );
+  v_candidate := v_username;
+
+  while exists (
+    select 1 from public.profiles where lower(username) = lower(v_candidate)
+  ) and v_attempt < 5 loop
+    v_candidate := v_username || substr(md5(random()::text || clock_timestamp()::text), 1, 4);
+    v_attempt := v_attempt + 1;
+  end loop;
+
+  insert into public.profiles (id, username, color)
+  values (new.id, v_candidate, '#1AAD5E');
+
+  -- (b) Paper-trading portfolio. cash_balance omitted so the column
+  -- DEFAULT (50000) fills it.
+  begin
+    insert into public.paper_portfolios (user_id)
+    values (new.id)
+    on conflict (user_id) do nothing;
+  exception when others then
+    raise warning '[handle_new_user] paper_portfolios insert failed for user_id=% : % (%)',
+      new.id, sqlerrm, sqlstate;
+  end;
+
+  -- (c) Auto-join UpTik Public.
+  begin
+    select id into v_group_id
+    from public.groups
+    where name = 'UpTik Public'
+    order by created_at asc
+    limit 1;
+
+    if v_group_id is not null then
+      insert into public.group_members (group_id, user_id, role)
+      values (v_group_id, new.id, 'member')
+      on conflict (group_id, user_id) do nothing;
+    else
+      raise warning '[handle_new_user] UpTik Public group not found, skipping auto-join for user_id=%', new.id;
+    end if;
+  exception when others then
+    raise warning '[handle_new_user] group_members insert failed for user_id=% : % (%)',
+      new.id, sqlerrm, sqlstate;
+  end;
+
   return new;
 end;
 $$;
