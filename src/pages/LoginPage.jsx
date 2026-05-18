@@ -152,23 +152,35 @@ export default function LoginPage({ recoveryMode = false, onPasswordReset }) {
     }
   }, [mode, recoveryMode]);
 
-  // Surface email-verification outcome from ?verify=... (set by App.jsx)
+  // Surface email-verification outcome from ?verify=... (set by App.jsx after
+  // its async verifyOtp resolves). Depend on `searchParams` (react-router
+  // state) — App.jsx now calls navigate() so this effect re-fires when the
+  // URL is updated, fixing the race where LoginPage mounted with only
+  // ?token_hash and the ?verify=... query was appended later.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const verify = params.get('verify');
+    const verify = searchParams.get('verify');
     if (!verify) return;
     if (verify === 'expired') {
-      setError('Your confirmation link has expired. Sign in and we\u2019ll resend it, or sign up again.');
+      // Most common cause: user clicked an older email after a /resend
+      // invalidated the previous token. Show Resend immediately so they
+      // don't have to attempt a failing sign-in first to discover the button.
+      setError('Your verification link is no longer valid. Use Resend below to get a fresh one.');
+      setResendState('idle');
     } else if (verify === 'failed') {
-      setError('We couldn\u2019t verify that link. Please try signing in, or request a new link.');
+      setError('We couldn\u2019t verify that link. Use Resend below to get a fresh one.');
+      setResendState('idle');
     } else if (verify === 'ok') {
       setSuccess('\u2713 Email confirmed! You can sign in now.');
     }
-    // Clean the URL so refreshes don't re-show the banner
-    const url = new URL(window.location.href);
-    url.searchParams.delete('verify');
-    window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
-  }, []);
+    // Clean the URL via react-router so refreshes don't re-show the banner.
+    // Using navigate() (not window.history.replaceState) keeps react-router's
+    // searchParams in sync — this effect will re-run with no `verify`, hit
+    // the early return, and idle.
+    const next = new URLSearchParams(searchParams);
+    next.delete('verify');
+    const qs = next.toString();
+    navigate(`${window.location.pathname}${qs ? `?${qs}` : ''}`, { replace: true });
+  }, [searchParams]);
 
   // Auto-redirect to /app 2s after successful reset
   useEffect(() => {

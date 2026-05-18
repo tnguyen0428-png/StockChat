@@ -4,7 +4,7 @@
 // ============================================
 
 import { useEffect, useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import { safeGet, safeSet, safeRemove } from './lib/safeStorage';
 import { usePresenceTracker } from './hooks/usePresence';
@@ -78,6 +78,7 @@ const RECOVERY_ON_LOAD = (() => {
 export default function App() {
   const [session, setSession]           = useState(undefined);
   const [recoveryMode, setRecoveryMode] = useState(RECOVERY_ON_LOAD);
+  const navigate = useNavigate();
 
   // Broadcast presence on the global 'online-users' channel whenever the
   // user is signed in. The hook is a no-op when userId is falsy (logged-out
@@ -122,7 +123,7 @@ export default function App() {
             // Successful signup confirmation.
             url.searchParams.set('verify', 'ok');
           }
-          window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+          navigate(url.pathname + (url.search ? url.search : ''), { replace: true });
         });
     }
 
