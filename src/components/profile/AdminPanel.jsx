@@ -23,6 +23,10 @@ export default function AdminPanel() {
   // Users state
   const [users, setUsers] = useState([]);
 
+  // Waitlist state — populated when the Waitlist accordion is opened.
+  // RLS policy `admin_can_read_waitlist` allows is_admin=true profiles to SELECT.
+  const [waitlist, setWaitlist] = useState([]);
+
   // Live presence — Set of user IDs currently connected to the app.
   // Subscription lasts the lifetime of AdminPanel (mounted only for admins
   // viewing the Profile tab), so it doesn't add cost for normal users.
@@ -266,6 +270,7 @@ export default function AdminPanel() {
     if (activeSection === 'lists')    { loadGroups(); loadCuratedLists(); }
     if (activeSection === 'screener') loadGroups();
     if (activeSection === 'news')     fetchNews();
+    if (activeSection === 'waitlist') loadWaitlist();
   }, [activeSection]);
 
   // Reload curated lists whenever the group filter changes while the section is open.
@@ -299,6 +304,17 @@ export default function AdminPanel() {
       .select('*, group_members(role, group_id, groups(name))')
       .order('created_at');
     if (data) setUsers(data);
+  };
+
+  const loadWaitlist = async () => {
+    // select('*') per CLAUDE.md rule 21 — pass whole rows through so a new
+    // column (e.g. utm_campaign) shows up automatically without a code change.
+    const { data, error } = await supabase
+      .from('waitlist')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) { console.error('[AdminPanel] Load waitlist failed:', error.message); return; }
+    if (data) setWaitlist(data);
   };
 
   const createGroup = async () => {
@@ -516,6 +532,7 @@ export default function AdminPanel() {
     { id: 'lists',        label: 'Curated Lists' },
     { id: 'groups',       label: 'Manage Groups' },
     { id: 'users',        label: 'Manage Users'  },
+    { id: 'waitlist',     label: 'Waitlist'      },
   ];
 
   // Show "Manage Users · 3 online" only when the users list has been loaded
@@ -524,6 +541,12 @@ export default function AdminPanel() {
   // fires loadUsers().
   const usersLabelSuffix = (activeSection === 'users' && users.length > 0)
     ? ` · ${onlineCount} online`
+    : '';
+
+  // Show "Waitlist · N" only after the list has been loaded for the same
+  // reason as usersLabelSuffix above — count is meaningless before fetch.
+  const waitlistLabelSuffix = (activeSection === 'waitlist' && waitlist.length > 0)
+    ? ` · ${waitlist.length}`
     : '';
 
   return (
@@ -536,6 +559,9 @@ export default function AdminPanel() {
               {s.label}
               {s.id === 'users' && usersLabelSuffix && (
                 <span style={adminStyles.onlineCountSuffix}>{usersLabelSuffix}</span>
+              )}
+              {s.id === 'waitlist' && waitlistLabelSuffix && (
+                <span style={adminStyles.onlineCountSuffix}>{waitlistLabelSuffix}</span>
               )}
             </span>
             <span style={adminStyles.accordionArrow}>{activeSection === s.id ? '▲' : '▼'}</span>
@@ -849,8 +875,85 @@ export default function AdminPanel() {
                   );
                 })}
               </div>
+            ) : s.id === 'waitlist' ? (
+              <div style={adminStyles.body}>
+                {waitlist.length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--text3)', padding: '10px 0' }}>
+                    No signups yet.
+                  </div>
+                ) : (
+                  <>
+                    {/* Tiny summary row — total + last 7d, derived without an extra fetch
+                        so the section stays cheap to open. */}
+                    {(() => {
+                      const now = Date.now();
+                      const dayMs = 86400000;
+                      const last7 = waitlist.filter(w => (now - new Date(w.created_at).getTime()) <= 7 * dayMs).length;
+                      return (
+                        <div style={{ fontSize: 11, color: 'var(--text3)', padding: '10px 0 6px' }}>
+                          {waitlist.length} total · {last7} in last 7 days
+                        </div>
+                      );
+                    })()}
+                    {waitlist.map(w => {
+                      const joined = w.created_at
+                        ? new Date(w.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+                        : '';
+                      return (
+                        <div key={w.id} style={adminStyles.listRow}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={adminStyles.listName}>{w.email}</div>
+                            <div style={adminStyles.listSub}>
+                              {w.name || '—'}
+                              {w.source && <span> · {w.source}</span>}
+                              {w.referred_by && <span> · ref: {w.referred_by}</span>}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text3)', whiteSpace: 'nowrap', marginLeft: 8 }}>
+                            {joined}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
             ) : null
           )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const adminStyles = {
+  secLabel:        { fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text3)', padding: '0 4px', margin: '14px 0 8px' },
+  accordion:       { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 6, overflow: 'hidden' },
+  accordionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 14px', cursor: 'pointer' },
+  accordionLabel:  { fontSize: 14, fontWeight: 500, color: 'var(--text1)' },
+  accordionArrow:  { fontSize: 11, color: 'var(--text3)' },
+  body:            { padding: '0 14px 14px', borderTop: '1px solid var(--border)' },
+  row:             { display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' },
+  input:           { flex: 1, background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'var(--text1)', outline: 'none', boxSizing: 'border-box' },
+  select:          { flex: 1, background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'var(--text1)', boxSizing: 'border-box' },
+  textarea:        { width: '100%', background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', fontSize: 13, color: 'var(--text1)', resize: 'none', lineHeight: 1.6, fontFamily: 'var(--font)', marginTop: 10, boxSizing: 'border-box' },
+  btn:             { background: 'var(--green)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  listRow:         { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '10px 0', borderBottom: '1px solid var(--border)', gap: 10 },
+  listName:        { fontSize: 13, fontWeight: 600, color: 'var(--text1)' },
+  listSub:         { fontSize: 11, color: 'var(--text3)', marginTop: 2 },
+  thesisText:      { fontSize: 11, color: 'var(--text2)', marginTop: 4, lineHeight: 1.5 },
+  progressBar:     { width: '100%', height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden', marginTop: 6 },
+  progressFill:    { height: '100%', background: 'var(--green)', borderRadius: 3, transition: 'width 0.3s ease' },
+  rank:            { fontSize: 12, fontWeight: 700, color: 'var(--text3)', width: 24 },
+  scoreTag:        { fontSize: 11, background: 'var(--green)', color: '#fff', borderRadius: 4, padding: '1px 6px', fontWeight: 600 },
+  toggle:          { width: 36, height: 20, borderRadius: 12, position: 'relative', cursor: 'pointer', transition: 'background 0.2s' },
+  knob:            { position: 'absolute', top: 3, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left 0.2s, right 0.2s' },
+  promoteBtn:      { background: 'var(--green)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
+  removeBtn:       { background: 'transparent', color: 'var(--red)', border: '1px solid var(--red)', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer' },
+  presenceDot:     { display: 'inline-block', width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 5 },
+  onlineCountSuffix:{ fontSize: 11, fontWeight: 400, color: 'var(--text3)', marginLeft: 4 },
+};
+   )}
         </div>
       ))}
     </div>
