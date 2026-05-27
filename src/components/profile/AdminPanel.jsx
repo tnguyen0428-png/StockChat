@@ -953,37 +953,3 @@ const adminStyles = {
   presenceDot:     { display: 'inline-block', width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 5 },
   onlineCountSuffix:{ fontSize: 11, fontWeight: 400, color: 'var(--text3)', marginLeft: 4 },
 };
-   )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const adminStyles = {
-  secLabel:        { fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text3)', padding: '0 4px', margin: '14px 0 8px' },
-  accordion:       { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 6, overflow: 'hidden' },
-  accordionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 14px', cursor: 'pointer' },
-  accordionLabel:  { fontSize: 14, fontWeight: 500, color: 'var(--text1)' },
-  accordionArrow:  { fontSize: 11, color: 'var(--text3)' },
-  body:            { padding: '0 14px 14px', borderTop: '1px solid var(--border)' },
-  row:             { display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' },
-  input:           { flex: 1, background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'var(--text1)', outline: 'none', boxSizing: 'border-box' },
-  select:          { flex: 1, background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'var(--text1)', boxSizing: 'border-box' },
-  textarea:        { width: '100%', background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', fontSize: 13, color: 'var(--text1)', resize: 'none', lineHeight: 1.6, fontFamily: 'var(--font)', marginTop: 10, boxSizing: 'border-box' },
-  btn:             { background: 'var(--green)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  listRow:         { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '10px 0', borderBottom: '1px solid var(--border)', gap: 10 },
-  listName:        { fontSize: 13, fontWeight: 600, color: 'var(--text1)' },
-  listSub:         { fontSize: 11, color: 'var(--text3)', marginTop: 2 },
-  thesisText:      { fontSize: 11, color: 'var(--text2)', marginTop: 4, lineHeight: 1.5 },
-  progressBar:     { width: '100%', height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden', marginTop: 6 },
-  progressFill:    { height: '100%', background: 'var(--green)', borderRadius: 3, transition: 'width 0.3s ease' },
-  rank:            { fontSize: 12, fontWeight: 700, color: 'var(--text3)', width: 24 },
-  scoreTag:        { fontSize: 11, background: 'var(--green)', color: '#fff', borderRadius: 4, padding: '1px 6px', fontWeight: 600 },
-  toggle:          { width: 36, height: 20, borderRadius: 12, position: 'relative', cursor: 'pointer', transition: 'background 0.2s' },
-  knob:            { position: 'absolute', top: 3, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left 0.2s, right 0.2s' },
-  promoteBtn:      { background: 'var(--green)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
-  removeBtn:       { background: 'transparent', color: 'var(--red)', border: '1px solid var(--red)', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer' },
-  presenceDot:     { display: 'inline-block', width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 5 },
-  onlineCountSuffix:{ fontSize: 11, fontWeight: 400, color: 'var(--text3)', marginLeft: 4 },
-};
