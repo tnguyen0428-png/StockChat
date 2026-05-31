@@ -317,6 +317,33 @@ export default function AdminPanel() {
     if (data) setWaitlist(data);
   };
 
+  const deleteWaitlistEntry = async (id, email) => {
+    if (!window.confirm(`Remove ${email} from the waitlist? This cannot be undone.`)) return;
+    // .select() returns the rows actually deleted. An empty array means RLS
+    // silently blocked the delete (missing DELETE policy / not admin) — that
+    // would otherwise look like success, so surface it instead of no-op'ing.
+    // The "Admin can delete waitlist" policy is added in migration
+    // 20260531000000_waitlist_admin_delete.sql.
+    const { data, error } = await supabase
+      .from('waitlist')
+      .delete()
+      .eq('id', id)
+      .select();
+    if (error) {
+      console.error('[AdminPanel] Delete waitlist entry failed:', error.message);
+      alert('Failed to remove from waitlist: ' + error.message);
+      return;
+    }
+    if (!data || data.length === 0) {
+      console.error('[AdminPanel] Delete waitlist entry removed 0 rows (RLS blocked or already gone):', id);
+      alert("Couldn't remove this entry — you may not have permission, or it was already removed.");
+      return;
+    }
+    // Optimistic local removal so the row disappears immediately (one tap, no
+    // refetch flash); the summary row + count suffix recompute off this state.
+    setWaitlist(prev => prev.filter(w => w.id !== id));
+  };
+
   const createGroup = async () => {
     if (!newGroupName.trim()) return;
     // created_by is required by the groups INSERT RLS policy. We set it to
@@ -909,8 +936,16 @@ export default function AdminPanel() {
                               {w.referred_by && <span> · ref: {w.referred_by}</span>}
                             </div>
                           </div>
-                          <div style={{ fontSize: 11, color: 'var(--text3)', whiteSpace: 'nowrap', marginLeft: 8 }}>
-                            {joined}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, marginLeft: 8 }}>
+                            <div style={{ fontSize: 11, color: 'var(--text3)', whiteSpace: 'nowrap' }}>
+                              {joined}
+                            </div>
+                            <button
+                              style={adminStyles.removeBtn}
+                              onClick={() => deleteWaitlistEntry(w.id, w.email)}
+                            >
+                              Remove
+                            </button>
                           </div>
                         </div>
                       );
