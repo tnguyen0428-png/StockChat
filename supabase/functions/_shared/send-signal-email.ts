@@ -17,8 +17,8 @@ const APP_BASE_URL         = 'https://uptikalerts.com';
 // SendGrid Unsubscribe Group (ASM = Advanced Suppression Manager).
 // All signal-alert emails ship with this group_id so:
 //   1. SendGrid auto-suppresses recipients who clicked Unsubscribe (defense
-//      in depth — even if user_watchlist.email_alerts_enabled is somehow
-//      stale, SendGrid still blocks the send).
+//      in depth — even if our recipient query ever returns someone who has
+//      opted out, SendGrid still blocks the send).
 //   2. The email body's <%asm_group_unsubscribe_raw_url%> tag resolves to
 //      a one-click opt-out URL specific to this group.
 //   3. CAN-SPAM compliance: each commercial email has a working unsubscribe.

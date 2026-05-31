@@ -5,6 +5,7 @@
 // ============================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { fanoutSignalAlertEmail } from '../_shared/fanout-signal-email.ts';
 
 const WATCHLIST = [
   'NVDA', 'PLTR', 'SMCI', 'CRWD', 'AAPL',
@@ -275,6 +276,17 @@ Deno.serve(async (req) => {
         } else {
           console.log(`[vol-scan] ${ticker}: ALERT INSERTED (rel_vol=${relVolume.toFixed(2)})`);
           inserted.push(ticker);
+          // Best-effort email fanout. Never throws — see helper contract.
+          // Awaited so the per-alert summary lands in the log line below
+          // (worst-case ~low-hundreds of recipients × parallel sends, well
+          // within edge function wall-clock budget at current scale).
+          await fanoutSignalAlertEmail(supabase, {
+            ticker,
+            signal_type: 'vol_surge',
+            price:       round2(snap.price),
+            change_pct:  round2(snap.changePct),
+            triggered_at: new Date(),
+          });
         }
       } catch (err: any) {
         console.error(`[vol-scan] ${ticker}: ${err.message}`);

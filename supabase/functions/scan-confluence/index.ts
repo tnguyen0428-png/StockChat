@@ -27,6 +27,7 @@
 // ============================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { fanoutSignalAlertEmail } from '../_shared/fanout-signal-email.ts';
 
 // ── Polygon config ───────────────────────────────────────────────────────────
 const POLYGON_BASE  = 'https://api.polygon.io';
@@ -815,6 +816,16 @@ async function runConfluenceScan(
       errors[r.ticker] = `DB insert failed: ${dbErr.message}`;
     } else {
       insertedTickers.push(r.ticker);
+      // Best-effort email fanout. Helper guards null price/change_pct
+      // internally (rule #22) — surfaces a skip with logged context
+      // rather than rendering "+0.00%" / "$null" sentinels in the email.
+      await fanoutSignalAlertEmail(supabase, {
+        ticker:       r.ticker,
+        signal_type:  'confluence',
+        price:        sd.price ?? null,
+        change_pct:   sd.change_pct ?? null,
+        triggered_at: new Date(nowIso),
+      });
     }
   }
 
