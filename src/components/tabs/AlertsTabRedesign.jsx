@@ -28,6 +28,13 @@ const TYPE_CONFIG = {
 // users who explicitly want that view; just not promoted as an action chip.
 const GRID_SIGNAL_TYPES = new Set(['flow_signal', 'gap_up', 'vol_surge', 'ma_cross', 'confluence']);
 
+// Signal types that get their own count card in the no-perf stats strip
+// ("Breakouts" = 52w_high, "Big money" = flow_signal). Keys are TYPE_CONFIG
+// entries. Each gets a count:'exact' query in loadData so the card stays a true
+// subset of "Total alerts" even past the 500-row fetch cap (rules 16/17). Add a
+// key here (and a matching StatCard below) to introduce a new per-type card.
+const STAT_CARD_TYPES = ['52w_high', 'flow_signal'];
+
 const CHIP_SLOTS = [
   { top: '10%', left: '5%' },  { top: '8%',  left: '35%' },
   { top: '15%', left: '65%' }, { top: '50%', left: '15%' },
@@ -382,6 +389,11 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
   // present a display limit as the real total (CLAUDE.md rule 17). null until
   // the count query resolves.
   const [alertCount, setAlertCount] = useState(null);
+  // Exact per-type counts ({ '52w_high': n, 'flow_signal': n }) over the 7d
+  // window — count:'exact', not derived from the capped liveAlerts — so the
+  // "Breakouts"/"Big money" cards stay true subsets of the total past 500
+  // (rules 16/17). null until the first load resolves.
+  const [byTypeCount, setByTypeCount] = useState(null);
   const [fearScore, setFearScore] = useState(null);
   const [vixScore, setVixScore] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -409,7 +421,7 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const [alertsRes, perfRes, marketRes, countRes] = await Promise.all([
+    const results = await Promise.all([
       supabase.from('breakout_alerts').select('*')
         .gte('created_at', sevenDaysAgo.toISOString())
         // Was .limit(50) — with 52w_high and gap_up dominating daily volume,
@@ -440,7 +452,19 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
       // alerts" number, independent of the 500/100 display caps above.
       supabase.from('breakout_alerts').select('*', { count: 'exact', head: true })
         .gte('created_at', sevenDaysAgo.toISOString()),
+      // One exact count per displayed card type over the same 7d window. Must be
+      // count:'exact' (not byType over liveAlerts) — liveAlerts is capped at 500,
+      // so a derived count would undercount once 7d volume passes 500 while the
+      // exact `total` above stays correct, re-opening the cap-as-total /
+      // mismatched-population gap at a 500 threshold (rules 16/17).
+      ...STAT_CARD_TYPES.map(stype =>
+        supabase.from('breakout_alerts').select('*', { count: 'exact', head: true })
+          .eq('signal_type', stype)
+          .gte('created_at', sevenDaysAgo.toISOString())
+      ),
     ]);
+    const [alertsRes, perfRes, marketRes, countRes] = results;
+    const typeCountRes = results.slice(4); // aligned with STAT_CARD_TYPES order
     // Log any failed branch in DEV so we notice when the stats card is
     // stale or blank because one specific query errored — the UI just
     // shows empty rows otherwise with no trail back to the cause.
@@ -450,6 +474,14 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
       if (marketRes.error) console.warn('[AlertsTab] loadData market_data failed:', marketRes.error?.message || marketRes.error);
       if (countRes.error)  console.warn('[AlertsTab] loadData alert count failed:', countRes.error?.message || countRes.error);
     }
+    // Build the exact per-type count map, keyed off STAT_CARD_TYPES order.
+    const nextByTypeCount = {};
+    STAT_CARD_TYPES.forEach((stype, i) => {
+      const r = typeCountRes[i];
+      if (import.meta.env.DEV && r?.error) console.warn(`[AlertsTab] loadData ${stype} count failed:`, r.error?.message || r.error);
+      if (r?.count != null) nextByTypeCount[stype] = r.count;
+    });
+    if (Object.keys(nextByTypeCount).length > 0) setByTypeCount(nextByTypeCount);
     if (alertsRes.data) setLiveAlerts(alertsRes.data);
     if (countRes.count != null) setAlertCount(countRes.count);
     if (perfRes.data) setPerfHistory(perfRes.data);
@@ -589,6 +621,14 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
         // it's always inside the 7d count window. Guard on null so we don't
         // turn a not-yet-loaded count into 1.
         setAlertCount(prev => (prev == null ? prev : prev + 1));
+        // Keep the exact per-type counts in step too, but only for types we
+        // actually render a card for (prev already holds just those keys) so
+        // the Breakouts/Big money cards don't drift stale between refetches.
+        setByTypeCount(prev => {
+          const stype = row.signal_type;
+          if (prev == null || !(stype in prev)) return prev;
+          return { ...prev, [stype]: prev[stype] + 1 };
+        });
         // Intentionally NOT bumping lastUpdated here. The FreshnessBar sits
         // under the stats strip and its label describes when SCORES were
         // last updated. An alert INSERT is a new pending row, not a new
@@ -783,14 +823,15 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
     // its length as a total would be a cap-as-total bug (rule 17). Falls back
     // to the capped list length only until the count query resolves / if it errored.
     const total = alertCount ?? alertHistory.length;
-    // byType powers the no-perf-branch "Breakouts"/"Big money" cards, which sit
-    // directly beside "Total alerts". Count from the RAW fetched set (liveAlerts,
-    // the full 7d window up to its 500 fetch ceiling) — NOT the deduped/sliced
-    // alertHistory — so those cards are honest subsets of the raw total and the
-    // whole strip describes one population (rule 16). (Live: 52w_high 106 / flow
-    // 79 raw vs 53 / 20 from the old slice-100 source.)
+    // The no-perf "Breakouts"/"Big money" cards use the exact per-type counts
+    // (count:'exact' over 7d) so they're true subsets of `total` regardless of
+    // the 500-row fetch cap (rules 16/17). The liveAlerts-derived byType is kept
+    // ONLY as a first-paint fallback until byTypeCount resolves — accurate while
+    // 7d volume ≤ 500, which is exactly when the fallback is still showing.
     const byType = {};
     liveAlerts.forEach(a => { byType[a.signal_type || 'vol_surge'] = (byType[a.signal_type || 'vol_surge'] || 0) + 1; });
+    const breakouts = byTypeCount?.['52w_high']   ?? byType['52w_high']   ?? 0;
+    const bigMoney  = byTypeCount?.['flow_signal'] ?? byType['flow_signal'] ?? 0;
     // Only count signal types shown in the Action alerts feed
     const actionTypes = new Set(Object.keys(TYPE_CONFIG));
     const resolved = perfHistory.filter(h => h.return_pct != null && actionTypes.has(h.signal_type));
@@ -802,8 +843,8 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
     // below the floor the aggregate win rate is sample-size noise and must not
     // be painted as a confident green/red number (rule 19).
     const hasEnoughSamples = resolved.length >= MIN_SAMPLES_FLOOR;
-    return { total, byType, winRate, avgReturn, resolvedCount: resolved.length, hasPerf: resolved.length > 0, hasEnoughSamples };
-  }, [alertHistory, liveAlerts, perfHistory, alertCount]);
+    return { total, breakouts, bigMoney, winRate, avgReturn, resolvedCount: resolved.length, hasPerf: resolved.length > 0, hasEnoughSamples };
+  }, [alertHistory, liveAlerts, perfHistory, alertCount, byTypeCount]);
 
   const selectedAlert = selectedId ? uniqueAlerts.find(a => a.id === selectedId) : null;
   const hasAlerts = uniqueAlerts.length > 0;
@@ -1076,8 +1117,8 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
               </>
             ) : (
               <>
-                <StatCard label="Breakouts" value={alertStats.byType['52w_high'] || 0} color="#fbbf24" t={t} darkMode={darkMode} />
-                <StatCard label="Big money" value={alertStats.byType['flow_signal'] || 0} color="#5eed8a" t={t} darkMode={darkMode} />
+                <StatCard label="Breakouts" value={alertStats.breakouts} color="#fbbf24" t={t} darkMode={darkMode} />
+                <StatCard label="Big money" value={alertStats.bigMoney} color="#5eed8a" t={t} darkMode={darkMode} />
               </>
             )}
           </div>
