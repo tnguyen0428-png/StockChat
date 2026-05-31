@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function WaitlistForm({ source = 'landing' }) {
+export default function WaitlistForm({ source = 'landing', inputId }) {
   const [email, setEmail]           = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess]       = useState(false);
@@ -86,10 +86,15 @@ export default function WaitlistForm({ source = 'landing' }) {
         </div>
       ) : (
         <>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* noValidate: defer to the custom EMAIL_RE check so invalid emails show
+              the styled, screen-reader-announced error instead of the native popup */}
+          <form noValidate onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <input
+              id={inputId}
               type="email"
               placeholder="you@example.com"
+              aria-label="Email address for the Circle 2 waitlist"
+              aria-invalid={errorMsg ? true : undefined}
               value={email}
               onChange={e => setEmail(e.target.value)}
               disabled={submitting}
@@ -129,12 +134,16 @@ export default function WaitlistForm({ source = 'landing' }) {
             </button>
           </form>
           {errorMsg && (
-            <div style={{
-              fontFamily: "'DM Sans', sans-serif",
-              fontSize: 12, fontWeight: 500,
-              color: '#E05252',
-              marginTop: 8,
-            }}>
+            <div
+              role="alert"
+              aria-live="assertive"
+              style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 12, fontWeight: 500,
+                color: '#E05252',
+                marginTop: 8,
+              }}
+            >
               {errorMsg}
             </div>
           )}
