@@ -774,12 +774,23 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
   }, [liveAlerts]);
 
   const alertStats = useMemo(() => {
-    // Real total from the count query (falls back to the capped list length
-    // only until the count resolves / if it errored) — never present the
-    // 100/500 display cap as the true total (rule 17).
+    // "Total alerts" is INTENTIONALLY the raw activity volume — how many alerts
+    // fired in the 7d window (count:'exact' query) — NOT the size of the
+    // deduped, visible feed (alertHistory is slice(0,100) then confluence-
+    // deduped; live that's ~93 vs 250 raw). It sits among activity/perf metrics
+    // (Scored / Win rate / Avg return), so volume is the right meaning. Don't
+    // "fix" this to the feed size — the feed is a capped display, and showing
+    // its length as a total would be a cap-as-total bug (rule 17). Falls back
+    // to the capped list length only until the count query resolves / if it errored.
     const total = alertCount ?? alertHistory.length;
+    // byType powers the no-perf-branch "Breakouts"/"Big money" cards, which sit
+    // directly beside "Total alerts". Count from the RAW fetched set (liveAlerts,
+    // the full 7d window up to its 500 fetch ceiling) — NOT the deduped/sliced
+    // alertHistory — so those cards are honest subsets of the raw total and the
+    // whole strip describes one population (rule 16). (Live: 52w_high 106 / flow
+    // 79 raw vs 53 / 20 from the old slice-100 source.)
     const byType = {};
-    alertHistory.forEach(a => { byType[a.signal_type || 'vol_surge'] = (byType[a.signal_type || 'vol_surge'] || 0) + 1; });
+    liveAlerts.forEach(a => { byType[a.signal_type || 'vol_surge'] = (byType[a.signal_type || 'vol_surge'] || 0) + 1; });
     // Only count signal types shown in the Action alerts feed
     const actionTypes = new Set(Object.keys(TYPE_CONFIG));
     const resolved = perfHistory.filter(h => h.return_pct != null && actionTypes.has(h.signal_type));
@@ -792,7 +803,7 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
     // be painted as a confident green/red number (rule 19).
     const hasEnoughSamples = resolved.length >= MIN_SAMPLES_FLOOR;
     return { total, byType, winRate, avgReturn, resolvedCount: resolved.length, hasPerf: resolved.length > 0, hasEnoughSamples };
-  }, [alertHistory, perfHistory, alertCount]);
+  }, [alertHistory, liveAlerts, perfHistory, alertCount]);
 
   const selectedAlert = selectedId ? uniqueAlerts.find(a => a.id === selectedId) : null;
   const hasAlerts = uniqueAlerts.length > 0;
