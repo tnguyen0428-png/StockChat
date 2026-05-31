@@ -1,59 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
 import WaitlistForm from '../components/WaitlistForm';
 
 const TOTAL_SPOTS = 50;
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const [email, setEmail]           = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess]       = useState(false);
-  const [btnError, setBtnError]     = useState('');
-  const [visible, setVisible]       = useState(false);
-  const [spotsUsed, setSpotsUsed]   = useState(25);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 60);
     return () => clearTimeout(t);
   }, []);
 
-  useEffect(() => {
-    supabase
-      .from('profiles')
-      .select('id', { count: 'exact', head: true })
-      .then(({ count }) => { if (count != null) setSpotsUsed(count); });
-  }, []);
-
-  const showError = (msg) => {
-    setBtnError(msg);
-    setTimeout(() => setBtnError(''), 2200);
+  // Circle 1 is permanently full (50/50). The only landing-page action is the
+  // Circle 2 waitlist below, so the hero CTA simply scrolls to that one form.
+  const scrollToWaitlist = () => {
+    const section = document.getElementById('circle2-waitlist');
+    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const input = document.getElementById('waitlist-email');
+    if (input) input.focus({ preventScroll: true });
   };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!email.trim()) { showError('Enter your email'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { showError('Invalid email'); return; }
-    if (spotsOpen > 0) {
-      navigate(`/login?mode=signup&email=${encodeURIComponent(email.trim().toLowerCase())}`);
-      return;
-    }
-    setSubmitting(true);
-    const { error } = await supabase
-      .from('waitlist')
-      .insert({ email: email.trim().toLowerCase() });
-    setSubmitting(false);
-    if (error) {
-      if (error.code === '23505') showError("You're already on the list!");
-      else showError('Something went wrong');
-      return;
-    }
-    setSuccess(true);
-  };
-
-  const spotsOpen = Math.max(0, TOTAL_SPOTS - spotsUsed);
-  const pct       = Math.min(100, (spotsUsed / TOTAL_SPOTS) * 100);
 
   const cls = (d) => `ls${visible ? ` ls-vis ls-d${d}` : ''}`;
 
@@ -77,9 +44,6 @@ export default function LandingPage() {
         .ls.ls-d5 { animation-delay: 0.48s; }
         .ls.ls-d6 { animation-delay: 0.58s; }
 
-        .ea-input { outline: none; }
-        .ea-input::placeholder { color: rgba(255,255,255,0.4); }
-        .ea-input:focus { border-color: #8cd9a0 !important; }
         .login-btn:hover { color: #8cd9a0 !important; }
 
         .ss-scroll { -ms-overflow-style: none; scrollbar-width: none; }
@@ -225,21 +189,21 @@ export default function LandingPage() {
               ))}
             </div>
 
-            {/* Spots counter card */}
+            {/* Scarcity card — Circle 1 full, one CTA to the Circle 2 waitlist */}
             <div className={cls(3)} style={{
               width: '100%', maxWidth: 400,
               background: 'rgba(255,255,255,0.06)',
               borderRadius: 16, padding: '18px 20px',
               border: '1px solid rgba(255,255,255,0.1)',
             }}>
-              {/* Counter */}
+              {/* Label */}
               <div style={{ marginBottom: 10 }}>
                 <div style={{
                   fontFamily: "'Outfit', sans-serif",
                   fontSize: 12, fontWeight: 600,
                   color: '#d4e4f2', letterSpacing: 1.5,
                 }}>
-                  BETA PHASE CLOSED
+                  BETA · CIRCLE 1
                 </div>
                 <div style={{
                   fontFamily: "'DM Sans', sans-serif",
@@ -247,72 +211,40 @@ export default function LandingPage() {
                   color: '#fff', letterSpacing: 0.2,
                   marginTop: 4,
                 }}>
-                  Circle 2 Waitlist
+                  All {TOTAL_SPOTS} seats are full
                 </div>
               </div>
 
-              {/* Progress bar — 4px */}
-              <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 4, marginBottom: 14, overflow: 'hidden' }}>
+              {/* Progress bar — static 100%, matches the "50/50 full" banner */}
+              <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 4, marginBottom: 8, overflow: 'hidden' }}>
                 <div style={{
-                  height: '100%', width: `${pct}%`,
+                  height: '100%', width: '100%',
                   background: '#1AAD5E', borderRadius: 4,
-                  transition: 'width 0.6s ease',
                 }} />
               </div>
+              <div style={{
+                fontSize: 12, color: 'rgba(255,255,255,0.5)',
+                marginBottom: 14, fontWeight: 500,
+              }}>
+                {TOTAL_SPOTS} / {TOTAL_SPOTS} taken
+              </div>
 
-              {/* Form / success */}
-              {success ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '4px 0' }}>
-                  <div style={{
-                    width: 38, height: 38, borderRadius: '50%',
-                    background: 'rgba(26,173,94,0.15)', border: '2px solid rgba(26,173,94,0.4)',
-                    color: '#8cd9a0', fontSize: 17, fontWeight: 700,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>✓</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', fontFamily: "'Outfit', sans-serif" }}>
-                    You're on the list
-                  </div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-                    We'll reach out when you're in.
-                  </div>
-                </div>
-              ) : (
-                <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    className="ea-input"
-                    type="email"
-                    placeholder="Your email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    disabled={submitting}
-                    style={{
-                      flex: 1, padding: '11px 13px', borderRadius: 9,
-                      border: '1.5px solid rgba(255,255,255,0.14)',
-                      background: 'rgba(255,255,255,0.08)',
-                      color: '#fff', fontSize: 15,
-                      fontFamily: "'DM Sans', sans-serif",
-                      transition: 'border-color 0.15s',
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    style={{
-                      flexShrink: 0,
-                      padding: '11px 15px', borderRadius: 9, border: 'none',
-                      background: btnError ? '#E05252' : '#1AAD5E',
-                      color: '#fff', fontSize: 13, fontWeight: 700,
-                      fontFamily: "'Outfit', sans-serif",
-                      cursor: submitting ? 'not-allowed' : 'pointer',
-                      whiteSpace: 'nowrap',
-                      opacity: submitting ? 0.7 : 1,
-                      transition: 'background 0.15s',
-                    }}
-                  >
-                    {submitting ? '…' : btnError || (spotsOpen > 0 ? 'Create account' : 'Join waitlist')}
-                  </button>
-                </form>
-              )}
+              {/* Single CTA → the one canonical waitlist form below */}
+              <button
+                type="button"
+                onClick={scrollToWaitlist}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px', borderRadius: 9, border: 'none',
+                  background: '#1AAD5E',
+                  color: '#fff', fontSize: 14, fontWeight: 700,
+                  fontFamily: "'Outfit', sans-serif",
+                  cursor: 'pointer',
+                  transition: 'background 0.15s',
+                }}
+              >
+                Join the Circle 2 waitlist →
+              </button>
             </div>
 
             {/* Social proof */}
@@ -346,13 +278,14 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════
             SECTION 1.5 — CIRCLE 2 WAITLIST FORM
         ══════════════════════════════════════ */}
-        <section style={{
+        <section id="circle2-waitlist" style={{
           background: '#eef2f7',
           padding: '28px 20px 8px',
           display: 'flex',
           justifyContent: 'center',
+          scrollMarginTop: 16,
         }}>
-          <WaitlistForm source="landing" />
+          <WaitlistForm source="landing" inputId="waitlist-email" />
         </section>
 
         {/* ══════════════════════════════════════
@@ -371,12 +304,17 @@ export default function LandingPage() {
           {/* Horizontal scroll cards */}
           <div
             className="ss-scroll"
-            style={{
-              display: 'flex', gap: 18, overflowX: 'auto',
-              padding: '4px 24px 12px',
-              justifyContent: 'center',
-            }}
+            style={{ overflowX: 'auto', padding: '4px 0 12px' }}
           >
+            {/* fit-content + minWidth:100% centers when it fits, scrolls from the
+                start (no clipped first card) when it overflows narrow screens */}
+            <div style={{
+              display: 'flex', gap: 18,
+              width: 'fit-content', minWidth: '100%',
+              justifyContent: 'center', boxSizing: 'border-box',
+              paddingLeft: 'max(24px, env(safe-area-inset-left))',
+              paddingRight: 'max(24px, env(safe-area-inset-right))',
+            }}>
             {[
               { src: '/screenshot-home.png',      label: 'Live prices & briefings',  desc: 'Market overview at a glance'  },
               { src: '/screenshot-alerts.png',    label: 'AI-powered scanner',       desc: 'Smart alerts & flow signals'  },
@@ -404,6 +342,7 @@ export default function LandingPage() {
                 <div style={{ fontSize: 12, color: '#7a8ea3', textAlign: 'center' }}>{s.desc}</div>
               </div>
             ))}
+            </div>
           </div>
         </section>
 
