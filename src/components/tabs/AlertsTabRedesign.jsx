@@ -376,6 +376,12 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
   // when the market is closed and pulse when open. Same source HomeTab uses.
   const { futuresData, marketPulse, marketStatus, loadMarketIndicators } = useMarketData();
   const [liveAlerts, setLiveAlerts] = useState([]);
+  // Exact count of alerts in the 7d window from the DB (count query), NOT
+  // liveAlerts.length — liveAlerts is capped at 500 and alertHistory at 100,
+  // so using their length as "Total alerts" would freeze at the cap and
+  // present a display limit as the real total (CLAUDE.md rule 17). null until
+  // the count query resolves.
+  const [alertCount, setAlertCount] = useState(null);
   const [fearScore, setFearScore] = useState(null);
   const [vixScore, setVixScore] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -403,7 +409,7 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const [alertsRes, perfRes, marketRes] = await Promise.all([
+    const [alertsRes, perfRes, marketRes, countRes] = await Promise.all([
       supabase.from('breakout_alerts').select('*')
         .gte('created_at', sevenDaysAgo.toISOString())
         // Was .limit(50) — with 52w_high and gap_up dominating daily volume,
@@ -429,6 +435,11 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
         // insert rate can't DoS the client's memory.
         .order('alert_time', { ascending: false }).limit(1000),
       supabase.from('market_data').select('*'),
+      // Exact total for the same 7d window the chips/history are fetched from.
+      // head:true → count only, no rows transferred. This is the honest "Total
+      // alerts" number, independent of the 500/100 display caps above.
+      supabase.from('breakout_alerts').select('*', { count: 'exact', head: true })
+        .gte('created_at', sevenDaysAgo.toISOString()),
     ]);
     // Log any failed branch in DEV so we notice when the stats card is
     // stale or blank because one specific query errored — the UI just
@@ -437,8 +448,10 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
       if (alertsRes.error) console.warn('[AlertsTab] loadData breakout_alerts failed:', alertsRes.error?.message || alertsRes.error);
       if (perfRes.error)   console.warn('[AlertsTab] loadData alert_performance failed:', perfRes.error?.message || perfRes.error);
       if (marketRes.error) console.warn('[AlertsTab] loadData market_data failed:', marketRes.error?.message || marketRes.error);
+      if (countRes.error)  console.warn('[AlertsTab] loadData alert count failed:', countRes.error?.message || countRes.error);
     }
     if (alertsRes.data) setLiveAlerts(alertsRes.data);
+    if (countRes.count != null) setAlertCount(countRes.count);
     if (perfRes.data) setPerfHistory(perfRes.data);
     if (marketRes.data) {
       // VIX and Fear & Greed are different metrics on different scales
@@ -571,6 +584,11 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
     const alertCh = supabase.channel('alerts_chips_feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'breakout_alerts' }, ({ new: row }) => {
         setLiveAlerts(prev => [row, ...prev]);
+        // Keep the exact "Total alerts" count in step with live inserts so it
+        // doesn't drift stale between refetches. The insert is today's row, so
+        // it's always inside the 7d count window. Guard on null so we don't
+        // turn a not-yet-loaded count into 1.
+        setAlertCount(prev => (prev == null ? prev : prev + 1));
         // Intentionally NOT bumping lastUpdated here. The FreshnessBar sits
         // under the stats strip and its label describes when SCORES were
         // last updated. An alert INSERT is a new pending row, not a new
@@ -756,7 +774,10 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
   }, [liveAlerts]);
 
   const alertStats = useMemo(() => {
-    const total = alertHistory.length;
+    // Real total from the count query (falls back to the capped list length
+    // only until the count resolves / if it errored) — never present the
+    // 100/500 display cap as the true total (rule 17).
+    const total = alertCount ?? alertHistory.length;
     const byType = {};
     alertHistory.forEach(a => { byType[a.signal_type || 'vol_surge'] = (byType[a.signal_type || 'vol_surge'] || 0) + 1; });
     // Only count signal types shown in the Action alerts feed
@@ -766,8 +787,12 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
     const wins = resolved.filter(h => h.return_pct >= 0).length;
     const winRate = resolved.length > 0 ? Math.round((wins / resolved.length) * 100) : null;
     const avgReturn = resolved.length > 0 ? resolved.reduce((s, h) => s + Number(h.return_pct), 0) / resolved.length : null;
-    return { total, byType, winRate, avgReturn, resolvedCount: resolved.length, hasPerf: resolved.length > 0 };
-  }, [alertHistory, perfHistory]);
+    // Same MIN_SAMPLES_FLOOR gate the per-signal cohort path uses (~line 933):
+    // below the floor the aggregate win rate is sample-size noise and must not
+    // be painted as a confident green/red number (rule 19).
+    const hasEnoughSamples = resolved.length >= MIN_SAMPLES_FLOOR;
+    return { total, byType, winRate, avgReturn, resolvedCount: resolved.length, hasPerf: resolved.length > 0, hasEnoughSamples };
+  }, [alertHistory, perfHistory, alertCount]);
 
   const selectedAlert = selectedId ? uniqueAlerts.find(a => a.id === selectedId) : null;
   const hasAlerts = uniqueAlerts.length > 0;
@@ -1027,7 +1052,15 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
             />
             {alertStats.hasPerf ? (
               <>
-                <StatCard label="Win rate" value={`${alertStats.winRate}%`} color={alertStats.winRate >= 50 ? t.green : t.red} t={t} darkMode={darkMode} />
+                {alertStats.hasEnoughSamples ? (
+                  <StatCard label="Win rate" value={`${alertStats.winRate}%`} color={alertStats.winRate >= 50 ? t.green : t.red} t={t} darkMode={darkMode} />
+                ) : (
+                  // Below MIN_SAMPLES_FLOOR: show the % but suppress the
+                  // confident green/red styling (neutral color) and surface the
+                  // sample size, mirroring the cohort/detail "n of 50" treatment
+                  // so a small sample can't read as a stable win rate (rule 19).
+                  <StatCard label="Win rate" value={`${alertStats.winRate}%`} color={t.text3} sub={`n=${alertStats.resolvedCount}/${MIN_SAMPLES_FLOOR}`} t={t} darkMode={darkMode} />
+                )}
                 <StatCard label="Avg return" value={`${alertStats.avgReturn >= 0 ? '+' : ''}${alertStats.avgReturn.toFixed(1)}%`} color={alertStats.avgReturn >= 0 ? t.green : t.red} t={t} darkMode={darkMode} />
               </>
             ) : (
@@ -1161,7 +1194,7 @@ export default function AlertsTab({ darkMode, isAdmin = false }) {
 
 // ═══ SUB-COMPONENTS ═══
 
-function StatCard({ label, value, color, t, darkMode }) {
+function StatCard({ label, value, color, t, darkMode, sub }) {
   return (
     <div style={{
       flex: 1, padding: '10px 6px 8px', textAlign: 'center', borderRadius: 10,
@@ -1175,6 +1208,7 @@ function StatCard({ label, value, color, t, darkMode }) {
     }}>
       <div style={{ fontSize: 11, color: t.text3, textTransform: 'uppercase', letterSpacing: 0.3 }}>{label}</div>
       <div style={{ fontSize: 18, fontWeight: 600, color, marginTop: 2, fontFamily: "'Outfit', sans-serif" }}>{value}</div>
+      {sub && <div style={{ fontSize: 9, color: t.text3, marginTop: 1, letterSpacing: 0.2 }}>{sub}</div>}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { useTheme } from './alertsCasinoComponents';
 import SellModal from '../portfolio/SellModal';
 import UserProfilePopup from '../chat/UserProfilePopup';
 import { useGroup } from '../../context/GroupContext';
+import { MIN_SAMPLES_FLOOR } from '../../lib/signalConfidence';
 
 import { SEASON_END } from '../../lib/constants';
 import { usePortfolio } from '../../hooks/usePortfolio';
@@ -363,9 +364,13 @@ export default function PortfolioTab({ session, darkMode, keyboardOpen = false, 
                   const totalPL  = closedTrades.reduce((sum, t) => sum + (Number(t.exit_price) - Number(t.entry_price)) * Number(t.shares), 0);
                   const avgHold  = closedTrades.reduce((sum, t) => { if (!t.sold_at || !t.bought_at) return sum; return sum + (new Date(t.sold_at) - new Date(t.bought_at)) / 86400000; }, 0) / closedTrades.length;
                   const winRate  = Math.round((wins / closedTrades.length) * 100);
+                  // Below MIN_SAMPLES_FLOOR a win rate is sample-size noise — don't
+                  // paint it green/red as if it were stable (CLAUDE.md rule 19).
+                  // Matches AlertsTabRedesign's aggregate win-rate gate.
+                  const enoughTrades = closedTrades.length >= MIN_SAMPLES_FLOOR;
                   return (
                     <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                      <div style={{ flex: 1, background: t.surface, borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: t.text3 }}>Win rate</div><div style={{ fontSize: 14, fontWeight: 700, color: winRate >= 50 ? t.green : t.red }}>{winRate}%</div></div>
+                      <div style={{ flex: 1, background: t.surface, borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: t.text3 }}>Win rate</div><div style={{ fontSize: 14, fontWeight: 700, color: enoughTrades ? (winRate >= 50 ? t.green : t.red) : t.text3 }}>{winRate}%</div>{!enoughTrades && <div style={{ fontSize: 9, color: t.text3, marginTop: 1 }}>n={closedTrades.length}/{MIN_SAMPLES_FLOOR}</div>}</div>
                       <div style={{ flex: 1, background: t.surface, borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: t.text3 }}>Avg hold</div><div style={{ fontSize: 14, fontWeight: 700, color: t.text1 }}>{avgHold.toFixed(1)}d</div></div>
                       <div style={{ flex: 1, background: t.surface, borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}><div style={{ fontSize: 11, color: t.text3 }}>Total P&L</div><div style={{ fontSize: 14, fontWeight: 700, color: totalPL >= 0 ? t.green : t.red }}>{totalPL >= 0 ? '+' : '-'}${Math.abs(totalPL).toFixed(0)}</div></div>
                     </div>
