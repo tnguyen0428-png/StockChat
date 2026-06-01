@@ -22,9 +22,10 @@
 // seeding test user_watchlist rows on a specific test ticker, real
 // watchers on real tickers are never returned by the RPC.
 //
-// The dry-run default also touches NOTHING in the DB: the breakout_alerts
-// insert is skipped unless this is a live run (DRY_RUN=false) or the caller
-// explicitly opts in with "insert": true in the request body.
+// The dry-run path also touches NOTHING in the DB: the breakout_alerts
+// insert happens ONLY on a live run (DRY_RUN=false). There is deliberately no
+// way to opt into a write during a dry-run — dry-run exists to prove the
+// RPC join / fanout plumbing without leaving any trace in real alert data.
 //
 // LIFECYCLE
 // This function exists for ONE verification run. After the production
@@ -43,11 +44,9 @@
 //     "signal_type": "vol_surge",
 //     "price": 175.75,
 //     "change_pct": 3.21,
-//     "insert": false,       // optional — set true to write the
-//                            // breakout_alerts row during a dry-run
-//                            // (live runs insert by default)
-//     "skip_insert": false   // optional — set true to never insert,
-//                            // even on a live run (fanout only)
+//     "skip_insert": false   // optional — set true to never insert, even on
+//                            // a live run (fanout only). A dry-run never
+//                            // inserts regardless of this flag.
 //   }
 //
 // Returns JSON {
@@ -86,7 +85,6 @@ Deno.serve(async (req) => {
   const price       = typeof body.price === 'number'       ? body.price       : null;
   const change_pct  = typeof body.change_pct === 'number'  ? body.change_pct  : null;
   const skip_insert = body.skip_insert === true;
-  const opt_insert  = body.insert === true;
 
   if (!ticker)            return json({ error: 'ticker required' }, 400);
   if (price === null)     return json({ error: 'price required (number)' }, 400);
@@ -101,12 +99,13 @@ Deno.serve(async (req) => {
   // the harness in dry-run. Missing/empty/typo'd env values all stay safe.
   const dry_run = Deno.env.get('DRY_RUN') !== 'false';
 
-  // Optionally insert a real breakout_alerts row so the verification mirrors
-  // what scan-vol-surge produces (CLAUDE.md rule 15: confirm row lands in DB
-  // before fanout fires). Fail-safe: in dry-run the default touches NOTHING —
-  // a real row is written only on a live run (DRY_RUN=false) or when the
-  // caller explicitly opts in with `insert: true`. `skip_insert` always wins.
-  const do_insert = !skip_insert && (!dry_run || opt_insert);
+  // On a LIVE run, insert a real breakout_alerts row so the verification
+  // mirrors what scan-vol-surge produces (CLAUDE.md rule 15: confirm the row
+  // lands in DB before fanout fires). Fail-safe: a dry-run NEVER writes — there
+  // is deliberately no opt-in to insert during a dry-run, so plumbing checks
+  // can't pollute real alert data or the stats counts. `skip_insert` suppresses
+  // the write even on a live run (fanout-only).
+  const do_insert = !skip_insert && !dry_run;
   let insert_ok = false;
   let insert_error: string | null = null;
   if (do_insert) {
